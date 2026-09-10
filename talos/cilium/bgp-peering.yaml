@@ -1,0 +1,35 @@
+apiVersion: cilium.io/v2
+kind: CiliumBGPPeerConfig
+metadata:
+  name: ucg-peer-config
+spec:
+  timers:
+    holdTimeSeconds: 90
+    keepAliveTimeSeconds: 30
+  gracefulRestart:
+    enabled: true
+    restartTimeSeconds: 120
+  families:
+    - afi: ipv4
+      safi: unicast
+      advertisements:
+        matchLabels:
+          advertise: bgp          # links to the Step B advertisement; harmless until it exists
+---
+apiVersion: cilium.io/v2
+kind: CiliumBGPClusterConfig
+metadata:
+  name: homelab-bgp
+spec:
+  nodeSelector:
+    matchLabels:
+      bgp-speaker: "true"
+  bgpInstances:
+    - name: instance-65001
+      localASN: 65001
+      peers:
+        - name: ucg
+          peerASN: 65000
+          peerAddress: "192.168.102.1"    # UCG Server-VLAN IP — confirm
+          peerConfigRef:
+            name: ucg-peer-config

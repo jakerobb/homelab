@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Talos secrets — never commit these. See talos/README.md.
+**/secrets.yaml
+**/controlplane.yaml
+**/worker.yaml
+**/talosconfig
+*.age
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

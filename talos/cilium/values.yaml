@@ -1,0 +1,41 @@
+ipam:
+  mode: kubernetes            # Cilium uses the podCIDR Talos' controller-manager
+                              # allocates from podSubnets (10.244.0.0/16) — they can't diverge
+
+kubeProxyReplacement: true    # we disabled kube-proxy in the Talos config
+
+# No kube-proxy means no ClusterIP for the API server yet, so reach it via Talos
+# KubePrism (the local LB you already have enabled on 7445) — solves the chicken-and-egg
+k8sServiceHost: localhost
+k8sServicePort: 7445
+
+# BGP control plane — installed now but DORMANT; it does nothing until we add
+# peering config in Phase 2. Including it now means Phase 2 is pure CRDs, no Helm upgrade.
+bgpControlPlane:
+  enabled: true
+
+# Talos already mounts cgroup v2; don't let Cilium try to mount it
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+
+# Talos runs a locked-down securityContext; grant Cilium exactly the caps it needs
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
