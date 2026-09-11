@@ -42,14 +42,12 @@ This repo contains IaC and related stuff for my homelab.
 - [ ] Confirm both new drives are detected (BIOS or live Linux USB) before going further
 
 ## 3. Install Proxmox VE
-- [ ] Download Proxmox VE ISO on your Mac
-- [ ] Use the GL.iNet Comet X to mount the ISO (virtual media) or flash to USB and boot from port 2
-- [ ] Install Proxmox to the original 1TB SSD — leave T500 and P3 Plus untouched during install
-- [ ] Set static management IP — decided: reuse `192.168.102.21`, same VLAN/subnet as the rest of the cluster
-- [ ] Confirm VLAN tagging is correct for Server VLAN on the bridge (vmbr0)
-- [ ] Switch to the no-subscription repo, disable enterprise repo nag, `apt update && apt full-upgrade`
-- [ ] Set NTP source (point at your existing infra, not just defaults)
-- [ ] Take a config backup / note down the install once stable
+Full runbook (ISO version/checksum, disk-selection safety note, network/VLAN
+config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-install.md).
+- [ ] Download Proxmox VE 9.2-1, verify checksum, mount via Comet X virtual media
+- [ ] Install to the original 1TB SSD only — T500 and P3 Plus must not be touched
+- [ ] Static IP `192.168.102.21`, gateway `192.168.102.1` — confirm UCG switch port VLAN mode (access vs. trunk) before this step
+- [ ] Post-install: no-subscription repo, `apt full-upgrade`, NTP source, config backup
 
 ## 4. Talos VM → Join Existing Cluster
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.
