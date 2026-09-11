@@ -54,8 +54,9 @@ This repo contains IaC and related stuff for my homelab.
 ## 4. Talos VM → Join Existing Cluster
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.
 - [ ] Copy the age private key (`~/.config/sops/age/keys.txt`) into 1Password for durability
-- [ ] Download the **stock** Talos v1.11.5 qcow2 image — **not** the `ghcr.io/talos-rpi5/installer` image the Pi control plane uses, that's Pi5-specific
-- [ ] Decide the new worker's static IP (same `192.168.102.0/24` VLAN as the rest of the cluster, per decision above) and hostname; add a patch under `talos/patches/`
+- [x] Talos image source resolved: built via [Image Factory](https://factory.talos.dev) (not a GitHub release) — see `talos/README.md` for the exact v1.11.5 qcow2 URL, distinct from the `ghcr.io/talos-rpi5/installer` image the Pi control plane uses
+- [x] Worker hostname (`talos-worker-msa2`) and IP (`192.168.102.22`) decided; patch added at `talos/patches/worker-msa2.yaml`
+- [ ] Once the VM's NIC MAC is known (or fixed in Terraform ahead of time), add a DHCP reservation for `.22` on the UCG
 - [ ] Create VM: q35 machine type, UEFI (OVMF), virtio-net, virtio-scsi, **memory ballooning disabled** (Terraform, once Proxmox is up — see `terraform/proxmox/`)
 - [ ] Boot the VM, capture its maintenance-mode IP
 - [ ] Generate worker config reusing the existing cluster's secrets bundle (`~/talos/homelab/secrets.yaml` on rpi5-1 — same cluster CA, do not regenerate secrets)

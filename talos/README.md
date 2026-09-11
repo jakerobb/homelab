@@ -67,5 +67,23 @@ follow-up once there's time to diff it carefully against the live config.
 - `cilium/` — Cilium Helm values and BGP/LB CRDs, applied to the existing cluster.
 - `patches/control-plane/` — per-node Talos config patches for the existing 3 Pi
   control-plane nodes (hostname only, currently).
-- `patches/worker-msa2.yaml` *(to add)* — patch for the new MS-A2 worker VM once its
-  static IP/hostname are decided (step 4 of the root README TODO).
+- `patches/worker-msa2.yaml` — patch for the new MS-A2 worker VM (hostname
+  `talos-worker-msa2`, matching the existing hostname-only patch style — IP
+  addressing is handled via DHCP reservation on the UCG, not in Talos config).
+
+## MS-A2 worker: decided values (2026-09-10)
+
+- **Hostname:** `talos-worker-msa2`
+- **IP:** `192.168.102.22` (next free slot after the MS-A2 host itself at `.21`) —
+  needs a DHCP reservation on the UCG once the VM exists and we know its NIC's MAC
+  (or we fix the MAC in the Terraform VM definition ahead of time and reserve it
+  before first boot — TBD when that resource gets written).
+- **Image source:** Talos doesn't publish a plain qcow2 on GitHub releases anymore —
+  VM images are built on demand via [Image Factory](https://factory.talos.dev).
+  For v1.11.5 with no customizations (the stock/non-Pi5 installer):
+  ```
+  https://factory.talos.dev/image/376567988ad370138ad8b2698212367b8edcb69b5fd68c80be1f2ec7d603b4ba/v1.11.5/nocloud-amd64.qcow2
+  ```
+  Directly consumable by Terraform's `proxmox_virtual_environment_download_file`
+  resource once that gets written (needs a real Proxmox node name / storage pool
+  first).
