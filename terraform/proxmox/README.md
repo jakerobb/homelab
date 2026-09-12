@@ -16,7 +16,7 @@ assumed defaults. **Not applied yet.** Known follow-ups before/at first apply:
 - Verify the disk actually grows to `size = 64` (GB) on import rather than staying
   at the source image's native (much smaller) size — untested
 - Once applied, add DHCP reservations on the UCG for both fixed MACs
-  (`02:00:00:00:00:22` → `.22`, `...:23` → `.23`)
+  (`02:00:00:00:00:31` → `.31`, `...:32` → `.32`)
 - `hexos` VM is still unwritten — needs IOMMU group info gathered from the live
   host first (root README step 5), plus a real decision on `hostpci` passthrough
   syntax for the two NVMe drives

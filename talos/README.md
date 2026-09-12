@@ -81,10 +81,14 @@ keeps serving. Naming is deliberately decoupled from "msa2" — more physical
 machines are coming later, and a worker's name shouldn't imply which box it
 happens to run on today.
 
+IP addressing convention on `192.168.102.0/24` (decided 2026-09-11): `.21-.29`
+reserved for physical hosts, `.31+` for VMs — keeps the two cleanly separated
+as more of each show up.
+
 | Hostname | IP | MAC (fixed in Terraform) |
 |---|---|---|
-| `talos-worker-1` | `192.168.102.22` | `02:00:00:00:00:22` |
-| `talos-worker-2` | `192.168.102.23` | `02:00:00:00:00:23` |
+| `talos-worker-1` | `192.168.102.31` | `02:00:00:00:00:31` |
+| `talos-worker-2` | `192.168.102.32` | `02:00:00:00:00:32` |
 
 Both need a DHCP reservation on the UCG (matching the fixed MAC above) and a
 BGP neighbor entry on the UCG's FRR config once they're up — see the BGP note

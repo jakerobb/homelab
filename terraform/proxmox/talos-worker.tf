@@ -6,8 +6,8 @@
 # hardware failure — that only gets fixed once more physical machines join.
 locals {
   talos_workers = {
-    talos-worker-1 = { mac_address = "02:00:00:00:00:22" } # -> 192.168.102.22
-    talos-worker-2 = { mac_address = "02:00:00:00:00:23" } # -> 192.168.102.23
+    talos-worker-1 = { mac_address = "02:00:00:00:00:31" } # -> 192.168.102.31
+    talos-worker-2 = { mac_address = "02:00:00:00:00:32" } # -> 192.168.102.32
   }
 }
 

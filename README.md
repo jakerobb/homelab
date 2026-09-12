@@ -55,10 +55,10 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.
 - [ ] Copy the age private key (`~/.config/sops/age/keys.txt`) into 1Password for durability
 - [x] Talos image source resolved: built via [Image Factory](https://factory.talos.dev) (not a GitHub release) — see `talos/README.md` for the exact v1.11.5 qcow2 URL, distinct from the `ghcr.io/talos-rpi5/installer` image the Pi control plane uses
-- [x] **Two** workers, not one — decided 2026-09-11 so a Talos upgrade doesn't leave the cluster with zero schedulable capacity (see `talos/README.md`). `talos-worker-1` (`.22`) / `talos-worker-2` (`.23`), 4 vCPU / 4GB RAM each, patches at `talos/patches/workers/`
+- [x] **Two** workers, not one — decided 2026-09-11 so a Talos upgrade doesn't leave the cluster with zero schedulable capacity (see `talos/README.md`). `talos-worker-1` (`.31`) / `talos-worker-2` (`.32`) — `.21-.29` is reserved for physical hosts, `.31+` for VMs — 4 vCPU / 4GB RAM each, patches at `talos/patches/workers/`
 - [x] Terraform written for both VMs (`terraform/proxmox/talos-worker.tf`, `images.tf`) — `terraform plan` reviewed and clean, not yet applied
 - [ ] `terraform apply` from rpi5-1
-- [ ] Add DHCP reservations for both fixed MACs (`02:00:00:00:00:22` → `.22`, `...:23` → `.23`) on the UCG
+- [ ] Add DHCP reservations for both fixed MACs (`02:00:00:00:00:31` → `.31`, `...:32` → `.32`) on the UCG
 - [ ] Boot both VMs, capture maintenance-mode IPs
 - [ ] Generate worker configs reusing the existing cluster's secrets bundle (`~/talos/homelab/secrets.yaml` on rpi5-1 — same cluster CA, do not regenerate secrets)
 - [ ] `talosctl apply-config` to join both as workers
