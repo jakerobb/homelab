@@ -4,15 +4,24 @@ Provider: [`bpg/proxmox`](https://registry.terraform.io/providers/bpg/proxmox/la
 
 ## Status
 
-Proxmox VE isn't installed yet (root README, step 3), so there are no VM resources
-here yet — `main.tf` will hold the Talos worker VM and HexOS VM definitions once the
-host exists and we know real values for:
+Proxmox VE is installed (root README step 3 done — hostname `proxmox`, static IP
+`192.168.102.21`, ext4 on the 1TB boot SSD). `images.tf` and `talos-worker.tf` are
+written and pass `terraform validate` against the real provider schema, but have
+**not been applied yet** — nothing has touched the live host. Written using the
+standard Proxmox defaults (`local-lvm` storage, `vmbr0` bridge) rather than
+confirmed-live values, so double check those against the actual host before
+`apply`. Known follow-ups before/at first apply:
 
-- `proxmox_node_name` (set during Proxmox install)
-- Storage pool name(s) for VM disks (default `local-lvm` unless changed at install)
-- The bridge/VLAN to attach VM NICs to (Server VLAN on `vmbr0`, per root README step 3)
-- Whether the two NVMe drives get passed through as raw PCI devices (`hostpci`, see
-  root README step 5) — this needs IOMMU group info gathered *after* Proxmox is up
+- Pin `checksum`/`checksum_algorithm` on the `proxmox_download_file` resource once
+  we have a checksum for the Image Factory qcow2 (Image Factory doesn't publish one
+  alongside the image the way GitHub releases do)
+- Verify the disk actually grows to `size = 64` (GB) on import rather than staying
+  at the source image's native (much smaller) size — untested
+- Once applied, add a DHCP reservation on the UCG for the fixed MAC
+  (`02:00:00:00:00:22`) → `192.168.102.22`
+- `hexos` VM is still unwritten — needs IOMMU group info gathered from the live
+  host first (root README step 5), plus a real decision on `hostpci` passthrough
+  syntax for the two NVMe drives
 
 ## Auth
 
@@ -24,10 +33,18 @@ file:
 export TF_VAR_proxmox_api_token="terraform@pve!provider=<uuid>"
 ```
 
-## Planned resources
+## Resources
 
-- `talos-worker-msa2` VM — q35, UEFI (OVMF), virtio-net, virtio-scsi, memory
-  ballooning disabled, boots the stock (non-rpi5) Talos qcow2. See
-  `../../talos/README.md` for the version/installer-image gotcha.
-- `hexos` VM — 8GB+ RAM baseline, PCIe passthrough of both NVMe drives (not virtual
-  disks).
+- `talos-worker-msa2` (`talos-worker.tf` + `images.tf`) — q35, UEFI (OVMF),
+  virtio-net, virtio-scsi, memory ballooning disabled, boots the stock (non-rpi5)
+  Talos v1.11.5 qcow2 imported via Image Factory. See `../../talos/README.md` for
+  the version/installer-image gotcha.
+- `hexos` VM — not yet written. 8GB+ RAM baseline, PCIe passthrough of both NVMe
+  drives (not virtual disks).
+
+## Running this
+
+This repo is cloned read-only (HTTPS, no credentials needed — it's a public repo)
+on **rpi5-1** at `~/dev/homelab`, which is also where Terraform itself now lives
+(`/usr/local/bin/terraform`, v1.16.2) — same jump-box convention as `talosctl`.
+Run `terraform plan`/`apply` from there rather than from a Mac.

@@ -47,7 +47,9 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [ ] Download Proxmox VE 9.2-1, verify checksum, mount via Comet X virtual media
 - [ ] Install to the original 1TB SSD only — T500 and P3 Plus must not be touched
 - [ ] Static IP `192.168.102.21`, gateway `192.168.102.1` — confirm UCG switch port VLAN mode (access vs. trunk) before this step
-- [ ] Post-install: no-subscription repo, `apt full-upgrade`, NTP source, config backup
+- [x] Post-install: no-subscription repo (watch for a *second* enterprise repo file just for Ceph — also needs disabling), `apt full-upgrade`
+- [ ] NTP source — no local NTP currently exists; check whether the UCG offers a built-in NTP server before deciding to point at public pools instead
+- [ ] Config backup — see [`docs/proxmox-config-backup.md`](docs/proxmox-config-backup.md) (script written, key installed on rpi5-1; still needs deploying + cron install on the Proxmox host itself)
 
 ## 4. Talos VM → Join Existing Cluster
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.

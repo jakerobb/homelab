@@ -72,6 +72,13 @@ Components: pve-no-subscription
 Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 SOURCES
 
+# PVE 9 also ships a SEPARATE enterprise repo just for Ceph packages, which also
+# 401s on `apt update` without a subscription. We're not running Ceph on a
+# single-node box, so just disable it too (check the exact filename first —
+# it's been renamed between point releases before):
+ls /etc/apt/sources.list.d/*.sources
+sed -i '/^Suites:/a Enabled: no' /etc/apt/sources.list.d/ceph.sources
+
 apt update && apt full-upgrade -y
 ```
 

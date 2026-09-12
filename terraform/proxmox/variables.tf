@@ -19,5 +19,5 @@ variable "proxmox_insecure_tls" {
 variable "proxmox_node_name" {
   description = "Name of the Proxmox node as configured during install (Datacenter > node name), used to target VM resources."
   type        = string
-  default     = "pve"
+  default     = "proxmox"
 }
