@@ -5,20 +5,18 @@ Provider: [`bpg/proxmox`](https://registry.terraform.io/providers/bpg/proxmox/la
 ## Status
 
 Proxmox VE is installed (root README step 3 done — hostname `proxmox`, static IP
-`192.168.102.21`, ext4 on the 1TB boot SSD). `images.tf` and `talos-worker.tf` are
-written and pass `terraform validate` against the real provider schema, but have
-**not been applied yet** — nothing has touched the live host. Written using the
-standard Proxmox defaults (`local-lvm` storage, `vmbr0` bridge) rather than
-confirmed-live values, so double check those against the actual host before
-`apply`. Known follow-ups before/at first apply:
+`192.168.102.21`, ext4 on the 1TB boot SSD). `images.tf` and `talos-worker.tf`
+have a clean `terraform plan` against the real host (ran from rpi5-1, 2 to add,
+0 to change/destroy) — `local-lvm` and `vmbr0` are confirmed real, not just
+assumed defaults. **Not applied yet.** Known follow-ups before/at first apply:
 
 - Pin `checksum`/`checksum_algorithm` on the `proxmox_download_file` resource once
   we have a checksum for the Image Factory qcow2 (Image Factory doesn't publish one
   alongside the image the way GitHub releases do)
 - Verify the disk actually grows to `size = 64` (GB) on import rather than staying
   at the source image's native (much smaller) size — untested
-- Once applied, add a DHCP reservation on the UCG for the fixed MAC
-  (`02:00:00:00:00:22`) → `192.168.102.22`
+- Once applied, add DHCP reservations on the UCG for both fixed MACs
+  (`02:00:00:00:00:22` → `.22`, `...:23` → `.23`)
 - `hexos` VM is still unwritten — needs IOMMU group info gathered from the live
   host first (root README step 5), plus a real decision on `hostpci` passthrough
   syntax for the two NVMe drives
@@ -35,10 +33,13 @@ export TF_VAR_proxmox_api_token="terraform@pve!provider=<uuid>"
 
 ## Resources
 
-- `talos-worker-msa2` (`talos-worker.tf` + `images.tf`) — q35, UEFI (OVMF),
-  virtio-net, virtio-scsi, memory ballooning disabled, boots the stock (non-rpi5)
-  Talos v1.11.5 qcow2 imported via Image Factory. See `../../talos/README.md` for
-  the version/installer-image gotcha.
+- `talos-worker-1` / `talos-worker-2` (`talos-worker.tf` + `images.tf`, `for_each`
+  over `local.talos_workers`) — q35, UEFI (OVMF), virtio-net, virtio-scsi, memory
+  ballooning disabled, 4 vCPU / 4GB RAM each, boots the stock (non-rpi5) Talos
+  v1.11.5 qcow2 imported via Image Factory. Two workers rather than one so a
+  Talos upgrade doesn't leave the cluster with zero schedulable capacity — see
+  `../../talos/README.md` for that rationale and the version/installer-image
+  gotcha.
 - `hexos` VM — not yet written. 8GB+ RAM baseline, PCIe passthrough of both NVMe
   drives (not virtual disks).
 

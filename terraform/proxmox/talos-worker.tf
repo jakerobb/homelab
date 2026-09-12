@@ -1,6 +1,21 @@
-resource "proxmox_virtual_environment_vm" "talos_worker_msa2" {
+# Two smaller workers rather than one big one, on purpose: with only 3
+# control-plane Pis (tainted, no workloads) and a single worker, a Talos
+# upgrade of that one worker would leave the cluster with zero schedulable
+# capacity until it came back. Two workers means one can be cordoned/upgraded
+# while the other keeps serving. Both still share the MS-A2's fate on a real
+# hardware failure — that only gets fixed once more physical machines join.
+locals {
+  talos_workers = {
+    talos-worker-1 = { mac_address = "02:00:00:00:00:22" } # -> 192.168.102.22
+    talos-worker-2 = { mac_address = "02:00:00:00:00:23" } # -> 192.168.102.23
+  }
+}
+
+resource "proxmox_virtual_environment_vm" "talos_worker" {
+  for_each = local.talos_workers
+
   node_name = var.proxmox_node_name
-  name      = "talos-worker-msa2"
+  name      = each.key
 
   machine = "q35"
   bios    = "ovmf"
@@ -16,7 +31,7 @@ resource "proxmox_virtual_environment_vm" "talos_worker_msa2" {
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 4096
     # No `floating` set — ballooning disabled, per root README step 4.
   }
 
@@ -25,7 +40,7 @@ resource "proxmox_virtual_environment_vm" "talos_worker_msa2" {
   disk {
     interface    = "scsi0"
     datastore_id = "local-lvm"
-    import_from  = proxmox_download_file.talos_worker_msa2.id
+    import_from  = proxmox_download_file.talos_worker_image.id
     file_format  = "raw"
     # Talos's nocloud image is small (a few GB) — grow it on import. Verify on
     # first apply that this actually resizes rather than just failing/ignoring.
@@ -35,7 +50,7 @@ resource "proxmox_virtual_environment_vm" "talos_worker_msa2" {
   network_device {
     bridge      = "vmbr0"
     model       = "virtio"
-    mac_address = "02:00:00:00:00:22" # locally-administered, encodes the planned .22 IP for memorability
+    mac_address = each.value.mac_address
   }
 
   vga {
@@ -43,5 +58,5 @@ resource "proxmox_virtual_environment_vm" "talos_worker_msa2" {
   }
 
   # Boot straight into the imported Talos disk image (already-installed,
-  # boots to maintenance mode) — no separate ISO/ initial-install step needed.
+  # boots to maintenance mode) — no separate ISO / initial-install step needed.
 }

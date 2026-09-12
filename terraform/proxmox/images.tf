@@ -1,4 +1,4 @@
-resource "proxmox_download_file" "talos_worker_msa2" {
+resource "proxmox_download_file" "talos_worker_image" {
   node_name    = var.proxmox_node_name
   content_type = "import"
   datastore_id = "local"

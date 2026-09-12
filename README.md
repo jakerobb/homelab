@@ -55,15 +55,16 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.
 - [ ] Copy the age private key (`~/.config/sops/age/keys.txt`) into 1Password for durability
 - [x] Talos image source resolved: built via [Image Factory](https://factory.talos.dev) (not a GitHub release) — see `talos/README.md` for the exact v1.11.5 qcow2 URL, distinct from the `ghcr.io/talos-rpi5/installer` image the Pi control plane uses
-- [x] Worker hostname (`talos-worker-msa2`) and IP (`192.168.102.22`) decided; patch added at `talos/patches/worker-msa2.yaml`
-- [ ] Once the VM's NIC MAC is known (or fixed in Terraform ahead of time), add a DHCP reservation for `.22` on the UCG
-- [ ] Create VM: q35 machine type, UEFI (OVMF), virtio-net, virtio-scsi, **memory ballooning disabled** (Terraform, once Proxmox is up — see `terraform/proxmox/`)
-- [ ] Boot the VM, capture its maintenance-mode IP
-- [ ] Generate worker config reusing the existing cluster's secrets bundle (`~/talos/homelab/secrets.yaml` on rpi5-1 — same cluster CA, do not regenerate secrets)
-- [ ] `talosctl apply-config` to join as worker
+- [x] **Two** workers, not one — decided 2026-09-11 so a Talos upgrade doesn't leave the cluster with zero schedulable capacity (see `talos/README.md`). `talos-worker-1` (`.22`) / `talos-worker-2` (`.23`), 4 vCPU / 4GB RAM each, patches at `talos/patches/workers/`
+- [x] Terraform written for both VMs (`terraform/proxmox/talos-worker.tf`, `images.tf`) — `terraform plan` reviewed and clean, not yet applied
+- [ ] `terraform apply` from rpi5-1
+- [ ] Add DHCP reservations for both fixed MACs (`02:00:00:00:00:22` → `.22`, `...:23` → `.23`) on the UCG
+- [ ] Boot both VMs, capture maintenance-mode IPs
+- [ ] Generate worker configs reusing the existing cluster's secrets bundle (`~/talos/homelab/secrets.yaml` on rpi5-1 — same cluster CA, do not regenerate secrets)
+- [ ] `talosctl apply-config` to join both as workers
 - [ ] Verify with `kubectl get nodes` — confirm `kubernetes.io/arch=amd64` label auto-applied
-- [ ] Label the new node `bgp-speaker=true` so `CiliumBGPClusterConfig`'s nodeSelector picks it up
-- [ ] **Update the UCG's FRR config to add the new node's IP as a BGP neighbor** — confirmed this is hardcoded per-node on the router side (`talos/cilium/bgp/ucg-frr-reference.conf`), not automatic, and lives outside this repo (Ubiquiti config)
+- [ ] Label both nodes `bgp-speaker=true` so `CiliumBGPClusterConfig`'s nodeSelector picks them up
+- [ ] **Update the UCG's FRR config to add both new node IPs as BGP neighbors** — confirmed this is hardcoded per-node on the router side (`talos/cilium/bgp/ucg-frr-reference.conf`), not automatic, and lives outside this repo (Ubiquiti config)
 - [ ] Watch for any DaemonSets that might crash-loop on amd64 (the mixed-arch trap you already know about)
 - [ ] Schedule a test workload on it to confirm it's live
 

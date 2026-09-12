@@ -67,23 +67,39 @@ follow-up once there's time to diff it carefully against the live config.
 - `cilium/` — Cilium Helm values and BGP/LB CRDs, applied to the existing cluster.
 - `patches/control-plane/` — per-node Talos config patches for the existing 3 Pi
   control-plane nodes (hostname only, currently).
-- `patches/worker-msa2.yaml` — patch for the new MS-A2 worker VM (hostname
-  `talos-worker-msa2`, matching the existing hostname-only patch style — IP
-  addressing is handled via DHCP reservation on the UCG, not in Talos config).
+- `patches/workers/` — patches for the two MS-A2 worker VMs (hostname only,
+  matching the control-plane patch style — IP addressing is handled via DHCP
+  reservation on the UCG, not in Talos config).
 
-## MS-A2 worker: decided values (2026-09-10)
+## MS-A2 workers: decided values (2026-09-11)
 
-- **Hostname:** `talos-worker-msa2`
-- **IP:** `192.168.102.22` (next free slot after the MS-A2 host itself at `.21`) —
-  needs a DHCP reservation on the UCG once the VM exists and we know its NIC's MAC
-  (or we fix the MAC in the Terraform VM definition ahead of time and reserve it
-  before first boot — TBD when that resource gets written).
+Two workers, not one — with only 3 tainted control-plane Pis and a single
+worker, upgrading that one worker would leave the cluster with zero
+schedulable capacity in the meantime. Two workers (still both VMs on the same
+physical MS-A2 for now) means one can be cordoned/upgraded while the other
+keeps serving. Naming is deliberately decoupled from "msa2" — more physical
+machines are coming later, and a worker's name shouldn't imply which box it
+happens to run on today.
+
+| Hostname | IP | MAC (fixed in Terraform) |
+|---|---|---|
+| `talos-worker-1` | `192.168.102.22` | `02:00:00:00:00:22` |
+| `talos-worker-2` | `192.168.102.23` | `02:00:00:00:00:23` |
+
+Both need a DHCP reservation on the UCG (matching the fixed MAC above) and a
+BGP neighbor entry on the UCG's FRR config once they're up — see the BGP note
+above, this now applies to **two** IPs, not one.
+
+Each: 4 vCPU, 4GB RAM. (Proxmox's `cores` is a vCPU count, not a physical-core
+reservation — the host scheduler spreads vCPU threads across all 32 logical
+threads/16 physical cores of the 8945HX as needed, so 8 vCPUs total across
+both workers leaves comfortable headroom.)
+
 - **Image source:** Talos doesn't publish a plain qcow2 on GitHub releases anymore —
   VM images are built on demand via [Image Factory](https://factory.talos.dev).
   For v1.11.5 with no customizations (the stock/non-Pi5 installer):
   ```
   https://factory.talos.dev/image/376567988ad370138ad8b2698212367b8edcb69b5fd68c80be1f2ec7d603b4ba/v1.11.5/nocloud-amd64.qcow2
   ```
-  Directly consumable by Terraform's `proxmox_virtual_environment_download_file`
-  resource once that gets written (needs a real Proxmox node name / storage pool
-  first).
+  Consumed by the `proxmox_download_file.talos_worker_image` resource in
+  `terraform/proxmox/images.tf`, imported into both workers' disks.
