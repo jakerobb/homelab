@@ -64,7 +64,7 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [ ] `talosctl apply-config` to join both as workers
 - [ ] Verify with `kubectl get nodes` — confirm `kubernetes.io/arch=amd64` label auto-applied
 - [ ] Label both nodes `bgp-speaker=true` so `CiliumBGPClusterConfig`'s nodeSelector picks them up
-- [ ] **Update the UCG's FRR config to add both new node IPs as BGP neighbors** — confirmed this is hardcoded per-node on the router side (`talos/cilium/bgp/ucg-frr-reference.conf`), not automatic, and lives outside this repo (Ubiquiti config)
+- [x] `talos/cilium/bgp/ucg-frr.conf` updated in-repo with `.31`/`.32` as BGP neighbors — still needs deploying to the UCG itself (manual, no Terraform/API access to the UDM for this)
 - [ ] Watch for any DaemonSets that might crash-loop on amd64 (the mixed-arch trap you already know about)
 - [ ] Schedule a test workload on it to confirm it's live
 

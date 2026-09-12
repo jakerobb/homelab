@@ -15,14 +15,15 @@
   `bgp-speaker: "true"` participate.
 - LoadBalancer IP pool `192.168.103.1-30` is advertised via BGP
   (`cilium/bgp/lb-pool.yaml`, `cilium/bgp/advertisement.yaml`).
-- `cilium/bgp/ucg-frr-reference.conf` is a **read-only copy** of the FRR config
-  currently running on the UCG itself — it is not applied from here. It's kept as
-  documentation of what the router side looks like today.
-  **Important:** it hardcodes each control-plane node as a BGP neighbor
-  (`192.168.102.11/.12/.13`). Adding a new BGP-speaking node (e.g. the MS-A2 worker)
-  requires manually adding its IP as a neighbor on the UCG in addition to labeling
-  the k8s node `bgp-speaker=true` — this is **not automatic** and lives outside this repo
-  (Ubiquiti network config, not something we have IaC access to yet).
+- `cilium/bgp/ucg-frr.conf` is the actual FRR config running on the UCG's BGP
+  daemon — maintained here as the source of truth, deployed to the router
+  manually since there's no Terraform/API access to the UDM/UCG for this.
+  **Important:** it hardcodes every peer IP individually (no dynamic
+  discovery) — adding a new BGP-speaking k8s node means both labeling it
+  `bgp-speaker=true` *and* adding a `neighbor <ip> peer-group HOMELAB` line
+  here, then re-deploying to the router. All BGP-speaking nodes share the same
+  `HOMELAB` peer-group/remote-as, since `CiliumBGPClusterConfig` uses a single
+  cluster-wide `localASN: 65001` regardless of node role.
 
 ## Where the secrets actually live
 
