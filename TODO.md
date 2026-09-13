@@ -15,11 +15,13 @@ auto-creating DNS records — see [`argocd/README.md`](argocd/README.md#dns--tls
 First real `HTTPRoute` is ArgoCD's own UI (`argocd.jakerobb.org`).
 
 ## etcd / control-plane backups
-**Not started.** No backup story exists yet for the Talos control plane's own
-state — if etcd is lost (all 3 Pi control-plane nodes, or corruption), there's
-currently no path back short of rebuilding the cluster from scratch. Worth
-closing given how much backup discipline went into everything else on this
-project (B2 for the NVMe data, the Proxmox host-config cron job).
+**Local backup done (2026-09-13).** Daily `talosctl etcd snapshot` via
+[`scripts/etcd-snapshot-backup.sh`](scripts/etcd-snapshot-backup.sh), stored
+on rpi5-1 (`~/backups/etcd`, 30-day retention) — see
+[`docs/etcd-backup.md`](docs/etcd-backup.md). Deliberately local-only for
+now; shipping a copy off-box (e.g. B2, matching the P3 Plus backup pattern)
+is a deferred follow-up. Restore procedure also not yet exercised — worth
+testing before relying on it in a real incident.
 
 ## HexOS storage
 **Not started.** Install Proxmox VM with IOMMU passthrough for the T500 (2TB)
