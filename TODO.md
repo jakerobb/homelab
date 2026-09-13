@@ -6,13 +6,14 @@ hardware-migration checklist in [README.md](README.md), these aren't
 sequenced — pick whichever's most useful next.
 
 ## Ingress (Gateway API)
-**In progress** — decided 2026-09-13 to use Gateway API (Cilium's built-in
-implementation) instead of a separate ingress-nginx-style controller; see
-[`talos/README.md`](talos/README.md#ingress-gateway-api-decided-2026-09-13).
-CRD install steps, `cilium/values.yaml` (`gatewayAPI.enabled: true`), and
-`cilium/gateway.yaml` are drafted. Remaining: confirm it's actually applied
-and working end-to-end, then add TLS (cert-manager vs. a manual cert — not
-yet decided) and the first real `HTTPRoute` once an app needs one.
+**Base setup done** — decided and deployed 2026-09-13, using Gateway API
+(Cilium's built-in implementation) instead of a separate ingress-nginx-style
+controller; see [`talos/README.md`](talos/README.md#ingress-gateway-api-decided-and-deployed-2026-09-13).
+CRDs installed, Cilium upgraded with `gatewayAPI.enabled: true`, and the
+`Gateway` is live and confirmed working end-to-end (`curl` to its IP gets a
+real `404` from Envoy). Remaining: TLS (cert-manager vs. a manual cert — not
+yet decided) and the first real `HTTPRoute` once an app needs one — ArgoCD's
+own UI is the likely first candidate.
 
 ## etcd / control-plane backups
 **Not started.** No backup story exists yet for the Talos control plane's own

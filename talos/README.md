@@ -63,10 +63,10 @@ key (rule in `.sops.yaml` at repo root). This repo is now self-contained for the
 secrets bundle — no more hard dependency on rpi5-1 surviving.
 
 - **Age public key:** `age1nqvgqc45f5j9y9ch0lyccdefeazs26xkp732rujp23nqeqmdjefshruqs8`
-- **Age private key:** lives only at `~/.config/sops/age/keys.txt` on Jake's Mac.
-  Not yet duplicated anywhere else — **TODO: copy it into 1Password** (as a Secure
-  Note/Password item) for durability, and optionally into a `SOPS_AGE_KEY` GitHub
-  Actions repo secret once a self-hosted runner exists, so CI can decrypt too.
+- **Age private key:** lives at `~/.config/sops/age/keys.txt` on Jake's Mac, and is
+  also duplicated in 1Password for durability. Optionally also worth putting in a
+  `SOPS_AGE_KEY` GitHub Actions repo secret once a self-hosted runner exists, so CI
+  can decrypt too.
 - To decrypt/use: `export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt` then
   `sops --decrypt talos/secrets.sops.yaml`.
 
