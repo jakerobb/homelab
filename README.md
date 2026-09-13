@@ -5,8 +5,8 @@ This repo contains IaC and related stuff for my homelab.
 
 - **Network:** Ubiquiti, Server VLAN `192.168.102.0/24`. Talos jump box (`rpi5-1`,
   `.2`, holds `talosctl` + cluster secrets) · 3-node Talos control plane (`.11`-`.13`,
-  Raspberry Pi 5 4GB) · MS-A2 worker host (`.21`, currently stock Windows, being
-  repurposed per the TODO below).
+  Raspberry Pi 5 4GB) · MS-A2 (`.21`) running Proxmox VE, hosting two Talos worker
+  VMs — `talos-worker-1` (`.31`) and `talos-worker-2` (`.32`) — joined to the cluster.
 - **Existing cluster:** Talos v1.11.5, Kubernetes v1.34.1, Cilium CNI with
   `kubeProxyReplacement`, full eBPF host routing, and L2 announcements for
   LoadBalancer IPs (`192.168.102.128/26`) — BGP was the original design but hit
@@ -19,8 +19,8 @@ This repo contains IaC and related stuff for my homelab.
 - **IaC layout:**
   - [`talos/`](talos/) — non-secret Cilium config and per-node Talos patches
     applied to the existing cluster.
-  - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions (in progress;
-    empty until Proxmox itself is installed per step 3 below).
+  - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions; the two
+    Talos worker VMs are provisioned from here, applied from rpi5-1.
   - Anything that can't reasonably be IaC'd (BIOS/IOMMU toggles, HexOS's GUI-only pool
     setup) gets a step-by-step runbook here instead of being skipped.
 
