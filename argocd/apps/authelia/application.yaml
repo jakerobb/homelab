@@ -1,0 +1,149 @@
+# Authelia, fronting ArgoCD only for now (see argocd/README.md for the
+# full writeup and TODO.md for the Compose-workload migrations this doesn't
+# cover yet). Deliberately light: file-based user database (SQLite via
+# `storage.local`, no Postgres) and memory-based sessions (no Redis) — see
+# argocd/README.md for why that's an acceptable trade for a homelab.
+#
+# ArgoCD gets real OIDC (see the oidc.config block added to
+# argocd/install/values.yaml) rather than Gateway-level forward-auth —
+# ArgoCD supports OIDC natively, so there's no need for Cilium's
+# ExternalAuth HTTPRoute filter (which isn't available yet at the cluster's
+# current Cilium version anyway — see TODO.md).
+#
+# Secrets: authelia-secrets / users-database / oidc-jwk (SOPS-encrypted
+# under argocd/secrets/, applied out-of-band — same caveat as the
+# Cloudflare token secrets: no SOPS/KSOPS decryption wired into ArgoCD sync
+# yet) must exist in the `authelia` namespace before this Application will
+# come up healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: authelia
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.authelia.com
+    chart: authelia
+    targetRevision: "0.11.22"
+    helm:
+      releaseName: authelia
+      valuesObject:
+        image:
+          tag: '4.39.25'
+
+        pod:
+          kind: 'StatefulSet'
+          replicas: 1
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+
+        ingress:
+          enabled: true
+          gatewayAPI:
+            enabled: true
+            parentRefs:
+              - name: homelab-gateway
+                namespace: gateway-system
+
+        persistence:
+          enabled: true
+          storageClass: local-path
+          size: 200Mi
+
+        secret:
+          existingSecret: authelia-secrets
+          additionalSecrets:
+            users-database:
+              items:
+                - key: 'users_database.yml'
+                  path: 'users_database.yml'
+            oidc-jwk:
+              items:
+                - key: 'oidc.jwk.RS256.pem'
+                  path: 'oidc.jwk.RS256.pem'
+
+        configMap:
+          authentication_backend:
+            file:
+              enabled: true
+              path: '/secrets/users-database/users_database.yml'
+
+          # No SMTP configured — password-reset/notification links get
+          # written to /config/notification.txt in the pod instead of
+          # emailed (`kubectl exec` to read it). Fine for a single-admin
+          # homelab; revisit if that gets old.
+          notifier:
+            filesystem:
+              enabled: true
+              filename: '/config/notification.txt'
+
+          storage:
+            local:
+              enabled: true
+              path: '/config/db.sqlite3'
+
+          session:
+            cookies:
+              - domain: 'jakerobb.org'
+                subdomain: 'auth'
+                default_redirection_url: 'https://argocd.jakerobb.org'
+
+          # Deny-by-default; only two rules exist because ArgoCD is the
+          # only thing behind this so far. Add a rule per app as each one
+          # moves off Compose and gets its own HTTPRoute (see TODO.md).
+          access_control:
+            default_policy: 'deny'
+            rules:
+              - domain: 'auth.jakerobb.org'
+                policy: 'bypass'
+              - domain: 'argocd.jakerobb.org'
+                policy: 'two_factor'
+
+          identity_providers:
+            oidc:
+              enabled: true
+              jwks:
+                - key_id: 'rsa'
+                  algorithm: 'RS256'
+                  use: 'sig'
+                  key:
+                    path: '/secrets/oidc-jwk/oidc.jwk.RS256.pem'
+              clients:
+                - client_id: 'argocd'
+                  client_name: 'ArgoCD'
+                  # pbkdf2-sha512 hash of the client secret ArgoCD itself
+                  # holds in plaintext (argocd/secrets/argocd-oidc-client-secret.sops.yaml,
+                  # applied via argocd/install/values.yaml at Helm-upgrade
+                  # time — see argocd/README.md).
+                  client_secret: '$pbkdf2-sha512$310000$zU.R9zGKBboxkc1zlxfNpQ$weqxt6tHx8YcX83ZhuBaLElD6n/3YN60LLmbO.dbtSjCERquTToS67ixm8YhCgFW0jNJDYWsoAydYMjR05xo1w'
+                  public: false
+                  redirect_uris:
+                    - 'https://argocd.jakerobb.org/auth/callback'
+                  scopes:
+                    - 'openid'
+                    - 'profile'
+                    - 'email'
+                    - 'groups'
+                  grant_types:
+                    - 'authorization_code'
+                    - 'refresh_token'
+                  response_types:
+                    - 'code'
+                  token_endpoint_auth_method: 'client_secret_basic'
+                  authorization_policy: 'two_factor'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: authelia
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

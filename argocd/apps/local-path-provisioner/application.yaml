@@ -1,0 +1,47 @@
+# First PVC-capable StorageClass in the cluster — nothing provided one before
+# this (`kubectl get storageclass` returned nothing). Deliberately lightweight:
+# Rancher's local-path-provisioner backs PVs with a directory on whichever
+# node the pod lands on (no replication across nodes) — fine as a bridge for
+# small, low-stakes volumes like Authelia's SQLite file, but not a
+# replacement for the "HexOS storage" TODO item's NFS/SMB-backed
+# StorageClass. Revisit once that lands.
+#
+# Sourced directly from upstream's own Helm chart (in their git repo, not a
+# separate chart index) rather than a third-party ArtifactHub mirror — this
+# thing runs with cluster-wide RBAC to manage PVs, worth trusting only the
+# maintainer's own packaging.
+#
+# reclaimPolicy: Retain (not the chart's own default of Delete) — this is the
+# first stateful/PVC-backed workload under ArgoCD's fully-automated
+# `prune: true`, the exact scenario argocd/README.md flagged as needing a
+# revisit. Retain means even an accidental prune of a PVC leaves the
+# underlying data recoverable instead of deleting it outright.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-path-provisioner
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rancher/local-path-provisioner.git
+    targetRevision: v0.0.36
+    path: deploy/chart/local-path-provisioner
+    helm:
+      releaseName: local-path-provisioner
+      valuesObject:
+        storageClass:
+          create: true
+          defaultClass: true
+          reclaimPolicy: Retain
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local-path-storage
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

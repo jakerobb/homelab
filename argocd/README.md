@@ -40,10 +40,10 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   makes ArgoCD serve plain HTTP internally instead of redirecting to its own
   self-signed HTTPS — TLS is terminated at the Gateway instead (see "DNS +
   TLS" below), so this isn't a downgrade.
-- **Auth:** no SSO wired up (`dex.enabled: false`). Local admin only for now;
-  password is auto-generated in the `argocd-initial-admin-secret` Secret on
-  first install (see below). Revisit if/when there's an SSO provider worth
-  integrating with.
+- **Auth:** SSO via Authelia (`dex.enabled: false` — using ArgoCD's native
+  OIDC support directly, not Dex). See "Authelia SSO" below. The local
+  `admin` account (password in `argocd-initial-admin-secret`, see "Bootstrap"
+  below) still exists as a break-glass fallback if Authelia is ever down.
 
 ## DNS + TLS (decided 2026-09-13)
 
@@ -112,16 +112,102 @@ on every device, no manually-added DNS entries per app:
    any other SOPS-encrypted file in this repo):
 
    ```bash
-   export KUBECONFIG=~/.kube/homelab.yaml
+   export KUBECONFIG=~/.kube/config
    sops -d argocd/secrets/cloudflare-api-token.cert-manager.sops.yaml | kubectl apply -f -
    sops -d argocd/secrets/cloudflare-api-token.external-dns.sops.yaml | kubectl apply -f -
    ```
 4. `git add argocd/secrets/` and commit — safe, they're encrypted.
 
+## Authelia SSO (decided 2026-09-13)
+
+Fronting **ArgoCD only** for now — see [`../TODO.md`](../TODO.md) for the
+per-workload plan to migrate everything currently on the RPi5 16GB's Docker
+Compose stack (Grafana, NetworkOptimizer, etc.) into the cluster one at a
+time; those get added to Authelia's `access_control` as they land, not now.
+
+- **Authelia, not Authentik:** Authentik needs Postgres + Redis, real
+  overkill for what's currently one protected app. Authelia runs as a single
+  pod with file-based config: SQLite (`storage.local`) instead of Postgres,
+  in-memory sessions instead of Redis. Trade-off: no admin web UI (users and
+  OIDC clients are YAML, redeployed via this repo — arguably a better fit
+  for this repo's IaC-first approach anyway) and no SMTP configured, so
+  password-reset/notification links land in a file inside the pod
+  (`kubectl exec -n authelia authelia-0 -- cat /config/notification.txt`)
+  instead of being emailed.
+- **Storage:** [`local-path-provisioner`](apps/local-path-provisioner/application.yaml)
+  is the cluster's first `StorageClass` — nothing provided PVCs before this.
+  It's a deliberate bridge, not a long-term answer: PVs are backed by a
+  directory on whichever single node the pod lands on, no redundancy. Fine
+  for Authelia's small SQLite file; superseded once the
+  [HexOS storage TODO](../TODO.md#hexos-storage) provides a real NFS/SMB
+  `StorageClass`. `reclaimPolicy: Retain` (not the chart's `Delete` default)
+  since this is also the first PVC-backed workload under ArgoCD's
+  fully-automated `prune: true` — see the "Sync policy" bullet above.
+- **ArgoCD gets real OIDC, not Gateway forward-auth:** ArgoCD has native
+  OIDC-client support (`configs.cm.oidc.config` in
+  [`install/values.yaml`](install/values.yaml)), so there's no need for
+  Cilium's Gateway API `ExternalAuth` HTTPRoute filter — which isn't
+  available yet anyway at the cluster's current Cilium version (1.19.5 vs.
+  the 1.20+ it needs; see [`../TODO.md`](../TODO.md)). That filter only
+  becomes relevant once a Compose app that *doesn't* speak OIDC natively
+  (NetworkOptimizer, change-detection, etc.) actually migrates in.
+- **Exposure:** `HTTPRoute` on `homelab-gateway` (auto-created by the
+  Authelia chart's `ingress.gatewayAPI` option), hostname
+  `auth.jakerobb.org`.
+- **Bootstrap ordering:** `local-path-provisioner` is sync-wave `0`
+  (alongside `cert-manager` — independent, both need to be healthy before
+  anything that depends on either); `authelia` is wave `1`.
+- **Secrets:** same out-of-band pattern as the Cloudflare token above — no
+  SOPS/KSOPS wired into ArgoCD sync yet, so these are applied directly with
+  `kubectl` rather than through GitOps. Three secrets already
+  generated and committed encrypted:
+  - `argocd/secrets/authelia.sops.yaml` → Secret `authelia-secrets` in the
+    `authelia` namespace (session/storage encryption keys, OIDC HMAC secret,
+    password-reset JWT secret — all randomly generated, not
+    human-memorable).
+  - `argocd/secrets/authelia-users-database.sops.yaml` → Secret
+    `users-database` in `authelia` (the `users_database.yml` file itself,
+    one `jake` account, argon2id-hashed password).
+  - `argocd/secrets/authelia-oidc-jwk.sops.yaml` → Secret `oidc-jwk` in
+    `authelia` (RSA-4096 private key Authelia uses to sign OIDC tokens).
+  - `argocd/secrets/argocd-oidc-client-secret.sops.yaml` — **not** a k8s
+    Secret manifest, a Helm *values fragment* (`configs.secret.extra`)
+    layered onto ArgoCD's own install at `helm upgrade` time, same as
+    `install/values.yaml` itself. Holds the plaintext OIDC client secret
+    ArgoCD needs; Authelia's own config only ever holds a one-way
+    pbkdf2-sha512 hash of it (inline in
+    [`apps/authelia/application.yaml`](apps/authelia/application.yaml),
+    safe to commit since it's not reversible).
+
+  Apply the three real Secrets once Authelia's namespace exists (after
+  `root-app.yaml` has synced at least once):
+
+  ```bash
+  export KUBECONFIG=~/.kube/config
+  for f in authelia authelia-users-database authelia-oidc-jwk; do
+    sops -d argocd/secrets/${f}.sops.yaml | kubectl apply -f -
+  done
+  ```
+
+  Then layer the OIDC client secret onto ArgoCD's own Helm install (this is
+  why it's a separate `-f`, not baked into `install/values.yaml` — see
+  "Upgrading ArgoCD itself" below):
+
+  ```bash
+  helm upgrade argocd argo/argo-cd --version 10.9.0 -n argocd \
+    -f argocd/install/values.yaml \
+    -f <(sops -d argocd/secrets/argocd-oidc-client-secret.sops.yaml)
+  ```
+- **First login:** browse to `https://argocd.jakerobb.org`, click the SSO
+  login option, authenticate as `jake` against Authelia. Since ArgoCD's
+  `access_control` policy is `two_factor` and this is a brand-new Authelia
+  instance, the first login prompts TOTP registration (scan a QR code) —
+  there's no SMTP for email-based recovery, so don't lose that TOTP secret.
+
 ## Bootstrap (one-time, manual)
 
 From a machine with `helm`/`kubectl` pointed at the cluster
-(`KUBECONFIG=~/.kube/homelab.yaml`):
+(`KUBECONFIG=~/.kube/config`, the default path — no need to export it):
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
