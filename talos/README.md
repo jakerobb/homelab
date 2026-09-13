@@ -12,7 +12,17 @@
   (see `cilium/values.yaml`).
 - BGP peering to the Ubiquiti gateway (UCG) is defined in `cilium/bgp-peering.yaml`
   (`CiliumBGPPeerConfig` + `CiliumBGPClusterConfig`). Only nodes labeled
-  `bgp-speaker: "true"` participate.
+  `bgp-speaker: "true"` participate. **Only label nodes that actually run
+  workload pods** (i.e. the workers, not control-plane nodes) — Cilium has every
+  BGP-speaking node advertise LoadBalancer IPs as reachable via itself, and
+  FRR's `maximum-paths 3` ECMPs traffic across whichever it picks. If a
+  control-plane node (tainted, no local pods for the service) ends up as one of
+  those paths, traffic routed to it needs an extra internal hop to reach the
+  real backend — this produced exactly the symptom we hit on 2026-09-12
+  (BGP session up, route exchanged, but the LB IP was unreachable, with an
+  ICMP redirect coming from a control-plane node). The 3 Pi control-plane nodes
+  had `bgp-speaker=true` left over from testing before real workers existed;
+  removing it from them (keeping only `talos-worker-1`/`-2`) fixed it.
 - LoadBalancer IP pool `192.168.103.1-30` is advertised via BGP
   (`cilium/bgp/lb-pool.yaml`, `cilium/bgp/advertisement.yaml`).
 - `cilium/bgp/ucg-frr.conf` is the actual FRR config running on the UCG's BGP

@@ -20,7 +20,14 @@ cgroup:
     enabled: false
   hostRoot: /sys/fs/cgroup
 
-# Talos runs a locked-down securityContext; grant Cilium exactly the caps it needs
+# Talos runs a locked-down securityContext; grant Cilium exactly the caps it needs.
+# CAP_BPF/CAP_PERFMON added 2026-09-13: without them Cilium silently falls back to
+# "Legacy" host routing + iptables masquerading instead of full eBPF host routing,
+# which turned out to have a gap handling externally-sourced (BGP-advertised LB)
+# traffic — TCP handshake completed but no data ever flowed. Confirmed via
+# `cilium status --verbose` showing "Routing: ... Host: Legacy" with no explicit
+# config anywhere requesting that; ClusterIP access worked perfectly the whole
+# time, isolating the problem to north-south traffic specifically.
 securityContext:
   capabilities:
     ciliumAgent:
@@ -35,6 +42,8 @@ securityContext:
       - FOWNER
       - SETGID
       - SETUID
+      - BPF
+      - PERFMON
     cleanCiliumState:
       - NET_ADMIN
       - SYS_ADMIN

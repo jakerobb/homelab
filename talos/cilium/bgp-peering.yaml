@@ -30,6 +30,6 @@ spec:
       peers:
         - name: ucg
           peerASN: 65000
-          peerAddress: "192.168.102.1"    # UCG Server-VLAN IP — confirm
+          peerAddress: "192.168.102.1"    # UCG Server-VLAN IP — confirmed correct 2026-09-12
           peerConfigRef:
             name: ucg-peer-config
