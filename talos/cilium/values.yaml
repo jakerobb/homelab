@@ -71,3 +71,15 @@ securityContext:
       - NET_ADMIN
       - SYS_ADMIN
       - SYS_RESOURCE
+
+# Ingress via Gateway API instead of a separate ingress-nginx-style controller —
+# reuses the existing LB pool (lb-pool.yaml) and L2 announcement policy
+# (l2-announcement-policy.yaml) for the Gateway's own LoadBalancer Service, so
+# there's no second controller/data-plane to run. Requires the upstream Gateway
+# API CRDs to be installed BEFORE this is applied (see talos/README.md) —
+# otherwise the operator has nothing to watch. Setting this to true also flips
+# on enable-envoy-config automatically and (with gatewayClass.create left at
+# its default "auto") makes cilium-operator create the `cilium` GatewayClass
+# once it sees the CRDs.
+gatewayAPI:
+  enabled: true

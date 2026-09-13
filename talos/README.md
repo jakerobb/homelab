@@ -81,9 +81,75 @@ deferred rather than guessed at, to avoid drifting the config used to actually
 generate a new node away from what's already running. Worth revisiting as a
 follow-up once there's time to diff it carefully against the live config.
 
+## Ingress: Gateway API (decided and deployed 2026-09-13)
+
+Using [Gateway API](https://gateway-api.sigs.k8s.io/) instead of a classic
+`Ingress`/ingress-nginx-style controller — `kubernetes/ingress-nginx` is
+headed for retirement (maintenance mode now, targeted retirement ~early
+2026) with Gateway API as the sanctioned successor, and Cilium already ships
+its own Gateway API implementation (embedded Envoy) so it's a Helm flag, not
+a second controller/data-plane to operate. The Gateway's LoadBalancer Service
+reuses the existing LB pool and L2 announcement policy exactly like any other
+`Service` — confirmed working (`curl` to the Gateway IP gets a real `404` from
+`server: envoy`, not a connection failure).
+
+**CRDs: experimental channel, not standard** — Cilium 1.19.5's operator hard
+-requires the `TLSRoute` CRD to serve `gateway.networking.k8s.io/v1alpha2`
+(`failed to setup field indexer... no matches for kind "TLSRoute" in version
+"v1alpha2"`, fatal at startup). The *standard* channel's `TLSRoute` CRD no
+longer serves that version; only the *experimental* channel does — even
+though we're not using TLSRoute today. So:
+```
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/experimental-install.yaml
+```
+Two gotchas applying that one file:
+- It's large enough that plain `kubectl apply` blows the
+  `last-applied-configuration` annotation's size limit on `BackendTLSPolicy`
+  — use `kubectl apply --server-side --force-conflicts` instead.
+- The bundle ships its own `safe-upgrades` `ValidatingAdmissionPolicy`, which
+  **blocks switching an existing CRD from standard to experimental channel**
+  — and since that policy is itself one of the objects in the file, applying
+  the whole file in one shot recreates the policy partway through and then
+  blocks the rest of the same apply. Fix: apply everything **except** the
+  `ValidatingAdmissionPolicy`/`ValidatingAdmissionPolicyBinding` docs first
+  (gets every CRD switched to experimental), then apply the full file again
+  (now a no-op for the CRDs, restores the safe-upgrades policy for next time).
+
+Apply order after that:
+
+1. CRDs above, before touching Cilium — the operator needs them present at
+   startup.
+2. `helm upgrade cilium cilium/cilium --version <currently-deployed chart
+   version> -n kube-system -f cilium/values.yaml` (as `cilium-values.yaml` on
+   rpi5-1 — check `helm list -n kube-system` for the version actually
+   running rather than assuming latest; this change didn't bump the chart).
+   Cilium's operator then auto-creates the `cilium` GatewayClass — it isn't
+   committed here.
+3. **Restart, don't just wait** — same failure mode as the `bpf.masquerade`
+   rollout: `enable-envoy-config` isn't hot-reloaded, so both `cilium-operator`
+   and the `cilium` agent DaemonSet keep running with the old value until
+   restarted. Symptoms if you skip this: `cilium-operator` crashloops with
+   the TLSRoute error above until it picks up the CRDs on a restart, and even
+   after that, `GatewayClass`/`Gateway` show `Accepted`/`Programmed: True`
+   but requests get TCP `RST` (`service-no-backend-response: reject`, since
+   the agent never actually started Envoy) — check agent logs for `module=
+   agent.controlplane.config-drift-checker key=enable-envoy-config
+   actual=false` to confirm.  `kubectl -n kube-system rollout restart
+   deployment/cilium-operator` then `rollout restart ds/cilium`, verifying
+   pods come back healthy after each before moving on.
+4. `kubectl apply -f cilium/gateway.yaml` — creates the `gateway-system`
+   namespace and a `Gateway` with a plain HTTP (port 80) listener open to
+   `HTTPRoute`s from any namespace.
+
+**Deliberately deferred:** TLS/443 (needs cert-manager or a manual cert, plus
+a decision on an internal CA vs public DNS-01), and any actual `HTTPRoute`s
+— those get added per-app in that app's own namespace as apps move onto the
+cluster. ArgoCD's own UI is the likely first one.
+
 ## Layout
 
-- `cilium/` — Cilium Helm values and LB/L2-announcement CRDs, applied to the existing cluster.
+- `cilium/` — Cilium Helm values, LB/L2-announcement CRDs, and the Gateway
+  API `Gateway` (ingress), applied to the existing cluster.
 - `patches/control-plane/` — per-node Talos config patches for the existing 3 Pi
   control-plane nodes (hostname only, currently).
 - `patches/workers/` — patches for the two MS-A2 worker VMs (hostname only,

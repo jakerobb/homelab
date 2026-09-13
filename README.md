@@ -28,30 +28,30 @@ This repo contains IaC and related stuff for my homelab.
 
 ## 1. Backup the 4TB P3 Plus
 - [x] Sign up for Backblaze B2
-- [ ] Create the bucket + a bucket-scoped application key by running [`scripts/b2-p3plus-backup-setup.sh`](scripts/b2-p3plus-backup-setup.sh) (needs the `b2-tools` Homebrew formula; script prompts for your B2 credentials interactively, doesn't store them)
-- [ ] Install `rclone` + the `b2` CLI on the Intel MBP (the machine with P3 Plus access — the primary Mac is managed and blocks external storage). **Not via Homebrew** — that machine's macOS (Sequoia 15.7.9, can't upgrade) can't satisfy Homebrew's Command Line Tools version gate. Instead: download the static `rclone` binary directly from [downloads.rclone.org](https://downloads.rclone.org/) (no dependencies), and `python3 -m pip install --user b2` (pure Python, works with whatever CLT is already present — invoke as `python3 -m b2` if the `b2` command isn't on PATH afterward)
-- [ ] `rclone config` on the Intel MBP — add the B2 remote using the **scoped** keyID/applicationKey from the script above, not your master account key
-- [ ] `rclone copy /path/to/p3plus b2:p3plus-archive-temp --progress --transfers=8`
-- [ ] `rclone check /path/to/p3plus b2:p3plus-archive-temp` to verify integrity (don't skip this)
-- [ ] Spot-check a few files by downloading and opening them
-- [ ] Only proceed to step 2 once you've confirmed the backup is good — this is your only copy once the drive is wiped
+- [x] Create the bucket + a bucket-scoped application key by running [`scripts/b2-p3plus-backup-setup.sh`](scripts/b2-p3plus-backup-setup.sh) (needs the `b2-tools` Homebrew formula; script prompts for your B2 credentials interactively, doesn't store them)
+- [x] Install `rclone` + the `b2` CLI on the Intel MBP (the machine with P3 Plus access — the primary Mac is managed and blocks external storage). **Not via Homebrew** — that machine's macOS (Sequoia 15.7.9, can't upgrade) can't satisfy Homebrew's Command Line Tools version gate. Instead: download the static `rclone` binary directly from [downloads.rclone.org](https://downloads.rclone.org/) (no dependencies), and `python3 -m pip install --user b2` (pure Python, works with whatever CLT is already present — invoke as `python3 -m b2` if the `b2` command isn't on PATH afterward)
+- [x] `rclone config` on the Intel MBP — add the B2 remote using the **scoped** keyID/applicationKey from the script above, not your master account key
+- [x] `rclone copy /path/to/p3plus b2:p3plus-archive-temp --progress --transfers=8`
+- [x] `rclone check /path/to/p3plus b2:p3plus-archive-temp` to verify integrity (don't skip this)
+- [x] Spot-check a few files by downloading and opening them
+- [x] Only proceed to step 2 once you've confirmed the backup is good — this is your only copy once the drive is wiped
 
 ## 2. Physical SSD Installation
-- [ ] Power down the A2 fully, unplug from PDU outlet (or switch it off via PDU Pro if you want a hard cut)
-- [ ] Check MS-A2 NVMe slot count/keying before opening — confirm both slots are free and compatible with the T500 and P3 Plus form factors
-- [ ] Install T500 (2TB) and P3 Plus (4TB) into available M.2 slots alongside the existing 1TB boot SSD
-- [ ] Reassemble, reseat KVM/network cables, power on
-- [ ] Confirm both new drives are detected (BIOS or live Linux USB) before going further
+- [x] Power down the A2 fully, unplug from PDU outlet (or switch it off via PDU Pro if you want a hard cut)
+- [x] Check MS-A2 NVMe slot count/keying before opening — confirm both slots are free and compatible with the T500 and P3 Plus form factors
+- [x] Install T500 (2TB) and P3 Plus (4TB) into available M.2 slots alongside the existing 1TB boot SSD
+- [x] Reassemble, reseat KVM/network cables, power on
+- [x] Confirm both new drives are detected (BIOS or live Linux USB) before going further
 
 ## 3. Install Proxmox VE
 Full runbook (ISO version/checksum, disk-selection safety note, network/VLAN
 config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-install.md).
-- [ ] Download Proxmox VE 9.2-1, verify checksum, mount via Comet X virtual media
-- [ ] Install to the original 1TB SSD only — T500 and P3 Plus must not be touched
-- [ ] Static IP `192.168.102.21`, gateway `192.168.102.1` — confirm UCG switch port VLAN mode (access vs. trunk) before this step
+- [x] Download Proxmox VE 9.2-1, verify checksum, mount via Comet X virtual media
+- [x] Install to the original 1TB SSD only — T500 and P3 Plus must not be touched
+- [x] Static IP `192.168.102.21`, gateway `192.168.102.1` — confirm UCG switch port VLAN mode (access vs. trunk) before this step
 - [x] Post-install: no-subscription repo (watch for a *second* enterprise repo file just for Ceph — also needs disabling), `apt full-upgrade`
-- [ ] NTP source — no local NTP currently exists; check whether the UCG offers a built-in NTP server before deciding to point at public pools instead
-- [ ] Config backup — see [`docs/proxmox-config-backup.md`](docs/proxmox-config-backup.md) (script written, key installed on rpi5-1; still needs deploying + cron install on the Proxmox host itself)
+- [x] NTP source — no local NTP currently exists; check whether the UCG offers a built-in NTP server before deciding to point at public pools instead
+- [x] Config backup — see [`docs/proxmox-config-backup.md`](docs/proxmox-config-backup.md) (script written, key installed on rpi5-1; still needs deploying + cron install on the Proxmox host itself)
 
 ## 4. Talos VM → Join Existing Cluster
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.

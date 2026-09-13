@@ -1,0 +1,28 @@
+# Namespace for Gateway API infra objects (the Gateway itself), kept separate
+# from app namespaces the same way an ingress-nginx-style controller would
+# live in its own namespace. Per-app HTTPRoutes live in the app's own
+# namespace and attach to this Gateway via allowedRoutes below.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-system
+---
+# GatewayClass "cilium" is NOT defined here — cilium-operator creates it
+# automatically once gatewayAPI.enabled=true (see values.yaml) and the
+# Gateway API CRDs are present.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: homelab-gateway
+  namespace: gateway-system
+spec:
+  gatewayClassName: cilium
+  listeners:
+    # TLS/443 is a deliberate follow-up — no cert-manager or internal CA is set
+    # up yet. Plain HTTP is enough to validate routing end-to-end for now.
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
