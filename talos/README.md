@@ -14,15 +14,26 @@
   (`CiliumBGPPeerConfig` + `CiliumBGPClusterConfig`). Only nodes labeled
   `bgp-speaker: "true"` participate. **Only label nodes that actually run
   workload pods** (i.e. the workers, not control-plane nodes) — Cilium has every
-  BGP-speaking node advertise LoadBalancer IPs as reachable via itself, and
-  FRR's `maximum-paths 3` ECMPs traffic across whichever it picks. If a
-  control-plane node (tainted, no local pods for the service) ends up as one of
-  those paths, traffic routed to it needs an extra internal hop to reach the
-  real backend — this produced exactly the symptom we hit on 2026-09-12
-  (BGP session up, route exchanged, but the LB IP was unreachable, with an
-  ICMP redirect coming from a control-plane node). The 3 Pi control-plane nodes
-  had `bgp-speaker=true` left over from testing before real workers existed;
-  removing it from them (keeping only `talos-worker-1`/`-2`) fixed it.
+  BGP-speaking node advertise LoadBalancer IPs as reachable via itself, so a
+  tainted control-plane node with no local pod for the service can end up as an
+  ECMP next-hop. The 3 Pi control-plane nodes had `bgp-speaker=true` left over
+  from testing before real workers existed; removed 2026-09-12 (now only
+  `talos-worker-1`/`-2`) as a correctness cleanup, though it turned out not to
+  be the actual cause of the outage below.
+- **External LoadBalancer traffic has been broken cluster-wide since the BGP
+  setup was first built — under investigation 2026-09-13.** Symptom: BGP
+  session established, routes exchanged correctly, `cilium service list` showed
+  the right backend, but external clients got a TCP handshake that completed
+  with zero data afterward (confirmed even on `bgp-test`, a service that had
+  been "up" for 67 days with this issue the whole time — the BGP control plane
+  was configured but never actually validated end-to-end until now). ClusterIP
+  access worked perfectly throughout, isolating the problem to external
+  (north-south) traffic specifically rather than the pods/overlay/BGP config.
+  `cilium status --verbose` showed `Routing: Host: Legacy` with `Masquerading:
+  IPTables` — Cilium was silently falling back off the modern eBPF host-routing
+  path, with no explicit config anywhere requesting that. Leading hypothesis:
+  the Talos-hardened `securityContext.capabilities` list (see below) is missing
+  `BPF`/`PERFMON`, which that path needs — testing now.
 - LoadBalancer IP pool `192.168.103.1-30` is advertised via BGP
   (`cilium/bgp/lb-pool.yaml`, `cilium/bgp/advertisement.yaml`).
 - `cilium/bgp/ucg-frr.conf` is the actual FRR config running on the UCG's BGP

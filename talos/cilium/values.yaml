@@ -4,6 +4,14 @@ ipam:
 
 kubeProxyReplacement: true    # we disabled kube-proxy in the Talos config
 
+# Added 2026-09-13: full eBPF host routing (bypassing iptables entirely) appears
+# to require BPF-based masquerading too — with masquerading left on iptables
+# (the default), Cilium was silently falling back to "Host: Legacy" routing,
+# which had a gap handling externally-sourced (BGP-advertised LB) traffic:
+# TCP handshake completed, zero data ever flowed. See talos/README.md.
+bpf:
+  masquerade: true
+
 # No kube-proxy means no ClusterIP for the API server yet, so reach it via Talos
 # KubePrism (the local LB you already have enabled on 7445) — solves the chicken-and-egg
 k8sServiceHost: localhost
@@ -21,13 +29,9 @@ cgroup:
   hostRoot: /sys/fs/cgroup
 
 # Talos runs a locked-down securityContext; grant Cilium exactly the caps it needs.
-# CAP_BPF/CAP_PERFMON added 2026-09-13: without them Cilium silently falls back to
-# "Legacy" host routing + iptables masquerading instead of full eBPF host routing,
-# which turned out to have a gap handling externally-sourced (BGP-advertised LB)
-# traffic — TCP handshake completed but no data ever flowed. Confirmed via
-# `cilium status --verbose` showing "Routing: ... Host: Legacy" with no explicit
-# config anywhere requesting that; ClusterIP access worked perfectly the whole
-# time, isolating the problem to north-south traffic specifically.
+# BPF/PERFMON added 2026-09-13 while chasing a "Host: Legacy" routing fallback
+# (see bpf.masquerade below and talos/README.md) — did NOT fix it on their own,
+# left in since they don't hurt and may still matter once masquerade mode changes.
 securityContext:
   capabilities:
     ciliumAgent:
