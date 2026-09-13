@@ -1,0 +1,17 @@
+# Lives in gateway-system (not cert-manager's own namespace) because the
+# resulting Secret is consumed directly by the Gateway's TLS listener
+# (talos/cilium/gateway.yaml), and Gateway API cert Secrets must be in the
+# same namespace as the Gateway unless a ReferenceGrant says otherwise.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-jakerobb-org
+  namespace: gateway-system
+spec:
+  secretName: wildcard-jakerobb-org-tls
+  issuerRef:
+    name: letsencrypt-cloudflare
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.jakerobb.org"
+    - "jakerobb.org"

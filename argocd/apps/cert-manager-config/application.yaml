@@ -1,0 +1,23 @@
+# Wave 1 — waits for the cert-manager Application (wave 0) to be Healthy
+# before applying, since the ClusterIssuer/Certificate kinds don't exist
+# until cert-manager's CRDs are installed. See argocd/README.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/cert-manager-config
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true

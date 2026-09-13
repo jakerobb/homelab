@@ -1,7 +1,8 @@
 # First real HTTPRoute on homelab-gateway (see talos/cilium/gateway.yaml).
-# Hostname-scoped from day one so future routes on the same HTTP listener
-# don't collide with a catch-all. Requires a local DNS record for
-# argocd.lan -> 192.168.102.128 (the Gateway's LB IP) — see argocd/README.md.
+# Hostname is a real public domain (Cloudflare-managed, external-dns creates
+# the record automatically — see argocd/apps/external-dns/) rather than a
+# manually-added local DNS entry. No sectionName pinned to a specific
+# listener, so this attaches to both the http and https listeners.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -12,7 +13,7 @@ spec:
     - name: homelab-gateway
       namespace: gateway-system
   hostnames:
-    - argocd.lan
+    - argocd.jakerobb.org
   rules:
     - backendRefs:
         - name: argocd-server

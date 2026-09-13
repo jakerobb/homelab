@@ -1,0 +1,31 @@
+# Wave 0: chart + CRDs + controllers only. The ClusterIssuer/Certificate
+# (argocd/apps/cert-manager-config) are a separate Application at wave 1 so
+# root waits for this one to report Healthy before creating them — otherwise
+# the ClusterIssuer's `kind` wouldn't exist yet (CRD race).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.21.2
+    helm:
+      releaseName: cert-manager
+      valuesObject:
+        crds:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

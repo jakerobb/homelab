@@ -18,11 +18,26 @@ metadata:
 spec:
   gatewayClassName: cilium
   listeners:
-    # TLS/443 is a deliberate follow-up — no cert-manager or internal CA is set
-    # up yet. Plain HTTP is enough to validate routing end-to-end for now.
+    # Kept alongside the https listener below (no forced redirect yet) —
+    # revisit once every route has moved to https.
     - name: http
       protocol: HTTP
       port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
+    # TLS decided 2026-09-13: real publicly-trusted certs via cert-manager +
+    # Let's Encrypt DNS-01 (Cloudflare), not an internal CA — see
+    # manifests/cert-manager-config/. The cert Secret lives in this same
+    # namespace (gateway-system), so no ReferenceGrant is needed.
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: wildcard-jakerobb-org-tls
       allowedRoutes:
         namespaces:
           from: All
