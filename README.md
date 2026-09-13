@@ -8,14 +8,16 @@ This repo contains IaC and related stuff for my homelab.
   Raspberry Pi 5 4GB) · MS-A2 worker host (`.21`, currently stock Windows, being
   repurposed per the TODO below).
 - **Existing cluster:** Talos v1.11.5, Kubernetes v1.34.1, Cilium CNI with
-  `kubeProxyReplacement` + BGP control plane (peers to the UCG, ASN 65001↔65000).
+  `kubeProxyReplacement`, full eBPF host routing, and L2 announcements for
+  LoadBalancer IPs (`192.168.102.128/26`) — BGP was the original design but hit
+  an unresolved UCG Fiber routing bug, see `talos/README.md` for the writeup.
   Control-plane nodes use a **custom Pi5 installer image** — any amd64 node must use
-  the stock Talos installer instead. Details, gotchas, and the open question of how
-  secrets get versioned live in [`talos/README.md`](talos/README.md).
+  the stock Talos installer instead. Details and gotchas live in
+  [`talos/README.md`](talos/README.md).
 - **Outside the cluster:** the original RPi5 16GB stays on Docker Compose duty for
   hardware-pinned things (e.g. NUT client for the UPS) until/unless that changes later.
 - **IaC layout:**
-  - [`talos/`](talos/) — non-secret Cilium/BGP config and per-node Talos patches
+  - [`talos/`](talos/) — non-secret Cilium config and per-node Talos patches
     applied to the existing cluster.
   - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions (in progress;
     empty until Proxmox itself is installed per step 3 below).
@@ -56,17 +58,13 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [ ] Copy the age private key (`~/.config/sops/age/keys.txt`) into 1Password for durability
 - [x] Talos image source resolved: built via [Image Factory](https://factory.talos.dev) (not a GitHub release) — see `talos/README.md` for the exact v1.11.5 qcow2 URL, distinct from the `ghcr.io/talos-rpi5/installer` image the Pi control plane uses
 - [x] **Two** workers, not one — decided 2026-09-11 so a Talos upgrade doesn't leave the cluster with zero schedulable capacity (see `talos/README.md`). `talos-worker-1` (`.31`) / `talos-worker-2` (`.32`) — `.21-.29` is reserved for physical hosts, `.31+` for VMs — 4 vCPU / 4GB RAM each, patches at `talos/patches/workers/`
-- [x] Terraform written for both VMs (`terraform/proxmox/talos-worker.tf`, `images.tf`) — `terraform plan` reviewed and clean, not yet applied
-- [ ] `terraform apply` from rpi5-1
-- [ ] Add DHCP reservations for both fixed MACs (`02:00:00:00:00:31` → `.31`, `...:32` → `.32`) on the UCG
-- [ ] Boot both VMs, capture maintenance-mode IPs
-- [ ] Generate worker configs reusing the existing cluster's secrets bundle (`~/talos/homelab/secrets.yaml` on rpi5-1 — same cluster CA, do not regenerate secrets)
-- [ ] `talosctl apply-config` to join both as workers
-- [ ] Verify with `kubectl get nodes` — confirm `kubernetes.io/arch=amd64` label auto-applied
-- [ ] Label both nodes `bgp-speaker=true` so `CiliumBGPClusterConfig`'s nodeSelector picks them up
-- [x] `talos/cilium/bgp/ucg-frr.conf` updated in-repo with `.31`/`.32` as BGP neighbors — still needs deploying to the UCG itself (manual, no Terraform/API access to the UDM for this)
-- [ ] Watch for any DaemonSets that might crash-loop on amd64 (the mixed-arch trap you already know about)
-- [ ] Schedule a test workload on it to confirm it's live
+- [x] Terraform written for both VMs (`terraform/proxmox/talos-worker.tf`, `images.tf`), applied from rpi5-1
+- [x] DHCP reservations added on the UCG for both fixed MACs → `.31`/`.32`
+- [x] Both VMs booted, worker configs generated and applied via `talosctl apply-config` (reused the existing cluster's secrets bundle — same cluster CA)
+- [x] `kubectl get nodes` confirms both `Ready` with `kubernetes.io/arch=amd64`
+- [x] No DaemonSets crash-looping on amd64 (Cilium + cilium-envoy both 5/5 across all nodes)
+- [x] Test workload scheduled and confirmed live (spread correctly across both new workers)
+- [x] **External LoadBalancer traffic was broken cluster-wide** (found while testing the above) — root cause was an unresolved UCG Fiber routing bug with BGP-learned routes, not anything in the cluster. Pivoted from BGP to Cilium L2 announcements; see `talos/README.md` for the full investigation and current LB pool (`192.168.102.128/26`). The UCG's now-unused BGP peering config should be removed there.
 
 ## 5. HexOS VM with T500 + P3 Plus
 - [ ] Check IOMMU groups for both NVMe drives — confirm they're isolated enough for clean passthrough
@@ -81,6 +79,6 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 
 ## Notes / Open Decisions
 - ~~Confirm whether Proxmox management IP and Talos VM IP should be on the same VLAN/subnet or split~~ — decided: same VLAN/subnet (`192.168.102.0/24`) as the existing cluster.
-- ~~BGP peering config may need an explicit update for the new Talos worker node~~ — confirmed: needs both a `bgp-speaker=true` k8s label *and* a manual UCG-side FRR neighbor addition (see step 4).
+- ~~BGP peering config may need an explicit update for the new Talos worker node~~ — moot: BGP itself was abandoned after an unresolved UCG Fiber routing bug, replaced with L2 announcements (see step 4, `talos/README.md`).
 - ~~Mirror vs. stripe on mismatched-capacity drives~~ — decided: stripe, or AnyRaid if HexOS has shipped it by the time we get there (see step 5).
 - ~~How Talos secrets get versioned~~ — decided: SOPS+age, encrypted bundle committed to the repo (see `talos/README.md`).

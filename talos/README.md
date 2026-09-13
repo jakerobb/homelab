@@ -8,43 +8,40 @@
   since stock Talos doesn't support the Pi5 directly. **Any amd64 worker (e.g. the MS-A2
   Talos VM) must use the standard `ghcr.io/siderolabs/installer:v1.11.5` / stock qcow2 —
   do not reuse the rpi5 installer image for it.**
-- CNI: Cilium, with `kubeProxyReplacement` enabled and BGP control plane enabled
-  (see `cilium/values.yaml`).
-- BGP peering to the Ubiquiti gateway (UCG) is defined in `cilium/bgp-peering.yaml`
-  (`CiliumBGPPeerConfig` + `CiliumBGPClusterConfig`). Only nodes labeled
-  `bgp-speaker: "true"` participate. **Only label nodes that actually run
-  workload pods** (i.e. the workers, not control-plane nodes) — Cilium has every
-  BGP-speaking node advertise LoadBalancer IPs as reachable via itself, so a
-  tainted control-plane node with no local pod for the service can end up as an
-  ECMP next-hop. The 3 Pi control-plane nodes had `bgp-speaker=true` left over
-  from testing before real workers existed; removed 2026-09-12 (now only
-  `talos-worker-1`/`-2`) as a correctness cleanup, though it turned out not to
-  be the actual cause of the outage below.
-- **External LoadBalancer traffic has been broken cluster-wide since the BGP
-  setup was first built — under investigation 2026-09-13.** Symptom: BGP
-  session established, routes exchanged correctly, `cilium service list` showed
-  the right backend, but external clients got a TCP handshake that completed
-  with zero data afterward (confirmed even on `bgp-test`, a service that had
-  been "up" for 67 days with this issue the whole time — the BGP control plane
-  was configured but never actually validated end-to-end until now). ClusterIP
-  access worked perfectly throughout, isolating the problem to external
-  (north-south) traffic specifically rather than the pods/overlay/BGP config.
-  `cilium status --verbose` showed `Routing: Host: Legacy` with `Masquerading:
-  IPTables` — Cilium was silently falling back off the modern eBPF host-routing
-  path, with no explicit config anywhere requesting that. Leading hypothesis:
-  the Talos-hardened `securityContext.capabilities` list (see below) is missing
-  `BPF`/`PERFMON`, which that path needs — testing now.
-- LoadBalancer IP pool `192.168.103.1-30` is advertised via BGP
-  (`cilium/bgp/lb-pool.yaml`, `cilium/bgp/advertisement.yaml`).
-- `cilium/bgp/ucg-frr.conf` is the actual FRR config running on the UCG's BGP
-  daemon — maintained here as the source of truth, deployed to the router
-  manually since there's no Terraform/API access to the UDM/UCG for this.
-  **Important:** it hardcodes every peer IP individually (no dynamic
-  discovery) — adding a new BGP-speaking k8s node means both labeling it
-  `bgp-speaker=true` *and* adding a `neighbor <ip> peer-group HOMELAB` line
-  here, then re-deploying to the router. All BGP-speaking nodes share the same
-  `HOMELAB` peer-group/remote-as, since `CiliumBGPClusterConfig` uses a single
-  cluster-wide `localASN: 65001` regardless of node role.
+- CNI: Cilium, with `kubeProxyReplacement` enabled, full eBPF host routing
+  (`bpf.masquerade: true`, `Host: BPF` — not the `Legacy`/iptables fallback),
+  and **L2 announcements** for LoadBalancer IPs (see `cilium/values.yaml`).
+- LoadBalancer IP pool: `192.168.102.128/26` (`.128-.191`), announced via
+  `cilium/l2-announcement-policy.yaml` — the pool just responds to ARP
+  directly, so it looks like a normal host on the LAN to everything else. Only
+  non-control-plane nodes announce (via `node-role.kubernetes.io/control-plane
+  DoesNotExist`, not a manual label — new workers need no extra labeling to
+  participate).
+
+### Why L2 announcements instead of BGP
+
+BGP was the original design (peering Cilium with the UCG Fiber, `localASN
+65001` / UCG `65000`) and mostly worked — sessions established, routes
+exchanged correctly — but external LoadBalancer traffic was **broken the
+entire time** (confirmed on a service that had been "up" for 67 days with
+this bug the whole time; BGP was configured but never actually validated
+end-to-end until 2026-09-13). Symptom: TCP handshake completed, then zero
+data ever flowed in either direction afterward. A synchronized packet capture
+(client, both worker nodes, `cilium monitor`) showed the true pattern: only
+the *first* packet of a new flow toward the LB IP got through in each
+direction — every packet after that, client→server, silently vanished, while
+the server kept retransmitting its SYN-ACK. That's the signature of a
+router-side flow-acceleration/fast-path bug (caches the first packet's
+forwarding decision, then the cached decision goes stale for the rest of the
+flow) — not anything on the Cilium/Talos side. Ruled out, with actual
+evidence, before concluding this: BGP session state, FRR config correctness,
+ECMP path count (tested both `maximum-paths 3` and `1`), control-plane nodes
+participating as peers, Cilium's `Legacy` vs `BPF` host-routing mode, and BPF
+masquerade — none of it moved the needle. No fix found in Ubiquiti's or
+Cilium's community trackers for this specific pattern on the UCG Fiber, so we
+pivoted to L2 announcements, which avoids router-side dynamic routing
+entirely. The UCG's BGP peering config (uploaded via Policy Engine > Dynamic
+Routing) should be removed there since nothing uses it anymore.
 
 ## Where the secrets actually live
 
@@ -86,7 +83,7 @@ follow-up once there's time to diff it carefully against the live config.
 
 ## Layout
 
-- `cilium/` — Cilium Helm values and BGP/LB CRDs, applied to the existing cluster.
+- `cilium/` — Cilium Helm values and LB/L2-announcement CRDs, applied to the existing cluster.
 - `patches/control-plane/` — per-node Talos config patches for the existing 3 Pi
   control-plane nodes (hostname only, currently).
 - `patches/workers/` — patches for the two MS-A2 worker VMs (hostname only,
@@ -112,9 +109,7 @@ as more of each show up.
 | `talos-worker-1` | `192.168.102.31` | `02:00:00:00:00:31` |
 | `talos-worker-2` | `192.168.102.32` | `02:00:00:00:00:32` |
 
-Both need a DHCP reservation on the UCG (matching the fixed MAC above) and a
-BGP neighbor entry on the UCG's FRR config once they're up — see the BGP note
-above, this now applies to **two** IPs, not one.
+Both need a DHCP reservation on the UCG (matching the fixed MAC above).
 
 Each: 4 vCPU, 4GB RAM. (Proxmox's `cores` is a vCPU count, not a physical-core
 reservation — the host scheduler spreads vCPU threads across all 32 logical

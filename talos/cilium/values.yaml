@@ -12,24 +12,33 @@ kubeProxyReplacement: true    # we disabled kube-proxy in the Talos config
 bpf:
   masquerade: true
 
-# TEMPORARY — remove after this rollout succeeds. Cilium's own config-drift-checker
-# showed enable-bpf-masquerade stuck at false at runtime despite the ConfigMap
-# correctly having true, because BPF masquerade state gets pinned to
-# /sys/fs/bpf on the host to survive normal pod restarts — switching datapath
-# mode needs that pinned state cleared first. This adds an init container that
-# does exactly that. Cluster already had the cleanCiliumState capabilities
-# below pre-provisioned, suggesting this was anticipated.
-cleanBpfState: true
-
 # No kube-proxy means no ClusterIP for the API server yet, so reach it via Talos
 # KubePrism (the local LB you already have enabled on 7445) — solves the chicken-and-egg
 k8sServiceHost: localhost
 k8sServicePort: 7445
 
-# BGP control plane — installed now but DORMANT; it does nothing until we add
-# peering config in Phase 2. Including it now means Phase 2 is pure CRDs, no Helm upgrade.
+# BGP control plane — DISABLED 2026-09-13. The UCG Fiber has some kind of
+# first-packet-only forwarding bug for BGP-learned routes (TCP handshake
+# completes, zero data ever flows after) that we couldn't resolve after
+# extensive investigation — see talos/README.md for the full writeup. Pivoted
+# to L2 announcements instead, which sidesteps router-side dynamic routing
+# entirely. The UCG's own BGP peering config (Policy Engine > Dynamic Routing)
+# should also be removed there since it's no longer used.
 bgpControlPlane:
+  enabled: false
+
+# L2 announcements: the LB pool IP just responds to ARP directly, making it
+# look like a normal host on the LAN — no routing/BGP involved.
+l2announcements:
   enabled: true
+
+# Sized for our LB pool's max size (192.168.102.128/26, 64 addresses): Cilium's
+# L2 announcement leader election renews its lease every leaseRenewDeadline
+# (default 5s), needing roughly numServices/5 QPS. 64/5 ≈ 13 — rounded up with
+# headroom since we're nowhere near 64 services today.
+k8sClientRateLimit:
+  qps: 20
+  burst: 40
 
 # Talos already mounts cgroup v2; don't let Cilium try to mount it
 cgroup:
@@ -38,9 +47,10 @@ cgroup:
   hostRoot: /sys/fs/cgroup
 
 # Talos runs a locked-down securityContext; grant Cilium exactly the caps it needs.
-# BPF/PERFMON added 2026-09-13 while chasing a "Host: Legacy" routing fallback
-# (see bpf.masquerade below and talos/README.md) — did NOT fix it on their own,
-# left in since they don't hurt and may still matter once masquerade mode changes.
+# BPF/PERFMON added 2026-09-13 alongside bpf.masquerade above, to unlock full
+# eBPF host routing instead of the "Legacy" iptables-based fallback — a real
+# improvement made along the way, even though it turned out not to be the
+# cause of the actual external-traffic bug (see talos/README.md).
 securityContext:
   capabilities:
     ciliumAgent:

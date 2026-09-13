@@ -1,0 +1,8 @@
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: homelab-pool
+spec:
+  blocks:
+    - cidr: "192.168.102.128/26" # .128-.191, 64 addresses. Physical hosts: .21-.29,
+                                  # VMs: .31-.99, DHCP: .200-.254 — see talos/README.md
