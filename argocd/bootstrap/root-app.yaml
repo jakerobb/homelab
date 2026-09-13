@@ -1,0 +1,28 @@
+# The one Application applied by hand. Everything under argocd/apps/ from
+# here on is reconciled by ArgoCD itself (recursive directory source, fully
+# automated sync) — this is the app-of-apps root.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    # Cascade-delete child-managed resources if this Application is ever deleted.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: argocd/apps
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

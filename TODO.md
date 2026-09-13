@@ -30,8 +30,12 @@ NFS/SMB, and — the actual goal, per discussion — wire it up as a Kubernetes
 persistent volumes that survive a pod being rescheduled to a different node.
 
 ## ArgoCD
-**Not started.** GitOps deployment of cluster workloads from this repo (or a
-paired one) instead of manual `kubectl apply`/`helm upgrade` from rpi5-1.
+**Base setup done** — decided and deployed 2026-09-13, installed via Helm
+(app-of-apps pattern, fully automated sync) into this same repo rather than a
+paired one; see [`argocd/README.md`](argocd/README.md). Remaining: add real
+workloads under `argocd/apps/` as other TODO items here get built out, and
+revisit the fully-automated `prune` decision once anything stateful (HexOS
+storage, below) is under ArgoCD's management.
 
 ## Metrics (Prometheus + timeseries DB)
 **Not started.** Cluster/node/pod metrics — specifically so OpenLens's

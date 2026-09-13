@@ -1,0 +1,17 @@
+# Homelab overrides for the argo-cd chart. Only deltas from chart defaults —
+# see `helm show values argo/argo-cd --version 10.9.0` for everything else.
+# Chart: https://github.com/argoproj/argo-helm, repo https://argoproj.github.io/argo-helm
+
+nameOverride: argocd
+fullnameOverride: argocd
+
+configs:
+  params:
+    # No TLS termination in-cluster yet (nothing in this cluster has it — see
+    # talos/cilium/gateway.yaml). Serve plain HTTP; the Gateway's own listener
+    # is plain HTTP too, so this isn't a regression vs. the rest of the cluster.
+    server.insecure: true
+
+dex:
+  # No SSO connector configured — local admin + `argocd` CLI auth for now.
+  enabled: false
