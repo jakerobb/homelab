@@ -26,11 +26,12 @@ spec:
         txtOwnerId: homelab-k8s
         domainFilters:
           - jakerobb.org
-        extraArgs:
-          # DNS-only (grey-cloud): these records point at a private LAN IP
-          # (the Gateway's LB IP), so proxying through Cloudflare's edge
-          # would break resolution entirely — same as the existing Caddy setup.
-          - --cloudflare-proxied=false
+        # cloudflare-proxied is NOT set — its own default is already `false`
+        # (DNS-only/grey-cloud), which is what we want: these records point
+        # at a private LAN IP, so Cloudflare's edge proxy would break
+        # resolution entirely. Explicitly passing `--cloudflare-proxied=false`
+        # crashes the pod — that flag's custom parser doesn't accept `=false`,
+        # only bare presence (meaning true) or omission (meaning false).
         env:
           - name: CF_API_TOKEN
             valueFrom:

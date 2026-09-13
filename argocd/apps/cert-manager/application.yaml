@@ -20,6 +20,14 @@ spec:
       valuesObject:
         crds:
           enabled: true
+        # DNS-01 self-check was failing zone-walk lookups through the
+        # cluster's own resolver chain (CoreDNS -> Unbound on the LAN),
+        # which returned an unrelated/bogus SOA answer for the query rather
+        # than the real jakerobb.org zone. Bypass it entirely for ACME
+        # propagation checks by going straight to public recursive resolvers.
+        extraArgs:
+          - --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53
+          - --dns01-recursive-nameservers-only=true
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager
