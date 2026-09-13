@@ -12,6 +12,15 @@ kubeProxyReplacement: true    # we disabled kube-proxy in the Talos config
 bpf:
   masquerade: true
 
+# TEMPORARY — remove after this rollout succeeds. Cilium's own config-drift-checker
+# showed enable-bpf-masquerade stuck at false at runtime despite the ConfigMap
+# correctly having true, because BPF masquerade state gets pinned to
+# /sys/fs/bpf on the host to survive normal pod restarts — switching datapath
+# mode needs that pinned state cleared first. This adds an init container that
+# does exactly that. Cluster already had the cleanCiliumState capabilities
+# below pre-provisioned, suggesting this was anticipated.
+cleanBpfState: true
+
 # No kube-proxy means no ClusterIP for the API server yet, so reach it via Talos
 # KubePrism (the local LB you already have enabled on 7445) — solves the chicken-and-egg
 k8sServiceHost: localhost
