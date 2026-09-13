@@ -1,0 +1,21 @@
+# Explicit, labeled Namespace — local-path-provisioner's helper pods (the
+# short-lived pods it spawns per-PVC to create/delete the backing directory)
+# mount a hostPath volume, which violates this cluster's default `baseline`
+# PodSecurity enforcement for any namespace that doesn't opt out. Discovered
+# 2026-09-13 when Authelia's PVC sat Pending: `helper-pod-create-pvc-... is
+# forbidden: violates PodSecurity "baseline:latest": hostPath volumes`.
+# `privileged` here is scoped to just this one namespace, not a cluster-wide
+# relaxation.
+#
+# This is a cluster-scoped resource (a Namespace), so it's applied directly
+# by the root Application regardless of the destination namespace below —
+# same mechanism as argocd-ingress/httproute.yaml. Deliberately the sole
+# owner of this object: the local-path-provisioner Application itself no
+# longer uses `CreateNamespace=true`, to avoid two different Applications
+# both trying to manage the same Namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: local-path-storage
+  labels:
+    pod-security.kubernetes.io/enforce: privileged

@@ -61,6 +61,21 @@ on every device, no manually-added DNS entries per app:
   (`registry: txt`, `txtOwnerId: homelab-k8s`) still means external-dns will
   only ever touch/prune records carrying its own marker — it won't adopt or
   delete Caddy's existing records just because a hostname collides.
+- **Unbound rebinding protection (gotcha, fixed 2026-09-13):** the LAN's
+  Unbound resolver (`~/docker/unbound/custom.conf.d/local.conf` on rpi5-1)
+  ships a DNS-rebinding-protection default from its Docker image
+  (`private-address: 192.168.0.0/16`) that silently strips any answer
+  resolving a non-allowlisted hostname to a private IP — returning `NOERROR`
+  with zero records, not a cache/propagation-delay symptom. Every hostname
+  external-dns creates under `jakerobb.org` resolves to a private LAN IP by
+  design, so this blocked `argocd.jakerobb.org` (and would have blocked every
+  future one, e.g. `auth.jakerobb.org` for Authelia) until `jakerobb.org` was
+  added to Unbound's `private-domain` allowlist alongside the existing `lan`
+  entry. **If a newly-added `HTTPRoute` hostname mysteriously won't resolve
+  from LAN clients** (even though `dig @1.1.1.1` shows the correct record),
+  check this first — it's already fixed for the `jakerobb.org` zone as a
+  whole, so it shouldn't recur, but it's the first thing to suspect if it
+  does.
 - **TLS:** [`cert-manager`](apps/cert-manager/application.yaml) with a
   `ClusterIssuer` doing **Let's Encrypt via DNS-01 challenges against
   Cloudflare** ([`manifests/cert-manager-config/`](../manifests/cert-manager-config/)) —
