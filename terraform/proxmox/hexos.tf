@@ -21,14 +21,16 @@ locals {
 
   hexos_passthrough_drives = {
     p3plus = {
-      id          = "c0a9:540a" # vendor:device, from lspci -nn (P3 Plus, 4TB)
-      path        = "0000:08:00.0"
-      iommu_group = 17
+      id           = "c0a9:540a" # vendor:device, from lspci -nn (P3 Plus, 4TB)
+      subsystem_id = "c0a9:5021" # from lspci -nn -vvv, "Subsystem:" line
+      path         = "0000:08:00.0"
+      iommu_group  = 17
     }
     t500 = {
-      id          = "c0a9:5415" # vendor:device, from lspci -nn (T500, 2TB)
-      path        = "0000:09:00.0"
-      iommu_group = 18
+      id           = "c0a9:5415" # vendor:device, from lspci -nn (T500, 2TB)
+      subsystem_id = "c0a9:2b00" # from lspci -nn -vvv, "Subsystem:" line
+      path         = "0000:09:00.0"
+      iommu_group  = 18
     }
   }
 }
@@ -38,10 +40,11 @@ resource "proxmox_hardware_mapping_pci" "hexos_drive" {
 
   name = each.key
   map = [{
-    id          = each.value.id
-    node        = var.proxmox_node_name
-    path        = each.value.path
-    iommu_group = each.value.iommu_group
+    id           = each.value.id
+    subsystem_id = each.value.subsystem_id
+    node         = var.proxmox_node_name
+    path         = each.value.path
+    iommu_group  = each.value.iommu_group
   }]
 }
 

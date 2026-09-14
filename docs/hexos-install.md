@@ -87,6 +87,17 @@ PCI resource mappings instead (`proxmox_hardware_mapping_pci`, referenced via
 `mapping = "..."` on the `hostpci` block rather than a raw `id`) — Terraform
 creates the mappings too, no manual GUI step needed.
 
+**Second gotcha, same day:** the mapping applies at `terraform apply` but the
+VM then fails to *start* with `PCI device mapping invalid (hardware probably
+changed): missing expected property 'subsystem-id'`. The `subsystem_id`
+attribute is documented as optional but is actually required for Proxmox to
+consider the mapping complete enough to use. Get it per drive with:
+
+```bash
+lspci -nn -vvv -s 08:00.0 | grep -i subsystem   # P3 Plus
+lspci -nn -vvv -s 09:00.0 | grep -i subsystem   # T500
+```
+
 ## 4. The installer ISO
 
 The HexOS website pushes the "HexOS Imager" tool, which only writes to a
