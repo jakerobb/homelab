@@ -98,16 +98,10 @@ resource "proxmox_virtual_environment_vm" "hexos" {
     file_format  = "raw"
   }
 
-  # Installer media — remove/detach once HexOS is installed and boots clean
-  # from scsi0.
-  cdrom {
-    file_id   = proxmox_download_file.hexos_iso.id
-    interface = "ide2"
-  }
-
-  # Boot the installer first; flip to just ["scsi0"] after a successful
-  # install and first boot confirmation.
-  boot_order = ["ide2", "scsi0"]
+  # No cdrom block — HexOS is installed and boots clean from scsi0. The
+  # installer ISO stays downloaded (proxmox_download_file.hexos_iso above)
+  # in case a reinstall is ever needed, just no longer attached to the VM.
+  boot_order = ["scsi0"]
 
   hostpci {
     device  = "hostpci0"
