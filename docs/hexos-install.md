@@ -118,6 +118,13 @@ terraform plan   # confirm: 1 to add (hexos), 0 to change/destroy
 terraform apply
 ```
 
+**Third gotcha:** the default `std` VGA adapter corrupted irrecoverably
+partway through the installer's ncurses wizard (once it changed console
+resolution) — a known weak spot with Linux guest console mode switches under
+Cirrus/std emulation. Fixed by switching `vga.type` to `virtio` in
+`hexos.tf`, which needs the VM stopped (hard **Stop**, not Shutdown — ACPI
+shutdown may not register mid-installer) before reapplying.
+
 Then, in the Proxmox web UI, open the `hexos` VM's **Console** (noVNC) and
 walk through HexOS's installer same as any other OS install — target its own
 32GB virtual boot disk (`scsi0`), **not** either passed-through NVMe. Once

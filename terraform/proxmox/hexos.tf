@@ -128,6 +128,10 @@ resource "proxmox_virtual_environment_vm" "hexos" {
   }
 
   vga {
-    type = "std" # needs a console for the installer, unlike headless Talos
+    # "std" (the default) corrupted irrecoverably partway through the HexOS/
+    # TrueNAS installer's ncurses wizard once it changed resolution — a known
+    # Cirrus/std-emulation weak spot with Linux guest console mode switches.
+    # virtio-gpu handles that far more reliably.
+    type = "virtio"
   }
 }

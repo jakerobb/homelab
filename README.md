@@ -70,7 +70,7 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 Runbook: [`docs/hexos-install.md`](docs/hexos-install.md).
 - [x] Enable IOMMU in Proxmox host (kernel params) — `amd_iommu=on iommu=pt` added to `GRUB_CMDLINE_LINUX_DEFAULT`, confirmed live post-reboot (the `AMD-Vi: Unknown option - 'on'` dmesg line is a harmless, expected quirk — see runbook)
 - [x] Check IOMMU groups for both NVMe drives — both isolated alone in their own group (P3 Plus = group 17 @ `0000:08:00.0`, T500 = group 18 @ `0000:09:00.0`), no ACS override needed
-- [ ] Create HexOS VM: allocate adequate RAM (8GB+ baseline, more helps ZFS ARC), reasonable vCPU count — Terraform written (`terraform/proxmox/hexos.tf`), not yet applied (needs the HexOS ISO uploaded to Proxmox first)
+- [x] Create HexOS VM: allocate adequate RAM (8GB+ baseline, more helps ZFS ARC), reasonable vCPU count — applied via `terraform/proxmox/hexos.tf` (6 vCPU / 8GB), VM exists and boots the installer ISO
 - [x] PCIe-passthrough both NVMe drives individually (not virtual disks) — HexOS/ZFS wants raw block access — `hostpci0`/`hostpci1` in `hexos.tf`
 - [ ] Install HexOS in the VM
 - [ ] Pool layout — decided: stripe (6TB usable, no redundancy) unless HexOS's ZFS AnyRaid is ready to use by then, in which case use that instead for flexible-capacity redundancy. Plain mirror is out (wastes 2TB of the P3 Plus given mismatched capacities).
