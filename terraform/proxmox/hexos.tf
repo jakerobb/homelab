@@ -10,9 +10,39 @@
 # are wired to, not the drives themselves — if either NVMe is ever moved to a
 # different M.2 slot on the board, these addresses (and this config) would
 # need re-deriving.
-
+#
+# Passthrough goes through named PCI resource mappings, not raw PCI IDs
+# directly on the VM's hostpci config — Proxmox hard-rejects raw hostpciN IDs
+# for anything but root@pam ("only root can set 'hostpciN' config for
+# non-mapped devices"), which breaks the api_token auth this repo uses on
+# purpose (see providers.tf). Mappings sidestep that entirely.
 locals {
   hexos_iso_file_name = "TrueNAS-SCALE-25.10.3-HexOS.iso"
+
+  hexos_passthrough_drives = {
+    p3plus = {
+      id          = "c0a9:540a" # vendor:device, from lspci -nn (P3 Plus, 4TB)
+      path        = "0000:08:00.0"
+      iommu_group = 17
+    }
+    t500 = {
+      id          = "c0a9:5415" # vendor:device, from lspci -nn (T500, 2TB)
+      path        = "0000:09:00.0"
+      iommu_group = 18
+    }
+  }
+}
+
+resource "proxmox_hardware_mapping_pci" "hexos_drive" {
+  for_each = local.hexos_passthrough_drives
+
+  name = each.key
+  map = [{
+    id          = each.value.id
+    node        = var.proxmox_node_name
+    path        = each.value.path
+    iommu_group = each.value.iommu_group
+  }]
 }
 
 resource "proxmox_download_file" "hexos_iso" {
@@ -77,15 +107,15 @@ resource "proxmox_virtual_environment_vm" "hexos" {
   boot_order = ["ide2", "scsi0"]
 
   hostpci {
-    device = "hostpci0"
-    id     = "0000:08:00.0" # P3 Plus (4TB)
-    pcie   = true
+    device  = "hostpci0"
+    mapping = proxmox_hardware_mapping_pci.hexos_drive["p3plus"].name
+    pcie    = true
   }
 
   hostpci {
-    device = "hostpci1"
-    id     = "0000:09:00.0" # T500 (2TB)
-    pcie   = true
+    device  = "hostpci1"
+    mapping = proxmox_hardware_mapping_pci.hexos_drive["t500"].name
+    pcie    = true
   }
 
   network_device {

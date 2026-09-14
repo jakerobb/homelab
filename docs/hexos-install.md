@@ -79,6 +79,14 @@ Both target drives are isolated alone in their own group — clean passthrough,
 no ACS override needed. These addresses are now in
 [`terraform/proxmox/hexos.tf`](../terraform/proxmox/hexos.tf).
 
+**Gotcha found 2026-09-13, on first `terraform apply`:** a raw `hostpciN` PCI
+ID on the VM config is rejected outright for non-root API tokens (`only root
+can set 'hostpciN' config for non-mapped devices` — HTTP 500), which breaks
+this repo's API-token-only convention (`providers.tf`). Fixed by using named
+PCI resource mappings instead (`proxmox_hardware_mapping_pci`, referenced via
+`mapping = "..."` on the `hostpci` block rather than a raw `id`) — Terraform
+creates the mappings too, no manual GUI step needed.
+
 ## 4. The installer ISO
 
 The HexOS website pushes the "HexOS Imager" tool, which only writes to a

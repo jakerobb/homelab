@@ -46,8 +46,10 @@ export TF_VAR_proxmox_api_token="terraform@pve!provider=<uuid>"
 - `hexos` VM (`hexos.tf`) — q35, UEFI (OVMF), 6 vCPU / 8GB RAM (ballooning
   disabled — ZFS ARC wants stable RAM), boots from the TrueNAS SCALE-based
   HexOS ISO (`hexos_iso` resource, downloaded directly by Proxmox) on first
-  apply. `hostpci0`/`hostpci1` pass through the P3 Plus (`0000:08:00.0`) and
-  T500 (`0000:09:00.0`) individually and raw, not as virtual disks.
+  apply. `hostpci0`/`hostpci1` pass through the P3 Plus and T500 individually
+  and raw, not as virtual disks — via named `proxmox_hardware_mapping_pci`
+  mappings rather than raw PCI IDs, since raw `hostpciN` IDs are rejected for
+  non-root API tokens (see `docs/hexos-install.md`).
 
 ## Running this
 
