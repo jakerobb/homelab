@@ -67,10 +67,11 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [x] **External LoadBalancer traffic was broken cluster-wide** (found while testing the above) — root cause was an unresolved UCG Fiber routing bug with BGP-learned routes, not anything in the cluster. Pivoted from BGP to Cilium L2 announcements; see `talos/README.md` for the full investigation and current LB pool (`192.168.102.128/26`). The UCG's now-unused BGP peering config should be removed there.
 
 ## 5. HexOS VM with T500 + P3 Plus
-- [ ] Check IOMMU groups for both NVMe drives — confirm they're isolated enough for clean passthrough
-- [ ] Enable IOMMU in Proxmox host (kernel params) if not already on
-- [ ] Create HexOS VM: allocate adequate RAM (8GB+ baseline, more helps ZFS ARC), reasonable vCPU count
-- [ ] PCIe-passthrough both NVMe drives individually (not virtual disks) — HexOS/ZFS wants raw block access
+Runbook: [`docs/hexos-install.md`](docs/hexos-install.md).
+- [x] Enable IOMMU in Proxmox host (kernel params) — `amd_iommu=on iommu=pt` added to `GRUB_CMDLINE_LINUX_DEFAULT`, confirmed live post-reboot (the `AMD-Vi: Unknown option - 'on'` dmesg line is a harmless, expected quirk — see runbook)
+- [x] Check IOMMU groups for both NVMe drives — both isolated alone in their own group (P3 Plus = group 17 @ `0000:08:00.0`, T500 = group 18 @ `0000:09:00.0`), no ACS override needed
+- [ ] Create HexOS VM: allocate adequate RAM (8GB+ baseline, more helps ZFS ARC), reasonable vCPU count — Terraform written (`terraform/proxmox/hexos.tf`), not yet applied (needs the HexOS ISO uploaded to Proxmox first)
+- [x] PCIe-passthrough both NVMe drives individually (not virtual disks) — HexOS/ZFS wants raw block access — `hostpci0`/`hostpci1` in `hexos.tf`
 - [ ] Install HexOS in the VM
 - [ ] Pool layout — decided: stripe (6TB usable, no redundancy) unless HexOS's ZFS AnyRaid is ready to use by then, in which case use that instead for flexible-capacity redundancy. Plain mirror is out (wastes 2TB of the P3 Plus given mismatched capacities).
 - [ ] Set up NFS or SMB share, test from another device on the network

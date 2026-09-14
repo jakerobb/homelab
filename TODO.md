@@ -24,9 +24,13 @@ is a deferred follow-up. Restore procedure also not yet exercised — worth
 testing before relying on it in a real incident.
 
 ## HexOS storage
-**Not started.** Install Proxmox VM with IOMMU passthrough for the T500 (2TB)
-+ P3 Plus (4TB) NVMe drives, restore the P3 Plus data from B2, expose as
-NFS/SMB, and — the actual goal, per discussion — wire it up as a Kubernetes
+**In progress — started 2026-09-13.** IOMMU enabled and confirmed on the
+Proxmox host, both NVMe drives isolated cleanly in their own IOMMU groups,
+Terraform written for the HexOS VM with passthrough — see
+[`docs/hexos-install.md`](docs/hexos-install.md) and root
+[README.md](README.md#5-hexos-vm-with-t500--p3-plus) step 5. Remaining: apply
+the Terraform, install HexOS, set up the pool/share, restore the P3 Plus data
+from B2, and — the actual goal, per discussion — wire it up as a Kubernetes
 `StorageClass` (via an NFS CSI driver or similar) so workloads can get real
 persistent volumes that survive a pod being rescheduled to a different node.
 

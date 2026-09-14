@@ -17,9 +17,12 @@ assumed defaults. **Not applied yet.** Known follow-ups before/at first apply:
   at the source image's native (much smaller) size — untested
 - Once applied, add DHCP reservations on the UCG for both fixed MACs
   (`02:00:00:00:00:31` → `.31`, `...:32` → `.32`)
-- `hexos` VM is still unwritten — needs IOMMU group info gathered from the live
-  host first (root README step 5), plus a real decision on `hostpci` passthrough
-  syntax for the two NVMe drives
+- `hexos.tf` written (2026-09-13) — IOMMU is on, both target drives sit alone
+  in their own IOMMU group (clean passthrough, no ACS override needed), see
+  `docs/hexos-install.md`. Installer ISO is downloaded by Proxmox directly
+  (`proxmox_download_file`, same pattern as the Talos qcow2) — HexOS's own
+  site only offers a USB-flashing tool, but it's TrueNAS SCALE underneath and
+  a plain ISO exists at `downloads.hexos.com`. **Not applied yet.**
 
 ## Auth
 
@@ -40,8 +43,11 @@ export TF_VAR_proxmox_api_token="terraform@pve!provider=<uuid>"
   Talos upgrade doesn't leave the cluster with zero schedulable capacity — see
   `../../talos/README.md` for that rationale and the version/installer-image
   gotcha.
-- `hexos` VM — not yet written. 8GB+ RAM baseline, PCIe passthrough of both NVMe
-  drives (not virtual disks).
+- `hexos` VM (`hexos.tf`) — q35, UEFI (OVMF), 6 vCPU / 8GB RAM (ballooning
+  disabled — ZFS ARC wants stable RAM), boots from the TrueNAS SCALE-based
+  HexOS ISO (`hexos_iso` resource, downloaded directly by Proxmox) on first
+  apply. `hostpci0`/`hostpci1` pass through the P3 Plus (`0000:08:00.0`) and
+  T500 (`0000:09:00.0`) individually and raw, not as virtual disks.
 
 ## Running this
 
