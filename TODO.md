@@ -98,18 +98,18 @@ under ArgoCD's `prune: true`, so its reclaim policy was deliberately set to
   more than one Authelia user.
 
 ## Gateway API forward-auth (Cilium ExternalAuth filter)
-**Not started — blocked on a Cilium upgrade.** Cilium added a native,
-Gateway-API-standard way to delegate auth to an external service
+**Not started — Cilium upgrade done, filter work remains.** Cilium added a
+native, Gateway-API-standard way to delegate auth to an external service
 (`ExternalAuth` HTTPRoute filter, GEP-1494) using the same `ext_authz`
-protocol Authelia already speaks — but it only shipped in **Cilium 1.20.0**;
-the cluster is still on **1.19.5**. Needed for any Compose workload below
-that doesn't have its own OIDC support (most of them — NetworkOptimizer,
-change-detection, VictoriaLogs, etc.), since Authelia's OIDC provider only
-directly helps apps that speak OIDC themselves (like ArgoCD/Grafana). Two
-pieces: (1) upgrade Cilium — its own tested change given the cluster's past
-BGP/routing issues, not something to fold silently into an app migration;
-(2) once upgraded, add an `ExternalAuth` filter to each protected app's
-`HTTPRoute` pointing at Authelia's `/api/authz/ext-authz/` endpoint.
+protocol Authelia already speaks — shipped in **Cilium 1.20.0**, and the
+cluster is now on **1.20.1** (upgraded 2026-09-15, see
+[`talos/README.md`](talos/README.md#cilium-upgrade-119120-2026-09-15)).
+Needed for any Compose workload below that doesn't have its own OIDC support
+(most of them — NetworkOptimizer, change-detection, VictoriaLogs, etc.),
+since Authelia's OIDC provider only directly helps apps that speak OIDC
+themselves (like ArgoCD/Grafana). Remaining: add an `ExternalAuth` filter to
+each protected app's `HTTPRoute` pointing at Authelia's
+`/api/authz/ext-authz/` endpoint.
 
 ## Compose workload migration
 **Not started.** Move each service off the RPi5 16GB's Docker Compose stack

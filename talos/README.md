@@ -8,7 +8,8 @@
   since stock Talos doesn't support the Pi5 directly. **Any amd64 worker (e.g. the MS-A2
   Talos VM) must use the standard `ghcr.io/siderolabs/installer:v1.11.5` / stock qcow2 —
   do not reuse the rpi5 installer image for it.**
-- CNI: Cilium, with `kubeProxyReplacement` enabled, full eBPF host routing
+- CNI: Cilium v1.20.1 (upgraded from 1.19.5 2026-09-15, see below), with
+  `kubeProxyReplacement` enabled, full eBPF host routing
   (`bpf.masquerade: true`, `Host: BPF` — not the `Legacy`/iptables fallback),
   and **L2 announcements** for LoadBalancer IPs (see `cilium/values.yaml`).
 - LoadBalancer IP pool: `192.168.102.128/26` (`.128-.191`), announced via
@@ -166,6 +167,55 @@ physical workers may use yet another naming scheme. Same "not hot-reloaded"
 gotcha as `enable-envoy-config` above: applying the policy change alone
 wasn't enough, needed `kubectl -n kube-system rollout restart ds/cilium`
 before the L2 responder actually picked it up.
+
+## Cilium upgrade 1.19→1.20 (2026-09-15)
+
+Upgraded chart `cilium-1.19.5` → `1.19.7` (latest 1.19 patch) → `1.20.1`,
+run from rpi5-1 against the live cluster:
+
+```
+helm upgrade cilium cilium/cilium --version 1.19.7 -n kube-system -f cilium/values.yaml --wait
+# verify ds/cilium, ds/cilium-envoy, deployment/cilium-operator healthy, then:
+helm upgrade cilium cilium/cilium --version 1.20.1 -n kube-system -f cilium/values.yaml \
+  --set upgradeCompatibility=1.19 --wait
+```
+
+`--set upgradeCompatibility=1.19` on the 1.20 step per Cilium's own upgrade
+guide — keeps `envoy.xdsMode` on the legacy `split` mode through the
+transition instead of jumping straight to 1.20's new `ads` default. Worth
+a follow-up no-op upgrade later to drop that flag once the new version's
+been running stable for a while.
+
+Diffed the chart's default `values.yaml` between all three versions before
+running this: 1.19.5→1.19.7 is pure image tag/digest bumps (no schema
+change). 1.19.7→1.20.1 has real changes, but none touch anything this repo's
+`cilium/values.yaml` actually sets (`ipam.mode`, `kubeProxyReplacement`,
+`bpf.masquerade`, `k8sServiceHost`/`Port`, `bgpControlPlane`,
+`l2announcements`, `k8sClientRateLimit`, `cgroup`, `securityContext`,
+`gatewayAPI`) — no values changes were needed. The 1.20 release notes'
+"action required" items (Envoy Go extensions/proxylib removal,
+`CiliumNodeConfig` v2alpha1→v2, mutual-auth deprecation, Gateway API ≥v1.6.1
+for TLSRoute) don't apply here either: no `CiliumNetworkPolicy`/
+`CiliumClusterwideNetworkPolicy`/`CiliumNodeConfig`/clustermesh/mutual-auth
+in this repo, and the Gateway API CRDs are already on the experimental
+channel at v1.6.2 (see above), past the v1.6.1 floor.
+
+Ran the official `cilium-preflight` release (image pre-pull + CNP/CCNP
+validation) before the 1.20 step — trivial here since there are no policies
+to validate, but still worth it on Pi-class hardware so the image pull
+happens ahead of the real rollout. One gotcha: `helm install
+cilium-preflight ... --set preflight.enabled=true` fails with an ownership
+conflict on the auto-created `GatewayClass` (`cilium-preflight` can't own a
+resource the `cilium` release already owns) unless you also pass `--set
+gatewayAPI.enabled=false` for the preflight release specifically — the
+preflight DaemonSet doesn't need Gateway API to pre-pull images anyway.
+
+Verified with the same test that would've caught the earlier BGP and L2
+gotchas above — external `curl` from the LAN (not just in-cluster) to both
+the bare Gateway LB IP and `argocd.jakerobb.org` — after each step, not just
+once at the end. Both steps rolled all 5 `cilium` + 5 `cilium-envoy` pods and
+both `cilium-operator` replicas with zero LB downtime observed; k8s v1.34.1
+(the floor of Cilium 1.20's tested 1.34–1.37 support matrix) had no issues.
 
 ## Layout
 
