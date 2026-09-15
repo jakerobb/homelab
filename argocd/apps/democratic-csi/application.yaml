@@ -1,0 +1,62 @@
+# iSCSI-backed StorageClass against HexOS/TrueNAS, chosen as the cluster's
+# default block-storage path (see terraform/proxmox and talos/README.md for
+# the iscsi-tools Talos extension this depends on). NFS stays available as a
+# separate, later addition for genuinely ReadWriteMany workloads — this app
+# only covers iSCSI.
+#
+# Sourced directly from the maintainer's own chart repo (not an ArtifactHub
+# mirror) — same trust reasoning as local-path-provisioner: this runs
+# privileged, cluster-wide, and provisions real storage.
+#
+# driver.existingConfigSecret points at a hand-maintained SOPS-encrypted
+# Secret (argocd/secrets/democratic-csi-truenas-iscsi-config.sops.yaml) —
+# not applied through ArgoCD sync (no SOPS/KSOPS wired up yet, same gap
+# argocd/README.md already flags), so it must be applied out-of-band before
+# this Application will go healthy. It contains the TrueNAS API key.
+#
+# reclaimPolicy: Retain, not the chart's Delete default — same reasoning as
+# local-path-provisioner: this is a real PVC-backed StorageClass under
+# ArgoCD's automated `prune: true`, so an accidental prune orphans the
+# backing zvol on HexOS instead of deleting real data outright.
+#
+# defaultClass: false for now — local-path-provisioner stays the cluster
+# default until a deliberate decision is made to switch it (open question,
+# not yet decided).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: democratic-csi
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/democratic-csi/charts.git
+    targetRevision: democratic-csi-0.15.1
+    path: stable/democratic-csi
+    helm:
+      releaseName: democratic-csi
+      valuesObject:
+        csiDriver:
+          name: "org.democratic-csi.iscsi"
+        storageClasses:
+          - name: hexos-iscsi
+            defaultClass: false
+            reclaimPolicy: Retain
+            volumeBindingMode: Immediate
+            allowVolumeExpansion: true
+            parameters:
+              fsType: ext4
+            mountOptions: []
+            secrets: {}
+        volumeSnapshotClasses: []
+        driver:
+          existingConfigSecret: democratic-csi-truenas-iscsi-config
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: democratic-csi
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true

@@ -1,0 +1,13 @@
+# Explicit, labeled Namespace, same reasoning as
+# argocd/apps/local-path-provisioner/namespace.yaml: democratic-csi's node
+# DaemonSet needs hostPath/device access and host networking to do iSCSI
+# attach/mount on each node, which the cluster's default `baseline`
+# PodSecurity enforcement blocks. Applying `privileged` here up front (rather
+# than waiting to hit the same PVC-stuck-Pending failure again) since it's
+# the same class of CSI-node-driver requirement.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: democratic-csi
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
