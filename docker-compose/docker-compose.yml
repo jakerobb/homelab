@@ -1,0 +1,472 @@
+x-dns: &dns
+  dns:
+    - 192.168.102.2
+
+services:
+  watchtower:
+    <<: *dns
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Run every day at 4:00am ET (cron format includes seconds)
+      - TZ=America/Detroit
+      - WATCHTOWER_SCHEDULE=0 0 4 * * *
+      # Remove old images after updating
+      - WATCHTOWER_CLEANUP=true
+      # Only update running containers
+      - WATCHTOWER_INCLUDE_STOPPED=false
+      # Rolling restart instead of stopping everything at once
+      - WATCHTOWER_ROLLING_RESTART=true
+      - DOCKER_API_VERSION=1.47
+
+  caddy:
+    <<: *dns
+    image: ghcr.io/caddybuilds/caddy-cloudflare:latest
+    container_name: caddy
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+  homeassistant:
+    <<: *dns
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    privileged: true
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=America/Detroit
+      - OFFICE_UPS_NUT_PASSWORD=__from-file__
+    volumes:
+      - ./homeassistant:/config
+      - /run/dbus:/run/dbus:ro
+      - ./resolv-host.conf:/etc/resolv.conf:ro
+
+  scrypted:
+    <<: *dns
+    container_name: scrypted
+    image: koush/scrypted
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=America/Detroit
+    volumes:
+      - ./scrypted:/server/volume
+
+  modbus-controller:
+    <<: *dns
+    container_name: modbus-controller
+    image: jakerobb/modbus-eth-controller:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./modbus-programs:/etc/modbus:ro
+      - ./resolv-host.conf:/etc/resolv.conf:ro
+
+  nut-upsd:
+    <<: *dns
+    image: instantlinux/nut-upsd
+    container_name: nut-upsd
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - ./nut-conf:/etc/nut/local
+      - ./secrets/nut-upsd-password:/run/secrets/nut-upsd-password
+      - /dev/bus/usb:/dev/bus/usb
+    environment:
+      # Use the user defined in upsd.users for monitoring.
+      - API_USER=${NUT_USER}
+    ports:
+      - "3493:3493"
+
+  nut-webui:
+    <<: *dns
+    container_name: nut-webui
+    restart: unless-stopped
+    depends_on:
+      - nut-upsd
+    image: edgd1er/webnut:latest
+    environment:
+      - UPS_HOST=nut-upsd
+      - UPS_PORT=3493
+      - UPS_USER=${NUT_USER}
+      - UPS_PASSWORD=${NUT_PASSWORD}
+    ports:
+      - "6543:6543"
+
+  change-detection:
+    <<: *dns
+    network_mode: host
+    image: dgtlmoon/changedetection.io:latest
+    container_name: change-detection
+    environment:
+      - PLAYWRIGHT_DRIVER_URL=ws://192.168.102.2:3000/?stealth=1&--disable-web-security=true&blockAds=true
+    ports:
+      - 9898:5000
+    volumes:
+      - ./change-detection:/datastore
+      - ./resolv-host.conf:/etc/resolv.conf:ro
+    restart: unless-stopped
+    labels:
+      tsdproxy.enable: "true"
+      tsdproxy.name: "delta"
+      #tsdproxy.container_port: 9898
+    depends_on:
+      browserless:
+        condition: service_started
+
+  browserless:
+    <<: *dns
+    volumes:
+      - ./resolv-host.conf:/etc/resolv.conf:ro
+    network_mode: host
+    image: ghcr.io/browserless/chromium:latest
+    container_name: browserless
+    environment:
+      - SCREEN_WIDTH=1920
+      - SCREEN_HEIGHT=1024
+      - SCREEN_DEPTH=16
+      - ENABLE_DEBUGGER=false
+      - TIMEOUT=60000
+      - CONCURRENT=10
+      - NO_COLOR=1
+      - FORCE_COLOR=0
+      - DEBUG_COLORS=no
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+
+  optimizer:
+    <<: *dns
+    image: ghcr.io/ozark-connect/network-optimizer:latest
+#    image: network-optimizer-test
+#    build:
+#      context: ../NetworkOptimizer   # path to your clone, not just docker/
+#      dockerfile: docker/Dockerfile   # adjust to match what's actually in their docker/ folder
+    container_name: network-optimizer
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./data:/app/data              # SQLite, configs, license
+      - ./ssh-keys:/app/ssh-keys      # Optional: SSH keys for agent deployment
+      - ./logs:/app/logs              # Application logs
+    environment:
+      - APP_LOG_LEVEL=Debug
+      - LOG_LEVEL=Debug
+      - TZ=${TZ:-America/Chicago}
+      # Bind to localhost only (for reverse proxy) or all interfaces (direct access)
+      - BIND_LOCALHOST_ONLY=${BIND_LOCALHOST_ONLY:-false}
+      - APP_PASSWORD=${APP_PASSWORD:-}
+      - DEMO_MODE_MAPPINGS=${DEMO_MODE_MAPPINGS:-}
+      # Host IP/name for path analysis and CORS (required for client speed tests)
+      - HOST_IP=${HOST_IP:-}
+      - HOST_NAME=${HOST_NAME:-}
+      # Reverse proxy hostname (e.g., optimizer.example.com) - overrides HOST_NAME for API URLs
+      - REVERSE_PROXIED_HOST_NAME=${REVERSE_PROXIED_HOST_NAME:-}
+      # OpenSpeedTest configuration (for UI display and CORS)
+      - OPENSPEEDTEST_PORT=${OPENSPEEDTEST_PORT:-3005}
+      - OPENSPEEDTEST_HOST=${OPENSPEEDTEST_HOST:-}
+      - OPENSPEEDTEST_HTTPS=${OPENSPEEDTEST_HTTPS:-false}
+      - OPENSPEEDTEST_HTTPS_PORT=${OPENSPEEDTEST_HTTPS_PORT:-443}
+      # iperf3 server mode - enable to accept client-initiated speed tests on port 5201
+      - Iperf3Server__Enabled=${IPERF3_SERVER_ENABLED:-false}
+      # Logging (Trace, Debug, Information, Warning, Error, Critical)
+      - Logging__LogLevel__Default=${LOG_LEVEL:-Debug}
+      - Logging__LogLevel__NetworkOptimizer=${APP_LOG_LEVEL:-Debug}
+      # Point to existing InfluxDB if desired (optional)
+      # - INFLUXDB_URL=http://localhost:8086
+      # - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      # - INFLUXDB_ORG=${INFLUXDB_ORG:-network-optimizer}
+      # - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-network_optimizer}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8042/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Network Optimizer Speed Test - customized OpenSpeedTest that sends results to Network Optimizer
+  # Requires HOST_IP or HOST_NAME to be set in .env for result reporting
+  network-optimizer-speedtest:
+    <<: *dns
+    image: ghcr.io/ozark-connect/speedtest:latest
+    container_name: network-optimizer-speedtest
+    restart: unless-stopped
+    ports:
+      - "${OPENSPEEDTEST_PORT:-3005}:3000"
+    environment:
+      - TZ=${TZ:-America/Chicago}
+      # For URL construction and host enforcement redirect
+      - HOST_NAME=${HOST_NAME:-}
+      - HOST_IP=${HOST_IP:-}
+      - OPENSPEEDTEST_PORT=${OPENSPEEDTEST_PORT:-3005}
+      - OPENSPEEDTEST_HOST=${OPENSPEEDTEST_HOST:-}
+      - OPENSPEEDTEST_HTTPS=${OPENSPEEDTEST_HTTPS:-false}
+      - OPENSPEEDTEST_HTTPS_PORT=${OPENSPEEDTEST_HTTPS_PORT:-443}
+      # For result reporting URL
+      - REVERSE_PROXIED_HOST_NAME=${REVERSE_PROXIED_HOST_NAME:-}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ntfy:
+    <<: *dns
+    image: binwiederhier/ntfy
+    container_name: ntfy
+    network_mode: host 
+    command:
+      - serve
+      - --config
+      - /etc/ntfy/server.yml
+      - --listen-http
+      - ":8011"
+  # user: UID:GID # optional: replace with your own user/group or uid/gid
+    volumes:
+      - ./resolv-host.conf:/etc/resolv.conf:ro
+      - ./ntfy/cache:/var/cache/ntfy
+      - ./ntfy/conf:/etc/ntfy
+    healthcheck: # optional: remember to adapt the host:port to your environment
+        test: ["CMD-SHELL", "wget -q --tries=1 http://localhost/v1/health -O - | grep -Eo '\"healthy\"\\s*:\\s*true' || exit 1"]
+        interval: 60s
+        timeout: 10s
+        retries: 3
+        start_period: 40s
+    restart: unless-stopped
+    init: true # needed, if healthcheck is used. Prevents zombie processes
+
+  unbound:
+    <<: *dns
+    image: klutchell/unbound:latest
+    container_name: unbound
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d
+
+  influxdb:
+    <<: *dns
+    container_name: influxdb
+    image: influxdb:2.7
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - TZ=America/Detroit
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_ORG=home
+      - DOCKER_INFLUXDB_INIT_BUCKET=telegraf
+      - DOCKER_INFLUXDB_INIT_RETENTION=7d
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb2
+      - ./influxdb/config:/etc/influxdb2
+      - ./resolv.conf:/etc/resolv.conf:ro
+
+  grafana:
+    <<: *dns
+    container_name: grafana
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+    ports:
+      - "3001:3000"
+    environment:
+      - TZ=America/Detroit
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://grafana.jakerobb.org
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,victoriametrics-logs-datasource
+    volumes:
+      - ./grafana:/var/lib/grafana
+      - ./resolv.conf:/etc/resolv.conf:ro
+      - ./grafana-provisioning:/etc/grafana/provisioning:ro
+
+  telegraf:
+    <<: *dns
+    container_name: telegraf
+    image: telegraf:latest
+    restart: unless-stopped
+    user: "telegraf:990"
+    depends_on:
+      - influxdb
+    environment:
+      - TZ=America/Detroit
+      - INFLUXDB_TOKEN=${INFLUXDB_ADMIN_TOKEN}
+      - HOST_ETC=/hostfs/etc
+      - HOST_PROC=/hostfs/proc
+      - HOST_SYS=/hostfs/sys
+      - HOST_VAR=/hostfs/var
+      - HOST_RUN=/hostfs/run
+      - HOST_MOUNT_PREFIX=/hostfs
+      - NUT_USER=${NUT_USER}
+      - NUT_PASSWORD=${NUT_PASSWORD}
+      - UNIFI_TOKEN=${UNIFI_TOKEN}
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ./resolv.conf:/etc/resolv.conf:ro
+      - /run/udev:/run/udev:ro
+      - /dev:/dev:ro
+      - /:/hostfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./telegraf/scripts:/etc/telegraf/scripts:ro
+      - /usr/bin/jq:/usr/bin/jq:ro
+      - /lib/aarch64-linux-gnu/libjq.so.1:/lib/aarch64-linux-gnu/libjq.so.1:ro
+      - /lib/aarch64-linux-gnu/libonig.so.5:/lib/aarch64-linux-gnu/libonig.so.5:ro
+
+  unpoller:
+    <<: *dns
+    container_name: unpoller
+    image: ghcr.io/unpoller/unpoller:latest
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+    environment:
+      - TZ=America/Detroit
+      - UP_INFLUXDB_URL=http://influxdb:8086
+      - UP_INFLUXDB_ORG=home
+      - UP_INFLUXDB_BUCKET=unifi
+      - UP_INFLUXDB_AUTH_TOKEN=${UNPOLLER_INFLUXDB_TOKEN}
+      - UP_UNIFI_DEFAULT_URL=https://47Net.lan
+      - UP_UNIFI_DEFAULT_USER=${UNPOLLER_UNIFI_USER}
+      - UP_UNIFI_DEFAULT_PASS=${UNPOLLER_UNIFI_PASS}
+      - UP_UNIFI_DEFAULT_VERIFY_SSL=false
+      - UP_PROMETHEUS_DISABLE=true
+      - UP_UNIFI_DEFAULT_SAVE_DPI=true
+    volumes:
+      - ./resolv.conf:/etc/resolv.conf:ro
+
+  nut-influx-relay:
+    <<: *dns
+    container_name: nut-influx-relay
+    image: jakerobb/nut-influx-relay:latest
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+    environment:
+#      - LOG_LEVEL=debug
+      - TZ=America/Detroit
+      - INFLUXDB_TOKEN=${NUT_RELAY_INFLUXDB_TOKEN}
+      - NUT_USER=${NUT_USER}
+      - NUT_PASSWORD=${NUT_PASSWORD}
+    volumes:
+      - ./nut-influx-relay/config.yaml:/etc/nut-influx-relay/config.yaml:ro
+      - ./resolv.conf:/etc/resolv.conf:ro
+    ports:
+      - "8085:8080"
+
+  ofelia:
+    <<: *dns
+    container_name: ofelia
+    image: mcuadros/ofelia:latest
+    restart: unless-stopped
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./resolv.conf:/etc/resolv.conf:ro
+    labels:
+      ofelia.job-local.docker-image-prune.schedule: "0 0 5 * * *"
+      ofelia.job-local.docker-image-prune.command: docker image prune -a --force
+    environment:
+      - TZ=America/Detroit
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    <<: *dns
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    ports:
+      - "1883:1883"
+
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    <<: *dns
+    depends_on:
+      - mosquitto
+    volumes:
+      - ./zigbee2mqtt/data:/app/data
+    ports:
+      - "8090:8080"
+    environment:
+      - TZ=America/Detroit
+
+  matter-server:
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    container_name: matter-server
+    restart: unless-stopped
+    network_mode: host
+    security_opt:
+      - apparmor=unconfined
+    volumes:
+      - ./matter-server/data:/data
+      - /run/dbus:/run/dbus:ro
+
+  zwave-js-ui:
+    container_name: zwave-js-ui
+    image: zwavejs/zwave-js-ui:latest
+    restart: unless-stopped
+    ports:
+      - "8091:8091"   # Web UI
+      - "3010:3000"   # WebSocket for HA
+    volumes:
+      - ./zwave-js-ui:/usr/src/app/store
+    environment:
+      - TZ=America/Detroit
+
+  victorialogs:
+    image: victoriametrics/victoria-logs:latest   # pin: tags use a -victorialogs suffix, e.g. vX.Y.Z-victorialogs
+    container_name: victorialogs
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/vlogs
+      - -retentionPeriod=90d
+      - '-syslog.streamFields.udp=[]'
+      - '-syslog.ignoreFields.udp=["app_name"]'
+      # - -syslog.useLocalTimestamp.udp    # uncomment if UniFi timestamps drift (the tz caveat from before)
+    ports:
+      - "9428:9428"        # HTTP API + web UI — consider binding to localhost or fronting via Caddy
+    volumes:
+      - victorialogs-data:/vlogs           # swap to a bind path if you want it in your backup set
+
+  vector:
+    image: timberio/vector:latest-debian
+    container_name: vector
+    restart: unless-stopped
+    depends_on:
+      - victorialogs
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./vector/vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - /run/log/journal:/run/log/journal:ro   # volatile, if present
+    # If Vector can't read the socket (root:docker), grant the gid:
+    # group_add:
+    #   - "999"   # getent group docker | cut -d: -f3
+    ports:
+      - "514:514/udp"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  victorialogs-data:
+

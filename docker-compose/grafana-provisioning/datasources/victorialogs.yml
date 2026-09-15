@@ -1,0 +1,9 @@
+apiVersion: 1
+datasources:
+  - name: VictoriaLogs
+    type: victoriametrics-logs-datasource
+    uid: victorialogs          # stable id so dashboards-as-code can reference it reliably
+    access: proxy
+    url: http://rpi5-1.lan:9428
+    isDefault: false
+    editable: false            # provisioning is the single source of truth; blocks UI drift

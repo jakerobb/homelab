@@ -1,0 +1,87 @@
+(cloudflare_tls) {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+		resolvers 1.1.1.1 8.8.8.8
+	}
+}
+
+homeassistant.jakerobb.org {
+	reverse_proxy rpi5-1.lan:8123
+	import cloudflare_tls
+}
+
+scrypted.jakerobb.org {
+	reverse_proxy rpi5-1.lan:11080
+	import cloudflare_tls
+}
+
+gateway.jakerobb.org {
+	reverse_proxy gateway.lan:80
+	import cloudflare_tls
+}
+
+modbus.jakerobb.org {
+	reverse_proxy modbus-controller.lan:8080
+	import cloudflare_tls
+}
+
+modbus-relay.jakerobb.org {
+	reverse_proxy modbus.lan:80
+	import cloudflare_tls
+}
+
+nut.jakerobb.org {
+	reverse_proxy nutweb.lan:6543
+	import cloudflare_tls
+}
+
+rack-led.jakerobb.org {
+	reverse_proxy rack-led.lan:80
+	import cloudflare_tls
+}
+
+changedetection.jakerobb.org {
+	reverse_proxy changedetection.lan:5000
+	import cloudflare_tls
+}
+
+optimizer.jakerobb.org {
+	reverse_proxy optimizer.lan:8042
+	import cloudflare_tls
+}
+
+ntfy.jakerobb.org {
+	reverse_proxy ntfy.lan:8011
+	import cloudflare_tls
+}
+
+influxdb.jakerobb.org {
+	reverse_proxy localhost:8086
+	import cloudflare_tls
+}
+
+grafana.jakerobb.org {
+	reverse_proxy localhost:3001
+	import cloudflare_tls
+}
+
+jetkvm.jakerobb.org {
+	reverse_proxy jetkvm1.lan:80
+        import cloudflare_tls
+}
+
+zigbee.jakerobb.org {
+	reverse_proxy rpi5-1.lan:8090
+	import cloudflare_tls
+}
+
+zwave.jakerobb.org {
+        reverse_proxy rpi5-1.lan:8091
+        import cloudflare_tls
+}
+
+logs.jakerobb.org {
+        reverse_proxy rpi5-1.lan:9428
+        import cloudflare_tls
+}
+

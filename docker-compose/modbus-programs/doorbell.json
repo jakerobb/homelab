@@ -1,0 +1,36 @@
+{
+  "address": "modbus.lan:4196",
+  "commands": [
+    [
+      {
+        "command": "on",
+        "relay": 1
+      }
+    ],
+    [],
+    [
+      {
+        "command": "off",
+        "relay": 1
+      }
+    ],
+    [],
+    [],
+    [],
+    [
+      {
+        "command": "on",
+        "relay": 1
+      }
+    ],
+    [],
+    [
+      {
+        "command": "off",
+        "relay": 1
+      }
+    ]
+  ],
+  "loops": 1,
+  "commandIntervalMillis": 75
+}

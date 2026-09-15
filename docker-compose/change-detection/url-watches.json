@@ -1,0 +1,1411 @@
+{
+  "note": "Hello! If you change this file manually, please be sure to restart your changedetection.io instance!",
+  "watching": {
+    "01243b4d-e5d4-4999-bd97-af6aba3605cd": {
+      "body": "",
+      "browser_steps": [
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        }
+      ],
+      "browser_steps_last_error_step": null,
+      "conditions": [
+        {
+          "field": "None",
+          "operator": "None",
+          "value": ""
+        }
+      ],
+      "conditions_match_logic": "ALL",
+      "check_count": 388,
+      "check_unique_lines": false,
+      "consecutive_filter_failures": 0,
+      "content-type": "text/plain",
+      "date_created": 1766601588,
+      "extract_text": [],
+      "fetch_backend": "html_requests",
+      "fetch_time": 0.715,
+      "filter_failure_notification_send": true,
+      "filter_text_added": true,
+      "filter_text_removed": true,
+      "filter_text_replaced": true,
+      "follow_price_changes": true,
+      "has_ldjson_price_data": null,
+      "headers": {},
+      "ignore_text": [],
+      "ignore_status_codes": false,
+      "in_stock_only": true,
+      "include_filters": [],
+      "last_checked": 1771086123,
+      "last_error": false,
+      "last_notification_error": false,
+      "last_viewed": 1767635231,
+      "method": "GET",
+      "notification_alert_count": 19,
+      "notification_body": "",
+      "notification_format": "System default",
+      "notification_muted": false,
+      "notification_screenshot": false,
+      "notification_title": "",
+      "notification_urls": [],
+      "page_title": null,
+      "paused": false,
+      "previous_md5": "744c207c77feeb66a79b29ea43e1286d",
+      "previous_md5_before_filters": "69a73710aa89c93ec6c95615ab366569",
+      "processor": "text_json_diff",
+      "price_change_threshold_percent": null,
+      "proxy": null,
+      "remote_server_reply": "nginx/1.24.0 (ubuntu)",
+      "sort_text_alphabetically": false,
+      "strip_ignored_lines": null,
+      "subtractive_selectors": [],
+      "tag": "",
+      "tags": [
+        "ec660fe5-f98e-477b-b397-14327e1b7c61"
+      ],
+      "text_should_not_be_present": [],
+      "time_between_check": {
+        "weeks": 1,
+        "days": null,
+        "hours": null,
+        "minutes": null,
+        "seconds": null
+      },
+      "time_between_check_use_default": false,
+      "time_schedule_limit": {
+        "enabled": false,
+        "monday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "tuesday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "wednesday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "thursday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "friday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "saturday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "sunday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "timezone": ""
+      },
+      "title": "",
+      "track_ldjson_price_data": null,
+      "trim_text_whitespace": false,
+      "remove_duplicate_lines": false,
+      "trigger_text": [],
+      "url": "https://changedetection.io/CHANGELOG.txt",
+      "use_page_title_in_list": null,
+      "uuid": "01243b4d-e5d4-4999-bd97-af6aba3605cd",
+      "webdriver_delay": null,
+      "webdriver_js_execute_code": "",
+      "content_type": "text/plain",
+      "last_check_status": 200,
+      "scheduler_timezone_default": null,
+      "save_button": true
+    },
+    "e00abf86-357e-446e-a677-0de42137b0aa": {
+      "body": "",
+      "browser_steps": [
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        }
+      ],
+      "browser_steps_last_error_step": null,
+      "conditions": [
+        {
+          "field": "None",
+          "operator": "None",
+          "value": ""
+        }
+      ],
+      "conditions_match_logic": "ALL",
+      "check_count": 12228,
+      "check_unique_lines": false,
+      "consecutive_filter_failures": 0,
+      "content-type": "text/html; charset=utf-8",
+      "date_created": 1766637670,
+      "extract_text": [],
+      "fetch_backend": "system",
+      "fetch_time": 0.585,
+      "filter_failure_notification_send": true,
+      "filter_text_added": true,
+      "filter_text_removed": true,
+      "filter_text_replaced": true,
+      "follow_price_changes": true,
+      "has_ldjson_price_data": null,
+      "headers": {},
+      "ignore_text": [],
+      "ignore_status_codes": false,
+      "in_stock_only": true,
+      "include_filters": [],
+      "last_checked": 1771318589,
+      "last_error": false,
+      "last_notification_error": false,
+      "last_viewed": 1769793151,
+      "method": "GET",
+      "notification_alert_count": 13,
+      "notification_body": "",
+      "notification_format": "System default",
+      "notification_muted": false,
+      "notification_screenshot": false,
+      "notification_title": "",
+      "notification_urls": [
+        "hassio://homeassistant.lan:8123/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI0MmQ2OGE5NmI2NDI0ZWZlODZjYWYwNzk3MDI1ZmQ4MSIsImlhdCI6MTc2NjYwMDY5MiwiZXhwIjoyMDgxOTYwNjkyfQ.szbAmxL_TkbtnX02hyCwLyROffUWYh2xbPV6zK-vIiI?verify=no&nid=changedetection"
+      ],
+      "page_title": "UniFi Travel Router - Ubiquiti Store",
+      "paused": false,
+      "previous_md5": "b98b8cdb4224f31fac3acf1a17e74e5d",
+      "previous_md5_before_filters": false,
+      "processor": "restock_diff",
+      "price_change_threshold_percent": null,
+      "proxy": null,
+      "remote_server_reply": "",
+      "sort_text_alphabetically": false,
+      "strip_ignored_lines": null,
+      "subtractive_selectors": [],
+      "tag": "",
+      "tags": [
+        "85ab9be2-0458-46f7-99df-a39c20810209"
+      ],
+      "text_should_not_be_present": [],
+      "time_between_check": {
+        "weeks": null,
+        "days": null,
+        "hours": null,
+        "minutes": 5,
+        "seconds": null
+      },
+      "time_between_check_use_default": false,
+      "time_schedule_limit": {
+        "enabled": false,
+        "monday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "tuesday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "wednesday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "thursday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "friday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "saturday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "sunday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "timezone": ""
+      },
+      "title": "",
+      "track_ldjson_price_data": null,
+      "trim_text_whitespace": false,
+      "remove_duplicate_lines": false,
+      "trigger_text": [],
+      "url": "https://store.ui.com/us/en/category/wifi-special-devices/products/utr",
+      "use_page_title_in_list": true,
+      "uuid": "e00abf86-357e-446e-a677-0de42137b0aa",
+      "webdriver_delay": null,
+      "webdriver_js_execute_code": "",
+      "content_type": "text/html; charset=utf-8",
+      "last_check_status": 200,
+      "scheduler_timezone_default": null,
+      "save_button": true,
+      "restock": {
+        "in_stock": false,
+        "price": 79.0,
+        "currency": "USD",
+        "original_price": 79.0,
+        "availability": "outofstock"
+      },
+      "restock_settings": {
+        "in_stock_processing": "in_stock_only",
+        "price_change_min": null,
+        "price_change_max": null,
+        "price_change_threshold_percent": null,
+        "follow_price_changes": true
+      }
+    },
+    "4e6f79df-0990-4911-b697-2ae50e560a12": {
+      "body": "",
+      "browser_steps": [
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        }
+      ],
+      "browser_steps_last_error_step": null,
+      "conditions": [
+        {
+          "field": null,
+          "operator": null,
+          "value": null
+        }
+      ],
+      "conditions_match_logic": "ALL",
+      "check_count": 5073,
+      "check_unique_lines": false,
+      "consecutive_filter_failures": 0,
+      "content-type": "text/html; charset=utf-8",
+      "date_created": 1767633433,
+      "extract_text": [],
+      "fetch_backend": "system",
+      "fetch_time": 0.504,
+      "filter_failure_notification_send": true,
+      "filter_text_added": true,
+      "filter_text_removed": true,
+      "filter_text_replaced": true,
+      "follow_price_changes": true,
+      "has_ldjson_price_data": true,
+      "headers": {},
+      "ignore_text": [],
+      "ignore_status_codes": false,
+      "in_stock_only": true,
+      "include_filters": [],
+      "last_checked": 1771318662,
+      "last_error": false,
+      "last_notification_error": false,
+      "last_viewed": 0,
+      "method": "GET",
+      "notification_alert_count": 16,
+      "notification_body": "",
+      "notification_format": "System default",
+      "notification_muted": false,
+      "notification_screenshot": false,
+      "notification_title": "",
+      "notification_urls": [],
+      "page_title": "Reader G6 Pro Entry - Ubiquiti Store",
+      "paused": false,
+      "previous_md5": "72f649c6d7fc3e65070a15bb445623e3",
+      "previous_md5_before_filters": "1c60a50d46aaf92bae087a4179e7a9cd",
+      "processor": "text_json_diff",
+      "price_change_threshold_percent": null,
+      "proxy": null,
+      "remote_server_reply": "",
+      "sort_text_alphabetically": false,
+      "strip_ignored_lines": null,
+      "subtractive_selectors": [],
+      "tag": "",
+      "tags": [
+        "85ab9be2-0458-46f7-99df-a39c20810209"
+      ],
+      "text_should_not_be_present": [],
+      "time_between_check": {
+        "weeks": null,
+        "days": null,
+        "hours": null,
+        "minutes": 5,
+        "seconds": null
+      },
+      "time_between_check_use_default": false,
+      "time_schedule_limit": {
+        "enabled": false,
+        "monday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "tuesday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "wednesday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "thursday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "friday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "saturday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "sunday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "timezone": ""
+      },
+      "title": "",
+      "track_ldjson_price_data": null,
+      "trim_text_whitespace": false,
+      "remove_duplicate_lines": false,
+      "trigger_text": [],
+      "url": "https://store.ui.com/us/en/category/door-access-readers/collections/doorbell-entry/products/uvc-g6-pro-entry?variant=uvc-g6-pro-entry",
+      "use_page_title_in_list": true,
+      "uuid": "4e6f79df-0990-4911-b697-2ae50e560a12",
+      "webdriver_delay": null,
+      "webdriver_js_execute_code": "",
+      "scheduler_timezone_default": null,
+      "save_button": true,
+      "content_type": "text/html; charset=utf-8",
+      "last_check_status": 200,
+      "restock_settings": {
+        "in_stock_processing": "in_stock_only",
+        "price_change_min": null,
+        "price_change_max": null,
+        "price_change_threshold_percent": null,
+        "follow_price_changes": true
+      }
+    },
+    "488336bb-2947-4bc6-953d-1e1d03faced8": {
+      "body": "",
+      "browser_steps": [
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        },
+        {
+          "operation": null,
+          "selector": null,
+          "optional_value": null
+        }
+      ],
+      "browser_steps_last_error_step": null,
+      "conditions": [
+        {
+          "field": null,
+          "operator": null,
+          "value": null
+        }
+      ],
+      "conditions_match_logic": "ALL",
+      "check_count": 5073,
+      "check_unique_lines": false,
+      "consecutive_filter_failures": 0,
+      "content-type": "text/html; charset=utf-8",
+      "date_created": 1767633491,
+      "extract_text": [],
+      "fetch_backend": "system",
+      "fetch_time": 0.475,
+      "filter_failure_notification_send": true,
+      "filter_text_added": true,
+      "filter_text_removed": true,
+      "filter_text_replaced": true,
+      "follow_price_changes": true,
+      "has_ldjson_price_data": null,
+      "headers": {},
+      "ignore_text": [],
+      "ignore_status_codes": false,
+      "in_stock_only": true,
+      "include_filters": [],
+      "last_checked": 1771318664,
+      "last_error": false,
+      "last_notification_error": false,
+      "last_viewed": 0,
+      "method": "GET",
+      "notification_alert_count": 9,
+      "notification_body": "",
+      "notification_format": "System default",
+      "notification_muted": false,
+      "notification_screenshot": false,
+      "notification_title": "",
+      "notification_urls": [],
+      "page_title": "Reader G6 Entry - Ubiquiti Store",
+      "paused": false,
+      "previous_md5": "206dd6861b1248783a58adb0176d91dc",
+      "previous_md5_before_filters": false,
+      "processor": "restock_diff",
+      "price_change_threshold_percent": null,
+      "proxy": null,
+      "remote_server_reply": "",
+      "sort_text_alphabetically": false,
+      "strip_ignored_lines": null,
+      "subtractive_selectors": [],
+      "tag": "",
+      "tags": [
+        "85ab9be2-0458-46f7-99df-a39c20810209"
+      ],
+      "text_should_not_be_present": [],
+      "time_between_check": {
+        "weeks": null,
+        "days": null,
+        "hours": null,
+        "minutes": 5,
+        "seconds": null
+      },
+      "time_between_check_use_default": false,
+      "time_schedule_limit": {
+        "enabled": false,
+        "monday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "tuesday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "wednesday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "thursday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "friday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "saturday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "sunday": {
+          "enabled": true,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "timezone": ""
+      },
+      "title": "",
+      "track_ldjson_price_data": null,
+      "trim_text_whitespace": false,
+      "remove_duplicate_lines": false,
+      "trigger_text": [],
+      "url": "https://store.ui.com/us/en/category/door-access-readers/collections/doorbell-entry/products/uvc-g6-entry?variant=uvc-g6-entry",
+      "use_page_title_in_list": true,
+      "uuid": "488336bb-2947-4bc6-953d-1e1d03faced8",
+      "webdriver_delay": null,
+      "webdriver_js_execute_code": "",
+      "scheduler_timezone_default": null,
+      "save_button": true,
+      "content_type": "text/html; charset=utf-8",
+      "last_check_status": 200,
+      "restock": {
+        "in_stock": true,
+        "price": 249.0,
+        "currency": "USD",
+        "original_price": 249.0,
+        "availability": "instock"
+      },
+      "restock_settings": {
+        "in_stock_processing": "in_stock_only",
+        "price_change_min": null,
+        "price_change_max": null,
+        "price_change_threshold_percent": null,
+        "follow_price_changes": true
+      }
+    }
+  },
+  "settings": {
+    "headers": {},
+    "requests": {
+      "extra_proxies": [
+        {
+          "proxy_name": "",
+          "proxy_url": ""
+        },
+        {
+          "proxy_name": "",
+          "proxy_url": ""
+        },
+        {
+          "proxy_name": "",
+          "proxy_url": ""
+        },
+        {
+          "proxy_name": "",
+          "proxy_url": ""
+        },
+        {
+          "proxy_name": "",
+          "proxy_url": ""
+        }
+      ],
+      "extra_browsers": [
+        {
+          "browser_name": "",
+          "browser_connection_url": ""
+        },
+        {
+          "browser_name": "",
+          "browser_connection_url": ""
+        },
+        {
+          "browser_name": "",
+          "browser_connection_url": ""
+        },
+        {
+          "browser_name": "",
+          "browser_connection_url": ""
+        },
+        {
+          "browser_name": "",
+          "browser_connection_url": ""
+        }
+      ],
+      "jitter_seconds": 0,
+      "proxy": null,
+      "time_between_check": {
+        "weeks": null,
+        "days": null,
+        "hours": 1,
+        "minutes": null,
+        "seconds": null
+      },
+      "timeout": 45,
+      "workers": 10,
+      "default_ua": {
+        "html_requests": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36",
+        "html_webdriver": ""
+      },
+      "time_schedule_limit": {
+        "enabled": false,
+        "monday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "tuesday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "wednesday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "thursday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "friday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "saturday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "sunday": {
+          "enabled": false,
+          "start_time": "00:00",
+          "duration": {
+            "hours": "24",
+            "minutes": "0"
+          }
+        },
+        "timezone": ""
+      }
+    },
+    "application": {
+      "all_paused": false,
+      "all_muted": false,
+      "api_access_token_enabled": true,
+      "base_url": "",
+      "empty_pages_are_a_change": false,
+      "fetch_backend": "html_requests",
+      "filter_failure_notification_threshold_attempts": 6,
+      "global_ignore_text": [],
+      "global_subtractive_selectors": [],
+      "ignore_whitespace": true,
+      "ignore_status_codes": false,
+      "ssim_threshold": "0.96",
+      "notification_body": "{{watch_url}} had a change.\r\n---\r\n{{diff}}\r\n---\r\n",
+      "notification_format": "htmlcolor",
+      "notification_title": "ChangeDetection.io Notification - {{watch_url}}",
+      "notification_urls": [
+        "hassio://homeassistant.lan:8123/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI0MmQ2OGE5NmI2NDI0ZWZlODZjYWYwNzk3MDI1ZmQ4MSIsImlhdCI6MTc2NjYwMDY5MiwiZXhwIjoyMDgxOTYwNjkyfQ.szbAmxL_TkbtnX02hyCwLyROffUWYh2xbPV6zK-vIiI?nid=changedetection"
+      ],
+      "pager_size": 50,
+      "password": false,
+      "render_anchor_tag_content": false,
+      "rss_access_token": "3c427a1ce8f33ab712e5db9c46df528e",
+      "rss_content_format": "text",
+      "rss_template_type": "system_default",
+      "rss_template_override": "",
+      "rss_diff_length": 5,
+      "rss_hide_muted_watches": true,
+      "rss_reader_mode": false,
+      "scheduler_timezone_default": "America/Detroit",
+      "schema_version": 25,
+      "shared_diff_access": false,
+      "strip_ignored_lines": false,
+      "tags": {
+        "594bed62-3915-440c-98c6-826a08416649": {
+          "body": null,
+          "browser_steps": [],
+          "browser_steps_last_error_step": null,
+          "conditions": {},
+          "conditions_match_logic": "ALL",
+          "check_count": 0,
+          "check_unique_lines": false,
+          "consecutive_filter_failures": 0,
+          "content-type": null,
+          "date_created": 1766601588,
+          "extract_text": [],
+          "fetch_backend": "system",
+          "fetch_time": 0.0,
+          "filter_failure_notification_send": true,
+          "filter_text_added": true,
+          "filter_text_removed": true,
+          "filter_text_replaced": true,
+          "follow_price_changes": true,
+          "has_ldjson_price_data": null,
+          "headers": {},
+          "ignore_text": [],
+          "ignore_status_codes": null,
+          "in_stock_only": true,
+          "include_filters": [],
+          "last_checked": 0,
+          "last_error": false,
+          "last_notification_error": null,
+          "last_viewed": 0,
+          "method": "GET",
+          "notification_alert_count": 0,
+          "notification_body": null,
+          "notification_format": "System default",
+          "notification_muted": false,
+          "notification_screenshot": false,
+          "notification_title": null,
+          "notification_urls": [],
+          "page_title": null,
+          "paused": false,
+          "previous_md5": false,
+          "previous_md5_before_filters": false,
+          "processor": "restock_diff",
+          "price_change_threshold_percent": null,
+          "proxy": null,
+          "remote_server_reply": null,
+          "sort_text_alphabetically": false,
+          "strip_ignored_lines": null,
+          "subtractive_selectors": [],
+          "tag": "",
+          "tags": [],
+          "text_should_not_be_present": [],
+          "time_between_check": {
+            "weeks": null,
+            "days": null,
+            "hours": null,
+            "minutes": null,
+            "seconds": null
+          },
+          "time_between_check_use_default": true,
+          "time_schedule_limit": {
+            "enabled": false,
+            "monday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "tuesday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "wednesday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "thursday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "friday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "saturday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "sunday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            }
+          },
+          "title": "Tech news",
+          "track_ldjson_price_data": null,
+          "trim_text_whitespace": false,
+          "remove_duplicate_lines": false,
+          "trigger_text": [],
+          "url": "",
+          "use_page_title_in_list": null,
+          "uuid": "594bed62-3915-440c-98c6-826a08416649",
+          "webdriver_delay": null,
+          "webdriver_js_execute_code": null,
+          "datastore_path": "/datastore",
+          "overrides_watch": null,
+          "restock": {
+            "in_stock": null,
+            "price": null,
+            "currency": null,
+            "original_price": null
+          },
+          "restock_settings": {
+            "follow_price_changes": true,
+            "in_stock_processing": "in_stock_only"
+          }
+        },
+        "ec660fe5-f98e-477b-b397-14327e1b7c61": {
+          "body": null,
+          "browser_steps": [],
+          "browser_steps_last_error_step": null,
+          "conditions": {},
+          "conditions_match_logic": "ALL",
+          "check_count": 0,
+          "check_unique_lines": false,
+          "consecutive_filter_failures": 0,
+          "content-type": null,
+          "date_created": 1766601588,
+          "extract_text": [],
+          "fetch_backend": "system",
+          "fetch_time": 0.0,
+          "filter_failure_notification_send": true,
+          "filter_text_added": true,
+          "filter_text_removed": true,
+          "filter_text_replaced": true,
+          "follow_price_changes": true,
+          "has_ldjson_price_data": null,
+          "headers": {},
+          "ignore_text": [],
+          "ignore_status_codes": null,
+          "in_stock_only": true,
+          "include_filters": [],
+          "last_checked": 0,
+          "last_error": false,
+          "last_notification_error": null,
+          "last_viewed": 0,
+          "method": "GET",
+          "notification_alert_count": 0,
+          "notification_body": null,
+          "notification_format": "System default",
+          "notification_muted": false,
+          "notification_screenshot": false,
+          "notification_title": null,
+          "notification_urls": [],
+          "page_title": null,
+          "paused": false,
+          "previous_md5": false,
+          "previous_md5_before_filters": false,
+          "processor": "restock_diff",
+          "price_change_threshold_percent": null,
+          "proxy": null,
+          "remote_server_reply": null,
+          "sort_text_alphabetically": false,
+          "strip_ignored_lines": null,
+          "subtractive_selectors": [],
+          "tag": "",
+          "tags": [],
+          "text_should_not_be_present": [],
+          "time_between_check": {
+            "weeks": null,
+            "days": null,
+            "hours": null,
+            "minutes": null,
+            "seconds": null
+          },
+          "time_between_check_use_default": true,
+          "time_schedule_limit": {
+            "enabled": false,
+            "monday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "tuesday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "wednesday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "thursday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "friday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "saturday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "sunday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            }
+          },
+          "title": "changedetection.io",
+          "track_ldjson_price_data": null,
+          "trim_text_whitespace": false,
+          "remove_duplicate_lines": false,
+          "trigger_text": [],
+          "url": "",
+          "use_page_title_in_list": null,
+          "uuid": "ec660fe5-f98e-477b-b397-14327e1b7c61",
+          "webdriver_delay": null,
+          "webdriver_js_execute_code": null,
+          "datastore_path": "/datastore",
+          "overrides_watch": null,
+          "restock": {
+            "in_stock": null,
+            "price": null,
+            "currency": null,
+            "original_price": null
+          },
+          "restock_settings": {
+            "follow_price_changes": true,
+            "in_stock_processing": "in_stock_only"
+          }
+        },
+        "85ab9be2-0458-46f7-99df-a39c20810209": {
+          "body": null,
+          "browser_steps": [],
+          "browser_steps_last_error_step": null,
+          "conditions": {},
+          "conditions_match_logic": "ALL",
+          "check_count": 0,
+          "check_unique_lines": false,
+          "consecutive_filter_failures": 0,
+          "content-type": null,
+          "date_created": 1767633446,
+          "extract_text": [],
+          "fetch_backend": "system",
+          "fetch_time": 0.0,
+          "filter_failure_notification_send": true,
+          "filter_text_added": true,
+          "filter_text_removed": true,
+          "filter_text_replaced": true,
+          "follow_price_changes": true,
+          "has_ldjson_price_data": null,
+          "headers": {},
+          "ignore_text": [],
+          "ignore_status_codes": null,
+          "in_stock_only": true,
+          "include_filters": [],
+          "last_checked": 0,
+          "last_error": false,
+          "last_notification_error": null,
+          "last_viewed": 0,
+          "method": "GET",
+          "notification_alert_count": 0,
+          "notification_body": null,
+          "notification_format": "System default",
+          "notification_muted": false,
+          "notification_screenshot": false,
+          "notification_title": null,
+          "notification_urls": [],
+          "page_title": null,
+          "paused": false,
+          "previous_md5": false,
+          "previous_md5_before_filters": false,
+          "processor": "restock_diff",
+          "price_change_threshold_percent": null,
+          "proxy": null,
+          "remote_server_reply": null,
+          "sort_text_alphabetically": false,
+          "strip_ignored_lines": null,
+          "subtractive_selectors": [],
+          "tag": "",
+          "tags": [],
+          "text_should_not_be_present": [],
+          "time_between_check": {
+            "weeks": null,
+            "days": null,
+            "hours": null,
+            "minutes": null,
+            "seconds": null
+          },
+          "time_between_check_use_default": true,
+          "time_schedule_limit": {
+            "enabled": false,
+            "monday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "tuesday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "wednesday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "thursday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "friday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "saturday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            },
+            "sunday": {
+              "enabled": true,
+              "start_time": "00:00",
+              "duration": {
+                "hours": "24",
+                "minutes": "00"
+              }
+            }
+          },
+          "title": "Unifi",
+          "track_ldjson_price_data": null,
+          "trim_text_whitespace": false,
+          "remove_duplicate_lines": false,
+          "trigger_text": [],
+          "url": "",
+          "use_page_title_in_list": null,
+          "uuid": "85ab9be2-0458-46f7-99df-a39c20810209",
+          "webdriver_delay": null,
+          "webdriver_js_execute_code": null,
+          "datastore_path": "/datastore",
+          "overrides_watch": null,
+          "restock": {
+            "in_stock": null,
+            "price": null,
+            "currency": null,
+            "original_price": null
+          },
+          "restock_settings": {
+            "follow_price_changes": true,
+            "in_stock_processing": "in_stock_only"
+          }
+        }
+      },
+      "webdriver_delay": null,
+      "ui": {
+        "open_diff_in_new_tab": true,
+        "socket_io_enabled": true,
+        "favicons_enabled": true,
+        "use_page_title_in_list": true
+      },
+      "active_base_url": "(\"Base URL\" not set - see settings - notifications)",
+      "api_access_token": "bede57337f089138559cc42d3b080ec6",
+      "processor": "text_json_diff",
+      "removepassword_button": false
+    }
+  },
+  "build_sha": "c22335ed01b2c3e24bbf81eb7004da80bbf27616\n",
+  "app_guid": "9247b233-5bac-4c49-aa0a-b37614e27ce7",
+  "version_tag": "0.52.9"
+}

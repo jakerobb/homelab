@@ -8,6 +8,44 @@
 **/talosconfig
 *.age
 
+# Docker Compose stack — runtime state, caches, and decrypted secrets that
+# `docker compose up` writes into these bind mounts on rpi5. Only the
+# hand-authored config already committed under docker-compose/ is tracked;
+# everything else here is regenerated. See docker-compose/README.md for the
+# full rationale/exclusion list. (Ignoring a path that's already tracked,
+# e.g. url-watches.json, doesn't hide changes to it — git still reports
+# modifications to tracked files regardless of .gitignore.)
+docker-compose/.env
+docker-compose/secrets/nut-upsd-password
+docker-compose/homeassistant/.storage/
+docker-compose/homeassistant/.cloud/
+docker-compose/homeassistant/.cache/
+docker-compose/homeassistant/core/
+docker-compose/homeassistant/deps/
+docker-compose/homeassistant/tts/
+docker-compose/homeassistant/custom_components/
+docker-compose/homeassistant/.ha_run.lock
+docker-compose/homeassistant/.HA_VERSION
+docker-compose/homeassistant/*.log*
+docker-compose/homeassistant/home-assistant_v2.db*
+docker-compose/homeassistant/lutron_caseta-*-key.pem
+docker-compose/scrypted/*
+docker-compose/nut-conf/*
+docker-compose/change-detection/*
+docker-compose/data/*
+docker-compose/ssh-keys/*
+docker-compose/logs/*
+docker-compose/ntfy/cache/*
+docker-compose/unbound/custom.conf.d/*.bak*
+docker-compose/influxdb/data/*
+docker-compose/influxdb/config/influx-configs
+docker-compose/grafana/*
+docker-compose/mosquitto/data/*
+docker-compose/mosquitto/log/*
+docker-compose/zigbee2mqtt/data/*
+docker-compose/matter-server/data/*
+docker-compose/zwave-js-ui/*
+
 # Terraform
 **/.terraform/*
 *.tfstate

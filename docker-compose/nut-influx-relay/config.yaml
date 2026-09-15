@@ -1,0 +1,32 @@
+poll_interval: 10s
+http_port: 8080
+
+influxdb:
+  url: http://influxdb:8086
+  token: ${INFLUXDB_TOKEN}
+  org: home
+  bucket: telegraf
+  measurement: upsd
+
+upses:
+  - label: rack
+    host: nut-upsd
+    port: 3493
+    ups_name: ups
+    tls: false
+    username: ${NUT_USER}
+    password: ${NUT_PASSWORD}
+    extra_field_mappings:
+      - nut_var: ups.realpower
+        influx_field: real_power_watts
+        type: float
+      - nut_var: ups.power
+        influx_field: apparent_power_va
+        type: float
+
+  - label: office
+    host: 192.168.0.9
+    port: 3493
+    ups_name: office-ups
+    tls: true
+    tls_skip_verify: true

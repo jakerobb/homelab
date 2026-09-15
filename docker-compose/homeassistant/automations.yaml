@@ -1,0 +1,423 @@
+- id: '1766600891735'
+  alias: Push notifications to Jake's iPhone 15 Pro Max
+  description: ''
+  triggers:
+  - trigger: persistent_notification
+    update_type:
+    - added
+    - updated
+    notification_id: changedetection
+  conditions: []
+  actions:
+  - action: notify.mobile_app_jake_s_iphone_15_pro_max
+    metadata: {}
+    data:
+      message: '{{trigger[''notification''][''message'']}}'
+  mode: single
+- id: '1771452044660'
+  alias: Turn on porch light
+  description: ''
+  triggers:
+  - trigger: webhook
+    allowed_methods:
+    - POST
+    - PUT
+    local_only: true
+    webhook_id: -Rfy9cEgWEK7UY5XvDjg-rcQy
+  conditions: []
+  actions:
+  - action: system_log.write
+    metadata: {}
+    data:
+      level: error
+      message: 'Turn on porch light trigger: {{ trigger }}'
+  - if:
+    - type: is_on
+      condition: device
+      device_id: 19146072ca8ec467429cc0dd5633ed18
+      entity_id: 84701294aea8d08e4f78aee2b05faff9
+      domain: binary_sensor
+    then:
+    - if:
+      - condition: device
+        type: is_on
+        device_id: 4813cda9108eca5bee6841c3a6082fc5
+        entity_id: a66152198561b1232a1a7916b9136b3b
+        domain: switch
+      then:
+      - if:
+        - condition: state
+          entity_id: timer.front_door_activity_timer
+          state:
+          - active
+        then:
+        - action: timer.start
+          metadata: {}
+          target:
+            entity_id: timer.front_door_activity_timer
+          data: {}
+      else:
+      - action: switch.turn_on
+        metadata: {}
+        target:
+          entity_id: switch.front_porch_light
+        data: {}
+      - action: timer.start
+        metadata: {}
+        data: {}
+        target:
+          entity_id: timer.front_door_activity_timer
+  mode: single
+- id: '1771513028678'
+  alias: Turn off porch light
+  description: ''
+  triggers:
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.front_door_activity_timer
+  conditions: []
+  actions:
+  - action: switch.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: switch.front_porch_light
+  mode: single
+- id: '1771552771114'
+  alias: 11pm shut down
+  description: ''
+  triggers:
+  - trigger: time
+    at: '23:00:00'
+  conditions:
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: timer.front_door_activity_timer
+      state:
+      - active
+  actions:
+  - action: switch.turn_off
+    metadata: {}
+    target:
+      entity_id: switch.front_porch_light
+    data: {}
+  mode: single
+- id: '1772399451675'
+  alias: Turn on card table light
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunrise
+    offset: 0
+  conditions: []
+  actions:
+  - action: switch.turn_on
+    metadata: {}
+    target:
+      entity_id: switch.card_table_light
+    data: {}
+  mode: single
+- id: '1772399491384'
+  alias: Turn off card table light
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunset
+    offset: 0
+  conditions: []
+  actions:
+  - action: switch.turn_off
+    metadata: {}
+    target:
+      entity_id: switch.card_table_light
+    data: {}
+  mode: single
+- id: '1772505712570'
+  alias: Turn off Rupert’s light
+  description: ''
+  triggers:
+  - trigger: time
+    at: '22:00:00'
+  conditions: []
+  actions:
+  - type: turn_off
+    device_id: 4481e86b530845d7dc79c9335c17ce20
+    entity_id: 0e7d1677a5acd394a4aa8dde876cb394
+    domain: switch
+    metadata:
+      secondary: false
+  mode: single
+- id: '1772506042305'
+  alias: Turn on Rupert’s Light
+  description: ''
+  triggers:
+  - trigger: time
+    at: 07:00:00
+  conditions: []
+  actions:
+  - type: turn_on
+    device_id: 4481e86b530845d7dc79c9335c17ce20
+    entity_id: 0e7d1677a5acd394a4aa8dde876cb394
+    domain: switch
+    metadata:
+      secondary: false
+  mode: single
+- id: '1778593416617'
+  alias: Tap Dial button 1 press - Living Room East on 30%
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 0b32a788dca66e6223fde7cfba235b63
+    type: action
+    subtype: button_1_press_release
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_on
+    metadata: {}
+    target:
+      entity_id:
+      - light.northeast
+      - light.0x001788010f270056
+    data:
+      transition: 1
+      color_temp_kelvin: 3500
+      brightness_pct: 30
+  mode: single
+- id: '1778593624907'
+  alias: Tap Dial Rotation - controls Living Room Brightness
+  description: ''
+  triggers:
+  - trigger: mqtt
+    options:
+      topic: zigbee2mqtt/Tap Dial Switch
+  conditions:
+  - condition: template
+    value_template: '{{ trigger.payload_json.action is defined and trigger.payload_json.action.startswith(''dial_rotate_'')
+      }}'
+  actions:
+  - variables:
+      step_map:
+        dial_rotate_right_fast: 25
+        dial_rotate_right_slow: 5
+        dial_rotate_right_step: 1
+        dial_rotate_left_step: -1
+        dial_rotate_left_slow: -5
+        dial_rotate_left_fast: -25
+      step: '{{ step_map.get(trigger.payload_json.action, 0) }}'
+  - condition: '{{ step != 0 }}'
+  - data:
+      step: '{{ step }}'
+    action: script.living_room_dial_brightness
+  mode: single
+- id: '1778598739260'
+  alias: Tap Dial button 2 press - Living Room Mid on 30%
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 0b32a788dca66e6223fde7cfba235b63
+    type: action
+    subtype: button_2_press_release
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_on
+    target:
+      entity_id:
+      - light.midnorth
+      - light.midsouth
+    data:
+      transition: 1
+      brightness_pct: 30
+      color_temp_kelvin: 3518
+  mode: single
+- id: '1778691751102'
+  alias: Tap Dial button 3 press - Living Room West on 30%
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 0b32a788dca66e6223fde7cfba235b63
+    type: action
+    subtype: button_3_press_release
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_on
+    target:
+      entity_id:
+      - light.0x001788010f26ff3b
+      - light.southwest
+    data:
+      transition: 1
+      color_temp_kelvin: 3527
+      brightness_pct: 30
+  mode: single
+- id: '1778691839543'
+  alias: Tap Dial button 4 press - Movie mode
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 0b32a788dca66e6223fde7cfba235b63
+    type: action
+    subtype: button_4_press_release
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_on
+    metadata: {}
+    target:
+      entity_id: light.southwest
+    data:
+      transition: 1
+      color_temp_kelvin: 3508
+      brightness_pct: 30
+    enabled: true
+  - action: light.turn_off
+    metadata: {}
+    target:
+      entity_id: light.midsouth
+    data:
+      transition: 1
+  - action: light.turn_off
+    metadata: {}
+    target:
+      entity_id: light.midnorth
+    data:
+      transition: 1
+  - action: light.turn_off
+    metadata: {}
+    target:
+      entity_id: light.0x001788010f270056
+    data:
+      transition: 1
+  - action: light.turn_off
+    metadata: {}
+    target:
+      entity_id: light.northeast
+    data:
+      transition: 1
+  - action: light.turn_off
+    metadata: {}
+    target:
+      entity_id: light.0x001788010f26ff3b
+    data:
+      transition: 1
+  mode: single
+- id: '1779821876804'
+  alias: LR Switch - Up Single -> LR lights on 30% or up 10%
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 49e962a06b1d757beb468044e8da225b
+    type: action
+    subtype: up_single
+    trigger: device
+  conditions: []
+  actions:
+  - if:
+    - condition: light.is_on
+      target:
+        entity_id: light.living_room_lights
+      options:
+        for: 00:00:00
+    then:
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.living_room_lights
+      data:
+        transition: 1
+        brightness_step_pct: 10
+    else:
+    - action: light.turn_on
+      target:
+        entity_id: light.living_room_lights
+      data:
+        color_temp_kelvin: 3505
+        brightness_pct: 30
+        transition: 1
+  mode: single
+- id: '1779821948105'
+  alias: LR Switch Down Held - All Off
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 49e962a06b1d757beb468044e8da225b
+    type: action
+    subtype: down_held
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_off
+    target:
+      entity_id:
+      - light.living_room_lights
+    data:
+      transition: 1
+  mode: single
+- id: '1779822163541'
+  alias: LR Switch Up Held -> Lights to 100%
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 49e962a06b1d757beb468044e8da225b
+    type: action
+    subtype: up_held
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.living_room_lights
+    data:
+      color_temp_kelvin: 3505
+      transition: 1
+      brightness_pct: 100
+  mode: single
+- id: '1779822227765'
+  alias: LR Switch Up Triple -> Lights to 70%
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 49e962a06b1d757beb468044e8da225b
+    type: action
+    subtype: up_triple
+    trigger: device
+  conditions: []
+  actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.living_room_lights
+    data:
+      color_temp_kelvin: 3505
+      brightness_pct: 70
+      transition: 1
+  mode: single
+- id: '1784513601399'
+  alias: LR Switch - Down Single -> Brightness down 10%
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: 49e962a06b1d757beb468044e8da225b
+    type: action
+    subtype: down_single
+    trigger: device
+  conditions: []
+  actions:
+  - if:
+    - condition: light.is_on
+      target:
+        entity_id: light.living_room_lights
+      options:
+        for: 00:00:00
+    then:
+    - action: light.turn_on
+      metadata: {}
+      target:
+        entity_id: light.living_room_lights
+      data:
+        transition: 1
+        brightness_step_pct: -10
+  mode: single

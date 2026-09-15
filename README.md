@@ -14,13 +14,17 @@ This repo contains IaC and related stuff for my homelab.
   Control-plane nodes use a **custom Pi5 installer image** — any amd64 node must use
   the stock Talos installer instead. Details and gotchas live in
   [`talos/README.md`](talos/README.md).
-- **Outside the cluster:** the original RPi5 16GB stays on Docker Compose duty for
-  hardware-pinned things (e.g. NUT client for the UPS) until/unless that changes later.
+- **Outside the cluster:** the original RPi5 16GB (`rpi5-1`) stays on Docker Compose
+  duty for hardware-pinned things (e.g. UPS NUT client) plus the LAN's Caddy reverse 
+  proxy and Unbound resolver, until/unless that changes later. Stack captured in
+  [`docker-compose/`](docker-compose/).
 - **IaC layout:**
   - [`talos/`](talos/) — non-secret Cilium config and per-node Talos patches
     applied to the existing cluster.
   - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions; the two
     Talos worker VMs are provisioned from here, applied from rpi5-1.
+  - [`docker-compose/`](docker-compose/) — the `rpi5-1` Compose stack's config
+    (secrets SOPS-encrypted); see its README for what's captured vs. excluded.
   - Anything that can't reasonably be IaC'd (BIOS/IOMMU toggles, HexOS's GUI-only pool
     setup) gets a step-by-step runbook here instead of being skipped.
 
@@ -112,7 +116,7 @@ Runbook: [`docs/hexos-install.md`](docs/hexos-install.md).
 - [x] Create HexOS VM: allocate adequate RAM (8GB+ baseline, more helps ZFS ARC), reasonable vCPU count — applied via `terraform/proxmox/hexos.tf` (6 vCPU / 8GB), VM exists and boots the installer ISO
 - [x] PCIe-passthrough both NVMe drives individually (not virtual disks) — HexOS/ZFS wants raw block access — `hostpci0`/`hostpci1` in `hexos.tf`
 - [x] Install HexOS in the VM — hit two more gotchas along the way (corrupted `std` VGA console, and the P3 Plus needing `vfio-pci disable_idle_d3=1` to attach reliably); see [`docs/hexos-install.md`](docs/hexos-install.md). Both drives now visible in HexOS.
-- [ ] Pool layout — decided: stripe (6TB usable, no redundancy) unless HexOS's ZFS AnyRaid is ready to use by then, in which case use that instead for flexible-capacity redundancy. Plain mirror is out (wastes 2TB of the P3 Plus given mismatched capacities).
+- [x] Pool layout — decided: stripe (6TB usable, no redundancy) unless HexOS's ZFS AnyRaid is ready to use by then, in which case use that instead for flexible-capacity redundancy. Plain mirror is out (wastes 2TB of the P3 Plus given mismatched capacities).
 - [ ] Set up NFS or SMB share, test from another device on the network
 - [ ] Once the pool is confirmed healthy, `rclone copy` the archived data back down from B2
 - [ ] Verify restored data integrity. **Keep the B2 backup for a few extra weeks** as insurance against early failure of the new (non-redundant, unless AnyRaid) pool before deleting the bucket — don't delete immediately just because the pool checks out on day one.

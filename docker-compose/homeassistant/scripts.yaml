@@ -1,0 +1,16 @@
+living_room_dial_brightness:
+  alias: Living Room Dial Brightness
+  fields:
+    step:
+      description: Brightness step percentage (negative to dim)
+  sequence:
+  - variables:
+      on_bulbs: "{{ expand('light.living_room_lights_ha')\n   | selectattr('state',
+        'eq', 'on')\n   | map(attribute='entity_id') | list }}\n"
+  - target:
+      entity_id: "{{ on_bulbs if on_bulbs | count > 0\n   else 'light.living_room_lights_ha'
+        }}\n"
+    data:
+      brightness_step_pct: '{{ step }}'
+      transition: 0.3
+    action: light.turn_on
