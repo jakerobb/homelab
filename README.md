@@ -24,6 +24,45 @@ This repo contains IaC and related stuff for my homelab.
   - Anything that can't reasonably be IaC'd (BIOS/IOMMU toggles, HexOS's GUI-only pool
     setup) gets a step-by-step runbook here instead of being skipped.
 
+## Hardware inventory
+
+### Rack
+- **UniFi Cloud Gateway Fiber** — router/gateway, OS2 (single-mode) fiber WAN.
+- **MinisForum MS-A2** (`192.168.102.21`) — AMD Ryzen 8845HS, 32GB RAM, 1TB
+  primary/boot NVMe, plus a 2TB and 4TB NVMe passed through to the HexOS VM
+  (see [`docs/hexos-install.md`](docs/hexos-install.md)). Runs Proxmox VE,
+  hosting the Talos worker VMs and the HexOS VM.
+- **UniFi Pro HD 24 PoE** — core switch.
+- **1U shelf:** Comet X (KVM-over-IP), SMLIGHT SLZB-06P10 (Zigbee gateway),
+  TubesZB Z-Wave PoE kit with Zooz ZAC93 (Z-Wave gateway), UniFi AI Port
+  (adds smart-detection features to older UniFi cameras). The Zigbee and
+  Z-Wave gateways are both linked into Home Assistant, which runs on
+  `rpi5-1`; software stack details to follow separately.
+- **2U Raspberry Pi mount:** `rpi5-1` (Talos jump box, holds `talosctl` +
+  cluster secrets; also the Docker Compose host for hardware-pinned services
+  like the UPS's NUT client), `talos-cp-1`/`talos-cp-2`/`talos-cp-3` (Talos
+  control plane, Pi 5 4GB). Room for six more Pis.
+- **UniFi PDU Pro** — rack power distribution/monitoring.
+- **CyberPower CP1500PFCRM2U** — rack UPS.
+- **Noctua 120mm fans** — one installed in the top of the rack, a second
+  planned for the bottom.
+- **Dig-Octa WLED controller** + **Mean Well 100W 12V power supply** — rack
+  accent, task, and status lighting (it's dark in there). Controlled from
+  Home Assistant; not yet automated. Only one LED strip is connected so far
+  — plan is to run strips along every edge inside the rack.
+
+### On top of the rack
+- **2019 MacBook Pro 15"** — connected via a **CalDigit TS3+** dock to the
+  network and to the Comet X. Currently idle; earmarked as a possible future
+  Talos K8s worker (running Talos in a UTM VM), on hold for now.
+
+### Office
+- **UniFi Pro XG 8 PoE** — connected to the Pro HD 24 PoE via OS2 fiber.
+- **CalDigit TS5+** dock.
+- **2021 MacBook Pro 14"** (M1 Pro, 32GB, 500GB) — primary workstation; not
+  part of the homelab infrastructure itself, but what's typically used to
+  drive it.
+
 # TODO
 
 ## 1. Backup the 4TB P3 Plus
@@ -72,7 +111,7 @@ Runbook: [`docs/hexos-install.md`](docs/hexos-install.md).
 - [x] Check IOMMU groups for both NVMe drives — both isolated alone in their own group (P3 Plus = group 17 @ `0000:08:00.0`, T500 = group 18 @ `0000:09:00.0`), no ACS override needed
 - [x] Create HexOS VM: allocate adequate RAM (8GB+ baseline, more helps ZFS ARC), reasonable vCPU count — applied via `terraform/proxmox/hexos.tf` (6 vCPU / 8GB), VM exists and boots the installer ISO
 - [x] PCIe-passthrough both NVMe drives individually (not virtual disks) — HexOS/ZFS wants raw block access — `hostpci0`/`hostpci1` in `hexos.tf`
-- [ ] Install HexOS in the VM
+- [x] Install HexOS in the VM — hit two more gotchas along the way (corrupted `std` VGA console, and the P3 Plus needing `vfio-pci disable_idle_d3=1` to attach reliably); see [`docs/hexos-install.md`](docs/hexos-install.md). Both drives now visible in HexOS.
 - [ ] Pool layout — decided: stripe (6TB usable, no redundancy) unless HexOS's ZFS AnyRaid is ready to use by then, in which case use that instead for flexible-capacity redundancy. Plain mirror is out (wastes 2TB of the P3 Plus given mismatched capacities).
 - [ ] Set up NFS or SMB share, test from another device on the network
 - [ ] Once the pool is confirmed healthy, `rclone copy` the archived data back down from B2

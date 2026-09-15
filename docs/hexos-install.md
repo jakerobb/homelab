@@ -128,12 +128,42 @@ shutdown may not register mid-installer) before reapplying.
 Then, in the Proxmox web UI, open the `hexos` VM's **Console** (noVNC) and
 walk through HexOS's installer same as any other OS install — target its own
 32GB virtual boot disk (`scsi0`), **not** either passed-through NVMe. Once
-installed and confirmed booting cleanly on its own:
+installed, on first login go to
+[deck.hexos.com](https://deck.hexos.com) to claim the server (this is what
+applies the actual HexOS branding/management layer on top of the base
+TrueNAS SCALE install — you'll see a plain TrueNAS UI until this step).
+Then, once installed and confirmed booting cleanly on its own:
 
 - In the Proxmox UI (or by editing `hexos.tf`), change `boot_order` to just
   `["scsi0"]` and detach/remove the `cdrom` block.
 - Confirm both passed-through drives are visible inside HexOS as raw block
   devices before proceeding to pool setup.
+
+**Fourth gotcha, discovered after a successful install:** the P3 Plus
+(`0000:08:00.0`) enumerated fine at the PCI level (visible via `lspci`) but
+never attached as a block device inside the guest, and the host's dmesg
+showed `vfio-pci 0000:08:00.0: Unable to change power state from D3cold to
+D0, device inaccessible`. This is a known vfio-pci issue: it tries to idle
+passed-through devices into D3 when the guest isn't actively driving them,
+and some NVMe controllers — especially budget/DRAM-less ones like this
+Crucial P3 Plus — can't reliably come back from that. Confirmed fix (matches
+reports of the same issue with TrueNAS as the guest,
+[Proxmox forum thread](https://forum.proxmox.com/threads/pci-passthrough-nvme-unable-to-change-power-state.166055/)):
+
+```bash
+echo 'options vfio-pci disable_idle_d3=1' | tee /etc/modprobe.d/vfio-disable-idle-d3.conf
+update-initramfs -u -k all
+reboot
+```
+
+Note this is a module-wide setting — it disables idle-D3 for every device
+bound to vfio-pci on the host, not just this one. Fine here since HexOS is
+the only passthrough VM, but worth knowing before adding a second one.
+
+A harmless, unrelated boot message you'll see either way:
+`Failed to start ipa-epn.timer`. That's a FreeIPA client timer Debian/TrueNAS
+SCALE ships by default; it has nothing to do without a FreeIPA domain joined.
+Cosmetic only.
 
 ## 6. Pool + share setup (GUI-only, HexOS)
 
