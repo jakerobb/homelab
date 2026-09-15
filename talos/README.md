@@ -190,3 +190,30 @@ both workers leaves comfortable headroom.)
   ```
   Consumed by the `proxmox_download_file.talos_worker_image` resource in
   `terraform/proxmox/images.tf`, imported into both workers' disks.
+
+## iscsi-tools extension (added 2026-09-15)
+
+Both workers now run a schematic that adds the `siderolabs/iscsi-tools`
+system extension, needed for democratic-csi's TrueNAS iSCSI driver to mount
+volumes off HexOS. Generated via Image Factory:
+
+```
+curl -X POST --data-binary @- https://factory.talos.dev/schematics <<'EOF'
+customization:
+  systemExtensions:
+    officialExtensions:
+      - siderolabs/iscsi-tools
+EOF
+```
+
+Schematic ID: `c9078f9419961640c712a8bf2bb9174933dfcf1da383fd8ea2b7dc21493f8bac`.
+
+Applied to both existing workers **in place** via `talosctl upgrade
+--nodes <ip> --image factory.talos.dev/installer/c9078f9419961640c712a8bf2bb9174933dfcf1da383fd8ea2b7dc21493f8bac:v1.11.5
+--wait` — no VM rebuild needed, Talos swaps the installed image and reboots.
+Talos handles cordon/drain automatically as part of the upgrade sequence.
+`terraform/proxmox/images.tf` is updated to the same schematic so a
+from-scratch worker rebuild matches what's actually running.
+
+Verify with `talosctl -n <worker-ip> get extensions` — expect an
+`iscsi-tools` entry alongside the `schematic` entry matching the ID above.
