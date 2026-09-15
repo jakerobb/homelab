@@ -1,3 +1,30 @@
 machine:
   network:
     hostname: talos-worker-1
+  # Needed for democratic-csi's iSCSI node driver (added 2026-09-15) — see
+  # talos/README.md#iscsi-tools-extension-added-2026-09-15. /etc/iscsi
+  # genuinely exists on the node (the iscsi-tools extension creates it), but
+  # kubelet runs in its own constrained mount namespace on Talos and doesn't
+  # see it by default, so a plain hostPath volume mount fails with
+  # "hostPath type check failed: /etc/iscsi is not a directory" even though
+  # the path is real. extraMounts explicitly bind-mounts it into kubelet's
+  # namespace so pods can see it too.
+  kernel:
+    modules:
+      - name: iscsi_tcp
+  kubelet:
+    extraMounts:
+      - destination: /etc/iscsi
+        type: bind
+        source: /etc/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
+      - destination: /var/lib/iscsi
+        type: bind
+        source: /var/lib/iscsi
+        options:
+          - bind
+          - rshared
+          - rw

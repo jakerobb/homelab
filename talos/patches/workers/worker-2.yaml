@@ -1,3 +1,25 @@
 machine:
   network:
     hostname: talos-worker-2
+  # See worker-1.yaml for why — identical patch, duplicated here since there's
+  # no shared/common worker patch file yet (both worker patches only had
+  # hostname before this).
+  kernel:
+    modules:
+      - name: iscsi_tcp
+  kubelet:
+    extraMounts:
+      - destination: /etc/iscsi
+        type: bind
+        source: /etc/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
+      - destination: /var/lib/iscsi
+        type: bind
+        source: /var/lib/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
