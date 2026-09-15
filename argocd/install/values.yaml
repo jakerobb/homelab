@@ -5,6 +5,16 @@
 nameOverride: argocd
 fullnameOverride: argocd
 
+global:
+  # Chart default is 3 (Deployments); lowered to match the homelab-wide
+  # revisionHistoryLimit: 2 policy — see argocd/README.md.
+  revisionHistoryLimit: 2
+
+controller:
+  # Chart default is 5 for the application-controller StatefulSet; same
+  # policy as global above.
+  revisionHistoryLimit: 2
+
 configs:
   params:
     # TLS is terminated at the Gateway (wildcard cert, see

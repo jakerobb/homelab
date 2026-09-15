@@ -37,6 +37,8 @@ spec:
         pod:
           kind: 'StatefulSet'
           replicas: 1
+          # See revisionHistoryLimit policy in argocd/README.md.
+          revisionHistoryLimit: 2
           resources:
             requests:
               cpu: 50m

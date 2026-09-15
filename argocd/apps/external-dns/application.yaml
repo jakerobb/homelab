@@ -12,6 +12,9 @@ spec:
     helm:
       releaseName: external-dns
       valuesObject:
+        # See revisionHistoryLimit policy in argocd/README.md.
+        revisionHistoryLimit: 2
+
         provider:
           name: cloudflare
         sources:

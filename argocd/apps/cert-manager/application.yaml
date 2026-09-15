@@ -18,6 +18,11 @@ spec:
     helm:
       releaseName: cert-manager
       valuesObject:
+        global:
+          # Applies to all of cert-manager's Deployments (controller,
+          # webhook, cainjector) — see revisionHistoryLimit policy in
+          # argocd/README.md.
+          revisionHistoryLimit: 2
         crds:
           enabled: true
         # DNS-01 self-check was failing zone-walk lookups through the

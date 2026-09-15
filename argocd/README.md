@@ -44,6 +44,13 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   OIDC support directly, not Dex). See "Authelia SSO" below. The local
   `admin` account (password in `argocd-initial-admin-secret`, see "Bootstrap"
   below) still exists as a break-glass fallback if Authelia is ever down.
+- **`revisionHistoryLimit: 2`** set on every app's Deployment/StatefulSet
+  where the chart exposes the knob (chart defaults are usually 10) — enough
+  to roll back one step, not a growing pile of dead ReplicaSets. Rancher's
+  `local-path-provisioner` chart doesn't template this field at all, so it's
+  stuck at the Kubernetes default (10) until that's patched upstream or
+  vendored; low-value to chase for a single-replica, rarely-redeployed
+  provisioner.
 
 ## DNS + TLS (decided 2026-09-13)
 
