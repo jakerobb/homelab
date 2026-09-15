@@ -52,6 +52,14 @@ spec:
             secrets: {}
         volumeSnapshotClasses: []
         driver:
+          # The chart's node DaemonSet template inspects
+          # driver.config.driver at Helm render time (contains "iscsi" ...)
+          # to decide whether to wire up iSCSI host mounts — it needs this
+          # even though existingConfigSecret supplies the real config
+          # (including this same value) at runtime. Not sensitive on its
+          # own, just the driver name.
+          config:
+            driver: freenas-api-iscsi
           existingConfigSecret: democratic-csi-truenas-iscsi-config
   destination:
     server: https://kubernetes.default.svc

@@ -24,15 +24,36 @@ is a deferred follow-up. Restore procedure also not yet exercised — worth
 testing before relying on it in a real incident.
 
 ## HexOS storage
-**In progress — started 2026-09-13.** IOMMU enabled and confirmed on the
-Proxmox host, both NVMe drives isolated cleanly in their own IOMMU groups,
-Terraform written for the HexOS VM with passthrough — see
-[`docs/hexos-install.md`](docs/hexos-install.md) and root
-[README.md](README.md#5-hexos-vm-with-t500--p3-plus) step 5. Remaining: apply
-the Terraform, install HexOS, set up the pool/share, restore the P3 Plus data
-from B2, and — the actual goal, per discussion — wire it up as a Kubernetes
-`StorageClass` (via an NFS CSI driver or similar) so workloads can get real
-persistent volumes that survive a pod being rescheduled to a different node.
+**In progress — started 2026-09-13.** Pool (`data`, striped, ~6TB usable)
+created, iSCSI service enabled with a Portal + Initiator Group configured.
+Both Talos workers upgraded in place (`talosctl upgrade`) to a schematic with
+the `siderolabs/iscsi-tools` extension — see
+[`talos/README.md`](talos/README.md#iscsi-tools-extension-added-2026-09-15).
+`democratic-csi` (TrueNAS iSCSI driver) deployed via ArgoCD against
+`data/k8s-iscsi` — see
+[`argocd/apps/democratic-csi/`](argocd/apps/democratic-csi/application.yaml).
+Remaining: verify the `hexos-iscsi` StorageClass provisions real volumes
+(throwaway test PVC), decide whether it becomes the cluster's default
+StorageClass (currently `local-path-provisioner` still is), move InfluxDB's
+datastore onto it (the original motivating case — NFS isn't safe for its
+embedded bbolt store), restore the P3 Plus data from B2, and — a separate,
+later addition — an NFS-backed StorageClass for genuinely ReadWriteMany
+workloads (media libraries, etc.), which iSCSI/block storage can't do.
+
+## ArgoCD-native SOPS decryption (KSOPS)
+**Not started.** Every SOPS-encrypted secret under `argocd/secrets/` is
+currently applied out-of-band by hand (`sops -d ... | kubectl apply -f -`)
+before an Application can go healthy — ArgoCD itself has no way to decrypt
+them, a gap already noted in [`argocd/README.md`](argocd/README.md) and hit
+concretely setting up `democratic-csi`'s driver-config secret. KSOPS
+(`viaduct-ai/kustomize-sops`) is the standard fix: an initContainer on
+`repo-server` decrypts SOPS files as part of the Kustomize build. Real
+tradeoffs to weigh before doing it, not just a config toggle: the age
+*private* key would need to live in-cluster (currently only Jake's Mac +
+1Password have it — this expands blast radius if `repo-server` is ever
+compromised), and every existing secret file would need restructuring from a
+standalone applied `Secret` into a Kustomize-generator reference, introducing
+Kustomize into a repo that's so far been pure raw-YAML + Helm `valuesObject`.
 
 ## ArgoCD
 **Base setup done** — decided and deployed 2026-09-13, installed via Helm
