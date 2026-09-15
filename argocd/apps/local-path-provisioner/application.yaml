@@ -1,10 +1,10 @@
 # First PVC-capable StorageClass in the cluster — nothing provided one before
 # this (`kubectl get storageclass` returned nothing). Deliberately lightweight:
 # Rancher's local-path-provisioner backs PVs with a directory on whichever
-# node the pod lands on (no replication across nodes) — fine as a bridge for
-# small, low-stakes volumes like Authelia's SQLite file, but not a
-# replacement for the "HexOS storage" TODO item's NFS/SMB-backed
-# StorageClass. Revisit once that lands.
+# node the pod lands on (no replication across nodes) — was a bridge until
+# HexOS storage landed. Now superseded as the cluster default by
+# `hexos-iscsi` (see argocd/apps/democratic-csi/) — kept around, not default,
+# for anything that genuinely wants node-local storage over networked.
 #
 # Sourced directly from upstream's own Helm chart (in their git repo, not a
 # separate chart index) rather than a third-party ArtifactHub mirror — this
@@ -34,7 +34,7 @@ spec:
       valuesObject:
         storageClass:
           create: true
-          defaultClass: true
+          defaultClass: false
           reclaimPolicy: Retain
   destination:
     server: https://kubernetes.default.svc

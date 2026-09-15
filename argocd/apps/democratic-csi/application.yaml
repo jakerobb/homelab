@@ -19,9 +19,8 @@
 # ArgoCD's automated `prune: true`, so an accidental prune orphans the
 # backing zvol on HexOS instead of deleting real data outright.
 #
-# defaultClass: false for now — local-path-provisioner stays the cluster
-# default until a deliberate decision is made to switch it (open question,
-# not yet decided).
+# defaultClass: true (decided 2026-09-15) — local-path-provisioner is no
+# longer the cluster default; see its own application.yaml comment.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -42,7 +41,7 @@ spec:
           name: "org.democratic-csi.iscsi"
         storageClasses:
           - name: hexos-iscsi
-            defaultClass: false
+            defaultClass: true
             reclaimPolicy: Retain
             volumeBindingMode: Immediate
             allowVolumeExpansion: true

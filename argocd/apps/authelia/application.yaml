@@ -56,7 +56,13 @@ spec:
 
         persistence:
           enabled: true
-          storageClass: local-path
+          # Moved from local-path to hexos-iscsi (2026-09-15) — deliberately
+          # a clean start, not a migration: single admin account, zero active
+          # sessions, so the old SQLite DB/2FA registrations weren't worth
+          # preserving. storageClassName is immutable on an existing PVC, so
+          # this requires deleting the old `authelia` PVC once synced (see
+          # TODO.md/session notes) before the chart can recreate it here.
+          storageClass: hexos-iscsi
           size: 200Mi
 
         secret:
