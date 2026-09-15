@@ -24,21 +24,40 @@ is a deferred follow-up. Restore procedure also not yet exercised — worth
 testing before relying on it in a real incident.
 
 ## HexOS storage
-**In progress — started 2026-09-13.** Pool (`data`, striped, ~6TB usable)
-created, iSCSI service enabled with a Portal + Initiator Group configured.
-Both Talos workers upgraded in place (`talosctl upgrade`) to a schematic with
-the `siderolabs/iscsi-tools` extension — see
+**Core work done — started 2026-09-13, iSCSI path completed 2026-09-15.**
+Pool (`data`, striped, ~6TB usable) created, iSCSI service enabled with a
+Portal + Initiator Group configured. Both Talos workers upgraded in place
+(`talosctl upgrade`) to a schematic with the `siderolabs/iscsi-tools`
+extension, plus a `kubelet.extraMounts` patch for `/etc/iscsi`/`/var/lib/iscsi`
+(kubelet runs in its own mount namespace on Talos and doesn't see host paths
+by default, even real ones) — see
 [`talos/README.md`](talos/README.md#iscsi-tools-extension-added-2026-09-15).
 `democratic-csi` (TrueNAS iSCSI driver) deployed via ArgoCD against
 `data/k8s-iscsi` — see
 [`argocd/apps/democratic-csi/`](argocd/apps/democratic-csi/application.yaml).
-Remaining: verify the `hexos-iscsi` StorageClass provisions real volumes
-(throwaway test PVC), decide whether it becomes the cluster's default
-StorageClass (currently `local-path-provisioner` still is), move InfluxDB's
-datastore onto it (the original motivating case — NFS isn't safe for its
-embedded bbolt store), restore the P3 Plus data from B2, and — a separate,
-later addition — an NFS-backed StorageClass for genuinely ReadWriteMany
-workloads (media libraries, etc.), which iSCSI/block storage can't do.
+Verified end-to-end with a throwaway PVC: dynamic provisioning, and clean
+detach/reattach with data intact when force-moved to the other worker node.
+`hexos-iscsi` is now the cluster's **default StorageClass**
+(`local-path-provisioner` demoted, kept around for node-local use cases).
+Authelia migrated onto it as the first real workload (clean start, not a
+data migration — see `argocd/apps/authelia/application.yaml`).
+
+Also found and fixed a real bug along the way, unrelated to HexOS itself but
+uncovered by finally exercising external Gateway access post-migration: the
+Cilium `CiliumL2AnnouncementPolicy` had a hardcoded `interfaces: [^eth0$]`
+that never matched the Talos workers' actual `ens18` NIC, so the LB IP
+silently never answered ARP — see
+[`talos/README.md`](talos/README.md#ingress-gateway-api-decided-and-deployed-2026-09-13)
+(gotcha entry, 2026-09-15).
+
+**Remaining, deliberately deferred to its own conversation (2026-09-15):**
+moving InfluxDB's datastore onto `hexos-iscsi` — the original motivating
+case (NFS isn't safe for its embedded bbolt store) — is a big enough lift
+(likely its own data-migration dance, unlike Authelia's clean-start path)
+to warrant fresh context rather than folding into this one. Also still
+open: restore the P3 Plus data from B2, and a separate, later addition of
+an NFS-backed StorageClass for genuinely ReadWriteMany workloads (media
+libraries, etc.), which iSCSI/block storage can't do.
 
 ## ArgoCD-native SOPS decryption (KSOPS)
 **Not started.** Every SOPS-encrypted secret under `argocd/secrets/` is

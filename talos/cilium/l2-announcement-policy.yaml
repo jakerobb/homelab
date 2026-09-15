@@ -11,7 +11,14 @@ spec:
     matchExpressions:
       - key: node-role.kubernetes.io/control-plane
         operator: DoesNotExist
-  interfaces:
-    - ^eth0$
+  # No `interfaces` restriction (found broken 2026-09-15): this originally
+  # pinned announcements to `^eth0$`, but the MS-A2 Talos worker VMs' real
+  # NIC is `ens18` (standard Proxmox virtio-net naming) — nothing ever
+  # matched, so Cilium's L2 responder held the leader lease and reported
+  # "Running" while silently never answering ARP for the LB IP. Confirmed via
+  # tcpdump: ARP requests went out from the jump box, zero replies came back.
+  # Omitting `interfaces` entirely announces over all of a node's interfaces
+  # (Cilium default) — more robust than hardcoding a NIC name, especially
+  # since future physical worker hardware may use yet another naming scheme.
   externalIPs: false
   loadBalancerIPs: true

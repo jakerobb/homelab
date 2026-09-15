@@ -146,6 +146,27 @@ a decision on an internal CA vs public DNS-01), and any actual `HTTPRoute`s
 — those get added per-app in that app's own namespace as apps move onto the
 cluster. ArgoCD's own UI is the likely first one.
 
+**Gotcha found and fixed (2026-09-15):** `argocd.jakerobb.org` stopped
+resolving to a working connection from the LAN — DNS was correct, and the
+Gateway/Envoy/Authelia chain was confirmed healthy from *inside* the cluster
+(`curl` to the Service ClusterIP worked fine), but nothing outside the
+cluster could reach the LB IP at all. Root cause, confirmed via `tcpdump`:
+`cilium/l2-announcement-policy.yaml` hardcoded `interfaces: [^eth0$]`, but
+the MS-A2 Talos worker VMs' real NIC is `ens18` (standard Proxmox
+virtio-net naming) — nothing ever matched, so Cilium's L2 responder held the
+leader lease and reported "Running" while silently never answering ARP for
+the LB IP. No evidence this ever worked correctly for the current worker
+VMs; it likely only looked validated because the original "confirmed
+working" `curl` test after the initial Gateway API cutover was against the
+Service directly, not tested via the external LB IP from the LAN. Fixed by
+removing the `interfaces` restriction entirely — an omitted `interfaces`
+field announces over all of a node's interfaces (Cilium's documented
+default), which is also more robust than hardcoding a NIC name given future
+physical workers may use yet another naming scheme. Same "not hot-reloaded"
+gotcha as `enable-envoy-config` above: applying the policy change alone
+wasn't enough, needed `kubectl -n kube-system rollout restart ds/cilium`
+before the L2 responder actually picked it up.
+
 ## Layout
 
 - `cilium/` — Cilium Helm values, LB/L2-announcement CRDs, and the Gateway
