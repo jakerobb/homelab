@@ -47,6 +47,16 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
     size = 64
   }
 
+  lifecycle {
+    # import_from only matters at disk creation time. Once a worker exists,
+    # Talos owns its own upgrades (talosctl upgrade — see talos/README.md);
+    # letting a changed talos_worker_image propagate here would make Terraform
+    # re-import the boot disk on an already-running node, discarding whatever
+    # talosctl already applied in place. A future image change should only
+    # affect a from-scratch worker (new for_each key, or after a manual taint).
+    ignore_changes = [disk[0].import_from]
+  }
+
   network_device {
     bridge      = "vmbr0"
     model       = "virtio"
