@@ -247,6 +247,74 @@ time; those get added to Authelia's `access_control` as they land, not now.
   Authelia user ever shows up and should get *some* default access instead
   of silently seeing nothing.
 
+## Renovate (dependency updates, decided and deployed 2026-09-16)
+
+Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
+(`docker-compose/docker-compose.yml`) — see the
+[`TODO.md`](../TODO.md#compose-workload-migration) note this replaces.
+
+- **PR-based, not in-place patching.** Watchtower silently swaps running
+  containers; that model fights GitOps (git is supposed to be the source of
+  truth for what's running). Instead, [Renovate](https://docs.renovatebot.com/)
+  runs as a `CronJob` ([`apps/renovate/`](apps/renovate/cronjob.yaml)) that
+  scans this repo and opens PRs bumping container image tags, ArgoCD Helm
+  chart versions (`argocd/apps/**/application.yaml`), docker-compose image
+  tags, and Terraform provider versions. Merging a PR is what actually
+  changes anything — ArgoCD's existing auto-sync then picks it up like any
+  other commit. Config lives in [`renovate.json`](../renovate.json) at the
+  repo root; the `kubernetes` and `argocd` managers are off by default
+  upstream (no reliable way to auto-detect which YAML is which) and are
+  explicitly scoped there to `argocd/apps/**`.
+- **Self-hosted CLI image, not the GitHub App** — keeps this entirely
+  in-cluster/GitOps'd like everything else here, at the cost of one manual
+  bootstrap step (the GitHub token below).
+- **Schedule:** daily, 4:17am America/Detroit — same off-peak slot Watchtower
+  used to run in.
+- **Image tag is pinned, not `:latest`** — deliberately, so the `kubernetes`
+  manager picks it up and Renovate ends up opening a PR against its own
+  CronJob when a new version ships.
+- **GitHub token (one-time, manual):** Renovate needs a token that can push
+  branches and open PRs against this repo. Create a **fine-grained personal
+  access token** at GitHub → Settings → Developer settings → Fine-grained
+  tokens, scoped to just `jakerobb/homelab`, with **Contents: Read and
+  write** and **Pull requests: Read and write** repository permissions (add
+  **Workflows: Read and write** too if `.github/workflows/` ever shows up).
+  Then, same out-of-band pattern as the Cloudflare/Authelia secrets above (no
+  SOPS/KSOPS wired into ArgoCD sync yet):
+
+  ```bash
+  read -rsp "Renovate GitHub token: " RENOVATE_TOKEN; echo
+  cat > argocd/secrets/renovate-github-token.sops.yaml <<EOF
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: renovate-github-token
+    namespace: renovate
+  stringData:
+    token: ${RENOVATE_TOKEN}
+  EOF
+  sops -e -i argocd/secrets/renovate-github-token.sops.yaml
+  unset RENOVATE_TOKEN
+  ```
+
+  Apply once the `renovate` namespace exists (after `root-app.yaml` has
+  synced at least once):
+
+  ```bash
+  export KUBECONFIG=~/.kube/config
+  sops -d argocd/secrets/renovate-github-token.sops.yaml | kubectl apply -f -
+  ```
+
+  `git add argocd/secrets/renovate-github-token.sops.yaml` and commit —
+  safe, it's encrypted.
+- **First run:** trigger it on demand instead of waiting for 4:17am —
+  `kubectl create job --from=cronjob/renovate -n renovate renovate-manual-1`
+  — then `kubectl logs -n renovate job/renovate-manual-1 -f`. Check the logs
+  against current [Renovate docs](https://docs.renovatebot.com/) if
+  `kubernetes`/`argocd` manager config keys have moved on again
+  (`managerFilePatterns` itself replaced the older `fileMatch` at some point)
+  or if it isn't picking up files you expected it to.
+
 ## Bootstrap (one-time, manual)
 
 From a machine with `helm`/`kubectl` pointed at the cluster

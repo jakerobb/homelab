@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/Detroit",
+  "kubernetes": {
+    "managerFilePatterns": ["/^argocd/apps/.+\\.ya?ml$/"]
+  },
+  "argocd": {
+    "managerFilePatterns": ["/^argocd/apps/.+/application\\.ya?ml$/"]
+  }
+}

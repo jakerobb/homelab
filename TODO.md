@@ -182,7 +182,9 @@ about hardware pinning going in, not a final answer.
   destination for the existing "Log aggregation" TODO item below (cluster
   logs get shipped *to* them, they don't move); `watchtower` and `ofelia`
   have no direct k8s equivalent (image-update automation and cron become
-  ArgoCD/`CronJob`-native concerns respectively, not lift-and-shifts);
+  ArgoCD/`CronJob`-native concerns respectively, not lift-and-shifts) —
+  `watchtower`'s half is now done, see
+  [`argocd/README.md`](argocd/README.md#renovate-dependency-updates-decided-and-deployed-2026-09-16);
   `caddy` is the Pi's reverse proxy for everything above — it just shrinks
   and eventually retires as workloads move onto the Cilium Gateway, rather
   than being "migrated" itself.

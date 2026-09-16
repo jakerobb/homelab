@@ -1,0 +1,61 @@
+# Kubernetes/GitOps equivalent of docker-compose's Watchtower
+# (docker-compose/docker-compose.yml): instead of patching running
+# containers directly, Renovate opens PRs against this repo (container image
+# tags, ArgoCD Helm chart versions under argocd/apps/**, docker-compose
+# image tags, Terraform provider versions) — merging one is what actually
+# changes anything, since ArgoCD's existing auto-sync then picks it up. See
+# renovate.json at the repo root for what it scans and how.
+#
+# Bare CronJob, no Helm chart — single container, no per-environment
+# variation (matches homepage/argocd-ingress precedent for plain manifests).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: renovate
+  namespace: renovate
+spec:
+  # Same off-peak slot as Watchtower's old WATCHTOWER_SCHEDULE
+  # (docker-compose/docker-compose.yml: 4:00am America/Detroit).
+  schedule: "17 4 * * *"
+  timeZone: America/Detroit
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: renovate
+              # Pinned, not :latest — this tag is itself now tracked by the
+              # kubernetes manager (see renovate.json), so Renovate will open
+              # a PR against itself when a new version ships.
+              image: renovate/renovate:44.94.0
+              args:
+                - jakerobb/homelab
+              env:
+                - name: RENOVATE_PLATFORM
+                  value: github
+                - name: LOG_LEVEL
+                  value: info
+                - name: RENOVATE_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: renovate-github-token
+                      key: token
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 1Gi
