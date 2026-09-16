@@ -256,7 +256,7 @@ services:
   influxdb:
     <<: *dns
     container_name: influxdb
-    image: influxdb:2.7
+    image: influxdb:2.9
     restart: unless-stopped
     ports:
       - "8086:8086"
