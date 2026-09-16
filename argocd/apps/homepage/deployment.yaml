@@ -45,6 +45,15 @@ spec:
             # one, added by hand since it can't be derived from MY_POD_IP.
             - name: HOMEPAGE_ALLOWED_HOSTS
               value: "$(MY_POD_IP):3000,home.jakerobb.org"
+            # stdout only, no log file: avoids winston's file transport
+            # (src/utils/logger.js) ever trying to create /app/config/logs,
+            # which is what actually 500'd every request (EACCES — non-root
+            # UID, no writable volume there). Also just the right call for a
+            # k8s app: let whatever aggregates container stdout handle this
+            # (see TODO.md's Kubernetes log aggregation item) instead of a
+            # log file nothing ever reads.
+            - name: LOG_TARGETS
+              value: "stdout"
           ports:
             - name: http
               containerPort: 3000

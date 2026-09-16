@@ -183,4 +183,9 @@ already running on the 16GB Pi for logs (see below).
 ## Log aggregation
 **Not started.** Ship pod and node logs off-cluster to the existing
 VictoriaLogs instance already running on the 16GB Pi, rather than logs only
-being reachable via `kubectl logs` per-pod.
+being reachable via `kubectl logs` per-pod. Homepage
+(`argocd/apps/homepage/`) is deliberately configured `LOG_TARGETS: stdout`
+(no log file) on the assumption this eventually collects it — worth
+revisiting every new app's logging config once a collector (Vector, most
+likely, since it's already what feeds VictoriaLogs on the Pi side per the
+Compose migration notes above) is actually running in-cluster.
