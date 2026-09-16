@@ -231,6 +231,21 @@ time; those get added to Authelia's `access_control` as they land, not now.
   `access_control` policy is `two_factor` and this is a brand-new Authelia
   instance, the first login prompts TOTP registration (scan a QR code) —
   there's no SMTP for email-based recovery, so don't lose that TOTP secret.
+- **RBAC (added 2026-09-16):** ArgoCD's RBAC subject defaults to the OIDC
+  `sub` claim, which Authelia fills with an opaque per-user UUID — not
+  something a `policy.csv` rule could sensibly target, and with no matching
+  rule a freshly-SSO'd user gets no role and no app access at all. Fixed via
+  `configs.rbac` in [`install/values.yaml`](install/values.yaml):
+  `scopes: '[groups, email]'` tells ArgoCD to also check the `email` claim
+  (already in the ID token — it's in `requestedScopes` above) as a policy
+  subject, then `policy.csv: g, jakerobb@gmail.com, role:admin` grants that
+  address admin. `policy.default` is left unset, which the chart renders as
+  an **empty** `policy.default` — ArgoCD treats that as "no access at all"
+  for anyone not matched by a `policy.csv` rule, not `role:readonly` as
+  might be assumed. Fine for now (single user), but worth setting
+  `configs.rbac.policy.default: 'role:readonly'` explicitly if a second
+  Authelia user ever shows up and should get *some* default access instead
+  of silently seeing nothing.
 
 ## Bootstrap (one-time, manual)
 

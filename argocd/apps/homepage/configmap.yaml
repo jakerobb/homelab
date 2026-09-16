@@ -21,6 +21,11 @@ metadata:
 data:
   settings.yaml: |
     title: Homelab
+    layout:
+      Homelab: # must match a group name from services.yaml exactly
+        style: row      # row = grid, default is a vertical list
+        columns: 4      # tiles per row
+        header: false   # optional, hides the "Homelab" heading
 
   # `mode: cluster` = discover via this pod's own ServiceAccount (see
   # clusterrole.yaml) rather than a mounted kubeconfig. `gateway: true` turns

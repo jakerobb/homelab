@@ -44,6 +44,17 @@ configs:
         - profile
         - email
         - groups
+  rbac:
+    # Without this, ArgoCD's RBAC subject defaults to the OIDC `sub` claim —
+    # an opaque UUID Authelia assigns, not anything a policy.csv rule could
+    # reasonably target — so a freshly-authenticated user gets no role and
+    # no app access. `scopes` tells ArgoCD to also check the `email` (and
+    # `groups`, for later) claims as possible policy.csv subjects; the
+    # `email` scope is already requested above, so it's already in the ID
+    # token — this is purely an RBAC-side change.
+    scopes: '[groups, email]'
+    policy.csv: |
+      g, jakerobb@gmail.com, role:admin
 
 dex:
   # No Dex connector — using ArgoCD's native OIDC support directly against
