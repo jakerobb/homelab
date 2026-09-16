@@ -217,6 +217,39 @@ once at the end. Both steps rolled all 5 `cilium` + 5 `cilium-envoy` pods and
 both `cilium-operator` replicas with zero LB downtime observed; k8s v1.34.1
 (the floor of Cilium 1.20's tested 1.34–1.37 support matrix) had no issues.
 
+### Now managed by ArgoCD (2026-09-15)
+
+**The two manual `helm upgrade cilium ...` runbooks above (this section and
+"Ingress: Gateway API") are historical.** Cilium's ongoing lifecycle is now
+an ArgoCD `Application` — [`argocd/apps/cilium/application.yaml`](../argocd/apps/cilium/application.yaml) —
+sourcing the chart from `helm.cilium.io` with values still coming from this
+same `cilium/values.yaml` (via a multi-source `$values` ref, so there's one
+copy of the config either way). **Do not run manual `helm upgrade cilium`
+again** — bump `targetRevision` and/or edit `cilium/values.yaml`, then Sync
+from ArgoCD.
+
+Deliberately **manual sync policy** (no `automated:` block), unlike every
+other app under `argocd/apps/` — the only app where that's true. Cilium is
+the CNI: a bad auto-sync has cluster-wide blast radius (breaks networking
+for every pod, including ArgoCD's own, leaving nothing able to auto-revert
+it), and this cluster has now had two *silent* Cilium failures (the BGP
+outage and the L2-announcement interface regex bug, both above) where the
+DaemonSet reported `Running`/Healthy the whole time traffic was actually
+broken — exactly what ArgoCD's resource-status health checks would also
+have missed. Keep syncing a conscious, one-at-a-time action: Sync, then run
+[`cilium/validate.sh`](cilium/validate.sh) from rpi5-1 (or anywhere on the
+LAN) before trusting it — it curls every LoadBalancer IP and HTTPRoute
+hostname from outside the cluster and checks each agent's actual datapath
+mode, instead of just asking Kubernetes whether the pods are Ready.
+
+Initial adoption: the `cilium`/`cilium-operator`/`cilium-envoy` resources
+already existed from the plain `helm upgrade` CLI runs above, not from
+Argo. First Sync just relabels them under Argo's tracking and leaves the
+old `cilium` Helm release object in `kube-system` stale/orphaned (Argo's
+Helm source renders and applies manifests directly — it doesn't drive the
+`helm` CLI or touch that release object). Harmless to ignore; nothing reads
+it going forward.
+
 ## Layout
 
 - `cilium/` — Cilium Helm values, LB/L2-announcement CRDs, and the Gateway

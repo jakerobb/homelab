@@ -14,9 +14,15 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   chart defaults. Chart defaults are already non-HA (1 replica each), so no
   HA-related overrides were needed.
 - **Bootstrap pattern: app-of-apps.** ArgoCD's own Helm install is the one
-  manual, non-GitOps step (parallel to how Cilium is installed/upgraded
-  directly via `helm`, not GitOps'd onto itself — avoids the chicken-and-egg
-  problem of ArgoCD managing its own install). Everything else — starting
+  manual, non-GitOps step — same chicken-and-egg reasoning as Cilium's
+  *initial* install (nothing has pod networking, including ArgoCD's own
+  pods, until Cilium is already running; nothing can run ArgoCD's own
+  Helm chart until ArgoCD is already running). Cilium's *ongoing* lifecycle
+  is GitOps'd like everything else as of 2026-09-15
+  ([`apps/cilium/`](apps/cilium/application.yaml)) — manual sync policy
+  only, unlike the rest of `apps/`, see [`talos/README.md`](../talos/README.md#now-managed-by-argocd-2026-09-15)
+  for why. ArgoCD's own install stays manual permanently, since it can never
+  bootstrap itself. Everything else — starting
   with ArgoCD's own ingress route — is reconciled from
   [`apps/`](apps/) by the root `Application` in
   [`bootstrap/root-app.yaml`](bootstrap/root-app.yaml), which is the second

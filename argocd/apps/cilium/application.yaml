@@ -1,0 +1,61 @@
+# Cilium's ongoing lifecycle, brought under ArgoCD 2026-09-15 (chart/values
+# already tracked in git at talos/cilium/values.yaml; this just adds
+# automatic drift detection + a one-click Sync instead of SSH'ing to rpi5-1
+# and running `helm upgrade` by hand each time).
+#
+# The very first install still has to be manual, though, and always will —
+# Cilium is the CNI, so nothing has pod networking (including ArgoCD's own
+# pods) until it's already running. Same chicken-and-egg reasoning as
+# ArgoCD's own bootstrap (see argocd/README.md). This Application only
+# manages Cilium from here on, on a cluster where it's already up.
+#
+# Deliberately NO `syncPolicy.automated` block — manual sync only, unlike
+# every other app under apps/. Reason: Cilium is the one component where a
+# bad sync has cluster-wide blast radius (breaks networking for every pod,
+# including ArgoCD's own — self-heal or auto-sync could re-apply a broken
+# config with nothing left able to revert it via the UI), and this cluster
+# has already had two *silent* Cilium failures where the DaemonSet reported
+# Running/Healthy the whole time while real external LB traffic was broken
+# (BGP routing bug, then an L2-announcement interface regex miss — see
+# talos/README.md). ArgoCD's health checks are resource-status checks, not
+# traffic checks, so auto-sync would have reported Healthy through both
+# incidents. Keep the human in the loop: edit values, click Sync, then
+# externally curl the LB IP before trusting it, exactly like the manual
+# runbook already did.
+#
+# Values come from talos/cilium/values.yaml via a second source + $values
+# ref, rather than being duplicated inline here — same file the old manual
+# `helm upgrade -f cilium/values.yaml` runbook used, so there's exactly one
+# copy of the actual config to keep in sync.
+#
+# Adopts resources originally created by plain `helm upgrade` CLI (not
+# Argo) — the pre-existing `cilium` Helm release object in kube-system from
+# those CLI runs is now stale/orphaned (Argo's Helm source type renders and
+# applies manifests directly, it doesn't drive `helm` itself or update that
+# release object) and can be ignored. Do not run manual `helm upgrade
+# cilium ...` again after this is synced once — bump `targetRevision`
+# and/or edit talos/cilium/values.yaml and Sync from here instead.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: 1.20.1
+      helm:
+        releaseName: cilium
+        valueFiles:
+          - $values/talos/cilium/values.yaml
+    - repoURL: https://github.com/jakerobb/homelab.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy: {}
