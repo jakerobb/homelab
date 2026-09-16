@@ -222,7 +222,7 @@ time; those get added to Authelia's `access_control` as they land, not now.
   "Upgrading ArgoCD itself" below):
 
   ```bash
-  helm upgrade argocd argo/argo-cd --version 10.9.0 -n argocd \
+  helm upgrade argocd argo/argo-cd --version 10.9.1 -n argocd \
     -f argocd/install/values.yaml \
     -f <(sops -d argocd/secrets/argocd-oidc-client-secret.sops.yaml)
   ```

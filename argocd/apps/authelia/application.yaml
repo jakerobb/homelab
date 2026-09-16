@@ -32,7 +32,7 @@ spec:
       releaseName: authelia
       valuesObject:
         image:
-          tag: '4.39.25'
+          tag: '4.39.27'
 
         pod:
           kind: 'StatefulSet'

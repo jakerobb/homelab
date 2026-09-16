@@ -1,5 +1,5 @@
 # Homelab overrides for the argo-cd chart. Only deltas from chart defaults —
-# see `helm show values argo/argo-cd --version 10.9.0` for everything else.
+# see `helm show values argo/argo-cd --version 10.9.1` for everything else.
 # Chart: https://github.com/argoproj/argo-helm, repo https://argoproj.github.io/argo-helm
 
 nameOverride: argocd
