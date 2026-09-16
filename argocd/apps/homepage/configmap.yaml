@@ -1,9 +1,18 @@
 # Homepage's own config files, one ConfigMap key per file, mounted
 # individually via subPath in deployment.yaml (see gethomepage.dev/installation/k8s/).
-# Only the files we actually use are included — anything left unmounted
-# (docker.yaml, bookmarks.yaml, custom.css/js) just means "no Docker hosts" /
-# "no bookmarks" / "no theme overrides", which is exactly today's state; add
-# a key + volumeMount pair together if that changes.
+#
+# All of them are mounted, even the ones we don't use (docker.yaml,
+# bookmarks.yaml, custom.css/js) — found out the hard way (2026-09-16) that
+# this isn't optional: `services.yaml`/`settings.yaml`/`bookmarks.yaml`/
+# `widgets.yaml` ship pre-baked as defaults in the image, but `docker.yaml`
+# doesn't, so Homepage lazily tries to *write* a default copy into
+# /app/config on first use — which fails EACCES under this pod's
+# ownership/securityContext and crash-loops the whole container
+# (`checkAndCopyConfig` in src/utils/config/config.js calls
+# `process.exit(1)` on that failure). Mounting an empty string for every
+# config file up front means `existsSync` is always true and that code path
+# never runs, matching the upstream example manifest we should have just
+# copied verbatim here to begin with.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -107,3 +116,11 @@ data:
     - search:
         provider: duckduckgo
         target: _blank
+
+  # Empty on purpose (see the top-of-file comment) — these three plus
+  # docker.yaml only need to *exist* to stop Homepage from trying to write
+  # its own default copy and crash-looping.
+  bookmarks.yaml: ""
+  docker.yaml: ""
+  custom.css: ""
+  custom.js: ""
