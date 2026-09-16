@@ -117,10 +117,15 @@ data:
         provider: duckduckgo
         target: _blank
 
-  # Empty on purpose (see the top-of-file comment) — these three plus
-  # docker.yaml only need to *exist* to stop Homepage from trying to write
-  # its own default copy and crash-looping.
+  # Empty on purpose (see the top-of-file comment) — these just need to
+  # *exist* to stop Homepage from trying to write its own default copy and
+  # crash-looping. Full set per `src/skeleton/` in the homepage repo as of
+  # v2.3.0 — docker.yaml wasn't enough (see deployment.yaml's history);
+  # proxmox.yaml turned out to be the same story, found live 2026-09-15.
+  # If a future Homepage version adds another skeleton file, expect the same
+  # crash for it too until it's added here.
   bookmarks.yaml: ""
   docker.yaml: ""
+  proxmox.yaml: ""
   custom.css: ""
   custom.js: ""

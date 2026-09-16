@@ -2,12 +2,15 @@
 # (https://gethomepage.dev/installation/k8s/) to what this cluster actually
 # uses: Gateway API only (the cluster deliberately has no Ingress controller
 # and no Traefik — see talos/README.md#ingress-gateway-api-decided-and-deployed-2026-09-13),
-# so the upstream example's `networking.k8s.io/ingresses` and
-# `traefik.io/ingressroutes` rules are dropped. `metrics.k8s.io` is also
-# dropped: no metrics-server is installed on this cluster yet (verified via
-# `kubectl top nodes` -> "Metrics API not available"), so granting it would
-# be dead weight — add it back if that ever changes (see TODO.md's metrics
-# item).
+# so the upstream example's `traefik.io/ingressroutes` rule is dropped.
+# `networking.k8s.io/ingresses`, despite that, is kept: Homepage's discovery
+# code unconditionally lists Ingresses on startup regardless of the
+# `gateway`/`ingress` toggles in kubernetes.yaml — found live 2026-09-16 as a
+# `403 Forbidden` in the logs (non-fatal, just noisy) after trimming it.
+# `metrics.k8s.io` is dropped: no metrics-server is installed on this cluster
+# yet (verified via `kubectl top nodes` -> "Metrics API not available"), so
+# granting it would be dead weight — add it back if that ever changes (see
+# TODO.md's metrics item).
 #
 # Read-only (get/list) everywhere; Homepage never needs to mutate cluster
 # state, only enumerate it for discovery + the (currently unused) cluster
@@ -22,6 +25,9 @@ rules:
     # is cheap to include for future flexibility (e.g. a Service with no
     # HTTPRoute in front of it).
     resources: [namespaces, pods, nodes, services]
+    verbs: [get, list]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
     verbs: [get, list]
   - apiGroups: [gateway.networking.k8s.io]
     resources: [httproutes, gateways]

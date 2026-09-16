@@ -95,6 +95,9 @@ spec:
             - mountPath: /app/config/custom.js
               name: homepage-config
               subPath: custom.js
+            - mountPath: /app/config/proxmox.yaml
+              name: homepage-config
+              subPath: proxmox.yaml
             - mountPath: /app/public/icons
               name: homepage-icons
       volumes:
