@@ -167,8 +167,16 @@ data:
     # different widget, the per-tile service version attached to a
     # services.yaml entry, not usable here. Mixed these up initially; caught
     # by reading src/widgets/unifi/proxy.js's group-name check directly.
+    #
+    # url is gateway.lan, not the Caddy-proxied gateway.jakerobb.org (that's
+    # still fine as the services.yaml tile's href, just not for this):
+    # UniFi OS consoles bake absolute redirects to their own hostname, and
+    # going through Caddy's extra hop caused an actual redirect loop —
+    # ERR_FR_TOO_MANY_REDIRECTS in the pod logs, found live 2026-09-16.
+    # Going direct to the device on the LAN sidesteps it, same reasoning as
+    # proxmox.lan/truenas.lan.
     - unifi_console:
-        url: https://gateway.jakerobb.org
+        url: https://gateway.lan
         key: "{{HOMEPAGE_FILE_UNIFI_API_KEY}}"
         fields:
           - uptime
