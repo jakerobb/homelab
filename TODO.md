@@ -98,7 +98,7 @@ under ArgoCD's `prune: true`, so its reclaim policy was deliberately set to
   more than one Authelia user.
 
 ## Gateway API forward-auth (Cilium ExternalAuth filter)
-**Not started — Cilium upgrade done, filter work remains.** Cilium added a
+**First use wired up 2026-09-15, not yet verified live.** Cilium added a
 native, Gateway-API-standard way to delegate auth to an external service
 (`ExternalAuth` HTTPRoute filter, GEP-1494) using the same `ext_authz`
 protocol Authelia already speaks — shipped in **Cilium 1.20.0**, and the
@@ -107,9 +107,21 @@ cluster is now on **1.20.1** (upgraded 2026-09-15, see
 Needed for any Compose workload below that doesn't have its own OIDC support
 (most of them — NetworkOptimizer, change-detection, VictoriaLogs, etc.),
 since Authelia's OIDC provider only directly helps apps that speak OIDC
-themselves (like ArgoCD/Grafana). Remaining: add an `ExternalAuth` filter to
-each protected app's `HTTPRoute` pointing at Authelia's
-`/api/authz/ext-authz/` endpoint.
+themselves (like ArgoCD/Grafana).
+
+The dashboard app below (`argocd/apps/homepage/`) is the pilot: its
+`HTTPRoute` carries an `ExternalAuth` filter pointing at Authelia's
+`/api/authz/ext-authz/` endpoint (field shape verified live against this
+cluster's CRDs, see the comment in `homepage/httproute.yaml`), plus the
+`access_control` rule and `ReferenceGrant` it needs
+(`argocd/apps/authelia/application.yaml` and `referencegrant.yaml`). Not yet
+confirmed working end-to-end post-sync — external curl `home.jakerobb.org`
+after it syncs, same discipline as the Cilium upgrade itself, before trusting
+it. Assumes Authelia's `ext-authz` authz endpoint works with zero explicit
+`server.endpoints.authz` config (per Authelia's docs and a working reference
+elsewhere) — if that assumption's wrong, that's the first thing to check.
+Once confirmed, add the same filter to each other protected app's
+`HTTPRoute` as it migrates.
 
 ## Compose workload migration
 **Not started.** Move each service off the RPi5 16GB's Docker Compose stack

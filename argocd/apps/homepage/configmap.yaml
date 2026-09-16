@@ -1,0 +1,109 @@
+# Homepage's own config files, one ConfigMap key per file, mounted
+# individually via subPath in deployment.yaml (see gethomepage.dev/installation/k8s/).
+# Only the files we actually use are included — anything left unmounted
+# (docker.yaml, bookmarks.yaml, custom.css/js) just means "no Docker hosts" /
+# "no bookmarks" / "no theme overrides", which is exactly today's state; add
+# a key + volumeMount pair together if that changes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+  namespace: homepage
+data:
+  settings.yaml: |
+    title: Homelab
+
+  # `mode: cluster` = discover via this pod's own ServiceAccount (see
+  # clusterrole.yaml) rather than a mounted kubeconfig. `gateway: true` turns
+  # on HTTPRoute discovery specifically — this cluster is Gateway-API-only
+  # (no Ingress controller), so `ingress`/`traefik` are deliberately left off.
+  # To opt an app already running in the cluster into auto-discovery instead
+  # of a manual entry below, annotate its HTTPRoute:
+  #   gethomepage.dev/enabled: "true"
+  #   gethomepage.dev/name: "My App"
+  #   gethomepage.dev/icon: "my-app.png"
+  #   gethomepage.dev/description: "..."
+  # Discovered services render in their own group, above the manual list
+  # below, in whatever order the Kubernetes API returns them (not
+  # alphabetical) — a known Homepage limitation, not something to chase here.
+  kubernetes.yaml: |
+    mode: cluster
+    gateway: true
+
+  # Manually-entered apps, alphabetical by name. This is deliberately a
+  # snapshot of everything currently proxied by docker-compose/caddy/Caddyfile
+  # plus the two apps already live in the cluster (ArgoCD, Authelia) — as
+  # each Compose app migrates into the cluster per TODO.md's "Compose workload
+  # migration" plan, delete its entry here and annotate its new HTTPRoute
+  # instead (see kubernetes.yaml above) so it becomes self-maintaining.
+  #
+  # Icon names are homarr-labs/dashboard-icons slugs
+  # (https://github.com/homarr-labs/dashboard-icons), verified to exist as of
+  # 2026-09-15. A few homelab-specific tools (Modbus Controller/Relay,
+  # Network Optimizer, Rack LED, Scrypted) have no dedicated icon in that set
+  # — they're on generic `mdi-*` (Material Design Icons, also bundled) for
+  # now. Swap those for a real custom icon any time by dropping an SVG in
+  # icons-configmap.yaml and changing `icon:` here to `/icons/<file>.svg`.
+  services.yaml: |
+    - Homelab:
+        - ArgoCD:
+            icon: argo-cd.png
+            href: https://argocd.jakerobb.org
+        - Authelia:
+            icon: authelia.png
+            href: https://auth.jakerobb.org
+        - Change Detection:
+            icon: changedetection.png
+            href: https://changedetection.jakerobb.org
+        - Grafana:
+            icon: grafana.png
+            href: https://grafana.jakerobb.org
+        - Home Assistant:
+            icon: home-assistant.png
+            href: https://homeassistant.jakerobb.org
+        - InfluxDB:
+            icon: influxdb.png
+            href: https://influxdb.jakerobb.org
+        - JetKVM:
+            icon: jetkvm.png
+            href: https://jetkvm.jakerobb.org
+        - Logs:
+            icon: victorialogs.png
+            href: https://logs.jakerobb.org
+        - Modbus Controller:
+            icon: mdi-chip
+            href: https://modbus.jakerobb.org
+        - Modbus Relay:
+            icon: mdi-swap-horizontal
+            href: https://modbus-relay.jakerobb.org
+        - Network Optimizer:
+            icon: mdi-speedometer
+            href: https://optimizer.jakerobb.org
+        - ntfy:
+            icon: ntfy.png
+            href: https://ntfy.jakerobb.org
+        - NUT (UPS Monitoring):
+            icon: nut.png
+            href: https://nut.jakerobb.org
+        - Rack LED:
+            icon: mdi-led-strip-variant
+            href: https://rack-led.jakerobb.org
+        - Scrypted:
+            icon: mdi-cctv
+            href: https://scrypted.jakerobb.org
+        - UniFi Gateway:
+            icon: unifi.png
+            href: https://gateway.jakerobb.org
+        - Z-Wave JS UI:
+            icon: z-wave-js-ui.png
+            href: https://zwave.jakerobb.org
+        - Zigbee2MQTT:
+            icon: zigbee2mqtt.png
+            href: https://zigbee.jakerobb.org
+
+  # Cluster/node widget deliberately omitted: needs metrics-server, which
+  # isn't installed (see clusterrole.yaml). Just a search bar for now.
+  widgets.yaml: |
+    - search:
+        provider: duckduckgo
+        target: _blank

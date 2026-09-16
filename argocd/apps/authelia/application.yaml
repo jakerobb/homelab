@@ -103,15 +103,20 @@ spec:
                 subdomain: 'auth'
                 default_redirection_url: 'https://argocd.jakerobb.org'
 
-          # Deny-by-default; only two rules exist because ArgoCD is the
-          # only thing behind this so far. Add a rule per app as each one
-          # moves off Compose and gets its own HTTPRoute (see TODO.md).
+          # Deny-by-default. ArgoCD uses native OIDC (its own client below);
+          # home.jakerobb.org (Homepage, argocd/apps/homepage/) is the first
+          # app gated via the Gateway-level ExternalAuth filter instead —
+          # this rule is what it's actually checking against. Add a rule per
+          # app as each one moves off Compose and gets its own HTTPRoute (see
+          # TODO.md).
           access_control:
             default_policy: 'deny'
             rules:
               - domain: 'auth.jakerobb.org'
                 policy: 'bypass'
               - domain: 'argocd.jakerobb.org'
+                policy: 'two_factor'
+              - domain: 'home.jakerobb.org'
                 policy: 'two_factor'
 
           identity_providers:

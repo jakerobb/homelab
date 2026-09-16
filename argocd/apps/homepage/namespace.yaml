@@ -1,0 +1,13 @@
+# Explicit, labeled Namespace (same mechanism as argocd-ingress/httproute.yaml
+# and local-path-provisioner/namespace.yaml: a cluster-scoped/plain resource
+# applied directly by the root Application, not via CreateNamespace=true,
+# since this app has no child Application of its own).
+#
+# No PodSecurity override needed here, unlike local-path-provisioner/
+# democratic-csi: Homepage's pod runs fully non-root with all capabilities
+# dropped (see deployment.yaml), so it's happy under the cluster's default
+# `baseline` enforcement.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homepage

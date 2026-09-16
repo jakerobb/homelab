@@ -1,0 +1,68 @@
+# First real use of Cilium 1.20's GEP-1494 `ExternalAuth` HTTPRoute filter in
+# this cluster (see TODO.md's "Gateway API forward-auth" entry — the Cilium
+# upgrade was done 2026-09-15, this filter is the "remains" part). Delegates
+# the auth decision to Authelia's ext-authz endpoint entirely at the Gateway
+# — this Deployment has zero auth code/session handling of its own.
+#
+# Field shape verified live against this cluster's CRDs with
+# `kubectl explain httproute.spec.rules.filters.externalAuth --recursive`
+# (Gateway API v1, Support: Extended) before writing this, since nothing else
+# here uses it yet.
+#
+# Requires a matching ReferenceGrant in the `authelia` namespace (see
+# argocd/apps/authelia/referencegrant.yaml) — Gateway API requires explicit
+# opt-in for any cross-namespace backendRef, and Authelia's Service lives in
+# `authelia` while this HTTPRoute lives in `homepage`.
+#
+# Also requires an `access_control` rule for `home.jakerobb.org` in
+# Authelia's config (see argocd/apps/authelia/application.yaml) — without
+# one, `default_policy: deny` blocks every request before it ever reaches
+# here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - home.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              # Authelia's ext-authz reads `host` (not x-forwarded-host) to
+              # match the `domain` in access_control rules, and
+              # x-forwarded-proto/-for for scheme/client IP — omitting `host`
+              # here would make Authelia fail to match home.jakerobb.org and
+              # fall through to default_policy (deny). See
+              # https://www.authelia.com/integration/proxies/envoy/.
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              # Authelia's response carries identity as exact remote-* headers
+              # (lowercase); this field is exact-match only, no prefix support.
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: homepage
+          port: 3000

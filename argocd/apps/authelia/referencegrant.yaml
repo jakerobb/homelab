@@ -1,0 +1,24 @@
+# Grants cross-namespace HTTPRoute `ExternalAuth`/backendRef access into this
+# namespace's `authelia` Service. Gateway API requires an explicit
+# ReferenceGrant for any cross-namespace reference (the exception,
+# Gateway-to-route attachment, doesn't cover this) — without it, Cilium
+# refuses to program the route at all.
+#
+# One `from` entry per namespace that has an HTTPRoute referencing Authelia
+# this way. homepage/httproute.yaml is the first; add another entry here
+# (not a second ReferenceGrant) as more apps adopt the ExternalAuth pattern
+# from TODO.md's "Gateway API forward-auth" list.
+apiVersion: gateway.networking.k8s.io/v1
+kind: ReferenceGrant
+metadata:
+  name: allow-external-auth-callers
+  namespace: authelia
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: homepage
+  to:
+    - group: ""
+      kind: Service
+      name: authelia
