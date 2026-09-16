@@ -67,6 +67,23 @@ data:
         - Grafana:
             icon: grafana.png
             href: https://grafana.jakerobb.org
+        # href and widget.url deliberately point at different places
+        # (confirmed 2026-09-16): the tile *links* to HexOS's own dashboard
+        # (deck.hexos.com — presumably the UI actually used day-to-day), but
+        # the *widget* pulls data straight from the local TrueNAS SCALE API
+        # (truenas.lan, plain HTTP) since that's what the API key authenticates
+        # against — deck.hexos.com is a separate cloud portal, not something
+        # this widget protocol could talk to even if desired.
+        - HexOS/TrueNAS:
+            icon: truenas-scale.png
+            href: https://deck.hexos.com/dash
+            widget:
+              type: truenas
+              url: http://truenas.lan
+              version: 2
+              key: "{{HOMEPAGE_FILE_TRUENAS_API_KEY}}"
+              enablePools: true
+              nasType: scale
         - Home Assistant:
             icon: home-assistant.png
             href: https://homeassistant.jakerobb.org
@@ -78,7 +95,7 @@ data:
             href: https://jetkvm.jakerobb.org
         - Logs:
             icon: victorialogs.png
-            href: https://logs.jakerobb.org
+            href: https://logs.jakerobb.org/select/vmui
         - Modbus Controller:
             icon: mdi-chip
             href: https://modbus.jakerobb.org
@@ -94,6 +111,27 @@ data:
         - NUT (UPS Monitoring):
             icon: nut.png
             href: https://nut.jakerobb.org
+        # proxmox.lan confirmed 2026-09-16 (replaces the terraform-default IP
+        # guessed earlier). Kept `https://` despite "unencrypted local
+        # access" — pveproxy (Proxmox's web service on 8006) is TLS-only,
+        # there's no plain-HTTP mode to fall back to; "unencrypted" here most
+        # likely means the self-signed cert / no real PKI, which Homepage
+        # already ignores for all widget backends (rejectUnauthorized:
+        # false, hardcoded — see clusterrole.yaml's era of investigation).
+        # Node name is still the terraform *default* (proxmox_node_name),
+        # unconfirmed — flag if it doesn't match.
+        - Proxmox:
+            icon: proxmox.png
+            href: https://proxmox.lan:8006
+            widget:
+              type: proxmox
+              url: https://proxmox.lan:8006
+              username: "{{HOMEPAGE_FILE_PROXMOX_TOKEN_ID}}"
+              password: "{{HOMEPAGE_FILE_PROXMOX_TOKEN_SECRET}}"
+              node: proxmox
+              fields:
+                - resources.cpu
+                - resources.mem
         - Rack LED:
             icon: mdi-led-strip-variant
             href: https://rack-led.jakerobb.org
@@ -111,8 +149,32 @@ data:
             href: https://zigbee.jakerobb.org
 
   # Cluster/node widget deliberately omitted: needs metrics-server, which
-  # isn't installed (see clusterrole.yaml). Just a search bar for now.
+  # isn't installed (see clusterrole.yaml).
+  #
+  # Open-Meteo needs no API key/account (gethomepage.dev/widgets/info/openmeteo/),
+  # so it's the only one of the requested widgets that doesn't need a new
+  # credential or service — see TODO.md for Proxmox/TrueNAS/rpi5-1 stats,
+  # which do. Coordinates for zip 48864 (Okemos, MI).
   widgets.yaml: |
+    - openmeteo:
+        label: Okemos, MI
+        latitude: 42.704994
+        longitude: -84.402071
+        timezone: America/New_York
+        units: imperial
+        cache: 5
+    # `unifi_console` is the correct top-bar key — `unifi` (no suffix) is a
+    # different widget, the per-tile service version attached to a
+    # services.yaml entry, not usable here. Mixed these up initially; caught
+    # by reading src/widgets/unifi/proxy.js's group-name check directly.
+    - unifi_console:
+        url: https://gateway.jakerobb.org
+        key: "{{HOMEPAGE_FILE_UNIFI_API_KEY}}"
+        fields:
+          - uptime
+          - wan
+          - lan
+          - wlan
     - search:
         provider: duckduckgo
         target: _blank

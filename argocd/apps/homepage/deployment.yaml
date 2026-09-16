@@ -54,6 +54,21 @@ spec:
             # log file nothing ever reads.
             - name: LOG_TARGETS
               value: "stdout"
+            # HOMEPAGE_FILE_XXX reads the *contents* of the file at this
+            # path and substitutes it for {{HOMEPAGE_FILE_XXX}} wherever that
+            # appears in services.yaml/widgets.yaml — keeps the actual
+            # secret values out of `kubectl describe pod`'s env dump, unlike
+            # HOMEPAGE_VAR_XXX (see gethomepage.dev's env-substitution docs).
+            # Sourced from the three Secrets mounted below (argocd/secrets/
+            # {proxmox-api-token,truenas-api-key,unifi-credentials}.homepage.sops.yaml).
+            - name: HOMEPAGE_FILE_PROXMOX_TOKEN_ID
+              value: /run/secrets/proxmox/token-id
+            - name: HOMEPAGE_FILE_PROXMOX_TOKEN_SECRET
+              value: /run/secrets/proxmox/token-secret
+            - name: HOMEPAGE_FILE_TRUENAS_API_KEY
+              value: /run/secrets/truenas/api-key
+            - name: HOMEPAGE_FILE_UNIFI_API_KEY
+              value: /run/secrets/unifi/api-key
           ports:
             - name: http
               containerPort: 3000
@@ -100,6 +115,15 @@ spec:
               subPath: proxmox.yaml
             - mountPath: /app/public/icons
               name: homepage-icons
+            - mountPath: /run/secrets/proxmox
+              name: proxmox-credentials
+              readOnly: true
+            - mountPath: /run/secrets/truenas
+              name: truenas-credentials
+              readOnly: true
+            - mountPath: /run/secrets/unifi
+              name: unifi-credentials
+              readOnly: true
       volumes:
         - name: homepage-config
           configMap:
@@ -107,3 +131,16 @@ spec:
         - name: homepage-icons
           configMap:
             name: homepage-icons
+        # Applied out-of-band via `sops -d ... | kubectl apply -f -` — see
+        # each secret's own comment header. Not ArgoCD-managed (no KSOPS
+        # yet, see TODO.md), so these Secrets must already exist in the
+        # `homepage` namespace before this Deployment will come up healthy.
+        - name: proxmox-credentials
+          secret:
+            secretName: homepage-proxmox-credentials
+        - name: truenas-credentials
+          secret:
+            secretName: homepage-truenas-credentials
+        - name: unifi-credentials
+          secret:
+            secretName: homepage-unifi-credentials

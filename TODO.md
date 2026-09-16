@@ -189,3 +189,28 @@ being reachable via `kubectl logs` per-pod. Homepage
 revisiting every new app's logging config once a collector (Vector, most
 likely, since it's already what feeds VictoriaLogs on the Pi side per the
 Compose migration notes above) is actually running in-cluster.
+
+## Homepage dashboard widgets
+**Requested 2026-09-16, nearly done.** Weather (Open-Meteo), Proxmox host
+CPU/mem, and HexOS/TrueNAS disk usage are fully wired in
+(`argocd/apps/homepage/configmap.yaml` + `deployment.yaml`), secrets
+encrypted and staged (`argocd/secrets/{proxmox-api-token,truenas-api-key}.homepage.sops.yaml`).
+Confirmed hosts: `https://proxmox.lan:8006` (node name still the terraform
+*default*, `proxmox_node_name` — unconfirmed), `http://truenas.lan` for the
+widget's own API calls vs. `https://deck.hexos.com/dash` for the tile's
+click-through link (two different things — see the comment in
+configmap.yaml). Remember to `sops -d ... | kubectl apply -f -` both once
+pushed (no KSOPS yet, applied out-of-band like every other secret here).
+
+Still open:
+- **UniFi Controller** (top-bar info widget: uptime/WAN/LAN/WLAN status) —
+  wiring is done (`argocd/apps/homepage/configmap.yaml`'s `unifi_console`
+  block + `deployment.yaml`), waiting on Jake to generate an API key in the
+  UniFi Network application and fill in
+  `argocd/secrets/unifi-credentials.homepage.sops.yaml` (still an unencrypted
+  placeholder template — encrypt with `sops -e -i` once filled in, same as
+  the other two were).
+
+**Explicitly deferred:** rpi5-1 CPU/mem via Glances — would need a new
+Glances service added to `docker-compose/`, reachable from the cluster over
+the LAN. Skipped for now at Jake's call, revisit later.
