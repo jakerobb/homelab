@@ -2,6 +2,15 @@ ipam:
   mode: kubernetes            # Cilium uses the podCIDR Talos' controller-manager
                               # allocates from podSubnets (10.244.0.0/16) — they can't diverge
 
+# Set during the 1.19->1.20 upgrade (2026-09-15, see talos/README.md) as a
+# one-time `--set` flag on the manual `helm upgrade` — moved here so ArgoCD's
+# render matches that same state instead of silently dropping it. Its one
+# concrete effect right now: keeps `envoy-xds-mode` unset in cilium-config
+# (agent's own legacy-safe default) instead of the chart writing the new
+# 1.20+ default of "ads" explicitly. Remove once 1.20.1 has been running
+# stable for a while — then run a plain no-op Sync to drop it cleanly.
+upgradeCompatibility: "1.19"
+
 kubeProxyReplacement: true    # we disabled kube-proxy in the Talos config
 
 # Added 2026-09-13: full eBPF host routing (bypassing iptables entirely) appears

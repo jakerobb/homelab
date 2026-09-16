@@ -97,6 +97,20 @@ under ArgoCD's `prune: true`, so its reclaim policy was deliberately set to
   whatever ArgoCD's default policy grants. Worth revisiting once there's
   more than one Authelia user.
 
+## Cilium: drop the upgradeCompatibility flag
+**Not started.** `talos/cilium/values.yaml` sets `upgradeCompatibility: "1.19"`,
+added 2026-09-16 so ArgoCD's render of the `cilium` Application matched the
+one-time `--set upgradeCompatibility=1.19` flag used on the manual 1.19→1.20
+`helm upgrade` the day before (2026-09-15, see
+[`talos/README.md`](talos/README.md#cilium-upgrade-119120-2026-09-15)). Keeps
+`envoy-xds-mode` unset (agent's legacy-safe default) instead of the chart's
+new 1.20+ default of `"ads"`. Once 1.20.1 has been running stable for a
+while, remove the key from `cilium/values.yaml` and Sync (see
+[`argocd/apps/cilium/`](argocd/apps/cilium/application.yaml)) — plain
+no-op-except-for-that-one-key change. Verify with
+[`talos/cilium/validate.sh`](talos/cilium/validate.sh) afterward, same as
+any other Cilium sync.
+
 ## Gateway API forward-auth (Cilium ExternalAuth filter)
 **First use wired up 2026-09-15, not yet verified live.** Cilium added a
 native, Gateway-API-standard way to delegate auth to an external service
