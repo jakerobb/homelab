@@ -98,7 +98,20 @@ spec:
               enabled: true
               path: '/config/db.sqlite3'
 
+          # Homelab-appropriate long-lived sessions (changed 2026-09-17) — no
+          # documented way to fully disable `inactivity` (unlike remember_me's
+          # `-1`), so the practical equivalent is setting it equal to
+          # `expiration`, which then always triggers first and makes
+          # inactivity a no-op. Also matters more than it might seem because
+          # ArgoCD uses real OIDC, not Gateway forward-auth: Authelia never
+          # sees ArgoCD-usage traffic, only the initial login and whatever
+          # redirects happen when ArgoCD's own OIDC token needs refreshing —
+          # so `inactivity` was really measuring "time since last touched
+          # auth.jakerobb.org directly", not actual activity.
           session:
+            expiration: '1 month'
+            inactivity: '1 month'
+            remember_me: '6 months'
             cookies:
               - domain: 'jakerobb.org'
                 subdomain: 'auth'
