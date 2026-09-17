@@ -33,22 +33,18 @@ data:
       Apps:
         tab: Apps
         style: row
-        columns: 4
         header: false
       Services:
         tab: Services
         style: row
-        columns: 4
         header: false
       Monitoring:
         tab: Monitoring
         style: row
-        columns: 4
         header: false
       Infrastructure:
         tab: Infrastructure
         style: row
-        columns: 4
         header: false
 
   # `mode: cluster` = discover via this pod's own ServiceAccount (see
@@ -77,19 +73,14 @@ data:
   #
   # Icon names are homarr-labs/dashboard-icons slugs
   # (https://github.com/homarr-labs/dashboard-icons), verified to exist as of
-  # 2026-09-15. A few homelab-specific tools (Modbus Controller/Relay,
-  # Network Optimizer, Rack LED, Scrypted) have no dedicated icon in that set
-  # — they're on generic `mdi-*` (Material Design Icons, also bundled) for
-  # now. Swap those for a real custom icon any time by dropping an SVG in
-  # icons-configmap.yaml and changing `icon:` here to `/icons/<file>.svg`.
-  # Four groups matching the four tabs in settings.yaml. Jake explicitly
-  # placed most of these (2026-09-17); Modbus Controller/Relay -> Services
-  # (same "device control" spirit as Rack LED/Zigbee/Z-Wave), Network
-  # Optimizer + NUT -> Monitoring (network/power telemetry, same spirit as
-  # Grafana/InfluxDB — NUT's own tile name literally says "UPS Monitoring"),
-  # UniFi Gateway -> Infrastructure (it's the network's own gateway, same
-  # foundational tier as Proxmox/TrueNAS) were my best-guess calls for the
-  # apps Jake didn't explicitly sort.
+  # 2026-09-15. Everything not in that set (Scrypted, Rack LED which runs
+  # WLED, Network Optimizer, Modbus Controller which uses the Modbus
+  # Organization's own logo, Modbus Relay which is Waveshare hardware so
+  # uses Waveshare's logo) is a real icon sourced from its own upstream
+  # project and baked into icons-configmap.yaml as of 2026-09-17 (see that
+  # file's header for exactly where each came from), referenced here as
+  # `/icons/<name>.png`.
+  # Four groups matching the four tabs in settings.yaml.
   services.yaml: |
     - Apps:
         - Home Assistant:
@@ -103,16 +94,16 @@ data:
             icon: jetkvm.png
             href: https://jetkvm.jakerobb.org
         - Modbus Controller:
-            icon: mdi-chip
+            icon: /icons/modbus.png
             href: https://modbus.jakerobb.org
         - Modbus Relay:
-            icon: mdi-swap-horizontal
+            icon: /icons/waveshare.png
             href: https://modbus-relay.jakerobb.org
         - Rack LED:
-            icon: mdi-led-strip-variant
+            icon: /icons/wled.png
             href: https://rack-led.jakerobb.org
         - Scrypted:
-            icon: mdi-cctv
+            icon: /icons/scrypted.png
             href: https://scrypted.jakerobb.org
         - Z-Wave JS UI:
             icon: z-wave-js-ui.png
@@ -131,7 +122,7 @@ data:
             icon: victorialogs.png
             href: https://logs.jakerobb.org/select/vmui
         - Network Optimizer:
-            icon: mdi-speedometer
+            icon: /icons/network-optimizer.png
             href: https://optimizer.jakerobb.org
         - ntfy:
             icon: ntfy.png
@@ -140,12 +131,6 @@ data:
             icon: nut.png
             href: https://nut.jakerobb.org
     - Infrastructure:
-        - ArgoCD:
-            icon: argo-cd.png
-            href: https://argocd.jakerobb.org
-        - Authelia:
-            icon: authelia.png
-            href: https://auth.jakerobb.org
         # href and widget.url deliberately point at different places
         # (confirmed 2026-09-16): the tile *links* to HexOS's own dashboard
         # (deck.hexos.com — presumably the UI actually used day-to-day), but
@@ -163,15 +148,6 @@ data:
               key: "{{HOMEPAGE_FILE_TRUENAS_API_KEY}}"
               enablePools: true
               nasType: scale
-        # proxmox.lan confirmed 2026-09-16 (replaces the terraform-default IP
-        # guessed earlier). Kept `https://` despite "unencrypted local
-        # access" — pveproxy (Proxmox's web service on 8006) is TLS-only,
-        # there's no plain-HTTP mode to fall back to; "unencrypted" here most
-        # likely means the self-signed cert / no real PKI, which Homepage
-        # already ignores for all widget backends (rejectUnauthorized:
-        # false, hardcoded — see clusterrole.yaml's era of investigation).
-        # Node name is still the terraform *default* (proxmox_node_name),
-        # unconfirmed — flag if it doesn't match.
         - Proxmox:
             icon: proxmox.png
             href: https://proxmox.lan:8006
@@ -187,14 +163,27 @@ data:
         - UniFi Gateway:
             icon: unifi.png
             href: https://gateway.jakerobb.org
+            widget:
+              type: unifi
+              url: https://gateway.lan
+              key: "{{HOMEPAGE_FILE_UNIFI_API_KEY}}"
+              fields:
+                - uptime
+                - wan
+                - lan
+                - wlan
+        - ArgoCD:
+            icon: argo-cd.png
+            href: https://argocd.jakerobb.org
+        - Authelia:
+            icon: authelia.png
+            href: https://auth.jakerobb.org
 
   # Cluster/node widget deliberately omitted: needs metrics-server, which
   # isn't installed (see clusterrole.yaml).
   #
-  # Open-Meteo needs no API key/account (gethomepage.dev/widgets/info/openmeteo/),
-  # so it's the only one of the requested widgets that doesn't need a new
-  # credential or service — see TODO.md for Proxmox/TrueNAS/rpi5-1 stats,
-  # which do. Coordinates for zip 48864 (Okemos, MI).
+  # Open-Meteo needs no API key/account (gethomepage.dev/widgets/info/openmeteo/).
+  # Coordinates for zip 48864 (Okemos, MI).
   widgets.yaml: |
     - openmeteo:
         label: Okemos, MI
@@ -203,39 +192,104 @@ data:
         timezone: America/New_York
         units: imperial
         cache: 5
-    # `unifi_console` is the correct top-bar key — `unifi` (no suffix) is a
-    # different widget, the per-tile service version attached to a
-    # services.yaml entry, not usable here. Mixed these up initially; caught
-    # by reading src/widgets/unifi/proxy.js's group-name check directly.
-    #
-    # url is gateway.lan, not the Caddy-proxied gateway.jakerobb.org (that's
-    # still fine as the services.yaml tile's href, just not for this):
-    # UniFi OS consoles bake absolute redirects to their own hostname, and
-    # going through Caddy's extra hop caused an actual redirect loop —
-    # ERR_FR_TOO_MANY_REDIRECTS in the pod logs, found live 2026-09-16.
-    # Going direct to the device on the LAN sidesteps it, same reasoning as
-    # proxmox.lan/truenas.lan.
-    - unifi_console:
-        url: https://gateway.lan
-        key: "{{HOMEPAGE_FILE_UNIFI_API_KEY}}"
-        fields:
-          - uptime
-          - wan
-          - lan
-          - wlan
     - search:
         provider: duckduckgo
         target: _blank
 
-  # Empty on purpose (see the top-of-file comment) — these just need to
-  # *exist* to stop Homepage from trying to write its own default copy and
-  # crash-looping. Full set per `src/skeleton/` in the homepage repo as of
-  # v2.3.0 — docker.yaml wasn't enough (see deployment.yaml's history);
-  # proxmox.yaml turned out to be the same story, found live 2026-09-15.
-  # If a future Homepage version adds another skeleton file, expect the same
-  # crash for it too until it's added here.
   bookmarks.yaml: ""
   docker.yaml: ""
   proxmox.yaml: ""
-  custom.css: ""
+
+  # Fixed physical width, CSS `in` is a real valid unit (96px/in by spec):
+  # 2in desktop, 1in under 640px (Tailwind's `sm` breakpoint).
+  #
+  # The messy sideways layout (2026-09-17 screenshot) was a structural bug,
+  # not a sizing one: .service-card has TWO children stacked in the actual
+  # DOM — .service-title (icon+name) AND, when a widget is attached,
+  # .service-container (the CPU/MEM/etc pills, or the red API-error badge —
+  # both siblings of .service-title, not nested inside it, per
+  # src/components/services/{item,widget/container}.jsx). Setting
+  # flex-direction:column on .service-title alone only stacked the icon+name
+  # *within themselves*; .service-card itself was still a default row, so it
+  # laid the icon+name block and the widget-pills block side by side. Fixed
+  # by making .service-card the column container instead. Also switched
+  # height to min-height: fixed height clipped/overflowed on any tile with
+  # widget data, which is taller than an icon-only tile — genuinely needs
+  # more room, not a bug to fight.
+  # Icons at 3x (0.8in -> 2.4in / 0.4in -> 1.2in) per Jake's request
+  # (2026-09-17) — flagging directly rather than silently deciding: 2.4in is
+  # wider than the 2in tile itself, so the icon will overflow/dominate the
+  # box at this size. Left the tile width alone since that wasn't part of
+  # the ask; first thing to try if it looks broken is bumping .service-card
+  # width up to something like 3in to match.
+  #
+  # .service-container (the widget-pills row) explicitly stretched via
+  # align-self — .service-card's align-items: center (needed to center
+  # .service-title, which should shrink-wrap, not stretch) would otherwise
+  # also shrink the pills row to its own content width instead of spanning
+  # full tile width like Jake wants.
+  custom.css: |
+    /* Overrides the <ul class="services-list"> Homepage renders per group
+       (src/components/services/list.jsx) — normally either a fixed
+       `grid grid-cols-N` (layout.style: row + columns: N) or a plain
+       vertical list. Neither flows based on available width. Forcing
+       flex-wrap here makes the actual number of tiles per row purely a
+       function of container width vs. .service-card's own fixed width, so
+       layout.columns in settings.yaml no longer matters — style: row can
+       stay (harmless) or go, your call, but columns is now a no-op. */
+    .services-list {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      gap: 0.5rem;
+    }
+    .service-card {
+      width: 3in;
+      min-height: 2in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .service-title {
+      flex-direction: column !important;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    
+    .service-icon, .service-icon img, .service-icon div {
+      width: 2.0in !important;
+      height: 2.0in !important;
+    }
+    /* Non-square source images (network-optimizer.png, modbus.png — see
+       icons-configmap.yaml) would otherwise stretch to fill the forced
+       square box above and distort. contain letterboxes them instead;
+       no effect on the square ones. */
+    .service-icon img {
+      object-fit: contain !important;
+    }
+    .service-name {
+      text-align: center;
+      padding-top: 0.5rem;
+    }
+    .service-container {
+      align-self: stretch;
+      width: 100%;
+      margin-top: auto;
+    }
+
+    @media (max-width: 640px) {
+      .service-card {
+        width: 1in;
+        min-height: 1in;
+      }
+      .service-icon, .service-icon img, .service-icon div {
+        width: 0.8in !important;
+        height: 0.8in !important;
+      }
+      .service-name {
+        font-size: 0.7rem;
+        padding-top: 0.25rem;
+      }
+    }
   custom.js: ""
