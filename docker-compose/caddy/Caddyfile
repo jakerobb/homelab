@@ -65,8 +65,8 @@ grafana.jakerobb.org {
 	import cloudflare_tls
 }
 
-jetkvm.jakerobb.org {
-	reverse_proxy jetkvm1.lan:80
+kvm.jakerobb.org {
+	reverse_proxy kvm.lan:80
         import cloudflare_tls
 }
 

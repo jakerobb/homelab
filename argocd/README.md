@@ -27,8 +27,26 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   [`apps/`](apps/) by the root `Application` in
   [`bootstrap/root-app.yaml`](bootstrap/root-app.yaml), which is the second
   and last manual step. Add new apps by dropping an `Application` manifest
-  (or, for something simple, raw manifests directly) anywhere under `apps/` —
-  the root app recurses.
+  anywhere under `apps/` — the root app recurses.
+  - **Convention (settled 2026-09-17): `apps/` holds only `Application`
+    manifests, never an app's actual resources.** Early on, a few simple
+    apps (`homepage`, `renovate`) were added as raw manifests directly under
+    `apps/<name>/` instead of getting their own `Application` — meaning
+    root owned their Deployments/CronJobs/etc. directly, alongside its
+    real job of owning the `Application` objects themselves. Downside:
+    those apps' health/sync status was inseparable from root's own (a
+    broken `homepage` Deployment made root itself show `Degraded`), and
+    they couldn't have their own sync policy. Fixed by moving each app's
+    actual manifests to `manifests/<name>/` (sibling to `apps/`, outside
+    root's recursion — same place [`manifests/cert-manager-config/`](../manifests/cert-manager-config/)
+    already lived) and adding a thin `apps/<name>/application.yaml`
+    pointing at that path — same shape as
+    [`apps/local-path-provisioner/application.yaml`](apps/local-path-provisioner/application.yaml),
+    just with a git path instead of an external Helm chart as the source.
+    `apps/argocd-ingress/httproute.yaml` and `apps/authelia/referencegrant.yaml`
+    are the one deliberate exception each — a single small resource
+    tightly coupled to its parent app's own bootstrap, not worth a whole
+    extra `Application` for.
 - **Sync policy: fully automated (`selfHeal: true`, `prune: true`)** on every
   app managed under `apps/`. Chosen deliberately over the safer
   automated-no-prune middle ground: nothing stateful (PVCs etc.) is under

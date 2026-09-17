@@ -1,0 +1,8 @@
+# Applied by renovate's own Application (argocd/apps/renovate/application.yaml)
+# alongside the rest of this directory. Default `baseline` PodSecurity is
+# fine — Renovate needs no host access, just outbound network to GitHub and
+# the various registries/chart repos it checks.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: renovate

@@ -90,9 +90,9 @@ data:
         - Change Detection:
             icon: changedetection.png
             href: https://changedetection.jakerobb.org
-        - JetKVM:
-            icon: jetkvm.png
-            href: https://jetkvm.jakerobb.org
+        - KVM:
+            icon: glinet.png
+            href: https://kvm.jakerobb.org
         - Modbus Controller:
             icon: /icons/modbus.png
             href: https://modbus.jakerobb.org
