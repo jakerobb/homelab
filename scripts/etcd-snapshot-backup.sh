@@ -5,6 +5,12 @@
 # talosconfig) and run via cron; see docs/etcd-backup.md for setup.
 set -euo pipefail
 
+# cron's default PATH (/usr/bin:/bin) doesn't include /usr/local/bin, where
+# talosctl lives — without this the job fails silently every night with no
+# mail transport configured to report it. Root-caused 2026-09-17: the only
+# etcd snapshot that ever existed was from the initial manual test run.
+PATH="/usr/local/bin:${PATH}"
+
 TALOSCONFIG="${HOME}/talos/homelab/talosconfig"
 ENDPOINTS="192.168.102.11,192.168.102.12,192.168.102.13"
 NODE="192.168.102.11"
