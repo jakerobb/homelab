@@ -99,7 +99,7 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 ## 4. Talos VM → Join Existing Cluster
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.
 - [x] Copy the age private key (`~/.config/sops/age/keys.txt`) into 1Password for durability
-- [x] Talos image source resolved: built via [Image Factory](https://factory.talos.dev) (not a GitHub release) — see `talos/README.md` for the exact v1.11.5 qcow2 URL, distinct from the `ghcr.io/talos-rpi5/installer` image the Pi control plane uses
+- [x] Talos image source resolved: built via [Image Factory](https://factory.talos.dev) (not a GitHub release) — see `talos/README.md` for the exact v1.11.5 qcow2 URL, distinct from the custom installer image the Pi control plane uses (see `talos/README.md` for that image's source, which has changed since this was written)
 - [x] **Two** workers, not one — decided 2026-09-11 so a Talos upgrade doesn't leave the cluster with zero schedulable capacity (see `talos/README.md`). `talos-worker-1` (`.31`) / `talos-worker-2` (`.32`) — `.21-.29` is reserved for physical hosts, `.31+` for VMs — 4 vCPU / 4GB RAM each, patches at `talos/patches/workers/`
 - [x] Terraform written for both VMs (`terraform/proxmox/talos-worker.tf`, `images.tf`), applied from rpi5-1
 - [x] DHCP reservations added on the UCG for both fixed MACs → `.31`/`.32`

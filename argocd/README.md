@@ -320,11 +320,12 @@ Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
 From a machine with `helm`/`kubectl` pointed at the cluster
 (`KUBECONFIG=~/.kube/config`, the default path — no need to export it):
 
+<!-- renovate: datasource=helm depName=argo-cd registryUrl=https://argoproj.github.io/argo-helm -->
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
 helm install argocd argo/argo-cd \
-  --version 10.9.0 \
+  --version 10.9.1 \
   --namespace argocd --create-namespace \
   -f argocd/install/values.yaml
 kubectl apply -f argocd/bootstrap/root-app.yaml

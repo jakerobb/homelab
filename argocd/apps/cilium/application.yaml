@@ -35,6 +35,16 @@
 # release object) and can be ignored. Do not run manual `helm upgrade
 # cilium ...` again after this is synced once — bump `targetRevision`
 # and/or edit talos/cilium/values.yaml and Sync from here instead.
+#
+# ignoreDifferences below (added 2026-09-17): the chart generates the
+# cilium-ca and hubble-server-certs Secrets itself (self-signed CA + Hubble
+# server cert, since no tls.ca.cert/hubble.tls values are set above) via
+# Helm's genCA/genSelfSignedCert template functions, which call crypto/rand
+# — every `helm template` render produces different random bytes. ArgoCD's
+# diff re-renders the chart and compares against whatever's live, so this
+# perpetually shows as OutOfSync on /data for these two Secrets even though
+# nothing is actually wrong. Scoped to just these two Secrets' /data so real
+# drift elsewhere still surfaces normally.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -59,3 +69,16 @@ spec:
     server: https://kubernetes.default.svc
     namespace: kube-system
   syncPolicy: {}
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: cilium-ca
+      namespace: kube-system
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: Secret
+      name: hubble-server-certs
+      namespace: kube-system
+      jsonPointers:
+        - /data

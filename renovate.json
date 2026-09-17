@@ -16,6 +16,14 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+tag: '(?<currentValue>.*?)'"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "ArgoCD's own chart version is bumped by hand via the `helm install`/`helm upgrade` command documented in argocd/README.md (see 'Upgrading ArgoCD itself') — it isn't a Kubernetes/ArgoCD Application manifest the built-in managers scan, so this catches it via an explicit annotation comment, same pattern as the Authelia one above. A PR here only updates the doc; the actual `helm upgrade` against the cluster is still a manual step by design.",
+      "managerFilePatterns": ["/^argocd/README\\.md$/"],
+      "matchStrings": [
+        "<!-- renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?) registryUrl=(?<registryUrl>\\S*?) -->[\\s\\S]*?--version (?<currentValue>[0-9.]+)"
+      ]
     }
   ]
 }

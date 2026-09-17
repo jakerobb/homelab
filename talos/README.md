@@ -2,11 +2,21 @@
 
 ## Current state (as of 2026-09-07)
 
-- **Talos v1.11.5**, **Kubernetes v1.34.1**.
+- **Talos v1.13.9** on control planes (upgrade from v1.11.5 staged 2026-09-17, not yet applied to
+  the live cluster — see below), **Kubernetes v1.34.1** (unchanged; v1.13.9 supports Kubernetes
+  1.31-1.36, so no forced Kubernetes bump alongside this one).
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
-  Control planes use a **custom installer image**, `ghcr.io/talos-rpi5/installer:v1.11.5`,
-  since stock Talos doesn't support the Pi5 directly. **Any amd64 worker (e.g. the MS-A2
-  Talos VM) must use the standard `ghcr.io/siderolabs/installer:v1.11.5` / stock qcow2 —
+  Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.13.9-9`,
+  since stock Talos doesn't support the Pi5 directly (no NVMe-capable U-Boot in the official
+  `rpi_5` overlay — see [siderolabs/sbc-raspberrypi#96](https://github.com/siderolabs/sbc-raspberrypi/issues/96)).
+  Previously `ghcr.io/talos-rpi5/installer` (`talos-rpi5/talos-builder`) — switched 2026-09-17
+  because that project is inactive (last release 2025-11-08, an 8-month-old PR bumping to v1.12.1
+  with zero comments). `yama6a/talos-raspberry-pi5` is a maintained downstream that reuses the
+  same `talos-rpi5/sbc-raspberrypi5` overlay and `talos-rpi5/u-boot` fork for the actual NVMe-boot
+  fix (credited, not reinvented) while tracking current Talos releases itself — see its own
+  [FUTURE_WORK.md](https://github.com/yama6a/talos-raspberry-pi5/blob/main/FUTURE_WORK.md): the
+  goal is to retire itself once that U-Boot patch lands upstream. **Any amd64 worker (e.g. the
+  MS-A2 Talos VM) must use the standard `ghcr.io/siderolabs/installer:v1.11.5` / stock qcow2 —
   do not reuse the rpi5 installer image for it.**
 - CNI: Cilium v1.20.1 (upgraded from 1.19.5 2026-09-15, see below), with
   `kubeProxyReplacement` enabled, full eBPF host routing
@@ -249,6 +259,49 @@ old `cilium` Helm release object in `kube-system` stale/orphaned (Argo's
 Helm source renders and applies manifests directly — it doesn't drive the
 `helm` CLI or touch that release object). Harmless to ignore; nothing reads
 it going forward.
+
+## Talos control-plane upgrade: talos-rpi5 → yama6a fork (2026-09-17)
+
+Moving all 3 control planes from `ghcr.io/talos-rpi5/installer:v1.11.5` to
+`ghcr.io/yama6a/talos-raspberry-pi5:v1.13.9-9` (see "Current state" above for
+why). Command, run once per node from rpi5-1:
+
+```bash
+talosctl upgrade --nodes <cp-ip> --image ghcr.io/yama6a/talos-raspberry-pi5:v1.13.9-9
+```
+
+**No canary node, and that's correct, not a corner cut.** Every Pi5 in this
+cluster is a control plane — the workers are amd64 Proxmox VMs, a different
+installer entirely, unaffected by this image. There's no spare Pi5 to test
+on first. That's fine: the entire reason this cluster runs 3 control planes
+instead of 1 is to make exactly this kind of direct, in-place test on a
+live quorum member a non-event — 2-of-3 etcd quorum tolerates a node
+misbehaving or going fully dark mid-upgrade without the cluster going down.
+Go straight at a control plane, one at a time, and let quorum be the safety
+net instead of routing around real hardware with a disposable node that
+doesn't exist here.
+
+Sequence: upgrade one control plane, verify it fully, then the next, then
+the last. Per node:
+1. `talosctl -n <cp-ip> version` — expect the new tag.
+2. `talosctl -n <cp-ip> get extensions` — expect `iscsi-tools`,
+   `util-linux-tools` (not `gvisor` — dropped by the new image; confirmed
+   2026-09-17 that nothing in the cluster references a `gvisor`
+   `RuntimeClass`, so this costs nothing).
+3. `kubectl get nodes` — the node back to `Ready`.
+4. A democratic-csi/hexos-iscsi-backed pod on that node still mounts and
+   writes — the new image adds `iscsi-tools` rather than removing anything
+   storage-related, but confirm rather than assume.
+5. External curl of the LB IP — this cluster has a history of *silent*
+   Cilium failures surviving a Healthy status (see "Cilium upgrade" above),
+   and a Talos upgrade touches the networking stack too.
+
+**If a node doesn't come back**, that's the known U-Boot failure mode (see
+[yama6a/talos-raspberry-pi5's upstream.md](https://github.com/yama6a/talos-raspberry-pi5/blob/main/docs/upstream.md)):
+reflash it from the previous release's raw image, rejoin it to the cluster,
+and `talosctl etcd remove-member` the stale entry from the two survivors
+first if the dead node was still listed. Recoverable, just physical — not
+a re-run-the-command fix.
 
 ## Layout
 
