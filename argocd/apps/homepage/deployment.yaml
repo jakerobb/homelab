@@ -85,34 +85,28 @@ spec:
             limits:
               memory: 256Mi
           volumeMounts:
-            - mountPath: /app/config/settings.yaml
+            # Whole-directory mount, deliberately NOT one subPath entry per
+            # file (that's how this was originally written). subPath-mounted
+            # files are frozen at whatever they were when the pod started —
+            # kubelet's periodic ConfigMap-volume refresh explicitly doesn't
+            # apply to subPath mounts, a real Kubernetes limitation, not a
+            # bug — so no ConfigMap edit, from git+ArgoCD or straight
+            # `kubectl apply`, ever reached a running pod without a manual
+            # restart. Found live 2026-09-17.
+            #
+            # Whole-mount trades that for a different constraint: it makes
+            # all of /app/config exclusively ConfigMap-owned (replaces
+            # whatever the image had there, and stays read-only), so it's
+            # only safe because homepage-config's 9 keys are the *complete*
+            # skeleton set Homepage ships (confirmed against src/skeleton/ in
+            # the homepage repo, v2.3.0) — if a future version adds a 10th
+            # skeleton file, expect the same EACCES crash-loop docker.yaml
+            # and proxmox.yaml caused earlier until it's added as a key here
+            # too. Propagation after a ConfigMap change is near-live, not
+            # instant — kubelet's own sync period plus cache TTL, typically
+            # up to ~1-2 minutes, not an immediate refresh.
+            - mountPath: /app/config
               name: homepage-config
-              subPath: settings.yaml
-            - mountPath: /app/config/kubernetes.yaml
-              name: homepage-config
-              subPath: kubernetes.yaml
-            - mountPath: /app/config/services.yaml
-              name: homepage-config
-              subPath: services.yaml
-            - mountPath: /app/config/widgets.yaml
-              name: homepage-config
-              subPath: widgets.yaml
-            # Empty, unused, but must exist — see configmap.yaml's top comment.
-            - mountPath: /app/config/bookmarks.yaml
-              name: homepage-config
-              subPath: bookmarks.yaml
-            - mountPath: /app/config/docker.yaml
-              name: homepage-config
-              subPath: docker.yaml
-            - mountPath: /app/config/custom.css
-              name: homepage-config
-              subPath: custom.css
-            - mountPath: /app/config/custom.js
-              name: homepage-config
-              subPath: custom.js
-            - mountPath: /app/config/proxmox.yaml
-              name: homepage-config
-              subPath: proxmox.yaml
             - mountPath: /app/public/icons
               name: homepage-icons
             - mountPath: /run/secrets/proxmox

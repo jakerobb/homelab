@@ -1,5 +1,8 @@
-# Homepage's own config files, one ConfigMap key per file, mounted
-# individually via subPath in deployment.yaml (see gethomepage.dev/installation/k8s/).
+# Homepage's own config files, one ConfigMap key per file. Mounted as a
+# single whole-directory volume in deployment.yaml (not one subPath entry
+# per file, which is how this originally shipped — subPath mounts don't
+# pick up ConfigMap changes on a running pod at all, see the comment on that
+# volumeMount) — every key here becomes a file at /app/config/<key>.
 #
 # All of them are mounted, even the ones we don't use (docker.yaml,
 # bookmarks.yaml, custom.css/js) — found out the hard way (2026-09-16) that
@@ -19,13 +22,34 @@ metadata:
   name: homepage-config
   namespace: homepage
 data:
+  # Four tabs per Jake's grouping (2026-09-17). Each group name here must
+  # match a group in services.yaml exactly. Kept the row/4-column grid style
+  # Jake already landed on for the single group; `header: false` since the
+  # tab label itself already names the group, a repeated heading inside it
+  # would be redundant.
   settings.yaml: |
     title: Homelab
     layout:
-      Homelab: # must match a group name from services.yaml exactly
-        style: row      # row = grid, default is a vertical list
-        columns: 4      # tiles per row
-        header: false   # optional, hides the "Homelab" heading
+      Apps:
+        tab: Apps
+        style: row
+        columns: 4
+        header: false
+      Services:
+        tab: Services
+        style: row
+        columns: 4
+        header: false
+      Monitoring:
+        tab: Monitoring
+        style: row
+        columns: 4
+        header: false
+      Infrastructure:
+        tab: Infrastructure
+        style: row
+        columns: 4
+        header: false
 
   # `mode: cluster` = discover via this pod's own ServiceAccount (see
   # clusterrole.yaml) rather than a mounted kubeconfig. `gateway: true` turns
@@ -58,20 +82,70 @@ data:
   # — they're on generic `mdi-*` (Material Design Icons, also bundled) for
   # now. Swap those for a real custom icon any time by dropping an SVG in
   # icons-configmap.yaml and changing `icon:` here to `/icons/<file>.svg`.
+  # Four groups matching the four tabs in settings.yaml. Jake explicitly
+  # placed most of these (2026-09-17); Modbus Controller/Relay -> Services
+  # (same "device control" spirit as Rack LED/Zigbee/Z-Wave), Network
+  # Optimizer + NUT -> Monitoring (network/power telemetry, same spirit as
+  # Grafana/InfluxDB — NUT's own tile name literally says "UPS Monitoring"),
+  # UniFi Gateway -> Infrastructure (it's the network's own gateway, same
+  # foundational tier as Proxmox/TrueNAS) were my best-guess calls for the
+  # apps Jake didn't explicitly sort.
   services.yaml: |
-    - Homelab:
+    - Apps:
+        - Home Assistant:
+            icon: home-assistant.png
+            href: https://homeassistant.jakerobb.org
+    - Services:
+        - Change Detection:
+            icon: changedetection.png
+            href: https://changedetection.jakerobb.org
+        - JetKVM:
+            icon: jetkvm.png
+            href: https://jetkvm.jakerobb.org
+        - Modbus Controller:
+            icon: mdi-chip
+            href: https://modbus.jakerobb.org
+        - Modbus Relay:
+            icon: mdi-swap-horizontal
+            href: https://modbus-relay.jakerobb.org
+        - Rack LED:
+            icon: mdi-led-strip-variant
+            href: https://rack-led.jakerobb.org
+        - Scrypted:
+            icon: mdi-cctv
+            href: https://scrypted.jakerobb.org
+        - Z-Wave JS UI:
+            icon: z-wave-js-ui.png
+            href: https://zwave.jakerobb.org
+        - Zigbee2MQTT:
+            icon: zigbee2mqtt.png
+            href: https://zigbee.jakerobb.org
+    - Monitoring:
+        - Grafana:
+            icon: grafana.png
+            href: https://grafana.jakerobb.org
+        - InfluxDB:
+            icon: influxdb.png
+            href: https://influxdb.jakerobb.org
+        - Logs:
+            icon: victorialogs.png
+            href: https://logs.jakerobb.org/select/vmui
+        - Network Optimizer:
+            icon: mdi-speedometer
+            href: https://optimizer.jakerobb.org
+        - ntfy:
+            icon: ntfy.png
+            href: https://ntfy.jakerobb.org
+        - NUT (UPS Monitoring):
+            icon: nut.png
+            href: https://nut.jakerobb.org
+    - Infrastructure:
         - ArgoCD:
             icon: argo-cd.png
             href: https://argocd.jakerobb.org
         - Authelia:
             icon: authelia.png
             href: https://auth.jakerobb.org
-        - Change Detection:
-            icon: changedetection.png
-            href: https://changedetection.jakerobb.org
-        - Grafana:
-            icon: grafana.png
-            href: https://grafana.jakerobb.org
         # href and widget.url deliberately point at different places
         # (confirmed 2026-09-16): the tile *links* to HexOS's own dashboard
         # (deck.hexos.com — presumably the UI actually used day-to-day), but
@@ -89,33 +163,6 @@ data:
               key: "{{HOMEPAGE_FILE_TRUENAS_API_KEY}}"
               enablePools: true
               nasType: scale
-        - Home Assistant:
-            icon: home-assistant.png
-            href: https://homeassistant.jakerobb.org
-        - InfluxDB:
-            icon: influxdb.png
-            href: https://influxdb.jakerobb.org
-        - JetKVM:
-            icon: jetkvm.png
-            href: https://jetkvm.jakerobb.org
-        - Logs:
-            icon: victorialogs.png
-            href: https://logs.jakerobb.org/select/vmui
-        - Modbus Controller:
-            icon: mdi-chip
-            href: https://modbus.jakerobb.org
-        - Modbus Relay:
-            icon: mdi-swap-horizontal
-            href: https://modbus-relay.jakerobb.org
-        - Network Optimizer:
-            icon: mdi-speedometer
-            href: https://optimizer.jakerobb.org
-        - ntfy:
-            icon: ntfy.png
-            href: https://ntfy.jakerobb.org
-        - NUT (UPS Monitoring):
-            icon: nut.png
-            href: https://nut.jakerobb.org
         # proxmox.lan confirmed 2026-09-16 (replaces the terraform-default IP
         # guessed earlier). Kept `https://` despite "unencrypted local
         # access" — pveproxy (Proxmox's web service on 8006) is TLS-only,
@@ -137,21 +184,9 @@ data:
               fields:
                 - resources.cpu
                 - resources.mem
-        - Rack LED:
-            icon: mdi-led-strip-variant
-            href: https://rack-led.jakerobb.org
-        - Scrypted:
-            icon: mdi-cctv
-            href: https://scrypted.jakerobb.org
         - UniFi Gateway:
             icon: unifi.png
             href: https://gateway.jakerobb.org
-        - Z-Wave JS UI:
-            icon: z-wave-js-ui.png
-            href: https://zwave.jakerobb.org
-        - Zigbee2MQTT:
-            icon: zigbee2mqtt.png
-            href: https://zigbee.jakerobb.org
 
   # Cluster/node widget deliberately omitted: needs metrics-server, which
   # isn't installed (see clusterrole.yaml).
