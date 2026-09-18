@@ -118,7 +118,7 @@ Runbook: [`docs/hexos-install.md`](docs/hexos-install.md).
 - [x] PCIe-passthrough both NVMe drives individually (not virtual disks) — HexOS/ZFS wants raw block access — `hostpci0`/`hostpci1` in `hexos.tf`
 - [x] Install HexOS in the VM — hit two more gotchas along the way (corrupted `std` VGA console, and the P3 Plus needing `vfio-pci disable_idle_d3=1` to attach reliably); see [`docs/hexos-install.md`](docs/hexos-install.md). Both drives now visible in HexOS.
 - [x] Pool layout — decided: stripe (6TB usable, no redundancy) unless HexOS's ZFS AnyRaid is ready to use by then, in which case use that instead for flexible-capacity redundancy. Plain mirror is out (wastes 2TB of the P3 Plus given mismatched capacities).
-- [ ] Set up NFS or SMB share, test from another device on the network
+- [x] Set up NFS or SMB share, test from another device on the network — `data/shared` dataset, both NFS and SMB, see [`docs/hexos-install.md`](docs/hexos-install.md#6-pool--share-setup-gui-only-hexos)
 - [ ] Once the pool is confirmed healthy, `rclone copy` the archived data back down from B2
 - [ ] Verify restored data integrity. **Keep the B2 backup for a few extra weeks** as insurance against early failure of the new (non-redundant, unless AnyRaid) pool before deleting the bucket — don't delete immediately just because the pool checks out on day one.
 

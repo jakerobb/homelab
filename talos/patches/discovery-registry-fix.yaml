@@ -1,0 +1,6 @@
+- op: replace
+  path: /cluster/discovery/registries/kubernetes/disabled
+  value: true
+- op: replace
+  path: /cluster/discovery/registries/service/disabled
+  value: false

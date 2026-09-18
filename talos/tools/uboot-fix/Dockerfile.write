@@ -1,0 +1,5 @@
+FROM alpine:3.20
+COPY installer-write.sh /bin/installer
+COPY u-boot.bin /payload/u-boot.bin
+RUN chmod +x /bin/installer
+ENTRYPOINT ["/bin/installer"]

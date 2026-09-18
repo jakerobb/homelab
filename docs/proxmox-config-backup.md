@@ -15,6 +15,13 @@ pruning anything older than 14 days on the receiving end.
 The script itself is versioned here, but it's **deployed manually** to the
 Proxmox host (not something Terraform manages) and run via cron there.
 
+**Status:** deployed and running — `/etc/cron.d/proxmox-config-backup` has been
+firing daily at 03:00 on the Proxmox host since 2026-09-11, confirmed
+2026-09-18 by checking for an unbroken run of dated archives in
+`~pve-backup/backups/proxmox/` on rpi5-1 (one per day, no gaps, sizes in the
+expected ~15-17KB range). The repo's TODO list just hadn't been updated to
+reflect that this was already done.
+
 ## One-time setup (done 2026-09-11)
 
 - Created `pve-backup` system user on rpi5-1 (`/home/pve-backup`, no sudo —

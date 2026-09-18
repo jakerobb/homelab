@@ -303,12 +303,415 @@ and `talosctl etcd remove-member` the stale entry from the two survivors
 first if the dead node was still listed. Recoverable, just physical — not
 a re-run-the-command fix.
 
+## Talos v1.14.1 upgrade blocked by Pi5 EFI-variable firmware bug (2026-09-18)
+
+**Resolved 2026-09-18 — all 3 Pi5 control planes are on v1.14.1.** The
+working fix (a custom `/bin/installer` image, fully remote, no drive-pull
+needed) is documented below under "What actually works." Kept the dead
+ends documented too so they're not re-investigated next time.
+
+Attempting `talosctl upgrade --image ghcr.io/yama6a/talos-raspberry-pi5:v1.14.1-1`
+on any of the 3 Pi5 control planes fails at the bootloader step:
+
+```
+updating EFI variables
+failed to install bootloader: failed to create efivarfs reader/writer: invalid argument
+```
+
+**Root cause:** the stock Raspberry Pi 5 U-Boot doesn't advertise EFI
+`SetVariable` support at runtime, so Linux mounts `/sys/firmware/efi/efivars`
+read-only (confirmed via `talosctl -n <cp-ip> read /proc/mounts | grep
+efivar` → `ro`). systemd-boot's boot-entry bookkeeping
+(`LoaderEntryDefault`/`LoaderEntrySelected`/`LoaderEntryOneShot`) is entirely
+EFI-variable-based on this platform — there's no config-file fallback in
+play — so any upgrade that needs to point the bootloader at a new UKI hits
+this. **The attempt fails cleanly before rebooting the node** — no reboot is
+attempted, so a failed attempt leaves the node exactly as it was (confirmed
+twice on `talos-cp-1`, still `v1.13.9`, `Ready`, etcd quorum untouched both
+times).
+
+This is a different U-Boot problem than the NVMe/PCIe one this fork
+(`yama6a/talos-raspberry-pi5`) exists to fix — it's not documented in that
+project's `docs/upstream.md`, and as of this writing the fork's builds don't
+carry a fix for it either.
+
+**The fix exists, just not upstream yet:**
+[excavador/u-boot-rpi5](https://github.com/excavador/u-boot-rpi5/releases/tag/v2025.04-rpi5-3-hive.2),
+`hive` branch, built with `CONFIG_EFI_RT_VOLATILE_STORE` (published
+2026-09-06 — very recent). Ships as a bare `u-boot.bin`:
+
+```bash
+curl -fsSLO https://github.com/excavador/u-boot-rpi5/releases/download/v2025.04-rpi5-3-hive.2/u-boot.bin
+curl -fsSLO https://github.com/excavador/u-boot-rpi5/releases/download/v2025.04-rpi5-3-hive.2/SHA256SUMS
+sha256sum -c SHA256SUMS   # 9aa3c44ab42d181dd3ecf1aa2759f2ee702e019d590110fd41c4a415de311265  u-boot.bin
+```
+
+### Where U-Boot actually lives
+
+It's a plain file, `/boot/EFI/u-boot.bin`, on the same FAT32 ESP as
+`config.txt`, the DTB/overlays, systemd-boot, and the Talos UKI — not a
+separate SPI/EEPROM chip. Confirmed by exporting the real installer image's
+filesystem:
+
+```bash
+cid=$(docker create ghcr.io/yama6a/talos-raspberry-pi5:v1.14.1-1)
+docker export $cid | tar -tvf - | grep u-boot
+# overlay/artifacts/arm64/u-boot/rpi5/u-boot.bin
+```
+
+Talos's `rpi_5` overlay installer (`siderolabs/sbc-raspberrypi`,
+`installers/rpi_5/src/main.go`) copies that path to `/boot/EFI/u-boot.bin`
+on **every** install/upgrade, alongside the DTB and `config.txt` — it's not
+a one-time, install-only artifact.
+
+### Dead ends, checked against Talos's actual source before giving up on them
+
+Before finding the working approach below, traced several alternatives all
+the way to Talos's source code (`siderolabs/talos`) rather than guessing:
+
+- **A same-version "firmware-only" `talosctl upgrade`** (custom image, `FROM
+  ghcr.io/yama6a/talos-raspberry-pi5:v1.13.9` with just `u-boot.bin`
+  replaced) — fails identically. The "updating EFI variables" step runs
+  *before* the overlay copies the new `u-boot.bin` onto disk, and that
+  write goes through whatever firmware is *already active this boot
+  session*, not whatever's embedded in the target image.
+- **PXE/netboot maintenance-mode fresh install** — `efivars.go`'s
+  `CreateBootEntry` (called by every sd-boot install *and* upgrade) still
+  calls `WriteVariable` even with no prior `BootOrder`
+  (`errors.Is(err, fs.ErrNotExist)` just starts from an empty `BootOrder{}`
+  and proceeds to write). A from-scratch install hits the identical error.
+  Also moot in practice: this fork doesn't publish a netboot-compatible
+  artifact at all, only a raw `dd`-able disk image.
+- **GRUB instead of sd-boot** — not selectable for this hardware.
+  `bootloader.go`'s `NewAuto()` hard-codes sd-boot for any UEFI-booting
+  system, and the Pi 5 boots UEFI via U-Boot.
+- **Downgrade, then re-upgrade with a patched image** — same call path as
+  any other upgrade; version direction/delta is irrelevant.
+
+These all share one root cause: the write depends on whether the
+*currently active* firmware supports EFI `SetVariable` — never on how
+Talos was invoked or what version is the target. None of them make the
+currently-running (broken) firmware capable of the write.
+
+### What actually works: a custom `/bin/installer` that swaps the file directly, no physical access needed
+
+The piece that unlocks a fully remote fix: `machined` doesn't care what's
+inside the image passed to `talosctl upgrade --image` — it just execs the
+literal path `/bin/installer` inside whatever container that image
+describes, and only checks its exit code. Nothing requires that binary to
+be Sidero's real installer. So instead of asking Talos's own code to write
+the file (which hits the EFI-variable requirement), ship a minimal
+container whose `/bin/installer` mounts the ESP directly and copies the
+file itself — no EFI variable ever touched:
+
+```sh
+#!/bin/sh
+set -eu
+PART=/dev/nvme0n1p1   # EFI partition, confirmed partition 1 on these nodes
+MNT=/mnt/esp
+NEW_HASH="9aa3c44ab42d181dd3ecf1aa2759f2ee702e019d590110fd41c4a415de311265"
+
+mount -t vfat -o rw "$PART" "$MNT"
+[ -f "$MNT/config.txt" ] && [ -f "$MNT/u-boot.bin" ] || { echo "wrong partition?" >&2; umount "$MNT"; exit 1; }
+cp /payload/u-boot.bin "$MNT/u-boot.bin.new"
+[ "$(sha256sum "$MNT/u-boot.bin.new" | awk '{print $1}')" = "$NEW_HASH" ] || { echo "payload mismatch" >&2; rm -f "$MNT/u-boot.bin.new"; umount "$MNT"; exit 1; }
+cp "$MNT/u-boot.bin" "$MNT/u-boot.bin.orig-backup-20260918"
+mv "$MNT/u-boot.bin.new" "$MNT/u-boot.bin"
+sync
+[ "$(sha256sum "$MNT/u-boot.bin" | awk '{print $1}')" = "$NEW_HASH" ] || { echo "post-write verify failed" >&2; umount "$MNT"; exit 1; }
+umount "$MNT"
+exit 0
+```
+
+```dockerfile
+FROM alpine:3.20
+COPY installer-write.sh /bin/installer
+COPY u-boot.bin /payload/u-boot.bin
+RUN chmod +x /bin/installer
+ENTRYPOINT ["/bin/installer"]
+```
+
+**The actual runnable scripts (this one plus its read-only dry-run sibling)
+are committed at [`talos/tools/uboot-fix/`](tools/uboot-fix/)** — that's the
+canonical copy to reuse for the next Talos bump, not this inline snippet.
+Update `NEW_HASH` and `BACKUP_NAME` there first; see that directory's
+`README.md`.
+
+Safety properties worth keeping if reusing this pattern: verify the staged
+payload's hash *before* touching the original, keep a backup of the
+original on the same partition, verify the final write, and abort (exit
+non-zero, leaving the node untouched) on any surprise. Same privileges as
+the real installer apply automatically — `machined` sets up the container's
+mount/device access identically regardless of image, confirmed by this
+script successfully doing real block-device mounts. **Always dry-run first**
+(a read-only variant that mounts `-o ro`, prints checksums, and
+deliberately exits 1) against a real node before trusting a write-mode
+image — costs nothing (exit 1 = "upgrade failed", no reboot, node
+untouched) and confirms partition-detection logic before it matters.
+
+`talosctl upgrade -n <cp-ip> --image <that image>` runs this, reports the
+exit code, and — because it thinks an upgrade happened — proceeds through
+its normal cordon/drain/reboot sequence even though the Talos OS itself
+never changed. That reboot is what's needed to load the new firmware.
+
+**One more wrinkle: no software-triggered reboot actually reloads U-Boot on
+this hardware**, not even `talosctl upgrade`'s default kexec-avoidance
+setting, nor `talosctl reboot --mode powercycle` (its help text says
+"bypasses kexec," but empirically it still didn't reinitialize firmware —
+confirmed via `efivarfs` staying `ro` and via `read /proc/uptime` proving a
+reboot really happened). Only a genuine power interruption
+(PoE port cycle) does. After power-cycling: **checking
+`/proc/mounts` via `talosctl read` is misleading** — it reflects a stale,
+early-boot mount taken from `machined`'s own root namespace and stays `ro`
+even after the fix is fully working. The real test is a fresh mount from
+within a *container* (any `talosctl upgrade`-invoked one, same as the real
+installer uses) — that one correctly reflects current firmware capability.
+Confirmed definitively by just re-running the real upgrade afterward and
+watching "updating EFI variables" succeed for the first time.
+
+**Also discovered along the way:** the stale variable-store file
+`ubootefi.var` (persisted pseudo-NVRAM, since this board has no real EFI
+NVRAM hardware) turned out *not* to be the blocker — it was a red herring
+investigated in parallel; the power-cycle requirement was the actual fix.
+No need to touch `ubootefi.var` for this to work.
+
+### Full sequence per node
+
+1. Build + dry-run-test + write the patched `u-boot.bin` remotely, per
+   above. Take an `etcd-snapshot-backup.sh` run first.
+2. Power-cycle the node's PoE port for real (software reboots don't count).
+3. Run the *real* upgrade with a combined image:
+   ```dockerfile
+   FROM ghcr.io/yama6a/talos-raspberry-pi5:v1.14.1-1
+   COPY u-boot.bin /overlay/artifacts/arm64/u-boot/rpi5/u-boot.bin
+   ```
+   **Don't use the plain `v1.14.1-1` tag** — its overlay install step would
+   silently overwrite the just-fixed `u-boot.bin` with the original broken
+   one again (the overlay unconditionally re-copies whatever's embedded in
+   whichever image performs the install). Verified end-to-end on `talos-cp-1`
+   on 2026-09-18: "updating EFI variables" succeeded, boot entry created,
+   `installation of v1.14.1 complete`, full reboot, node Ready, extensions
+   (`iscsi-tools`, `util-linux-tools`) intact.
+4. Verify per the checklist in "Talos control-plane upgrade" above
+   (version, extensions, node Ready, a democratic-csi pod, external LB
+   curl). Expect a brief window of cluster-wide pod churn right after
+   (Cilium re-establishing on other nodes, `cilium-operator`'s standby
+   replica occasionally crash-looping if it hit a flaky-API window during
+   the reboot — harmless, `kubectl delete pod` for a clean retry if it
+   doesn't self-heal).
+
+Build once on rpi5-1 (arm64, matches the target hardware — no
+cross-compilation), push to `ttl.sh` (anonymous, no auth needed; these
+nodes have no registry pull-credential configured, so any image used here
+must stay public regardless of where it's hosted).
+
+**This patch has to be reapplied on every future Talos OS bump for these 3
+Pi5 nodes** — check whether `yama6a/talos-raspberry-pi5` (or upstream
+`siderolabs/sbc-raspberrypi`) has merged the `hive`-branch fix itself before
+assuming a plain upgrade will work; until it has, always build the same
+`FROM <target-tag>` + `u-boot.bin` swap rather than using the tag directly.
+
+The 2 amd64 MS-A2 workers are unaffected (standard UEFI via Proxmox/OVMF, no
+`efivarfs` restriction) — they upgraded to v1.14.1 cleanly using the stock
+Image Factory schematic image (see the worker-upgrade notes; correct
+reference is `factory.talos.dev/installer/<schematic-id>:v1.14.1`, not
+`ghcr.io/siderolabs/installer:v1.14.1`, which doesn't exist for recent
+releases).
+
+## Kubernetes discovery registry: leave the `kubernetes` one disabled (found/fixed 2026-09-18)
+
+All 3 control planes were repeatedly logging (harmless-looking, but noisy)
+warnings:
+
+```
+kubernetes registry node watch error ... nodes is forbidden: User
+"system:node:talos-cp-X" cannot list resource "nodes" in API group "" at
+the cluster scope: node 'talos-cp-X' cannot read all nodes, only its own
+Node object
+```
+
+**Root cause, upstream:** Kubernetes 1.32+ tightened node RBAC so a
+kubelet's own credentials can no longer `list`/`watch` all `Node` objects —
+this broke Talos's legacy "Kubernetes discovery registry" (which relies on
+exactly that) across the wider Talos community, not just here. Traced to
+`internal/app/machined/pkg/controllers/cluster/kubernetes_pull.go` in
+`siderolabs/talos`: the `KubernetesPullController` only skips its
+watch/list attempt when `cluster.discovery.registries.kubernetes.disabled`
+is `true`; otherwise it retries forever, 5-strikes-then-rebuild-client, and
+fails identically every cycle.
+
+**Root cause, this cluster:** `talosctl get discoveryconfig` showed cp-1
+already correctly configured (`kubernetes` registry disabled, `service`
+registry — the working `discovery.talos.dev`-backed one — enabled), but
+cp-2 and cp-3 had it backwards (`kubernetes` enabled, `service` disabled)
+— not just noisy, but meaning those two nodes had **zero working cluster
+discovery** the whole time. The shared `controlplane.yaml` template on
+rpi5-1 also had the broken setting, so this wasn't a fluke — cp-1 must have
+been individually patched at some point without the fix being propagated
+back to the template or the other two nodes.
+
+**Fix applied** (JSON6902 patch, no reboot needed) — committed at
+[`talos/patches/discovery-registry-fix.yaml`](patches/discovery-registry-fix.yaml):
+
+```yaml
+- op: replace
+  path: /cluster/discovery/registries/kubernetes/disabled
+  value: true
+- op: replace
+  path: /cluster/discovery/registries/service/disabled
+  value: false
+```
+
+```bash
+talosctl patch machineconfig -n <cp-ip> -p @discovery-registry-fix.yaml --mode=no-reboot
+```
+
+Applied to cp-2 and cp-3 (cp-1 was already correct); verified via
+`talosctl get discoveryconfig` showing `registryKubernetesEnabled: false` /
+`registryServiceEnabled: true` on all 3, and the warning no longer
+recurring in `dmesg` past the in-flight retry counter it was already on.
+Also fixed the same setting in the shared `~/talos/homelab/controlplane.yaml`
+template on rpi5-1, so a future from-scratch control-plane node won't
+reintroduce this.
+
+## Workload isolation (Talos 1.14 feature): not enabled yet, checked 2026-09-18
+
+Considered enabling `SecurityProfileConfig`'s `workloadIsolation: true` (runs
+CRI/kubelet/all pods in a dedicated PID+mount namespace that Talos can tear
+down and relaunch without a full reboot if it dies). Not enabled — found a
+confirmed blocker, not just a theoretical one:
+
+- [siderolabs/talos#14374](https://github.com/siderolabs/talos/issues/14374):
+  a startup race between CRI and `sandboxd` causes every node to
+  restart-loop (`sandbox namespace not available yet`, kubelet down,
+  `NotReady`) for 1–3 minutes on **every boot** with isolation enabled.
+  Fixed upstream 2026-09-16 — one day *after* our current `v1.14.1` was
+  published (2026-09-15). We're on the affected version, and no `v1.14.2`
+  exists yet to upgrade past it (checked — `v1.14.1` is still latest as of
+  2026-09-18).
+- Softer, unverified risk: `node-exporter` runs `hostPID`/`hostNetwork` and
+  mounts `/proc`/`/sys`/`/` from the host to read real host metrics — under
+  isolation its process-level metrics may describe the sandbox instead of
+  the true host unless specific collector exclusions are configured, which
+  ours aren't today.
+
+democratic-csi is *not* at risk from this feature when it does get enabled
+— it's a real CSI driver (attach/mount happens in its own privileged node
+pod), not the in-tree iSCSI volume plugin that workload isolation is known
+to break.
+
+**Revisit once a Talos release ships with the CRI/sandboxd race fixed** —
+check the changelog for #14374 specifically before assuming a later patch
+release includes it.
+
+## Container log size limits (added 2026-09-18)
+
+Kubelet's `containerLogMaxSize`/`containerLogMaxFiles` were previously
+unset, relying on kubelet's implicit defaults (`10Mi` × `5` files = 50Mi
+ceiling per container). Made that explicit rather than implicit, via
+`machine.kubelet.extraConfig` on all 5 nodes — committed at
+[`talos/patches/kubelet-log-limits.yaml`](patches/kubelet-log-limits.yaml):
+
+```yaml
+- op: add
+  path: /machine/kubelet/extraConfig
+  value:
+    containerLogMaxSize: 10Mi
+    containerLogMaxFiles: 5
+```
+
+```bash
+talosctl patch machineconfig -n <node-ip> -p @kubelet-log-limits.yaml --mode=no-reboot
+```
+
+Applied live to all 5 nodes (no reboot needed, no pod disruption). Also
+updated in the shared `~/talos/homelab/controlplane.yaml` and `worker.yaml`
+templates on rpi5-1 so a future from-scratch node gets this by default
+rather than falling back to kubelet's implicit default.
+
+**Why 50Mi/container is comfortable headroom, not a tight budget:** even
+the worker with the most containers scheduled to it (30, vs. 64GB disk)
+only implies ~1.5GB worst case — under 2.3% of that node's capacity, and
+the real worst case is smaller still since several of those are DaemonSets
+(`cilium`, `cilium-envoy`, `democratic-csi-node`, `node-exporter`) already
+pinned one-per-node and unable to pile up further even if a node went
+down. RAM (4GB/worker) is the actual binding constraint on how many
+containers these boxes can run, not disk.
+
+## Control-plane VIP (added 2026-09-18)
+
+kubectl/OpenLens previously pointed at a single control-plane IP
+(`192.168.102.11`), so any restart of that one node dropped the connection
+until manually pointed at another CP. Added a Talos-native Virtual (shared)
+IP — `192.168.102.10` — that floats across all 3 control planes via
+gratuitous ARP, so any client only ever needs one endpoint. This is Talos's
+own built-in VIP feature (`machine.network.interfaces[].vip`), not the
+third-party kube-vip project — it works at the OS/network layer below
+Kubernetes, so it doesn't depend on the API server already being up (unlike
+kube-vip's typical leader-election-via-API-server approach).
+
+Patch (committed at
+[`talos/patches/control-plane/vip.yaml`](patches/control-plane/vip.yaml),
+same content applied to all 3 CPs since these are cluster-wide settings, not
+per-node):
+
+```yaml
+machine:
+  network:
+    interfaces:
+      - interface: end0
+        dhcp: true
+        vip:
+          ip: 192.168.102.10
+  certSANs:
+    - 192.168.102.10
+cluster:
+  controlPlane:
+    endpoint: https://192.168.102.10:6443
+  apiServer:
+    certSANs:
+      - 192.168.102.10
+```
+
+```bash
+talosctl patch machineconfig -n <cp-ip> -p @vip.yaml --mode=no-reboot
+```
+
+Applied live to all 3 control planes (no reboot needed). Also updated in the
+shared `~/talos/homelab/controlplane.yaml` template on rpi5-1.
+`~/.kube/homelab.yaml`'s `server:` now points at the VIP instead of `.11`
+directly.
+
+**Gotcha: `talosctl patch machineconfig` appends to list fields (`certSANs`)
+instead of replacing them** — patching with the full existing list plus the
+new entry produces duplicates; patch with only the new entry and Talos
+merges it in.
+
+**Gotcha: `.10` collided with an existing device** — the first attempt
+picked `192.168.102.10` without checking the LAN for existing users, and it
+turned out to already be leased to a Zigbee coordinator (a
+locally-administered/randomized MAC, so nothing in this repo's IP
+conventions would have flagged it). The symptom was confusing: ICMP ping to
+the VIP worked fine (the other device answered), but every TCP connection
+was refused, and `cilium monitor` on the VIP-holding node showed *zero*
+trace of the inbound SYN — proof the packets weren't even reaching the Pi.
+Moved the Zigbee coordinator to `192.168.102.4` (see
+[`docker-compose/zigbee2mqtt/configuration.sops.yaml`](../docker-compose/zigbee2mqtt/configuration.sops.yaml),
+`serial.port`) before re-attempting, and confirmed via `ip neigh` that
+`.10` resolved to the control plane's real MAC before proceeding.
+
+Verified failover works: `talosctl -n 192.168.102.11 reboot` while watching
+`talosctl -n <ip> get addresses` on the other two control planes — the VIP
+moved to `talos-cp-2` within the outage window, and `kubectl` against
+`https://192.168.102.10:6443` never dropped.
+
 ## Layout
 
 - `cilium/` — Cilium Helm values, LB/L2-announcement CRDs, and the Gateway
   API `Gateway` (ingress), applied to the existing cluster.
 - `patches/control-plane/` — per-node Talos config patches for the existing 3 Pi
-  control-plane nodes (hostname only, currently).
+  control-plane nodes: hostname patches (`cp1.yaml`/`cp2.yaml`/`cp3.yaml`)
+  plus the shared VIP patch (`vip.yaml`, identical across all 3).
 - `patches/workers/` — patches for the two MS-A2 worker VMs (hostname only,
   matching the control-plane patch style — IP addressing is handled via DHCP
   reservation on the UCG, not in Talos config).

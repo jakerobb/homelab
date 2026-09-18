@@ -4,7 +4,7 @@ mqtt:
     server: ENC[AES256_GCM,data:xwF6LWg/sKZ4QNXAkqpWzxK++1CM,iv:fXRuDA82V69sRPdHdJfBUNy7Akq9Y3ISpVPfLcwS6b4=,tag:kQ/jYkuj+dok4+w3tyUeHQ==,type:str]
 serial:
     adapter: ENC[AES256_GCM,data:Gv+ch4HX,iv:JxCV0yPFmvnHbFBnfTcC4scm2MZxD5kjcrmkOup9D/E=,tag:wbgYJTW6PZiMIMlxHNYaLg==,type:str]
-    port: ENC[AES256_GCM,data:qXm6h11ae3OwQw+wx3sFqTTlCCOAEruvbA==,iv:m3+jF81cV4QUKxBRb7ZyYBtcj//Iqe9AL8J3CVOnJmY=,tag:CWFNol/VH2dF0NvQJMSDnA==,type:str]
+    port: ENC[AES256_GCM,data:fN64SU90CAKG57t6Q3maaBn0429ozQ3f,iv:SEBj+OmmOKWjUqEnqWSKis9xeRFArL7D7rRfhQZ9F/Q=,tag:CvQbqm3883NmvenbQ55XTg==,type:str]
 advanced:
     log_level: ENC[AES256_GCM,data:CVPWOQ==,iv:0XCLePUAuBPA7qE2toMnGJmt3sI+WtG2iPu7Vzs+bYA=,tag:S0jxdfWvJQlmLeS77i8buQ==,type:str]
     channel: ENC[AES256_GCM,data:FsA=,iv:hTbPdQz/uHgh+mT4E0bfnCrMncaC2zMhP+GKCDCVd2U=,tag:rFHwmMpNyruFvxknj4+rGw==,type:int]
@@ -88,7 +88,7 @@ sops:
             wn8LNCGvn4Efah4CYvTjx3Kj+veBF3fw41lh7BvNX7og2ZhyEpn5hQ==
             -----END AGE ENCRYPTED FILE-----
           recipient: age1nqvgqc45f5j9y9ch0lyccdefeazs26xkp732rujp23nqeqmdjefshruqs8
-    lastmodified: "2026-09-15T17:02:37Z"
-    mac: ENC[AES256_GCM,data:ucVwneuEUcXDtTPIuAT9veCBRqiAccefDvCp0qBGvI8di19ZsHtxNVtMoCNA3twOR/5uMloAeljNi/BFquVm7Idgg2TCVxRjW91Zu9Z4iFYkaa0tIi+QyQ+72wb0W+XqPyIr+0yqJeZpY7l1ximHotopsW7rWGLFIoV0xV0EFpE=,iv:pl/nZsfCyZhPOQ2OMOnnvlylAAKCfZYSq9/ZTnmPZ1o=,tag:kWSNWli/2d3/9yzQWmL1Xw==,type:str]
+    lastmodified: "2026-09-18T23:41:04Z"
+    mac: ENC[AES256_GCM,data:vO2Hv+VeKRNNZKFnbl2krSrE5Re15iqUXJqzMJp7O8h7OU7bP8DmjoTza5OzSK6nK4uRSLiqhggVMXAH3pg9ZNkxAZVJU5ugMVhIyun4Fdq9+q7kcyBoI/DdRdejWbJp1jgTQiSdblfky+EO7r6pJIXMvGoCjM+HSY6/WY4sSkU=,iv:xwVEKEdJPBZ6jbppQufUU4YyBr0POWkQAbCYtw113JE=,tag:s8dU0vl7w+A9dlduD3BtKA==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.3

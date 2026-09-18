@@ -167,12 +167,23 @@ Cosmetic only.
 
 ## 6. Pool + share setup (GUI-only, HexOS)
 
-- [ ] Create the pool: stripe across both drives (6TB usable, no redundancy) —
+- [x] Create the pool: stripe across both drives (6TB usable, no redundancy) —
       unless HexOS's ZFS AnyRaid has shipped by now, in which case use that
       instead for flexible-capacity redundancy (see root README step 5 notes
-      on why plain mirror is out).
-- [ ] Set up an NFS or SMB share, test from another device on the network.
+      on why plain mirror is out). Done as `data`, striped, ~4TB usable; also
+      hosts `data/k8s-iscsi` for the cluster's `democratic-csi` StorageClass
+      (see [`TODO.md`](../TODO.md#hexos-storage)).
+- [x] Set up an NFS or SMB share, test from another device on the network.
+      Done 2026-09-18: new dataset `data/shared` (Generic preset, so both
+      protocols share consistent permissions on the same files). NFS export
+      at `/mnt/data/shared`, restricted to the Server (`192.168.102.0/24`)
+      and Trusted (`192.168.92.0/24`) VLANs, default root-squash. SMB share
+      `shared` on the same path, backed by a dedicated local TrueNAS user
+      (not the admin account). Verified with a real mount
+      (`mount -t nfs -o vers=4 truenas.lan:/mnt/data/shared`) from rpi5-1.
 - [ ] Once the pool is confirmed healthy, `rclone copy` the archived data back
       down from B2.
 - [ ] Verify restored data integrity. Keep the B2 backup for a few extra weeks
-      as insurance before deleting the bucket.
+      as insurance against early failure of the new (non-redundant, unless
+      AnyRaid) pool before deleting the bucket — don't delete immediately
+      just because the pool checks out on day one.

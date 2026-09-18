@@ -1,0 +1,4 @@
+FROM alpine:3.20
+COPY installer-dryrun.sh /bin/installer
+RUN chmod +x /bin/installer
+ENTRYPOINT ["/bin/installer"]

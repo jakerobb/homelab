@@ -1,0 +1,15 @@
+machine:
+  network:
+    interfaces:
+      - interface: end0
+        dhcp: true
+        vip:
+          ip: 192.168.102.10
+  certSANs:
+    - 192.168.102.10
+cluster:
+  controlPlane:
+    endpoint: https://192.168.102.10:6443
+  apiServer:
+    certSANs:
+      - 192.168.102.10
