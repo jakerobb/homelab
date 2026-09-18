@@ -33,7 +33,7 @@ spec:
       valuesObject:
         image:
           # renovate: datasource=docker depName=authelia/authelia
-          tag: '4.39.27'
+          tag: '4.39.28'
 
         pod:
           kind: 'StatefulSet'
