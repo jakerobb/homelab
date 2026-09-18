@@ -94,7 +94,7 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [x] Static IP `192.168.102.21`, gateway `192.168.102.1` — confirm UCG switch port VLAN mode (access vs. trunk) before this step
 - [x] Post-install: no-subscription repo (watch for a *second* enterprise repo file just for Ceph — also needs disabling), `apt full-upgrade`
 - [x] NTP source — no local NTP currently exists; check whether the UCG offers a built-in NTP server before deciding to point at public pools instead
-- [x] Config backup — see [`docs/proxmox-config-backup.md`](docs/proxmox-config-backup.md) (script written, key installed on rpi5-1; still needs deploying + cron install on the Proxmox host itself)
+- [x] Config backup — see [`docs/proxmox-config-backup.md`](docs/proxmox-config-backup.md); deployed + cron installed on the Proxmox host, verified running daily since 2026-09-11
 
 ## 4. Talos VM → Join Existing Cluster
 - [x] Secrets bundle is now committed encrypted (SOPS+age) — see [`talos/README.md`](talos/README.md#secrets-sops--age-decided-2026-09-08). Still using plain `talosctl` (not Talhelper) to render machine configs from it.
@@ -107,7 +107,8 @@ config, post-install repo setup): [`docs/proxmox-install.md`](docs/proxmox-insta
 - [x] `kubectl get nodes` confirms both `Ready` with `kubernetes.io/arch=amd64`
 - [x] No DaemonSets crash-looping on amd64 (Cilium + cilium-envoy both 5/5 across all nodes)
 - [x] Test workload scheduled and confirmed live (spread correctly across both new workers)
-- [x] **External LoadBalancer traffic was broken cluster-wide** (found while testing the above) — root cause was an unresolved UCG Fiber routing bug with BGP-learned routes, not anything in the cluster. Pivoted from BGP to Cilium L2 announcements; see `talos/README.md` for the full investigation and current LB pool (`192.168.102.128/26`). The UCG's now-unused BGP peering config should be removed there.
+- [x] **External LoadBalancer traffic was broken cluster-wide** (found while testing the above) — root cause was an unresolved UCG Fiber routing bug with BGP-learned routes, not anything in the cluster. Pivoted from BGP to Cilium L2 announcements; see `talos/README.md` for the full investigation and current LB pool (`192.168.102.128/26`).
+- [x] Remove the UCG's now-unused BGP peering config — done 2026-09-18.
 
 ## 5. HexOS VM with T500 + P3 Plus
 Runbook: [`docs/hexos-install.md`](docs/hexos-install.md).
@@ -120,6 +121,9 @@ Runbook: [`docs/hexos-install.md`](docs/hexos-install.md).
 - [ ] Set up NFS or SMB share, test from another device on the network
 - [ ] Once the pool is confirmed healthy, `rclone copy` the archived data back down from B2
 - [ ] Verify restored data integrity. **Keep the B2 backup for a few extra weeks** as insurance against early failure of the new (non-redundant, unless AnyRaid) pool before deleting the bucket — don't delete immediately just because the pool checks out on day one.
+
+## 6. Outstanding hardening / cleanup
+- [ ] Install `msmtpq` queue wrapper on rpi5-1 so alert email survives a relay outage at cron-run time instead of being silently dropped — see [`docs/email-alerts.md`](docs/email-alerts.md#known-gap-no-queuing-if-the-relay-is-unreachable)
 
 ## Notes / Open Decisions
 - ~~Confirm whether Proxmox management IP and Talos VM IP should be on the same VLAN/subnet or split~~ — decided: same VLAN/subnet (`192.168.102.0/24`) as the existing cluster.

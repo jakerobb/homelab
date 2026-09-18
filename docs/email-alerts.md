@@ -21,12 +21,6 @@ it created its DKIM (`brevo1`/`brevo2._domainkey`), mail-branding
 and appended its DMARC reporting address (`rua=mailto:rua@dmarc.brevo.com`)
 to the existing `_dmarc` TXT record. No manual DNS work needed this time.
 
-Leftover from the abandoned SendGrid attempt (harmless but unused — added
-manually via the Cloudflare API before switching providers, never cleaned
-up): `23632814`, `em9710`, `s1._domainkey`, `s2._domainkey`, and `url7765`
-CNAMEs under `jakerobb.org`. Safe to delete whenever, not currently
-referenced by anything.
-
 Not tracked as Terraform/IaC — one-time, unlikely-to-change zone
 configuration, same reasoning as other Cloudflare-console-managed pieces.
 
