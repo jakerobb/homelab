@@ -1,0 +1,84 @@
+# Closes the other half of metrics-server's TODO (see
+# argocd/apps/metrics-server/application.yaml and
+# TODO.md#metrics-prometheus--timeseries-db): OpenLens's own visual metrics
+# (the "Cluster" dashboard's CPU/Memory graphs, and even the plain usage bars
+# on the Nodes list) all run through a Prometheus it can query, separately
+# from the Kubernetes Metrics API metrics-server provides for `kubectl top`.
+#
+# Grafana and Alertmanager both disabled deliberately for now:
+# - grafana.enabled: false — today's actual goal is just feeding OpenLens;
+#   the existing Compose-stack Grafana on the 16GB Pi already covers
+#   dashboarding until that workload migrates in (see TODO.md).
+# - alertmanager.enabled: false — no notification receiver wired up yet
+#   (ntfy is a migration candidate per TODO.md, not deployed); an
+#   unconfigured Alertmanager would just be a standing idle pod. Revisit
+#   once ntfy (or similar) is actually in the cluster — see TODO.md.
+#
+# Namespace is `monitoring`, not a per-app namespace like the rest of
+# apps/ — this is the ecosystem-standard name and what OpenLens's own
+# "Prometheus Operator" auto-detect option looks for.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 91.4.1
+    helm:
+      releaseName: kube-prometheus-stack
+      valuesObject:
+        grafana:
+          enabled: false
+        alertmanager:
+          enabled: false
+        prometheusOperator:
+          # See revisionHistoryLimit policy in argocd/README.md. Prometheus
+          # itself is an Operator-managed StatefulSet, not a Helm-templated
+          # Deployment, so this chart doesn't expose an equivalent knob for
+          # it — same "not worth chasing" call as local-path-provisioner's.
+          revisionHistoryLimit: 2
+        prometheus:
+          prometheusSpec:
+            # Cluster-wide discovery — without this, only the chart's own
+            # bundled ServiceMonitors get scraped, and a future app's
+            # ServiceMonitor would be silently ignored.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            # No VictoriaMetrics remote-write yet (see TODO.md), so keep
+            # local retention/storage modest — this is a bridge, not the
+            # long-term store.
+            retention: 10d
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: hexos-iscsi
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 10Gi
+        prometheus-node-exporter:
+          # Chart default tolerations are empty, so node-exporter wouldn't
+          # otherwise run on the (tainted) control-plane nodes — tolerate it
+          # explicitly for full-cluster host metrics coverage.
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+        # kubelet.serviceMonitor.tlsConfig.insecureSkipVerify is already the
+        # chart default (Talos's self-signed-per-node kubelet certs are
+        # exactly the case it's defaulted on for) — same call already made
+        # for metrics-server, nothing to override here.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

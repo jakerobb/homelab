@@ -335,13 +335,15 @@ Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
 
 ## metrics-server (decided and deployed 2026-09-17)
 
-Cluster/node/pod live resource metrics — specifically so OpenLens's graphs
-and `kubectl top` populate. Deployed as
+Cluster/node/pod live resource metrics via the Kubernetes Metrics API —
+`kubectl top`. Deployed as
 [`apps/metrics-server/`](apps/metrics-server/application.yaml), same
-external-Helm-chart pattern as `cert-manager`/`external-dns`. This only
-covers *live* metrics (metrics-server keeps no history); the historical/
-Prometheus half of [`TODO.md`](../TODO.md#metrics-prometheus--timeseries-db)
-is still open.
+external-Helm-chart pattern as `cert-manager`/`external-dns`. Turns out this
+alone does *not* populate OpenLens's own graphs/usage bars — those are
+Prometheus-backed specifically (confirmed directly by OpenLens itself), so
+[`kube-prometheus-stack`](#kube-prometheus-stack-decided-and-deployed-2026-09-17)
+was added separately for that. This app only covers *live* Metrics-API
+values (metrics-server keeps no history) either way.
 
 - **`--kubelet-insecure-tls` set deliberately.** Talos's kubelet serving
   certs are self-signed per-node, not signed by the cluster CA (confirmed via
@@ -365,6 +367,52 @@ is still open.
 - **Namespace:** own `metrics-server` namespace (`CreateNamespace=true`),
   consistent with `cert-manager`/`external-dns`/etc. rather than
   `kube-system`.
+
+## kube-prometheus-stack (decided and deployed 2026-09-17)
+
+The other half of the metrics-server decision above: metrics-server only
+gives current-instant values (`kubectl top`, OpenLens's Metrics API-backed
+bits), but OpenLens's own visual metrics — the "Cluster" dashboard's
+CPU/Memory graphs, and even the plain usage bars on the Nodes list — need a
+Prometheus it can run PromQL queries against, confirmed directly by OpenLens
+itself ("Metrics are not available due to missing or invalid Prometheus
+configuration"). Deployed as
+[`apps/kube-prometheus-stack/`](apps/kube-prometheus-stack/application.yaml),
+chart `kube-prometheus-stack` from `prometheus-community`.
+
+- **Grafana and Alertmanager both disabled.** Grafana: today's actual goal
+  is just feeding OpenLens, and the existing Compose-stack Grafana on the
+  16GB Pi already covers dashboarding until that workload migrates in (see
+  [`TODO.md`](../TODO.md#compose-workload-migration)). Alertmanager: no
+  notification receiver is wired up yet — would just be a standing idle pod
+  — revisit once something like `ntfy` actually lands in the cluster (see
+  [`TODO.md`](../TODO.md#alerting)).
+- **Namespace:** `monitoring`, breaking from this repo's usual one-app-one-
+  namespace convention — this is the ecosystem-standard name, and what
+  OpenLens's own "Prometheus Operator" auto-detect option looks for.
+- **Storage:** `hexos-iscsi` (already the cluster default StorageClass, with
+  `reclaimPolicy: Retain` — see [`democratic-csi`](apps/democratic-csi/application.yaml)),
+  10Gi, 10-day retention. Deliberately modest — no VictoriaMetrics
+  remote-write yet (see [`TODO.md`](../TODO.md#metrics-prometheus--timeseries-db)),
+  so this is a bridge, not the long-term store.
+- **Kubelet scrape TLS:** `insecureSkipVerify` is already the chart default
+  for the kubelet `ServiceMonitor` — same call already made for
+  metrics-server (self-signed per-node kubelet certs on Talos), nothing to
+  override.
+- **`serviceMonitorSelectorNilUsesHelmValues: false`** (and the Pod-
+  monitor/rule equivalents) — the chart defaults to `true`, which restricts
+  the operator to its own bundled ServiceMonitors. Set `false` for
+  cluster-wide discovery, so a future app's own ServiceMonitor gets picked
+  up automatically instead of silently ignored.
+- **node-exporter tolerations:** the chart's default tolerations are empty,
+  so its DaemonSet wouldn't otherwise run on the tainted control-plane
+  nodes — added an explicit toleration for full-cluster host metrics
+  coverage.
+- **No exposure needed.** OpenLens talks to Prometheus through the
+  Kubernetes API server's proxy subresource, the same path it uses for pod
+  logs/exec — no HTTPRoute/Gateway/Authelia route required just for
+  OpenLens to work. (A route for browsing the Prometheus UI directly is a
+  separate, optional later addition.)
 
 ## Bootstrap (one-time, manual)
 

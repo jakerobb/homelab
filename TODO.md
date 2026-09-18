@@ -190,14 +190,29 @@ about hardware pinning going in, not a final answer.
   than being "migrated" itself.
 
 ## Metrics (Prometheus + timeseries DB)
-**Live metrics done, historical not started.** `metrics-server`
+**Instant metrics and querying both done, remote-write not started.**
+`metrics-server`
 ([`argocd/README.md`](argocd/README.md#metrics-server-decided-and-deployed-2026-09-17))
-now covers *live* cluster/node/pod metrics — OpenLens's graphs and
-`kubectl top` both work off it. Still open: a real Prometheus (for
-richer/longer-lived metrics than metrics-server's no-history model) remote-
-writing to a proper timeseries database rather than relying on Prometheus's
-own short-lived local storage. VictoriaMetrics is the natural pairing given
-VictoriaLogs is already running on the 16GB Pi for logs (see below).
+covers the Kubernetes Metrics API (`kubectl top`). Turns out that alone
+wasn't enough for OpenLens's own graphs/usage bars — those are Prometheus-
+backed specifically, confirmed directly by OpenLens itself when it wasn't
+there yet — so `kube-prometheus-stack`
+([`argocd/README.md`](argocd/README.md#kube-prometheus-stack-decided-and-deployed-2026-09-17))
+was added too (Grafana and Alertmanager both off — see the "Alerting" item
+below for the latter). Still open: remote-writing to a proper timeseries
+database rather than relying on Prometheus's own short-lived (10-day) local
+storage. VictoriaMetrics is the natural pairing given VictoriaLogs is
+already running on the 16GB Pi for logs (see below).
+
+## Alerting
+**Not started.** `kube-prometheus-stack`'s Alertmanager is deliberately
+disabled for now (see
+[`argocd/README.md`](argocd/README.md#kube-prometheus-stack-decided-and-deployed-2026-09-17))
+since there's no notification receiver configured — an unconfigured
+Alertmanager would just be a standing idle pod. `ntfy` is already a
+migration candidate elsewhere in this doc and would be a natural receiver;
+revisit enabling Alertmanager once something like it actually lands in the
+cluster.
 
 ## Log aggregation
 **Not started.** Ship pod and node logs off-cluster to the existing
