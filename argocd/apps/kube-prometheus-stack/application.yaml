@@ -82,3 +82,15 @@ spec:
       prune: true
     syncOptions:
       - CreateNamespace=true
+    # Talos's cluster-wide PodSecurity default enforces `baseline` on every
+    # namespace except kube-system (confirmed via
+    # `talosctl get admissioncontrolconfig`) — node-exporter needs
+    # hostNetwork/hostPID/hostPath/hostPort, all blocked at `baseline`.
+    # First workload in this cluster to actually need host-level access, so
+    # nothing else has hit this default before. Overridden per-namespace
+    # here rather than touching the cluster-wide exemptions list.
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged
