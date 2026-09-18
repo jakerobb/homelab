@@ -83,12 +83,21 @@ spec:
     syncOptions:
       - CreateNamespace=true
       # prometheus-operator's CRDs (Prometheus, Alertmanager, etc.) have
-      # very large OpenAPI schemas — client-side apply's
-      # last-applied-configuration annotation blows past Kubernetes'
-      # 256KiB annotation limit for several of them. Server-side apply
-      # avoids that annotation entirely. Well-known upstream issue, not
-      # specific to this cluster.
+      # very large OpenAPI schemas — checked directly: the raw
+      # crd-prometheuses.yaml as shipped by the chart is 858KB, almost
+      # entirely `spec` (the schema itself); its own authored
+      # metadata.annotations is 80 bytes. client-side apply's
+      # last-applied-configuration annotation duplicates the *entire*
+      # manifest into a single annotation value, blowing past Kubernetes'
+      # 256KiB total-annotations limit for the 6 of 10 CRDs over that size.
+      # ServerSideApply=true alone did NOT fix this in this ArgoCD version
+      # (confirmed live — identical failure with it active) despite being
+      # the commonly-cited fix; Replace=true (kubectl replace/create
+      # instead of apply, no last-applied-config annotation computed at
+      # all) is what actually avoids it. Kept both — some CRDs in this set
+      # are small enough that plain apply semantics are still fine for them.
       - ServerSideApply=true
+      - Replace=true
     # Talos's cluster-wide PodSecurity default enforces `baseline` on every
     # namespace except kube-system (confirmed via
     # `talosctl get admissioncontrolconfig`) — node-exporter needs
