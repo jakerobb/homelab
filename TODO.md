@@ -190,11 +190,14 @@ about hardware pinning going in, not a final answer.
   than being "migrated" itself.
 
 ## Metrics (Prometheus + timeseries DB)
-**Not started.** Cluster/node/pod metrics — specifically so OpenLens's
-graphs and stats actually populate — plus remote-writing them to a proper
-timeseries database rather than relying on Prometheus's own short-lived
-local storage. VictoriaMetrics is the natural pairing given VictoriaLogs is
-already running on the 16GB Pi for logs (see below).
+**Live metrics done, historical not started.** `metrics-server`
+([`argocd/README.md`](argocd/README.md#metrics-server-decided-and-deployed-2026-09-17))
+now covers *live* cluster/node/pod metrics — OpenLens's graphs and
+`kubectl top` both work off it. Still open: a real Prometheus (for
+richer/longer-lived metrics than metrics-server's no-history model) remote-
+writing to a proper timeseries database rather than relying on Prometheus's
+own short-lived local storage. VictoriaMetrics is the natural pairing given
+VictoriaLogs is already running on the 16GB Pi for logs (see below).
 
 ## Log aggregation
 **Not started.** Ship pod and node logs off-cluster to the existing

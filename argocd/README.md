@@ -333,6 +333,39 @@ Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
   (`managerFilePatterns` itself replaced the older `fileMatch` at some point)
   or if it isn't picking up files you expected it to.
 
+## metrics-server (decided and deployed 2026-09-17)
+
+Cluster/node/pod live resource metrics — specifically so OpenLens's graphs
+and `kubectl top` populate. Deployed as
+[`apps/metrics-server/`](apps/metrics-server/application.yaml), same
+external-Helm-chart pattern as `cert-manager`/`external-dns`. This only
+covers *live* metrics (metrics-server keeps no history); the historical/
+Prometheus half of [`TODO.md`](../TODO.md#metrics-prometheus--timeseries-db)
+is still open.
+
+- **`--kubelet-insecure-tls` set deliberately.** Talos's kubelet serving
+  certs are self-signed per-node, not signed by the cluster CA (confirmed via
+  `openssl s_client` against a control-plane node's :10250 — issuer is a
+  per-node `talos-cp-N-ca`, not the cluster CA), so metrics-server can't
+  verify them out of the box. The "proper" fix — `rotate-server-certificates`
+  in Talos's kubelet config plus a CSR auto-approver
+  ([`kubelet-csr-approver`](https://github.com/postfinance/kubelet-csr-approver),
+  since Kubernetes doesn't auto-approve `kubelet-serving` CSRs) — was
+  considered and skipped: that's a standing 2-replica controller
+  (~128Mi/200m requested continuously, and its chart's default toleration
+  would let it land on the control-plane nodes, which are the tighter of the
+  two node classes at ~2.3-2.5Gi available on these 4GB Pi 5s) to approve on
+  the order of 5 CSRs/year. TLS is still encrypted either way —
+  `--kubelet-insecure-tls` only skips chain/hostname verification, a
+  non-issue on this cluster's private LAN. Worth reconsidering only if
+  another kubelet-scraping workload shows up that can't tolerate insecure
+  TLS (most, like a future Prometheus's kubelet `ServiceMonitor`, ship
+  `insecureSkipVerify: true` by default for exactly this reason) or if
+  multiple such consumers make the standing approver cost worth it.
+- **Namespace:** own `metrics-server` namespace (`CreateNamespace=true`),
+  consistent with `cert-manager`/`external-dns`/etc. rather than
+  `kube-system`.
+
 ## Bootstrap (one-time, manual)
 
 From a machine with `helm`/`kubectl` pointed at the cluster

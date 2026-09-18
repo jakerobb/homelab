@@ -1,0 +1,36 @@
+# --kubelet-insecure-tls: Talos's kubelet serving certs are self-signed
+# per-node (not signed by the cluster CA), so metrics-server can't verify
+# them by default. The "proper" fix is enabling kubelet server cert rotation
+# plus a CSR auto-approver (kubelet-csr-approver) so kubelet gets a
+# cluster-CA-signed cert — skipped for now: that's a standing 2-replica
+# controller (~128Mi/200m requested continuously) to approve a handful of
+# CSRs a year, on Pi-class nodes that aren't swimming in headroom. TLS is
+# still encrypted either way; this only skips chain/hostname verification,
+# which is a non-issue on the private LAN this cluster runs on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    chart: metrics-server
+    targetRevision: 3.14.0
+    helm:
+      releaseName: metrics-server
+      valuesObject:
+        # See revisionHistoryLimit policy in argocd/README.md.
+        revisionHistoryLimit: 2
+        args:
+          - --kubelet-insecure-tls
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metrics-server
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
