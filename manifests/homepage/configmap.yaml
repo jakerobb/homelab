@@ -184,6 +184,20 @@ data:
   #
   # Open-Meteo needs no API key/account (gethomepage.dev/widgets/info/openmeteo/).
   # Coordinates for zip 48864 (Okemos, MI).
+  #
+  # Search box: `custom` provider pointed at our own SearXNG
+  # (argocd/apps/searxng/) instead of duckduckgo — SearXNG's own
+  # `/search?q=` endpoint takes the same query-param shape any of the
+  # built-in providers use. This is a plain browser navigation (target:
+  # _blank), not an XHR, so the existing Authelia SSO session cookie
+  # (domain: 'jakerobb.org', see argocd/apps/authelia/application.yaml)
+  # covers it with no extra login. Deliberately not setting
+  # showSearchSuggestions/suggestionUrl: that's a same-origin XHR fetch from
+  # home.jakerobb.org to search.jakerobb.org, which would need both CORS
+  # headers on SearXNG (doesn't send any by default) and
+  # `credentials: include` support from Homepage's own fetch call to carry
+  # the SSO cookie cross-subdomain — not worth the complexity for
+  # autocomplete alone.
   widgets.yaml: |
     - openmeteo:
         label: Okemos, MI
@@ -193,7 +207,8 @@ data:
         units: imperial
         cache: 5
     - search:
-        provider: duckduckgo
+        provider: custom
+        url: https://search.jakerobb.org/search?q=
         target: _blank
 
   bookmarks.yaml: ""
