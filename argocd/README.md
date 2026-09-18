@@ -466,7 +466,7 @@ From a machine with `helm`/`kubectl` pointed at the cluster
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
 helm install argocd argo/argo-cd \
-  --version 10.9.1 \
+  --version 10.9.2 \
   --namespace argocd --create-namespace \
   -f argocd/install/values.yaml
 kubectl apply -f argocd/bootstrap/root-app.yaml
