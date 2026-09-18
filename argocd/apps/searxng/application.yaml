@@ -1,0 +1,21 @@
+# Own Application rather than raw manifests under root — isolates searxng's
+# sync/health status, same reasoning as homepage's own Application. See
+# argocd/README.md's app-of-apps section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: searxng
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/searxng
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: searxng
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true

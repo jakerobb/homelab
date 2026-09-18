@@ -132,6 +132,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'home.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'search.jakerobb.org'
+                policy: 'two_factor'
 
           identity_providers:
             oidc:

@@ -135,7 +135,9 @@ it. Assumes Authelia's `ext-authz` authz endpoint works with zero explicit
 `server.endpoints.authz` config (per Authelia's docs and a working reference
 elsewhere) — if that assumption's wrong, that's the first thing to check.
 Once confirmed, add the same filter to each other protected app's
-`HTTPRoute` as it migrates.
+`HTTPRoute` as it migrates. Second use added 2026-09-18 for the new
+`argocd/apps/searxng/` app (same filter/`access_control`/`ReferenceGrant`
+pattern) — also not yet confirmed live post-sync.
 
 ## Compose workload migration
 **Not started.** Move each service off the RPi5 16GB's Docker Compose stack
