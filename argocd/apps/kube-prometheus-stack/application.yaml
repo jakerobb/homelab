@@ -82,6 +82,13 @@ spec:
       prune: true
     syncOptions:
       - CreateNamespace=true
+      # prometheus-operator's CRDs (Prometheus, Alertmanager, etc.) have
+      # very large OpenAPI schemas — client-side apply's
+      # last-applied-configuration annotation blows past Kubernetes'
+      # 256KiB annotation limit for several of them. Server-side apply
+      # avoids that annotation entirely. Well-known upstream issue, not
+      # specific to this cluster.
+      - ServerSideApply=true
     # Talos's cluster-wide PodSecurity default enforces `baseline` on every
     # namespace except kube-system (confirmed via
     # `talosctl get admissioncontrolconfig`) — node-exporter needs
