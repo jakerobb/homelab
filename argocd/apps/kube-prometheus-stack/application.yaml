@@ -17,6 +17,17 @@
 # Namespace is `monitoring`, not a per-app namespace like the rest of
 # apps/ — this is the ecosystem-standard name and what OpenLens's own
 # "Prometheus Operator" auto-detect option looks for.
+#
+# crds.enabled: false — this chart's CRDs (Prometheus, Alertmanager, etc.)
+# are installed manually, out-of-band, once (see argocd/README.md's
+# kube-prometheus-stack section for the one-time step and why: 6 of the 10
+# are 600-860KB as authored, and ArgoCD's diffing pipeline can't apply
+# anything that size — confirmed neither ServerSideApply=true nor
+# Replace=true sync options avoid it, while a plain `kubectl create`
+# outside ArgoCD entirely works instantly). Matches Helm's own general
+# convention of not touching CRDs on upgrade anyway. Consequence: bumping
+# targetRevision needs a manual CRD re-apply if that release changed any
+# CRD schemas — check the chart's release notes.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -31,6 +42,8 @@ spec:
     helm:
       releaseName: kube-prometheus-stack
       valuesObject:
+        crds:
+          enabled: false
         grafana:
           enabled: false
         alertmanager:
@@ -82,22 +95,10 @@ spec:
       prune: true
     syncOptions:
       - CreateNamespace=true
-      # prometheus-operator's CRDs (Prometheus, Alertmanager, etc.) have
-      # very large OpenAPI schemas — checked directly: the raw
-      # crd-prometheuses.yaml as shipped by the chart is 858KB, almost
-      # entirely `spec` (the schema itself); its own authored
-      # metadata.annotations is 80 bytes. client-side apply's
-      # last-applied-configuration annotation duplicates the *entire*
-      # manifest into a single annotation value, blowing past Kubernetes'
-      # 256KiB total-annotations limit for the 6 of 10 CRDs over that size.
-      # ServerSideApply=true alone did NOT fix this in this ArgoCD version
-      # (confirmed live — identical failure with it active) despite being
-      # the commonly-cited fix; Replace=true (kubectl replace/create
-      # instead of apply, no last-applied-config annotation computed at
-      # all) is what actually avoids it. Kept both — some CRDs in this set
-      # are small enough that plain apply semantics are still fine for them.
+      # Harmless, sensible default for the resources ArgoCD does manage
+      # here now that CRDs are out of its hands (see crds.enabled above) —
+      # not load-bearing for any specific known issue.
       - ServerSideApply=true
-      - Replace=true
     # Talos's cluster-wide PodSecurity default enforces `baseline` on every
     # namespace except kube-system (confirmed via
     # `talosctl get admissioncontrolconfig`) — node-exporter needs

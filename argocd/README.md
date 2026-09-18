@@ -413,6 +413,48 @@ chart `kube-prometheus-stack` from `prometheus-community`.
   logs/exec — no HTTPRoute/Gateway/Authelia route required just for
   OpenLens to work. (A route for browsing the Prometheus UI directly is a
   separate, optional later addition.)
+- **`monitoring` namespace gets a PodSecurity `privileged` override**
+  (`syncPolicy.managedNamespaceMetadata.labels`). Talos's cluster-wide
+  `PodSecurity` admission default enforces `baseline` on every namespace
+  except `kube-system` (confirmed via `talosctl get admissioncontrolconfig`
+  — this is a Talos default, not something this repo configured), which
+  blocks node-exporter's `hostNetwork`/`hostPID`/`hostPath`/`hostPort`
+  needs outright. First workload in this cluster to actually need
+  host-level access, so nothing else had hit this default before.
+  Overridden per-namespace rather than touching the cluster-wide
+  exemptions list.
+- **`crds.enabled: false` — this chart's CRDs are installed manually,
+  out-of-band, once** (see "kube-prometheus-stack CRDs" below), same
+  one-time-step pattern as the Cloudflare tokens/Authelia secrets above.
+  6 of the 10 CRDs (`Prometheus`, `Alertmanager`, `AlertmanagerConfig`,
+  `ScrapeConfig`, `PrometheusAgent`, `ThanosRuler`) are 600-860KB as
+  authored — almost entirely their OpenAPI schema, not
+  `metadata.annotations` (checked directly: `crd-prometheuses.yaml`'s own
+  authored annotations are 80 bytes). ArgoCD's diffing pipeline duplicates
+  the *entire* manifest into a `metadata.annotations` value somewhere in
+  that process and hits Kubernetes' 256KiB total-annotations limit —
+  confirmed neither `ServerSideApply=true` nor `Replace=true` sync options
+  avoid this (tried both, identical failure each time), while a plain
+  `kubectl create` outside ArgoCD entirely works instantly. Matches Helm's
+  own general convention of not touching CRDs on upgrade anyway.
+  **Consequence: bumping `targetRevision` needs a manual CRD re-apply if
+  that release changed any CRD schemas** — check the chart's release notes,
+  and re-run the step below against the new chart version if so.
+
+### kube-prometheus-stack CRDs (one-time, manual, and again on any CRD-affecting upgrade)
+
+```bash
+export KUBECONFIG=~/.kube/config
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update prometheus-community
+helm pull prometheus-community/kube-prometheus-stack --version 91.4.1 --untar --untardir /tmp/kps-chart
+kubectl create -f /tmp/kps-chart/kube-prometheus-stack/charts/crds/crds/
+```
+
+(`kubectl create`, not `apply` — same reasoning as above. If a CRD already
+exists this errors harmlessly on that one; re-run per-file with `kubectl
+replace -f` for just the changed ones on an upgrade instead of blanket
+re-creating.)
 
 ## Bootstrap (one-time, manual)
 
