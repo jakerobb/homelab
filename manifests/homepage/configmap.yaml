@@ -228,7 +228,42 @@ data:
   # .service-title, which should shrink-wrap, not stretch) would otherwise
   # also shrink the pills row to its own content width instead of spanning
   # full tile width like Jake wants.
+  # Theme-aware overrides (2026-09-18): Homepage toggles a literal `light`/
+  # `dark` class on <html> (src/utils/contexts/theme.jsx, persisted in
+  # localStorage) — not a media query, and not the --color-N variables in
+  # its own theme.css (those vary by color-theme selection like
+  # slate/gray/white, a separate setting; light/dark there is baked into
+  # which Tailwind dark: class each component uses at build time, not a
+  # variable we can hook into). So: structural rules (size/layout) stay
+  # unscoped since they're the same either way; only color declarations are
+  # split into html.light/html.dark blocks. Dark-mode colors below are a
+  # first guess (can't render-check them myself) — tune freely.
   custom.css: |
+    .container {
+      border-width: 1px;
+      border-radius: 16px;
+      margin: 10px auto;
+    }
+    html.light .container {
+      background-color: #FCFCFC;
+    }
+    html.dark .container {
+      background-color: #11111A;
+    }
+
+    html.light #tabs ul {
+      background-color: #EAF2FF;
+      border-width: 1px;
+    }
+    
+    html.light #tabs button[aria-selected="true"] {
+      background-color: #C8E1FF;
+    }
+    
+    #tabs button[aria-selected="true"] {
+      font-weight: bold;
+    }
+    
     /* Overrides the <ul class="services-list"> Homepage renders per group
        (src/components/services/list.jsx) — normally either a fixed
        `grid grid-cols-N` (layout.style: row + columns: N) or a plain
@@ -249,6 +284,15 @@ data:
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
+      border-width: 1px;
+    }
+    html.light .service-card {
+      border-color: #2A2F44;
+      background-color: #F5FAFF;
+    }
+    html.dark .service-card {
+      border-color: #2A3F55;
+      background-color: #11192A;
     }
     .service-title {
       flex-direction: column !important;
