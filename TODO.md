@@ -23,7 +23,9 @@ Talos worker VMs to the existing Pi control plane via Terraform
 (`terraform/proxmox/talos-worker.tf`) — pivoting from BGP to Cilium L2
 announcements along the way after an unresolved UCG Fiber routing bug (see
 "Ingress" below) — then built the HexOS VM with both new NVMes passed
-through via PCIe and a striped ~6TB pool with NFS/SMB shares (runbook:
+through via PCIe and a ~4TB pool (P3 Plus, with the T500 ending up as a
+dedicated ZFS log device rather than striped capacity) with NFS/SMB shares
+(runbook:
 [`docs/hexos-install.md`](docs/hexos-install.md)). Both loose ends from
 that checklist are tracked below rather than here: restoring the P3 Plus
 data from B2 (see "HexOS storage") and the mail-alerting queue gap found
@@ -49,7 +51,9 @@ testing before relying on it in a real incident.
 
 ## HexOS storage
 **Core work done — started 2026-09-13, iSCSI path completed 2026-09-15.**
-Pool (`data`, striped, ~6TB usable) created, iSCSI service enabled with a
+Pool (`data`, ~4TB usable — the T500 ended up as a dedicated ZFS log device
+rather than striped capacity, see [`docs/hexos-install.md`](docs/hexos-install.md#6-pool--share-setup-gui-only-hexos))
+created, iSCSI service enabled with a
 Portal + Initiator Group configured. Both Talos workers upgraded in place
 (`talosctl upgrade`) to a schematic with the `siderolabs/iscsi-tools`
 extension, plus a `kubelet.extraMounts` patch for `/etc/iscsi`/`/var/lib/iscsi`
@@ -74,12 +78,16 @@ silently never answered ARP — see
 [`talos/README.md`](talos/README.md#ingress-gateway-api-decided-and-deployed-2026-09-13)
 (gotcha entry, 2026-09-15).
 
-**In progress (2026-09-18):** restoring the P3 Plus data from B2 (see
-"Hardware migration" above) — `rsync` is copying the archived data back to
-HexOS now. Still to do once that finishes: verify restored data integrity,
-then keep the B2 backup itself for a few extra weeks after that as
-insurance against early failure of the new non-redundant (unless AnyRaid)
-pool, rather than deleting it the moment the pool checks out.
+**P3 Plus data restored from B2 and verified (2026-09-20).** Mounted the
+`data/shared` NFS export (see [`docs/hexos-install.md`](docs/hexos-install.md#6-pool--share-setup-gui-only-hexos))
+on the Intel MacBook Pro and ran `rclone copy p3plus-b2:p3plus-archive-temp`
+down onto it (~14h50m for 1.33TiB/318821 files — mostly small Photos Library
+files, which dominate transfer time far more than raw bandwidth). `rclone
+check` afterward: 0 differences, 318821 matching files. Only remaining step
+is time-based, not active work: keep the B2 bucket a few more weeks (through
+roughly mid-October 2026) as insurance against early failure of the new
+non-redundant (unless AnyRaid) pool before deleting it, rather than deleting
+it the moment the pool checks out.
 
 The earlier idea of moving InfluxDB's datastore onto `hexos-iscsi` is now
 moot — the Compose observability stack (InfluxDB included) isn't being

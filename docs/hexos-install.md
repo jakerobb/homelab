@@ -170,9 +170,12 @@ Cosmetic only.
 - [x] Create the pool: stripe across both drives (6TB usable, no redundancy) —
       unless HexOS's ZFS AnyRaid has shipped by now, in which case use that
       instead for flexible-capacity redundancy (see root README step 5 notes
-      on why plain mirror is out). Done as `data`, striped, ~4TB usable; also
-      hosts `data/k8s-iscsi` for the cluster's `democratic-csi` StorageClass
-      (see [`TODO.md`](../TODO.md#hexos-storage)).
+      on why plain mirror is out). **Didn't work out as planned:** HexOS put
+      the T500 (2TB) to use as a dedicated ZFS log (SLOG) device rather than
+      striping it into the pool's capacity, so `data` is really a single vdev
+      on the P3 Plus (4TB) plus that log device, not a 6TB stripe — actual
+      usable space is ~4TB. Also hosts `data/k8s-iscsi` for the cluster's
+      `democratic-csi` StorageClass (see [`TODO.md`](../TODO.md#hexos-storage)).
 - [x] Set up an NFS or SMB share, test from another device on the network.
       Done 2026-09-18: new dataset `data/shared` (Generic preset, so both
       protocols share consistent permissions on the same files). NFS export
@@ -181,9 +184,25 @@ Cosmetic only.
       `shared` on the same path, backed by a dedicated local TrueNAS user
       (not the admin account). Verified with a real mount
       (`mount -t nfs -o vers=4 truenas.lan:/mnt/data/shared`) from rpi5-1.
-- [ ] Once the pool is confirmed healthy, `rclone copy` the archived data back
-      down from B2.
-- [ ] Verify restored data integrity. Keep the B2 backup for a few extra weeks
+      Dataset ACL needed a manual fix: the initial "Generic" preset didn't
+      grant write to the SMB user (owner was `root:root`); applying the
+      built-in **POSIX_OPEN** preset ACL (rwx for owner/group/other, both
+      access and default entries) resolved it in one shot — trying to hand-add
+      a single named-user ACE hit POSIX.1e's completeness rules (a named
+      entry requires a default mask entry, and any default entries require
+      the full default USER_OBJ/GROUP_OBJ/OTHER set too). **macOS gotcha:**
+      NFSv4 mounts fail from macOS against this share with a bare
+      `Operation not permitted` (both Terminal and Finder, managed and
+      unmanaged Macs alike, Full Disk Access notwithstanding) — a known
+      macOS-NFSv4-client vs. Linux-`nfs-kernel-server` interop issue. Force
+      NFSv3 from any Mac client instead: `mount -t nfs -o vers=3,resvport
+      truenas.lan:/mnt/data/shared <mountpoint>`.
+- [x] Once the pool is confirmed healthy, `rclone copy` the archived data back
+      down from B2. Done 2026-09-20 from the Intel MacBook Pro, mounted over
+      NFSv3 onto `data/shared` — see [`TODO.md`](../TODO.md#hexos-storage)
+      for the full writeup (remote name, duration, file count).
+- [x] Verify restored data integrity. `rclone check` against the B2 remote:
+      0 differences, 318821 matching files. Keep the B2 backup for a few extra weeks
       as insurance against early failure of the new (non-redundant, unless
       AnyRaid) pool before deleting the bucket — don't delete immediately
       just because the pool checks out on day one.
