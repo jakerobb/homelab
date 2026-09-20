@@ -3,7 +3,7 @@
 heap config, and system memory -- run in two modes from cron:
 
   --window-hours 24                          (daily, always sends)
-  --window-hours 1 --min-full-gc-per-hour 200  (hourly, only sends if tripped)
+  --window-hours 1 --min-full-gc-per-hour 150  (hourly, only sends if tripped)
 
 Runs from rpi5-1, not the gateway itself, so the only thing that can break
 across a UniFi OS/Network app upgrade is the one authorized_keys line on the

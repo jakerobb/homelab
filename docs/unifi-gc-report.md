@@ -5,7 +5,7 @@ live JVM heap config, and system memory, run in two modes:
 
 - **Daily** (7am, always sends): 24h window, a routine digest.
 - **Hourly** (always runs, only sends if tripped): 1h window, emails
-  immediately if the Full GC rate exceeds 200/hour, so a regression is
+  immediately if the Full GC rate exceeds 150/hour, so a regression is
   caught same-day instead of waiting for the next daily digest.
 
 Background: see
@@ -100,7 +100,7 @@ else needs to change.
 ```
 MAILTO=jakerobb@gmail.com
 0 7 * * * /usr/bin/python3 /home/jakerobb/bin/unifi-gc-report.py --window-hours 24 >> /home/jakerobb/.unifi-gc-report.log 2>&1
-0 * * * * /usr/bin/python3 /home/jakerobb/bin/unifi-gc-report.py --window-hours 1 --min-full-gc-per-hour 200 >> /home/jakerobb/.unifi-gc-report.log 2>&1
+0 * * * * /usr/bin/python3 /home/jakerobb/bin/unifi-gc-report.py --window-hours 1 --min-full-gc-per-hour 150 >> /home/jakerobb/.unifi-gc-report.log 2>&1
 ```
 
 Unlike `etcd-snapshot-backup.sh` (silent on success, mails on failure via
@@ -117,13 +117,24 @@ out that cycle and the failure is only visible in the log, not by email.
 Acceptable for a non-critical diagnostic digest; revisit if that gap ever
 matters in practice.
 
-The 200/hour threshold is a judgment call, not a hard boundary: prior
-profiling put the stock/unlocked thrashing baseline at 47-73/hour and the
-locked-heap healthy steady state at 24-42/hour, so 200 is well above normal
-noise in either state but well below the ~332/hour seen right before the
-2026-09-18 hang -- meant to catch a building problem with room to spare
-before it gets that bad. Adjust the `--min-full-gc-per-hour` value in the
-crontab line if it turns out to be too sensitive or not sensitive enough.
+The threshold is a judgment call, not a hard boundary, and has already moved
+once: started at 200/hour (prior profiling put the stock/unlocked thrashing
+baseline at 47-73/hour and the locked-heap healthy steady state at
+24-42/hour, so 200 seemed well above normal noise in either state while
+staying well below the ~332/hour seen right before the 2026-09-18 hang).
+
+Lowered to **150/hour on 2026-09-20** after a real data point: the dashboard
+was noticeably slow (a single check took over a minute; ~3-4s to load
+afterward, still sluggish) while this box's current-process Full GC rate was
+~109-125/hour -- elevated well above the healthy 24-42/hour range, but under
+the original 200 threshold, so no alert fired despite a real, user-visible
+problem. `unifi-core` and CPU were otherwise healthy at the time (89% idle),
+pointing at GC pause frequency itself as the likely contributor. 150 sits
+just above that observed "degraded but not critical" band, still comfortably
+below the actual thrashing range. Adjust the `--min-full-gc-per-hour` value
+in the crontab line again if 150 turns out to be too sensitive (noisy false
+positives during normal operation) or not sensitive enough (another
+slow-dashboard episode that doesn't trip it).
 
 ## Testing / redeploying
 
@@ -138,7 +149,7 @@ ssh jakerobb@rpi5-1.lan "python3 ~/bin/unifi-gc-report.py --window-hours 24"
 ssh jakerobb@rpi5-1.lan "python3 ~/bin/unifi-gc-report.py --window-hours 1 --min-full-gc-per-hour 5"
 
 # Hourly alert mode at the real threshold -- should print "Skipped: ..." and not email, under normal conditions
-ssh jakerobb@rpi5-1.lan "python3 ~/bin/unifi-gc-report.py --window-hours 1 --min-full-gc-per-hour 200"
+ssh jakerobb@rpi5-1.lan "python3 ~/bin/unifi-gc-report.py --window-hours 1 --min-full-gc-per-hour 150"
 ```
 
 Verified end-to-end 2026-09-19: all three modes above run and behave as
