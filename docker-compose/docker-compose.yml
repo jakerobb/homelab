@@ -49,6 +49,14 @@ services:
       - ./homeassistant:/config
       - /run/dbus:/run/dbus:ro
       - ./resolv-host.conf:/etc/resolv.conf:ro
+    # Added directly on rpi5-1 at some point, never backfilled here until
+    # the docker-compose/ split-brain cleanup (2026-09-20) — found via a
+    # live diff against the deployed compose file. RPi5 GPIO UART, presumably
+    # for a serial-connected integration (not one of the standalone
+    # Zigbee2MQTT/Z-Wave JS UI containers, which own their own USB dongles).
+    devices:
+      - /dev/ttyAMA0
+      - /dev/serial0
 
   scrypted:
     <<: *dns

@@ -8,9 +8,80 @@ resolver, and metrics/logging stack.
 Many of these workloads are not hardware dependent, and movement to
 Kubernetes will happen as time permits.
 
-Deployed by copying this directory to `~/docker` on `rpi5-1` and running
-`docker compose up -d` from there. Not yet wired into any CI/CD — changes are
-made on the host and backfilled here, or edited here and copied over.
+Deployed from `~/docker` on `rpi5-1`, running `docker compose up -d` from
+there — not yet wired into any CI/CD. Not a copy of this directory anymore
+(see "Split-brain elimination" below): most config-time files under
+`~/docker/` are symlinks into `~/dev/homelab/docker-compose/` (a plain `git
+clone` of this repo, kept up to date with `git pull`), so editing here and
+pulling on the host *is* the deploy step for those files. A handful of files
+still can't be symlinked (Docker limitation, see below) and remain real
+copies needing a manual re-copy after editing here.
+
+## Split-brain elimination (2026-09-20)
+
+Previously: edit on the host and backfill here, or edit here and copy over
+by hand — exactly the ad-hoc process that let `caddy/Caddyfile` (a stale
+`jetkvm.jakerobb.org` route, dead for who knows how long — `jetkvm1.lan`
+doesn't even resolve anymore) and `docker-compose.yml` (a `/dev/ttyAMA0`/
+`/dev/serial0` device passthrough added to homeassistant directly on the
+host) silently drift out of the repo. Fixed with symlinks from `~/docker/`
+into a `~/dev/homelab` git checkout on rpi5-1 — one copy of the content,
+`git pull` is the only sync step needed, drift becomes structurally
+impossible instead of just easy to avoid.
+
+**Symlinked (works reliably):** `docker-compose.yml`, `caddy/Caddyfile`,
+`resolv.conf`, `resolv-host.conf`, `telegraf/` (whole dir),
+`nut-influx-relay/` (whole dir), `vector/vector.yaml`.
+
+**NOT symlinked — reverted to real (manually re-copied) files after a live
+test broke Home Assistant** (config unreadable inside the container within
+seconds of creating the symlink, caught and fixed before anything actually
+restarted and failed on it): `homeassistant/{configuration,automations,
+scenes,scripts}.yaml`, `homeassistant/blueprints/`,
+`homeassistant/lutron_caseta-*.pem`, `change-detection/url-watches.json`,
+`unbound/custom.conf.d/local.conf`, `grafana-provisioning/`,
+`modbus-programs/`, `mosquitto/config/`.
+
+**Why those specifically fail** — two distinct Docker bind-mount behaviors,
+confirmed live against this stack, not just theory:
+1. A symlinked **file** as a bind-mount source works, whether it's the
+   direct source (`caddy/Caddyfile`) or reached through a symlinked parent
+   *directory* in the path (`telegraf/telegraf.conf`,
+   `nut-influx-relay/config.yaml`) — Docker resolves the full host path,
+   including any symlinks, before creating the mount.
+2. A symlinked **directory** used as the bind-mount source itself does
+   *not* get resolved the same way (`grafana-provisioning`,
+   `mosquitto/config` — confirmed via a from-scratch container restart:
+   `cat` inside the container returned `No such file or directory` even
+   though the symlink itself was intact and pointed somewhere real).
+   Similarly, a symlink for a single file *nested inside* an
+   already-real, whole-directory bind mount (`./homeassistant:/config`,
+   `./change-detection:/datastore`) is invisible from inside the
+   container — its mount namespace only has whatever was actually mounted,
+   not arbitrary other host paths a symlink happens to point at.
+
+Fixing these properly needs Docker's actual supported mechanism for this —
+an explicit extra bind-mount line per file, layered on top of the existing
+directory mount (e.g. `./homeassistant/configuration.yaml:/config/configuration.yaml`
+*in addition to* `./homeassistant:/config`) — which is a real edit to
+`docker-compose.yml`'s volumes, not just a host-side symlink, and wasn't
+made without discussing it first given the Home Assistant near-miss above.
+These files stay split-brain (manual re-copy after editing) until that's
+decided.
+
+**One general gotcha, hit repeatedly during this migration:** a container
+that was already running when its bind-mount source changed on the host
+(symlink created, or reverted back to a real file/dir) keeps serving
+whatever it resolved at its *own* start time — Linux bind-mounts a specific
+filesystem object, not a path that's continuously re-resolved. `docker
+compose up -d` only recreates a container if the *compose file* content
+changed; it does **not** notice a bind-mount source changing type on disk.
+A container whose mount source was directly replaced (not just a file
+*within* an unchanged directory) needs an explicit restart
+(`docker compose restart <service>`) to pick it up — confirmed necessary
+for `grafana`, `mosquitto`, `unbound`, `modbus-controller`, and `caddy`
+(which also needed it for its own separate reason: Caddy only re-reads
+`Caddyfile` on an explicit reload/restart, never continuously).
 
 ## What's captured vs. excluded
 
@@ -43,7 +114,16 @@ and database files are **not** committed — they're excluded the same way
   and is the only hand-authored part), `data/`, `logs/`, `ssh-keys/` (the
   network-optimizer container's SQLite db, PDFs, and license — `ssh-keys/`
   is currently empty).
-- `nut-conf/` — empty on the host (0600, no files); nothing to capture.
+- `nut-conf/` — genuinely empty (confirmed 2026-09-20, permissions had
+  drifted to unreadable — fixed to `u+x`), and unreferenced by anything: the
+  `nut-upsd` container generates its real `/etc/nut/ups.conf` itself
+  (`instantlinux/nut-upsd`'s own entrypoint, from env vars), not from this
+  bind mount. `nut-conf-office/ups.conf`, tracked below in this same repo,
+  is consequently **orphaned** — not mounted by any service in
+  `docker-compose.yml`, doesn't correspond to `nut-conf/` despite the
+  similar name. Left in place rather than deleted, since removing it wasn't
+  asked for and it's possible it predates the current image's
+  auto-generation behavior and has some other purpose not yet understood.
 - `caddy/Caddyfile.bak` — a stale backup, superseded by `Caddyfile`.
 
 ## Secrets
