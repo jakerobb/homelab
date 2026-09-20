@@ -202,7 +202,13 @@ Cosmetic only.
       NFSv3 onto `data/shared` — see [`TODO.md`](../TODO.md#hexos-storage)
       for the full writeup (remote name, duration, file count).
 - [x] Verify restored data integrity. `rclone check` against the B2 remote:
-      0 differences, 318821 matching files. Keep the B2 backup for a few extra weeks
+      0 differences, 318821 matching files. Confirmed 2026-09-20 via the
+      TrueNAS API: a weekly scrub is already scheduled by default (Sundays
+      00:00, 7-day threshold) — no gap there. Per-disk SMART self-test
+      scheduling doesn't apply here: both real disks are NVMe, which doesn't
+      use the classic ATA SMART self-test framework `smartd` manages (that's
+      SATA/SAS-only); NVMe health is polled natively by TrueNAS's middleware
+      instead. Keep the B2 backup for a few extra weeks
       as insurance against early failure of the new (non-redundant, unless
       AnyRaid) pool before deleting the bucket — don't delete immediately
       just because the pool checks out on day one.
