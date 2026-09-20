@@ -83,11 +83,7 @@ silently never answered ARP — see
 on the Intel MacBook Pro and ran `rclone copy p3plus-b2:p3plus-archive-temp`
 down onto it (~14h50m for 1.33TiB/318821 files — mostly small Photos Library
 files, which dominate transfer time far more than raw bandwidth). `rclone
-check` afterward: 0 differences, 318821 matching files. Only remaining step
-is time-based, not active work: keep the B2 bucket a few more weeks (through
-roughly mid-October 2026) as insurance against early failure of the new
-non-redundant (unless AnyRaid) pool before deleting it, rather than deleting
-it the moment the pool checks out.
+check` afterward: 0 differences, 318821 matching files.
 
 The earlier idea of moving InfluxDB's datastore onto `hexos-iscsi` is now
 moot — the Compose observability stack (InfluxDB included) isn't being
@@ -129,24 +125,6 @@ under ArgoCD's `prune: true`, so its reclaim policy was deliberately set to
 - Add an `access_control` rule (and, per-app, either native OIDC or Cilium's
   `ExternalAuth` filter — see "Gateway API forward-auth" below) as each
   Compose workload below actually migrates into the cluster.
-- Currently only local admin + Authelia; no group/role mapping into ArgoCD
-  RBAC (`argocd-rbac-cm`) — anyone who authenticates via Authelia gets
-  whatever ArgoCD's default policy grants. Worth revisiting once there's
-  more than one Authelia user.
-
-## Cilium: drop the upgradeCompatibility flag
-**Not started.** `talos/cilium/values.yaml` sets `upgradeCompatibility: "1.19"`,
-added 2026-09-16 so ArgoCD's render of the `cilium` Application matched the
-one-time `--set upgradeCompatibility=1.19` flag used on the manual 1.19→1.20
-`helm upgrade` the day before (2026-09-15, see
-[`talos/README.md`](talos/README.md#cilium-upgrade-119120-2026-09-15)). Keeps
-`envoy-xds-mode` unset (agent's legacy-safe default) instead of the chart's
-new 1.20+ default of `"ads"`. Once 1.20.1 has been running stable for a
-while, remove the key from `cilium/values.yaml` and Sync (see
-[`argocd/apps/cilium/`](argocd/apps/cilium/application.yaml)) — plain
-no-op-except-for-that-one-key change. Verify with
-[`talos/cilium/validate.sh`](talos/cilium/validate.sh) afterward, same as
-any other Cilium sync.
 
 ## Gateway API forward-auth (Cilium ExternalAuth filter)
 **First use wired up 2026-09-15, not yet verified live.** Cilium added a
@@ -265,9 +243,7 @@ routed through the `ntfy-alertmanager` bridge to `ntfy`'s `homelab-alerts`
 topic — see
 [`argocd/README.md`](argocd/README.md#kube-prometheus-stack-decided-and-deployed-2026-09-17).
 Only `severity` is mapped to ntfy priority/tags today
-([`manifests/ntfy-alertmanager/configmap.yaml`](manifests/ntfy-alertmanager/configmap.yaml))
-— worth revisiting with more label-based routing (e.g. per-namespace
-topics) once there's a better sense of real alert volume/noise.
+([`manifests/ntfy-alertmanager/configmap.yaml`](manifests/ntfy-alertmanager/configmap.yaml)).
 
 ## rpi5-1 mail-alert reliability (msmtpq)
 **Not started**, merged in from README.md's checklist (2026-09-18). The
@@ -290,18 +266,6 @@ being reachable via `kubectl logs` per-pod. Homepage
 revisiting every new app's logging config once a collector (Vector, most
 likely, since it's already what feeds VictoriaLogs on the Pi side per the
 Compose migration notes above) is actually running in-cluster.
-
-## TrueNAS REST API deprecation (affects Homepage's HexOS/TrueNAS widget)
-**Not started, found 2026-09-20** while checking the `data` pool's scrub/SMART
-config. TrueNAS's own Alerts list a `RESTAPIUsage` warning: the REST API
-(what Homepage's `truenas` widget authenticates against, see
-[`argocd/apps/homepage/`](argocd/apps/homepage/)) is deprecated and will be
-**removed in HexOS/TrueNAS v26.04**, in favor of the JSON-RPC 2.0/WebSocket
-API. Not urgent — HexOS isn't currently on that version — but will silently
-break the widget whenever it does eventually update. Homepage's own
-`truenas` widget type would need to support the new API (check for a
-Homepage update that does before upgrading HexOS past 26.04), or the widget
-gets dropped/replaced at that point.
 
 ## Homepage dashboard widgets
 **Done (2026-09-18).** Weather (Open-Meteo), Proxmox host CPU/mem, HexOS/TrueNAS
