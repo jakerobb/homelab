@@ -1,0 +1,28 @@
+# Own Application rather than raw manifests under root — isolates
+# ntfy-alertmanager's sync/health status, same reasoning as homepage's own
+# Application. See argocd/README.md's app-of-apps section.
+#
+# Targets the existing `monitoring` namespace (alongside kube-prometheus-stack
+# — this only exists to serve that stack's Alertmanager) rather than its own:
+# no namespace.yaml here and no CreateNamespace=true, since
+# argocd/apps/kube-prometheus-stack/application.yaml already owns creating
+# that namespace and two Applications both managing the same Namespace
+# object would be an ownership conflict.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ntfy-alertmanager
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/ntfy-alertmanager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true

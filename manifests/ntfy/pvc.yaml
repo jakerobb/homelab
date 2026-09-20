@@ -1,0 +1,17 @@
+# Persists the message cache (recent notifications, for offline
+# clients/replay) across pod restarts — small and short-lived by design
+# (ntfy's default cache-duration is 12h), but losing it on every reschedule
+# would mean Alertmanager/watchdog notifications silently disappear from
+# subscribed clients' history. 1Gi is generous headroom over the
+# pre-migration cache.db (258KB at time of migration).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ntfy-cache
+  namespace: ntfy
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

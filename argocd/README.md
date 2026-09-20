@@ -380,13 +380,50 @@ configuration"). Deployed as
 [`apps/kube-prometheus-stack/`](apps/kube-prometheus-stack/application.yaml),
 chart `kube-prometheus-stack` from `prometheus-community`.
 
-- **Grafana and Alertmanager both disabled.** Grafana: today's actual goal
-  is just feeding OpenLens, and the existing Compose-stack Grafana on the
-  16GB Pi already covers dashboarding until that workload migrates in (see
-  [`TODO.md`](../TODO.md#compose-workload-migration)). Alertmanager: no
-  notification receiver is wired up yet — would just be a standing idle pod
-  — revisit once something like `ntfy` actually lands in the cluster (see
-  [`TODO.md`](../TODO.md#alerting)).
+- **Grafana still disabled.** Today's actual goal is just feeding OpenLens,
+  and the existing Compose-stack Grafana on the 16GB Pi already covers
+  dashboarding until that workload migrates in (see
+  [`TODO.md`](../TODO.md#compose-workload-migration)).
+- **Alertmanager enabled 2026-09-20** (was disabled at initial deploy — no
+  notification receiver was wired up yet, see git history for this section's
+  original wording). Surfaced by a scheduled health check: Prometheus had
+  real alerts firing silently for ~2 days (`TargetDown`/
+  `KubeSchedulerInstanceUnreachable`/`KubeControllerManagerInstanceUnreachable`
+  — see the metrics-bind-address fix in
+  [`talos/README.md`](../talos/README.md#kube-scheduler--kube-controller-manager-metrics-bind-address-fixed-2026-09-20)
+  for that one's own root cause) with nowhere to send them, confirmed by
+  Prometheus's own `PrometheusNotConnectedToAlertmanagers` alert. Once
+  [`ntfy`](apps/ntfy/application.yaml) actually landed in the cluster (see
+  its own section below), the original blocker was gone.
+  - **Routes through [`ntfy-alertmanager`](apps/ntfy-alertmanager/application.yaml),
+    not a raw webhook straight to ntfy** — Alertmanager's `webhook_configs`
+    always POSTs its own fixed JSON schema with no templating support, and
+    ntfy's publish endpoint expects its own different JSON shape (or a
+    plain-text body); pointed directly at each other, ntfy would just reject
+    Alertmanager's payload. `ntfy-alertmanager` (xenrox, see
+    [source](https://git.xenrox.net/~xenrox/ntfy-alertmanager)) is a small,
+    purpose-built bridge for exactly this — maps alert labels
+    (`severity` today) to ntfy priority/tags via its `scfg` config
+    ([`manifests/ntfy-alertmanager/configmap.yaml`](../manifests/ntfy-alertmanager/configmap.yaml)).
+    Publishes to ntfy's `homelab-alerts` topic — subscribe to
+    `https://ntfy.jakerobb.org/homelab-alerts` (web/app) to actually receive
+    these.
+  - **Single replica, no HA gossip, 4h `repeat_interval`** — this is a
+    best-effort home-notification path, not a paged on-call system; no need
+    for Alertmanager's usual multi-replica dedup/gossip setup.
+  - **`Watchdog` routed to a `null` receiver**, not dropped as a rule — it's
+    the chart's always-firing canary alert (proves the Prometheus→
+    Alertmanager pipeline itself is alive), which would otherwise re-notify
+    every `repeat_interval` forever. Routing to `null` keeps it visible in
+    the Prometheus/Alertmanager UI for a manual check without spamming a
+    notification for it.
+  - **`KubeProxyDown`/the whole `kubeProxy` rule group disabled**
+    (`defaultRules.rules.kubeProxy: false`, `kubeProxy.enabled: false`) — a
+    permanent false positive on this cluster: Cilium runs in
+    kube-proxy-replacement mode (see "Ingress: Gateway API" in
+    [`talos/README.md`](../talos/README.md)), so there's no kube-proxy
+    DaemonSet to ever be up or scrape. Found firing, unnoticed, since this
+    chart was first deployed on 2026-09-17.
 - **Namespace:** `monitoring`, breaking from this repo's usual one-app-one-
   namespace convention — this is the ecosystem-standard name, and what
   OpenLens's own "Prometheus Operator" auto-detect option looks for.
@@ -482,6 +519,55 @@ a `VolumeSnapshot` into a `VolumeSnapshotContent` still needs the
 snapshot-controller + validating webhook, not installed here (CRDs-only was
 the actual ask; add the controller separately if snapshots are wanted for
 real).
+
+## ntfy (migrated from docker-compose, 2026-09-20)
+
+Moved off rpi5-1's docker-compose stack into the cluster — the blocker noted
+in the original kube-prometheus-stack Alertmanager decision ("revisit once
+something like ntfy actually lands in the cluster") is what triggered this,
+not the other way around. Deployed as
+[`apps/ntfy/`](apps/ntfy/application.yaml), bare manifests (no official
+chart) at [`manifests/ntfy/`](../manifests/ntfy/), same "bare Deployment"
+call as homepage/searxng.
+
+- **Config carried over as-is** from the pre-migration
+  `docker/ntfy/conf/server.yml` on rpi5-1 (`base-url`, `upstream-base-url`)
+  — see [`manifests/ntfy/configmap.yaml`](../manifests/ntfy/configmap.yaml).
+  No `auth-file` was configured before, and none is configured now — this
+  migration doesn't change ntfy's security posture, just where it runs (see
+  the HTTPRoute's own comment for why it's deliberately *not* gated by
+  Authelia's `ExternalAuth` filter, unlike homepage/searxng).
+- **1Gi PVC** (`hexos-iscsi`) for the message cache (`cache.db`) so recent
+  notification history survives a pod restart — the pre-migration cache.db
+  was 258KB, so this is generous headroom, not a tight budget. The old
+  compose service's cache/conf directories on rpi5-1 are **not** migrated
+  into this PVC; ntfy's cache is short-lived by design (12h default
+  retention) and not worth the extra migration step.
+- **DNS gotcha, real and hit for the first time by this migration:**
+  `ntfy.jakerobb.org` already existed as a Cloudflare DNS record from the
+  pre-migration Caddy setup (`docker-compose/caddy/Caddyfile`, now removed),
+  created outside external-dns and carrying no TXT ownership marker. Per
+  external-dns's documented behavior (see "DNS + TLS" above — "won't adopt
+  or delete Caddy's existing records just because a hostname collides"),
+  syncing this app's `HTTPRoute` will **not** make external-dns take over or
+  overwrite that record automatically. **Manual step required:** delete the
+  existing `ntfy.jakerobb.org` A record in the Cloudflare dashboard once
+  this app has synced, so external-dns creates its own owned record pointing
+  at the Gateway's LB IP. Every previous app that moved from Caddy into the
+  cluster (`home`, `search`, `argocd`) used a hostname Caddy never served,
+  so this is the first time this specific collision has actually come up —
+  worth checking for the same gotcha on the next Caddy→k8s migration.
+- **`ntfy.lan` (the UniFi local-DNS entry Caddy used internally to reach the
+  compose container on rpi5-1) is no longer needed by anything** once the
+  Caddyfile block is gone — safe to delete outright, not repoint. Any
+  device/integration that was talking to `ntfy.lan` directly (bypassing
+  Caddy) rather than `ntfy.jakerobb.org` needs to be repointed by hand;
+  nothing in this repo can enumerate those (Home Assistant's own notify
+  config, for one, isn't tracked here).
+- **Homepage entry converted to `gethomepage.dev/*` annotation-based
+  discovery** (on the new `HTTPRoute`), replacing the manual `services.yaml`
+  entry it had before — same pattern searxng's `httproute.yaml` established
+  first.
 
 ## Bootstrap (one-time, manual)
 

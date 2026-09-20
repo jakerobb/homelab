@@ -50,10 +50,11 @@ optimizer.jakerobb.org {
 	import cloudflare_tls
 }
 
-ntfy.jakerobb.org {
-	reverse_proxy ntfy.lan:8011
-	import cloudflare_tls
-}
+# ntfy.jakerobb.org migrated to the k8s cluster 2026-09-20 (Gateway API
+# HTTPRoute + external-dns, see argocd/apps/ntfy/) — this block, and the
+# ntfy.lan UniFi DNS entry it depended on, are no longer needed. See
+# argocd/README.md's ntfy section for the DNS cutover caveat before deleting
+# either for good.
 
 influxdb.jakerobb.org {
 	reverse_proxy localhost:8086

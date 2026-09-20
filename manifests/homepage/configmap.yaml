@@ -124,9 +124,9 @@ data:
         - Network Optimizer:
             icon: /icons/network-optimizer.png
             href: https://optimizer.jakerobb.org
-        - ntfy:
-            icon: ntfy.png
-            href: https://ntfy.jakerobb.org
+        # ntfy moved to gethomepage.dev/* annotation-based discovery
+        # (manifests/ntfy/httproute.yaml) 2026-09-20, same pattern as
+        # searxng — removed from here to avoid a duplicate tile.
         - NUT (UPS Monitoring):
             icon: nut.png
             href: https://nut.jakerobb.org

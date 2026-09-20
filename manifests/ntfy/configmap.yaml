@@ -1,0 +1,15 @@
+# Same three settings as the pre-migration docker-compose config
+# (docker/ntfy/conf/server.yml on rpi5-1) plus listen-http, made explicit
+# here instead of the `--listen-http` command-line flag the compose service
+# used — keeps the whole server config in one place.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-config
+  namespace: ntfy
+data:
+  server.yml: |
+    base-url: "https://ntfy.jakerobb.org"
+    listen-http: ":8080"
+    cache-file: "/var/cache/ntfy/cache.db"
+    upstream-base-url: "https://ntfy.sh"

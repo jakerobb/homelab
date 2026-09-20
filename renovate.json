@@ -3,7 +3,10 @@
   "extends": ["config:recommended"],
   "timezone": "America/Detroit",
   "kubernetes": {
-    "managerFilePatterns": ["/^argocd/apps/.+\\.ya?ml$/"]
+    "managerFilePatterns": [
+      "/^argocd/apps/.+\\.ya?ml$/",
+      "/^manifests/.+\\.ya?ml$/"
+    ]
   },
   "argocd": {
     "managerFilePatterns": ["/^argocd/apps/.+/application\\.ya?ml$/"]

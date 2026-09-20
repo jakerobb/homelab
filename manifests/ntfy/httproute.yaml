@@ -1,0 +1,42 @@
+# Deliberately NOT gated by Authelia's ExternalAuth filter, unlike
+# homepage/httproute.yaml and searxng/httproute.yaml — ntfy's actual clients
+# (the mobile/web apps subscribing to topics, Alertmanager's webhook
+# receiver, and any other script publishing a message) are all
+# non-interactive HTTP clients that can't complete Authelia's browser-based
+# login redirect. Same unauthenticated-at-the-proxy posture the
+# docker-compose/Caddy setup already had (no ntfy `auth-file` configured
+# either — see configmap.yaml) — this migration doesn't change ntfy's
+# security posture, just where it runs.
+#
+# gethomepage.dev/* annotations opt this into Homepage's Kubernetes
+# discovery (see manifests/homepage/configmap.yaml's kubernetes.yaml),
+# replacing the manual "Monitoring" group entry that configmap.yaml used to
+# carry for ntfy — same pattern searxng's httproute.yaml established.
+#
+# DNS gotcha (see argocd/README.md's ntfy section): `ntfy.jakerobb.org`
+# already exists in Cloudflare from the pre-migration Caddy setup, without
+# external-dns's TXT ownership marker — external-dns will NOT take over or
+# overwrite that record automatically. The stale record must be deleted in
+# Cloudflare before (or right after) this syncs, or requests will keep
+# hitting the old rpi5-1 path instead of this Gateway.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ntfy
+  namespace: ntfy
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: ntfy
+    gethomepage.dev/description: Push notifications
+    gethomepage.dev/icon: ntfy.png
+    gethomepage.dev/group: Monitoring
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - ntfy.jakerobb.org
+  rules:
+    - backendRefs:
+        - name: ntfy
+          port: 8080

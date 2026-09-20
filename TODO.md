@@ -221,8 +221,8 @@ what's known/suspected about hardware pinning going in, not a final answer.
 - **modbus-controller** — custom app talking to Modbus-over-Ethernet
   devices; likely fine to migrate (network-based, no obvious hardware pin)
   but confirm.
-- **ntfy** — push notification server; straightforward migration candidate,
-  no obvious hardware dependency.
+- **ntfy** — **done 2026-09-20**, see
+  [`argocd/README.md`](argocd/README.md#ntfy-migrated-from-docker-compose-2026-09-20).
 - **Not migration candidates:** `victorialogs` + `vector` are the intended
   destination for the existing "Log aggregation" TODO item below (cluster
   logs get shipped *to* them, they don't move); `watchtower` and `ofelia`
@@ -260,14 +260,14 @@ preserve, but a best-effort migration into whatever lands here is worth
 attempting for continuity if it turns out to be reasonably easy.
 
 ## Alerting
-**Not started.** `kube-prometheus-stack`'s Alertmanager is deliberately
-disabled for now (see
-[`argocd/README.md`](argocd/README.md#kube-prometheus-stack-decided-and-deployed-2026-09-17))
-since there's no notification receiver configured — an unconfigured
-Alertmanager would just be a standing idle pod. `ntfy` is already a
-migration candidate elsewhere in this doc and would be a natural receiver;
-revisit enabling Alertmanager once something like it actually lands in the
-cluster.
+**Done 2026-09-20.** `kube-prometheus-stack`'s Alertmanager is enabled,
+routed through the `ntfy-alertmanager` bridge to `ntfy`'s `homelab-alerts`
+topic — see
+[`argocd/README.md`](argocd/README.md#kube-prometheus-stack-decided-and-deployed-2026-09-17).
+Only `severity` is mapped to ntfy priority/tags today
+([`manifests/ntfy-alertmanager/configmap.yaml`](manifests/ntfy-alertmanager/configmap.yaml))
+— worth revisiting with more label-based routing (e.g. per-namespace
+topics) once there's a better sense of real alert volume/noise.
 
 ## rpi5-1 mail-alert reliability (msmtpq)
 **Not started**, merged in from README.md's checklist (2026-09-18). The
@@ -290,6 +290,18 @@ being reachable via `kubectl logs` per-pod. Homepage
 revisiting every new app's logging config once a collector (Vector, most
 likely, since it's already what feeds VictoriaLogs on the Pi side per the
 Compose migration notes above) is actually running in-cluster.
+
+## TrueNAS REST API deprecation (affects Homepage's HexOS/TrueNAS widget)
+**Not started, found 2026-09-20** while checking the `data` pool's scrub/SMART
+config. TrueNAS's own Alerts list a `RESTAPIUsage` warning: the REST API
+(what Homepage's `truenas` widget authenticates against, see
+[`argocd/apps/homepage/`](argocd/apps/homepage/)) is deprecated and will be
+**removed in HexOS/TrueNAS v26.04**, in favor of the JSON-RPC 2.0/WebSocket
+API. Not urgent — HexOS isn't currently on that version — but will silently
+break the widget whenever it does eventually update. Homepage's own
+`truenas` widget type would need to support the new API (check for a
+Homepage update that does before upgrading HexOS past 26.04), or the widget
+gets dropped/replaced at that point.
 
 ## Homepage dashboard widgets
 **Done (2026-09-18).** Weather (Open-Meteo), Proxmox host CPU/mem, HexOS/TrueNAS

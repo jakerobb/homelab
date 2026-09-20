@@ -1,0 +1,14 @@
+# ClusterIP only — this only ever receives from Alertmanager, in the same
+# namespace, never from outside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ntfy-alertmanager
+  namespace: monitoring
+spec:
+  selector:
+    app.kubernetes.io/name: ntfy-alertmanager
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

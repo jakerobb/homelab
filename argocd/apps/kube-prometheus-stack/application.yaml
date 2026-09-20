@@ -5,14 +5,19 @@
 # on the Nodes list) all run through a Prometheus it can query, separately
 # from the Kubernetes Metrics API metrics-server provides for `kubectl top`.
 #
-# Grafana and Alertmanager both disabled deliberately for now:
+# Grafana still disabled deliberately for now:
 # - grafana.enabled: false — today's actual goal is just feeding OpenLens;
 #   the existing Compose-stack Grafana on the 16GB Pi already covers
 #   dashboarding until that workload migrates in (see TODO.md).
-# - alertmanager.enabled: false — no notification receiver wired up yet
-#   (ntfy is a migration candidate per TODO.md, not deployed); an
-#   unconfigured Alertmanager would just be a standing idle pod. Revisit
-#   once ntfy (or similar) is actually in the cluster — see TODO.md.
+#
+# Alertmanager enabled 2026-09-20, once ntfy actually landed in the cluster
+# (argocd/apps/ntfy/) — see argocd/README.md's kube-prometheus-stack section
+# for the full story: Prometheus had real alerts firing for ~2 days with
+# nowhere to send them (confirmed via its own `PrometheusNotConnectedToAlertmanagers`
+# alert) before this was noticed. Routes through `ntfy-alertmanager`
+# (argocd/apps/ntfy-alertmanager/) rather than a raw webhook straight to
+# ntfy — Alertmanager's webhook_configs can't template its POST body into
+# something ntfy's publish API would accept.
 #
 # Namespace is `monitoring`, not a per-app namespace like the rest of
 # apps/ — this is the ecosystem-standard name and what OpenLens's own
@@ -47,6 +52,53 @@ spec:
         grafana:
           enabled: false
         alertmanager:
+          enabled: true
+          alertmanagerSpec:
+            # Single replica, no HA gossip — matches this being a
+            # best-effort home notification path, not a paged on-call
+            # system. Trivial resource footprint either way.
+            replicas: 1
+            resources:
+              requests:
+                cpu: 10m
+                memory: 32Mi
+              limits:
+                memory: 64Mi
+          config:
+            route:
+              receiver: ntfy
+              group_by: ["alertname", "namespace"]
+              group_wait: 30s
+              group_interval: 5m
+              # Home-lab pace, not paging pace — a still-firing alert gets
+              # re-sent at most every 4h instead of Alertmanager's 4h
+              # chart-default-adjacent-but-unset behavior, made explicit.
+              repeat_interval: 4h
+              routes:
+                # The chart's Watchdog alert (always firing by design, to
+                # prove the pipeline itself works) would otherwise repeat
+                # every 4h forever — inhibit at the route instead of
+                # dropping the rule, so it's still visible in the
+                # Prometheus/Alertmanager UI if ever checked by hand.
+                - receiver: "null"
+                  matchers:
+                    - alertname = "Watchdog"
+            receivers:
+              - name: ntfy
+                webhook_configs:
+                  - url: http://ntfy-alertmanager.monitoring.svc.cluster.local:8080
+                    send_resolved: true
+              - name: "null"
+        # KubeProxyDown/KubeProxy* are permanent false positives on this
+        # cluster — Cilium runs in kube-proxy-replacement mode (see
+        # talos/README.md's "Ingress: Gateway API" section), so there's no
+        # kube-proxy DaemonSet to ever be up or scrape. Drops the whole rule
+        # group rather than silencing the symptom in Alertmanager, so it
+        # never fires (or gets scraped as a dead target) in the first place.
+        defaultRules:
+          rules:
+            kubeProxy: false
+        kubeProxy:
           enabled: false
         prometheusOperator:
           # See revisionHistoryLimit policy in argocd/README.md. Prometheus

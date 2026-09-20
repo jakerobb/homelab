@@ -1,0 +1,11 @@
+# Explicit, labeled Namespace rather than relying on CreateNamespace=true —
+# applied by ntfy's own Application (argocd/apps/ntfy/application.yaml)
+# alongside the rest of this directory. Same reasoning as homepage/namespace.yaml.
+#
+# No PodSecurity override needed: the pod runs fully non-root with all
+# capabilities dropped (see deployment.yaml), so it's happy under the
+# cluster's default `baseline` enforcement.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ntfy

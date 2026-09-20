@@ -1,0 +1,45 @@
+# scfg format — see https://git.xenrox.net/~xenrox/ntfy-alertmanager/tree/master/item/config.scfg
+# for the full annotated example this is trimmed from.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-alertmanager-config
+  namespace: monitoring
+data:
+  config: |
+    http-address :8080
+    log-level info
+
+    # Alerts sharing a group_by key (see kube-prometheus-stack's Alertmanager
+    # route config) arrive as one Alertmanager webhook call — send them as
+    # one combined ntfy message rather than one notification per alert.
+    alert-mode multi
+
+    labels {
+        order "severity"
+
+        severity "critical" {
+            priority 5
+            tags "rotating_light"
+        }
+        severity "warning" {
+            priority 3
+            tags "warning"
+        }
+        severity "none" {
+            priority 1
+        }
+    }
+
+    resolved {
+        tags "white_check_mark"
+        priority 2
+    }
+
+    ntfy {
+        # In-cluster Service DNS, not the public https://ntfy.jakerobb.org
+        # hostname — keeps this off the Gateway/DNS/TLS chain entirely, so a
+        # problem with any of those can't also take out alert delivery.
+        server http://ntfy.ntfy.svc.cluster.local:8080
+        topic homelab-alerts
+    }

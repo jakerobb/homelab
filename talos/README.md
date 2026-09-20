@@ -777,3 +777,43 @@ from-scratch worker rebuild matches what's actually running.
 
 Verify with `talosctl -n <worker-ip> get extensions` — expect an
 `iscsi-tools` entry alongside the `schematic` entry matching the ID above.
+
+## kube-scheduler / kube-controller-manager metrics bind address (fixed 2026-09-20)
+
+Both components' secure metrics port (`:10259` / `:10257`) defaulted to
+Talos's built-in `--bind-address=127.0.0.1` — invisible from outside the
+node, so `kube-prometheus-stack`'s Prometheus (running in-cluster, not on
+the host network) got `connection refused` scraping either one. This was
+**silent**: the pods themselves were `Running`/healthy the whole time, only
+their metrics endpoint was unreachable — surfaced by Prometheus's own
+`TargetDown`/`KubeSchedulerInstanceUnreachable`/
+`KubeControllerManagerInstanceUnreachable` alerts (which nobody saw, since
+no Alertmanager existed yet either — see the kube-prometheus-stack section
+below).
+
+Fix, committed at
+[`talos/patches/control-plane/metrics-bind-address.yaml`](patches/control-plane/metrics-bind-address.yaml)
+(applied to all 3 control planes, no reboot needed):
+
+```yaml
+cluster:
+  controllerManager:
+    extraArgs:
+      bind-address: 0.0.0.0
+  scheduler:
+    extraArgs:
+      bind-address: 0.0.0.0
+```
+
+```bash
+talosctl patch machineconfig -n <cp-ip> -p @metrics-bind-address.yaml --mode=no-reboot
+```
+
+Safe to expose: both ports serve HTTPS with the same TLS-client-cert/token
+auth as the rest of the control plane, not the deprecated insecure port —
+binding `0.0.0.0` doesn't remove any auth. Verified via Prometheus's
+`/api/v1/targets`: all 6 targets (`kube-scheduler` + `kube-controller-manager`
+× 3 nodes) went from `down`/`connection refused` to `up` immediately after
+each pod restarted. Also applied to the shared
+`~/talos/homelab/controlplane.yaml` template on rpi5-1 so a future
+from-scratch control-plane node won't reintroduce this.

@@ -219,30 +219,13 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  ntfy:
-    <<: *dns
-    image: binwiederhier/ntfy
-    container_name: ntfy
-    network_mode: host 
-    command:
-      - serve
-      - --config
-      - /etc/ntfy/server.yml
-      - --listen-http
-      - ":8011"
-  # user: UID:GID # optional: replace with your own user/group or uid/gid
-    volumes:
-      - ./resolv-host.conf:/etc/resolv.conf:ro
-      - ./ntfy/cache:/var/cache/ntfy
-      - ./ntfy/conf:/etc/ntfy
-    healthcheck:
-        test: ["CMD-SHELL", "wget -q --tries=1 http://localhost:8011/v1/health -O - | grep -Eo '\"healthy\"\\s*:\\s*true' || exit 1"]
-        interval: 60s
-        timeout: 10s
-        retries: 3
-        start_period: 40s
-    restart: unless-stopped
-    init: true # needed, if healthcheck is used. Prevents zombie processes
+  # Migrated to the k8s cluster 2026-09-20 — see argocd/apps/ntfy/ and
+  # argocd/README.md's ntfy section. Not removed until the cluster-hosted
+  # replacement is confirmed reachable at https://ntfy.jakerobb.org and the
+  # stale pre-migration Cloudflare DNS record is cleared (that record
+  # predates external-dns and isn't touched by it automatically); pull the
+  # ./ntfy/cache and ./ntfy/conf directories on rpi5-1 by hand afterward,
+  # they aren't reused by the k8s deployment.
 
   unbound:
     <<: *dns
