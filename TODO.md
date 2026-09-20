@@ -1,9 +1,33 @@
 # TODO
 
 Cluster-readiness backlog — each of these is its own effort, meant to be
-tackled in a separate conversation rather than all at once. Unlike the
-hardware-migration checklist in [README.md](README.md), these aren't
-sequenced — pick whichever's most useful next.
+tackled in a separate conversation rather than all at once. Not strictly
+sequenced, but **Jake's explicit priority (2026-09-18): get the cluster
+robust and smoothly operating — monitoring, alerting, log aggregation,
+storage/backup gaps closed — before migrating any Compose workloads.**
+"Compose workload migration" below is deliberately last for that reason;
+pick among the others first.
+
+The hardware-migration checklist that used to live in
+[README.md](README.md) is now merged in below (see "Hardware migration
+(SSD/Proxmox/Talos worker/HexOS VM)") — it's ~done, with its two loose ends
+folded into "HexOS storage" and the new "rpi5-1 mail-alert reliability"
+section.
+
+## Hardware migration (SSD install, Proxmox, Talos worker, HexOS VM)
+**Done**, merged in from README.md's original phased checklist (2026-09-18).
+B2-backed up the 4TB P3 Plus, physically installed it and the 2TB T500
+into the MS-A2, installed Proxmox VE 9.2-1 to the original 1TB boot SSD
+(runbook: [`docs/proxmox-install.md`](docs/proxmox-install.md)), joined two
+Talos worker VMs to the existing Pi control plane via Terraform
+(`terraform/proxmox/talos-worker.tf`) — pivoting from BGP to Cilium L2
+announcements along the way after an unresolved UCG Fiber routing bug (see
+"Ingress" below) — then built the HexOS VM with both new NVMes passed
+through via PCIe and a striped ~6TB pool with NFS/SMB shares (runbook:
+[`docs/hexos-install.md`](docs/hexos-install.md)). Both loose ends from
+that checklist are tracked below rather than here: restoring the P3 Plus
+data from B2 (see "HexOS storage") and the mail-alerting queue gap found
+along the way (see "rpi5-1 mail-alert reliability").
 
 ## Ingress (Gateway API)
 **Done** — decided and deployed 2026-09-13, using Gateway API (Cilium's
@@ -50,14 +74,19 @@ silently never answered ARP — see
 [`talos/README.md`](talos/README.md#ingress-gateway-api-decided-and-deployed-2026-09-13)
 (gotcha entry, 2026-09-15).
 
-**Remaining, deliberately deferred to its own conversation (2026-09-15):**
-moving InfluxDB's datastore onto `hexos-iscsi` — the original motivating
-case (NFS isn't safe for its embedded bbolt store) — is a big enough lift
-(likely its own data-migration dance, unlike Authelia's clean-start path)
-to warrant fresh context rather than folding into this one. Also still
-open: restore the P3 Plus data from B2, and a separate, later addition of
-an NFS-backed StorageClass for genuinely ReadWriteMany workloads (media
-libraries, etc.), which iSCSI/block storage can't do.
+**In progress (2026-09-18):** restoring the P3 Plus data from B2 (see
+"Hardware migration" above) — `rsync` is copying the archived data back to
+HexOS now. Still to do once that finishes: verify restored data integrity,
+then keep the B2 backup itself for a few extra weeks after that as
+insurance against early failure of the new non-redundant (unless AnyRaid)
+pool, rather than deleting it the moment the pool checks out.
+
+The earlier idea of moving InfluxDB's datastore onto `hexos-iscsi` is now
+moot — the Compose observability stack (InfluxDB included) isn't being
+lifted into the cluster as-is, see "Observability stack" under "Compose
+workload migration" below. Separately, and later: an NFS-backed
+StorageClass for genuinely ReadWriteMany workloads (media libraries, etc.),
+which iSCSI/block storage can't do.
 
 ## ArgoCD-native SOPS decryption (KSOPS)
 **Not started.** Every SOPS-encrypted secret under `argocd/secrets/` is
@@ -140,10 +169,13 @@ Once confirmed, add the same filter to each other protected app's
 pattern) — also not yet confirmed live post-sync.
 
 ## Compose workload migration
-**Not started.** Move each service off the RPi5 16GB's Docker Compose stack
-(`~/docker/docker-compose.yml` on rpi5-1) into the cluster, one at a time, in
-separate conversations — per-item notes below on what's known/suspected
-about hardware pinning going in, not a final answer.
+**Not started — deliberately held until the cluster itself is robust**
+(Jake's call, 2026-09-18): monitoring, alerting, log aggregation, and the
+open storage/backup items above should land first, so a migrated workload
+isn't the thing that finds the gaps. Move each service off the RPi5 16GB's
+Docker Compose stack (`~/docker/docker-compose.yml` on rpi5-1) into the
+cluster, one at a time, in separate conversations — per-item notes below on
+what's known/suspected about hardware pinning going in, not a final answer.
 
 - **NetworkOptimizer** (`optimizer` + `network-optimizer-speedtest`) — no
   hardware dependency, network-based app. Needs a persistent volume (SQLite,
@@ -155,11 +187,14 @@ about hardware pinning going in, not a final answer.
   — no hardware dependency. Needs a persistent volume for the datastore.
   Same SSO story as NetworkOptimizer (basic-auth only, no OIDC).
 - **Observability stack** (`influxdb`, `grafana`, `telegraf`, `unpoller`) —
-  likely superseded rather than lifted-and-shifted: the "Metrics" TODO below
-  already plans VictoriaMetrics for in-cluster metrics. Worth deciding
-  whether to migrate this stack as-is or fold it into that effort instead of
-  running two parallel timeseries stacks. Grafana itself has native OIDC
-  support, so it's a clean Authelia win whichever way storage goes.
+  **decided (2026-09-18): not migrated as-is.** Superseded by whatever comes
+  out of the "Metrics" item above instead of running two parallel
+  timeseries stacks — see that section for the current direction. Where
+  reasonably easy, migrate the existing InfluxDB history into the new stack
+  for continuity (not required, per Jake). `unpoller` (UniFi metrics →
+  InfluxDB) will need an equivalent pointed at whatever replaces it.
+  Whichever tool ends up as the dashboard has native OIDC support (Grafana
+  does today), so it's a clean Authelia win either way.
 - **NUT UPS monitoring** (`nut-upsd`, `nut-webui`, `nut-influx-relay`) —
   `nut-upsd` needs direct USB access to the UPS and almost certainly has to
   stay Pi-pinned; `nut-webui` and `nut-influx-relay` only talk to it over the
@@ -206,6 +241,16 @@ database rather than relying on Prometheus's own short-lived (10-day) local
 storage. VictoriaMetrics is the natural pairing given VictoriaLogs is
 already running on the 16GB Pi for logs (see below).
 
+**Decided (2026-09-18):** this — not a lift-and-shift of the Compose stack's
+InfluxDB/Grafana — is what replaces that stack; see "Observability stack"
+under "Compose workload migration" below. Leaning toward staying in the
+VictoriaMetrics family (VictoriaMetrics here + VictoriaLogs, already
+running, + possibly VictoriaTraces for tracing) over Grafana's own
+Mimir/Loki/Tempo ("LGTM") stack, mainly for resource footprint on this
+hardware — not locked in yet. Existing InfluxDB history isn't a priority to
+preserve, but a best-effort migration into whatever lands here is worth
+attempting for continuity if it turns out to be reasonably easy.
+
 ## Alerting
 **Not started.** `kube-prometheus-stack`'s Alertmanager is deliberately
 disabled for now (see
@@ -215,6 +260,18 @@ Alertmanager would just be a standing idle pod. `ntfy` is already a
 migration candidate elsewhere in this doc and would be a natural receiver;
 revisit enabling Alertmanager once something like it actually lands in the
 cluster.
+
+## rpi5-1 mail-alert reliability (msmtpq)
+**Not started**, merged in from README.md's checklist (2026-09-18). The
+`etcd-snapshot-backup.sh` cron job on rpi5-1 emails failures via `msmtp`
+(see [`docs/email-alerts.md`](docs/email-alerts.md)), but `msmtp` sends
+synchronously with no retry/queue — an ISP outage exactly when the 3:15 AM
+cron fires would silently drop the alert. Fix: install `msmtpq` (bundled
+with `msmtp`, a lightweight file-based queue wrapper reusing the same
+config). Low priority given how narrow the overlap window is. Deliberately
+**out of scope for in-cluster alerting** above — this path exists
+specifically to survive a cluster outage, so it stays on rpi5-1 independent
+of cluster health.
 
 ## Log aggregation
 **Not started.** Ship pod and node logs off-cluster to the existing
@@ -227,25 +284,18 @@ likely, since it's already what feeds VictoriaLogs on the Pi side per the
 Compose migration notes above) is actually running in-cluster.
 
 ## Homepage dashboard widgets
-**Requested 2026-09-16, nearly done.** Weather (Open-Meteo), Proxmox host
-CPU/mem, and HexOS/TrueNAS disk usage are fully wired in
+**Done (2026-09-18).** Weather (Open-Meteo), Proxmox host CPU/mem, HexOS/TrueNAS
+disk usage, and UniFi Controller (top-bar uptime/WAN/LAN/WLAN status) are
+all wired in and confirmed working
 (`argocd/apps/homepage/configmap.yaml` + `deployment.yaml`), secrets
-encrypted and staged (`argocd/secrets/{proxmox-api-token,truenas-api-key}.homepage.sops.yaml`).
+encrypted
+(`argocd/secrets/{proxmox-api-token,truenas-api-key,unifi-credentials}.homepage.sops.yaml`).
 Confirmed hosts: `https://proxmox.lan:8006` (node name still the terraform
 *default*, `proxmox_node_name` — unconfirmed), `http://truenas.lan` for the
 widget's own API calls vs. `https://deck.hexos.com/dash` for the tile's
 click-through link (two different things — see the comment in
-configmap.yaml). Remember to `sops -d ... | kubectl apply -f -` both once
+configmap.yaml). Remember to `sops -d ... | kubectl apply -f -` each once
 pushed (no KSOPS yet, applied out-of-band like every other secret here).
-
-Still open:
-- **UniFi Controller** (top-bar info widget: uptime/WAN/LAN/WLAN status) —
-  wiring is done (`argocd/apps/homepage/configmap.yaml`'s `unifi_console`
-  block + `deployment.yaml`), waiting on Jake to generate an API key in the
-  UniFi Network application and fill in
-  `argocd/secrets/unifi-credentials.homepage.sops.yaml` (still an unencrypted
-  placeholder template — encrypt with `sops -e -i` once filled in, same as
-  the other two were).
 
 **Explicitly deferred:** rpi5-1 CPU/mem via Glances — would need a new
 Glances service added to `docker-compose/`, reachable from the cluster over

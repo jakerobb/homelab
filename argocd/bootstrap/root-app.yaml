@@ -26,3 +26,19 @@ spec:
       prune: true
     syncOptions:
       - CreateNamespace=true
+  # cilium's Application object sets `syncPolicy: {}` explicitly (see
+  # argocd/apps/cilium/application.yaml) to keep it manual-sync-only, but
+  # ArgoCD's diff engine drops empty structs (omitempty) when normalizing
+  # the git-desired side while the live object -- round-tripped through
+  # etcd -- keeps the literal `{}`. That makes this Application perpetually
+  # show OutOfSync here even though selfHeal has nothing to actually fix
+  # (verified via `argocd app diff cilium --core`: zero real drift).
+  # Same shape as the cilium-ca/hubble-server-certs ignoreDifferences below,
+  # just scoped to root's own comparison instead of cilium's.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      name: cilium
+      namespace: argocd
+      jsonPointers:
+        - /spec/syncPolicy

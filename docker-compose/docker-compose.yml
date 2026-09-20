@@ -469,4 +469,3 @@ volumes:
   caddy_data:
   caddy_config:
   victorialogs-data:
-

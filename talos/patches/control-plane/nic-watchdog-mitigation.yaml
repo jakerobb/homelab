@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rpi5-nic-mitigation
+  namespace: node-tuning
+  labels:
+    app: rpi5-nic-mitigation
+spec:
+  selector:
+    matchLabels:
+      app: rpi5-nic-mitigation
+  template:
+    metadata:
+      labels:
+        app: rpi5-nic-mitigation
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: ethtool-mitigation
+          image: nicolaka/netshoot:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              while true; do
+                ethtool -K end0 tso off gso off 2>&1
+                ethtool --set-eee end0 eee off 2>&1 || true
+                sleep 30
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add: ["NET_ADMIN"]
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
