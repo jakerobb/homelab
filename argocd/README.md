@@ -456,6 +456,33 @@ exists this errors harmlessly on that one; re-run per-file with `kubectl
 replace -f` for just the changed ones on an upgrade instead of blanket
 re-creating.)
 
+### external-snapshotter CRDs (one-time, manual, and again on any schema-affecting upgrade)
+
+`VolumeSnapshotClass`/`VolumeSnapshotContent`/`VolumeSnapshot`, installed
+2026-09-19 so democratic-csi's controller stops spamming failed watches for
+CRDs that didn't exist yet (see talos/README.md's health-check runbook).
+These particular CRDs are small enough (well under the 256KiB annotation
+limit above) that ArgoCD could technically manage them without hitting that
+bug — but CRDs stay out of ArgoCD's hands here as a blanket rule, not a
+case-by-case one, matching Helm's own convention. An `argocd/apps/
+external-snapshotter` Application briefly existed on 2026-09-20 and was
+removed for exactly this reason.
+
+Manifests are vendored at
+[`manifests/external-snapshotter/`](../manifests/external-snapshotter),
+pulled from the [external-snapshotter](https://github.com/kubernetes-csi/external-snapshotter)
+`client/config/crd/` directory at the release tag below:
+
+```bash
+kubectl create -f manifests/external-snapshotter/
+```
+
+Installed from `v8.6.0`. This only registers the CRDs — actually reconciling
+a `VolumeSnapshot` into a `VolumeSnapshotContent` still needs the
+snapshot-controller + validating webhook, not installed here (CRDs-only was
+the actual ask; add the controller separately if snapshots are wanted for
+real).
+
 ## Bootstrap (one-time, manual)
 
 From a machine with `helm`/`kubectl` pointed at the cluster
