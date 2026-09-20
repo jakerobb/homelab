@@ -1,4 +1,4 @@
-FROM alpine:3.20
+FROM alpine:3.24
 COPY installer-write.sh /bin/installer
 COPY u-boot.bin /payload/u-boot.bin
 RUN chmod +x /bin/installer
