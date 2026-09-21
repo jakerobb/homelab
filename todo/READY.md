@@ -60,6 +60,12 @@ Reserved business opportunities:
 * fastodon.dev, fastodon.me - I was into Mastodon for a while and thought I wanted to build and host an ActivityPub server in Go rather than Ruby; it would be super performant, hence the name. 
 * camaroev.net, camaro-ev.com, camaroev.org, camaroquestions.com, firebirdquestions.com, transamquestions.com, fbodyquestions.com, modyourcamaro.com -- I love Camaros and wanted to build something here. 
 
+## Make a Documentation app/site -- docs.jakerobb.org
+
+Serves a hyperlinked view of all the docs. What everything is, how it works, how it's connected, how to fix common 
+issues, how to get access, etc. This should be behind Authelia, linked from Homepage, and deployed as an ArgoCD
+application just like everything else.
+
 ## Compose workload migration
 
 **Not started — deliberately held until the cluster itself is robust**
