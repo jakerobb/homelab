@@ -20,7 +20,7 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   Helm chart until ArgoCD is already running). Cilium's *ongoing* lifecycle
   is GitOps'd like everything else as of 2026-09-15
   ([`apps/cilium/`](apps/cilium/application.yaml)) — manual sync policy
-  only, unlike the rest of `apps/`, see [`talos/README.md`](../talos/README.md#now-managed-by-argocd-2026-09-15)
+  only, unlike the rest of `apps/`, see [`talos/README.md`](../talos/README.md#cilium-version-management)
   for why. ArgoCD's own install stays manual permanently, since it can never
   bootstrap itself. Everything else — starting
   with ArgoCD's own ingress route — is reconciled from
@@ -240,10 +240,12 @@ time; those get added to Authelia's `access_control` as they land, not now.
   "Upgrading ArgoCD itself" below):
 
   ```bash
-  helm upgrade argocd argo/argo-cd --version 10.9.1 -n argocd \
+  helm upgrade argocd argo/argo-cd --version <currently-deployed chart version> -n argocd \
     -f argocd/install/values.yaml \
     -f <(sops -d argocd/secrets/argocd-oidc-client-secret.sops.yaml)
   ```
+  (Check `helm list -n argocd` for the version actually running rather than assuming — don't hardcode a version here
+  that can silently drift from the "Bootstrap" section below.)
 - **First login:** browse to `https://argocd.jakerobb.org`, click the SSO
   login option, authenticate as `jake` against Authelia. Since ArgoCD's
   `access_control` policy is `two_factor` and this is a brand-new Authelia
@@ -484,7 +486,9 @@ chart `kube-prometheus-stack` from `prometheus-community`.
 export KUBECONFIG=~/.kube/config
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update prometheus-community
-helm pull prometheus-community/kube-prometheus-stack --version 91.4.1 --untar --untardir /tmp/kps-chart
+helm pull prometheus-community/kube-prometheus-stack \
+  --version <targetRevision from argocd/apps/kube-prometheus-stack/application.yaml> \
+  --untar --untardir /tmp/kps-chart
 kubectl create -f /tmp/kps-chart/kube-prometheus-stack/charts/crds/crds/
 ```
 

@@ -8,10 +8,9 @@ live JVM heap config, and system memory, run in two modes:
   immediately if the Full GC rate exceeds 150/hour, so a regression is
   caught same-day instead of waiting for the next daily digest.
 
-Background: see
-[`unifi-diagnostics/2026-09-18-jvm-gc-hang/README.md`](../unifi-diagnostics/2026-09-18-jvm-gc-hang/README.md)
-for the hang this is watching for, and the JVM heap lock (`-Xms == -Xmx`,
-currently 640M/640M) applied afterward.
+Background: watching for a repeat of a 2026-09-18 JVM GC hang on this box,
+fixed at the time by locking the heap (`-Xms == -Xmx`, currently 640M/640M)
+instead of leaving it to the JVM's default sizing.
 
 Runs from rpi5-1, not the gateway itself. UniFi OS/Network upgrades reset
 the gateway's overlay filesystem for things like `/etc/default/unifi` and

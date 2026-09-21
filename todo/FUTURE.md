@@ -25,9 +25,22 @@ issues surface before then.
 2026-09-16) running stable for a meaningful stretch before removing the `upgradeCompatibility: "1.19"` key from
 `talos/cilium/values.yaml` and syncing. That key currently keeps `envoy-xds-mode` on its legacy-safe default instead of
 1.20+'s new `"ads"` default — a low-risk, one-key change once the wait's over. See [
-`../talos/README.md`](../talos/README.md#cilium-upgrade-119120-2026-09-15). **Consider 1.20.x stable, and the flag safe
+`../talos/README.md`](../talos/README.md#cilium-version-management). **Consider 1.20.x stable, and the flag safe
 to remove, on or after 2026-10-15** (one month from the 1.20.1 upgrade — the 1.20.2 patch bump the next day doesn't
 reset this clock), assuming no issues surface before then.
+
+## Talos workload isolation (`SecurityProfileConfig`)
+
+**Waiting on:** a Talos release that actually fixes
+[siderolabs/talos#14374](https://github.com/siderolabs/talos/issues/14374) — a
+startup race between CRI and `sandboxd` that causes every node to
+restart-loop for 1–3 minutes on every boot with `workloadIsolation: true`
+enabled. Fixed upstream 2026-09-16, one day after the currently-running
+Talos version was published, so we're still on the affected release. See
+[`../talos/README.md`](../talos/README.md#workload-isolation-talos-114-feature-not-enabled)
+for what this feature would buy us and why it's otherwise appealing. No
+target date — check the changelog of each new Talos release for #14374
+specifically before assuming it's fixed.
 
 ## Authelia RBAC group/role mapping
 
@@ -53,3 +66,16 @@ ntfy priority/tags today ([
 or similar are premature until there's a track record to design against. **Consider there to be enough of a track record
 to design against on or after 2026-10-20** (one month from Alertmanager going live), assuming no issues surface before
 then.
+
+## Linode workload migration
+**Waiting on:** the Mac Studio being online and all home workloads being moved. 
+
+I have a Kubernetes cluster running in Linode (LKE). It runs my personal website and some apps I built. It's massive
+overkill and costs way too much money. When all of the home workloads have been moved and the Mac Studio is online, 
+there will be enough resources in-house to move almost all of that off the cloud. My intention is to serve the static 
+content from their smallest static instance (used to be called a Nanode, $5/month) and serve APIs from the house. This 
+is not normally something I'd recommend, but I have like four users and no uptime guarantees, so I feel good about it.
+That $85/month saved will go a long way toward paying for the Mac Studio!
+
+Also, this setup is constantly emailing me about high CPU usage and container restarts. I have not had time to 
+investigate, but my plan is to eliminate most of it anyway. Every time I check the website itself, it seems fine. 

@@ -43,6 +43,23 @@ stays on rpi5-1 independent of cluster health.
 `hexos-iscsi` `StorageClass` already in place is iSCSI/block storage, which can't do RWX. HexOS's `data/shared` NFS
 export already exists and is usable manually; this is about wiring a real dynamically-provisioned `StorageClass` for it.
 
+## Migrate domain names Hover -> CloudFlare
+
+I have several domain names registered at Hover:
+* jakerobb.dev -- my personal website
+* soleman.ski -- Squarespace site for my father-in-law's business. I never finished it. 
+* commaspacebitch.com -- a joke domain I registered twenty years ago, never used, and should stop paying for.
+
+Just grabbed these because I could; completely unused; some forwarded to jakerobb.dev
+* jakerobb.me
+* robb.online
+* robb.software
+
+Reserved business opportunities:
+* indigoapps.dev -- Indigo because it's the color Apple left out of its original rainbow logo; the idea was that I'd build apps Apple neglected. No specific ideas.
+* fastodon.dev, fastodon.me - I was into Mastodon for a while and thought I wanted to build and host an ActivityPub server in Go rather than Ruby; it would be super performant, hence the name. 
+* camaroev.net, camaro-ev.com, camaroev.org, camaroquestions.com, firebirdquestions.com, transamquestions.com, fbodyquestions.com, modyourcamaro.com -- I love Camaros and wanted to build something here. 
+
 ## Compose workload migration
 
 **Not started — deliberately held until the cluster itself is robust**

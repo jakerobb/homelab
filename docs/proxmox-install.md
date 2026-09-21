@@ -85,8 +85,8 @@ apt update && apt full-upgrade -y
 - **NTP:** point at your existing infra rather than defaults — edit
   `/etc/chrony/chrony.conf` (Proxmox 9 uses chrony) and replace the default pool
   with whatever NTP source the rest of the homelab uses.
-- **Config backup:** once stable, back up `/etc/pve` (or at minimum note the
-  install) — there's no automation for this yet.
+- **Config backup:** automated daily — see
+  [`proxmox-config-backup.md`](proxmox-config-backup.md).
 
 ## 6. After this
 

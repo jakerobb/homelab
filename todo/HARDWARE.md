@@ -27,6 +27,8 @@ This document enumerates my hardware plans.
 * Move the PDU Pro to the back rail to free up space in the rack.
     * This will require cutting power to _everything_. Need to figure out how to prep for that.
 * Figure out why the WLED controller is offline. Did a power connection from the Meanwell PSU come loose?
+* Learn how to connect multiple LED strips together (have to solder _under_ the clear rubber diffusion cover somehow)
+  and then connect all the strips
 
 ## Future acquisitions
 

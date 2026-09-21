@@ -1,6 +1,8 @@
 # Talos cluster config
 
-## Current state (as of 2026-09-21)
+## Current state
+
+_(as of 2026-09-21)_
 
 - **Talos v1.14.1** on all 5 nodes (control planes and both workers), **Kubernetes v1.37.0**.
   Both already fully upgraded — see "Talos control-plane upgrade" and "Talos v1.14.1 upgrade
@@ -28,8 +30,9 @@
   (the `iscsi-tools` + `util-linux-tools` schematic — see "iscsi-tools extension" below), confirmed
   against both workers' live `get extensions` output and correctly persisted in machine config as
   of 2026-09-21.
-- CNI: Cilium v1.20.2 (patch-bumped from 1.20.1 2026-09-16, itself upgraded from 1.19.5 2026-09-15,
-  see below), with
+- CNI: Cilium — version tracked in
+  [`../argocd/apps/cilium/application.yaml`](../argocd/apps/cilium/application.yaml)'s
+  `targetRevision` (see "Cilium: version management" below for how upgrades work), with
   `kubeProxyReplacement` enabled, full eBPF host routing
   (`bpf.masquerade: true`, `Host: BPF` — not the `Legacy`/iptables fallback),
   and **L2 announcements** for LoadBalancer IPs (see `cilium/values.yaml`).
@@ -189,87 +192,53 @@ gotcha as `enable-envoy-config` above: applying the policy change alone
 wasn't enough, needed `kubectl -n kube-system rollout restart ds/cilium`
 before the L2 responder actually picked it up.
 
-## Cilium upgrade 1.19→1.20 (2026-09-15)
+## Cilium: version management
 
-Upgraded chart `cilium-1.19.5` → `1.19.7` (latest 1.19 patch) → `1.20.1`,
-run from rpi5-1 against the live cluster:
-
-```
-helm upgrade cilium cilium/cilium --version 1.19.7 -n kube-system -f cilium/values.yaml --wait
-# verify ds/cilium, ds/cilium-envoy, deployment/cilium-operator healthy, then:
-helm upgrade cilium cilium/cilium --version 1.20.1 -n kube-system -f cilium/values.yaml \
-  --set upgradeCompatibility=1.19 --wait
-```
-
-`--set upgradeCompatibility=1.19` on the 1.20 step per Cilium's own upgrade
-guide — keeps `envoy.xdsMode` on the legacy `split` mode through the
-transition instead of jumping straight to 1.20's new `ads` default. Worth
-a follow-up no-op upgrade later to drop that flag once the new version's
-been running stable for a while.
-
-Diffed the chart's default `values.yaml` between all three versions before
-running this: 1.19.5→1.19.7 is pure image tag/digest bumps (no schema
-change). 1.19.7→1.20.1 has real changes, but none touch anything this repo's
-`cilium/values.yaml` actually sets (`ipam.mode`, `kubeProxyReplacement`,
-`bpf.masquerade`, `k8sServiceHost`/`Port`, `bgpControlPlane`,
-`l2announcements`, `k8sClientRateLimit`, `cgroup`, `securityContext`,
-`gatewayAPI`) — no values changes were needed. The 1.20 release notes'
-"action required" items (Envoy Go extensions/proxylib removal,
-`CiliumNodeConfig` v2alpha1→v2, mutual-auth deprecation, Gateway API ≥v1.6.1
-for TLSRoute) don't apply here either: no `CiliumNetworkPolicy`/
-`CiliumClusterwideNetworkPolicy`/`CiliumNodeConfig`/clustermesh/mutual-auth
-in this repo, and the Gateway API CRDs are already on the experimental
-channel at v1.6.2 (see above), past the v1.6.1 floor.
-
-Ran the official `cilium-preflight` release (image pre-pull + CNP/CCNP
-validation) before the 1.20 step — trivial here since there are no policies
-to validate, but still worth it on Pi-class hardware so the image pull
-happens ahead of the real rollout. One gotcha: `helm install
-cilium-preflight ... --set preflight.enabled=true` fails with an ownership
-conflict on the auto-created `GatewayClass` (`cilium-preflight` can't own a
-resource the `cilium` release already owns) unless you also pass `--set
-gatewayAPI.enabled=false` for the preflight release specifically — the
-preflight DaemonSet doesn't need Gateway API to pre-pull images anyway.
-
-Verified with the same test that would've caught the earlier BGP and L2
-gotchas above — external `curl` from the LAN (not just in-cluster) to both
-the bare Gateway LB IP and `argocd.jakerobb.org` — after each step, not just
-once at the end. Both steps rolled all 5 `cilium` + 5 `cilium-envoy` pods and
-both `cilium-operator` replicas with zero LB downtime observed; k8s v1.34.1
-(the floor of Cilium 1.20's tested 1.34–1.37 support matrix) had no issues.
-
-### Now managed by ArgoCD (2026-09-15)
-
-**The two manual `helm upgrade cilium ...` runbooks above (this section and
-"Ingress: Gateway API") are historical.** Cilium's ongoing lifecycle is now
-an ArgoCD `Application` — [`argocd/apps/cilium/application.yaml`](../argocd/apps/cilium/application.yaml) —
-sourcing the chart from `helm.cilium.io` with values still coming from this
-same `cilium/values.yaml` (via a multi-source `$values` ref, so there's one
-copy of the config either way). **Do not run manual `helm upgrade cilium`
-again** — bump `targetRevision` and/or edit `cilium/values.yaml`, then Sync
-from ArgoCD.
+Cilium's ongoing lifecycle is an ArgoCD `Application` —
+[`argocd/apps/cilium/application.yaml`](../argocd/apps/cilium/application.yaml) —
+sourcing the chart from `helm.cilium.io` with values coming from this same
+`cilium/values.yaml` (via a multi-source `$values` ref, so there's one copy
+of the config either way). **Never run a manual `helm upgrade cilium`** —
+bump `targetRevision` and/or edit `cilium/values.yaml`, then Sync from
+ArgoCD.
 
 Deliberately **manual sync policy** (no `automated:` block), unlike every
 other app under `argocd/apps/` — the only app where that's true. Cilium is
 the CNI: a bad auto-sync has cluster-wide blast radius (breaks networking
 for every pod, including ArgoCD's own, leaving nothing able to auto-revert
-it), and this cluster has now had two *silent* Cilium failures (the BGP
-outage and the L2-announcement interface regex bug, both above) where the
+it), and this cluster has had two *silent* Cilium failures (the BGP outage
+and the L2-announcement interface regex bug, both above) where the
 DaemonSet reported `Running`/Healthy the whole time traffic was actually
 broken — exactly what ArgoCD's resource-status health checks would also
-have missed. Keep syncing a conscious, one-at-a-time action: Sync, then run
-[`cilium/validate.sh`](cilium/validate.sh) from rpi5-1 (or anywhere on the
-LAN) before trusting it — it curls every LoadBalancer IP and HTTPRoute
+have missed. Treat syncing as a conscious, one-at-a-time action: Sync, then
+run [`cilium/validate.sh`](cilium/validate.sh) from rpi5-1 (or anywhere on
+the LAN) before trusting it — it curls every LoadBalancer IP and HTTPRoute
 hostname from outside the cluster and checks each agent's actual datapath
 mode, instead of just asking Kubernetes whether the pods are Ready.
 
-Initial adoption: the `cilium`/`cilium-operator`/`cilium-envoy` resources
-already existed from the plain `helm upgrade` CLI runs above, not from
-Argo. First Sync just relabels them under Argo's tracking and leaves the
-old `cilium` Helm release object in `kube-system` stale/orphaned (Argo's
-Helm source renders and applies manifests directly — it doesn't drive the
-`helm` CLI or touch that release object). Harmless to ignore; nothing reads
-it going forward.
+**Before bumping `targetRevision` to a new minor version:** diff the
+chart's default `values.yaml` between the current and target versions first
+— catches upstream schema changes that might silently affect something
+`cilium/values.yaml` actually sets, before they land live. Also worth
+running the official `cilium-preflight` release first on Pi-class hardware,
+so image pulls happen ahead of the real rollout rather than during it — one
+gotcha: `helm install cilium-preflight ... --set preflight.enabled=true`
+fails with an ownership conflict on the auto-created `GatewayClass`
+(`cilium-preflight` can't own a resource the real `cilium` release already
+owns) unless you also pass `--set gatewayAPI.enabled=false` for the
+preflight release specifically — the preflight DaemonSet doesn't need
+Gateway API to pre-pull images anyway. See [`../todo/FUTURE.md`](../todo/FUTURE.md)
+for the still-open `upgradeCompatibility` flag cleanup left over from the
+1.19→1.20 migration.
+
+Cilium was originally adopted into ArgoCD from resources that already
+existed from earlier manual `helm upgrade` CLI runs, not created by Argo —
+the first Sync just relabels them under Argo's tracking (Argo's Helm source
+renders and applies manifests directly; it doesn't drive the `helm` CLI or
+touch a release object). That left an old, plain `cilium` Helm release
+object stale/orphaned in `kube-system` — harmless to ignore, nothing reads
+it going forward, but worth knowing about if it's ever noticed and looks
+alarming.
 
 ## Talos control-plane upgrade: talos-rpi5 → yama6a fork (2026-09-17)
 
@@ -620,7 +589,7 @@ Also fixed the same setting in the shared `~/talos/homelab/controlplane.yaml`
 template on rpi5-1, so a future from-scratch control-plane node won't
 reintroduce this.
 
-## Workload isolation (Talos 1.14 feature): not enabled yet, checked 2026-09-18
+## Workload isolation (Talos 1.14 feature): not enabled
 
 Considered enabling `SecurityProfileConfig`'s `workloadIsolation: true` (runs
 CRI/kubelet/all pods in a dedicated PID+mount namespace that Talos can tear
@@ -646,8 +615,9 @@ democratic-csi is *not* at risk from this feature when it does get enabled
 pod), not the in-tree iSCSI volume plugin that workload isolation is known
 to break.
 
-**Revisit once a Talos release ships with the CRI/sandboxd race fixed** —
-check the changelog for #14374 specifically before assuming a later patch
+Tracked in [`../todo/FUTURE.md`](../todo/FUTURE.md) — blocked on a Talos
+release shipping with the CRI/sandboxd race (#14374) actually fixed; check
+the changelog for that issue specifically before assuming a later patch
 release includes it.
 
 ## Container log size limits (added 2026-09-18)

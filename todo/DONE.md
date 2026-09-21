@@ -58,6 +58,12 @@ was added too (Grafana still off; Alertmanager was off initially but has since b
 Remote-writing to a proper timeseries database instead of relying on Prometheus's own short-lived (10-day) local storage
 is still open, tracked separately.
 
+## Proxmox host config backup
+
+**Done — deployed and running since 2026-09-11.** Daily cron on the Proxmox host itself tars up `/etc/pve`, network
+config, apt sources, and chrony config, and ships it to rpi5-1 over a restricted SSH key (file transfer only, no
+shell). See [`../docs/proxmox-config-backup.md`](../docs/proxmox-config-backup.md).
+
 ## etcd / control-plane backups
 
 **Done.** Daily `talosctl etcd snapshot` via
@@ -101,6 +107,35 @@ check` afterward: 0 differences, 318821 matching files.
 The earlier idea of moving InfluxDB's datastore onto `hexos-iscsi` is now moot — the Compose observability stack
 (InfluxDB included) isn't being lifted into the cluster as-is; it's superseded by the in-cluster metrics stack instead.
 
+## Talos control-plane installer & firmware fix
+
+**Done.** Control-plane installer switched from the now-inactive `talos-rpi5/installer` to the maintained
+`yama6a/talos-raspberry-pi5` fork (2026-09-17), then all 3 Pi5 control planes were upgraded past a Pi5-specific
+U-Boot EFI-variable bug that blocked every normal `talosctl upgrade`, fixed with a custom `/bin/installer` image
+that swaps the patched `u-boot.bin` directly rather than going through Talos's own (blocked) EFI-variable write
+path. Full rationale, the dead ends ruled out first, and the reusable tooling for the next Talos bump are in
+[`../talos/README.md`](../talos/README.md#talos-v1141-upgrade-blocked-by-pi5-efi-variable-firmware-bug-2026-09-18) and
+[`../talos/tools/uboot-fix/`](../talos/tools/uboot-fix/).
+
+## Talos cluster reliability fixes
+
+**Done.** A handful of silent (Healthy-looking but actually broken) issues found and fixed on the existing cluster,
+each with its root cause and rationale written up in [`../talos/README.md`](../talos/README.md):
+
+- **Kubernetes discovery registry** — two control planes had cluster discovery entirely broken (Kubernetes 1.32+
+  tightened node RBAC in a way that broke Talos's legacy discovery mechanism); fixed by disabling it in favor of
+  the `service` registry.
+- **kube-scheduler / kube-controller-manager metrics** — both bound to `127.0.0.1` by Talos's own default, so
+  Prometheus couldn't scrape either one; fixed by explicitly binding `0.0.0.0` (still TLS/auth-protected, so this
+  doesn't remove any auth).
+- **Control-plane VIP** (`192.168.102.10`) — floats across all 3 control planes via Talos's built-in VIP feature,
+  so `kubectl`/OpenLens no longer drop their connection when a single control-plane node restarts.
+- **Container log size limits** — made kubelet's previously-implicit `containerLogMaxSize`/`containerLogMaxFiles`
+  explicit rather than relying on defaults.
+- **Machine-config `install.image` drift** — found stale on all 5 nodes (harmless day-to-day); fixed on both
+  workers, deliberately left stale on control planes rather than papered over with a value that would be a
+  landmine if it were ever actually used to reinstall one — see talos/README.md for why.
+
 ## Alerting
 
 **Done 2026-09-20.** `kube-prometheus-stack`'s Alertmanager is enabled, routed through the `ntfy-alertmanager` bridge to
@@ -132,8 +167,9 @@ The rpi5-1 CPU/mem widget (Glances) was deliberately deferred rather than shippe
 
 **Done — wired up 2026-09-15, confirmed working live.** Cilium added a native, Gateway-API-standard way to delegate
 auth to an external service (`ExternalAuth` HTTPRoute filter, GEP-1494) using the same `ext_authz` protocol Authelia
-already speaks — shipped in **Cilium 1.20.0**, and the cluster is now on **1.20.1** (upgraded 2026-09-15, see [
-`../talos/README.md`](../talos/README.md#cilium-upgrade-119120-2026-09-15)). Needed for any Compose workload that
+already speaks — shipped in **Cilium 1.20.0**; see [
+`../talos/README.md`](../talos/README.md#cilium-version-management) for how the cluster's Cilium version is tracked
+and upgraded. Needed for any Compose workload that
 doesn't have its own OIDC support (most of them — NetworkOptimizer, change-detection, VictoriaLogs, etc.), since
 Authelia's OIDC provider only directly helps apps that speak OIDC themselves (like ArgoCD/Grafana).
 

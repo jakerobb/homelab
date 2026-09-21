@@ -185,6 +185,8 @@ ls -la ~/backups/etcd/
 
 # Install the daily cron job (03:15 — offset from the Proxmox config backup
 # at 03:00 on a different host, so there's no real reason they'd collide,
-# just kept them visually distinct)
-crontab -l 2>/dev/null | { cat; echo "15 3 * * * \$HOME/bin/etcd-snapshot-backup.sh"; } | crontab -
+# just kept them visually distinct). MAILTO must already be set in this
+# crontab (see email-alerts.md) and stdout must be redirected away, so cron
+# only mails on a real failure (stderr) rather than on every successful run.
+crontab -l 2>/dev/null | { cat; echo "15 3 * * * \$HOME/bin/etcd-snapshot-backup.sh > /dev/null"; } | crontab -
 ```

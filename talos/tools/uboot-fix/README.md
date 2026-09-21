@@ -56,6 +56,6 @@ talosctl upgrade -n <cp-ip> --image ttl.sh/<name>-write:24h    # exit 0, node re
 #    U-Boot on this hardware, not even `talosctl reboot --mode powercycle`.
 
 # 5. Then the real Talos version bump, using a combined image (see main
-#    README's "Then the real version bump" section) -- NOT the stock tag,
+#    README's "Full sequence per node" section) -- NOT the stock tag,
 #    or its overlay install step silently reverts u-boot.bin.
 ```

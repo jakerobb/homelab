@@ -1,28 +1,22 @@
 # Proxmox (Terraform)
 
-Provider: [`bpg/proxmox`](https://registry.terraform.io/providers/bpg/proxmox/latest) v0.112.0.
+Provider: [`bpg/proxmox`](https://registry.terraform.io/providers/bpg/proxmox/latest) — pinned version lives in `versions.tf`.
 
 ## Status
 
 Proxmox VE is installed (root README step 3 done — hostname `proxmox`, static IP
-`192.168.102.21`, ext4 on the 1TB boot SSD). `images.tf` and `talos-worker.tf`
-have a clean `terraform plan` against the real host (ran from rpi5-1, 2 to add,
-0 to change/destroy) — `local-lvm` and `vmbr0` are confirmed real, not just
-assumed defaults. **Not applied yet.** Known follow-ups before/at first apply:
+`192.168.102.21`, ext4 on the 1TB boot SSD). `images.tf`, `talos-worker.tf`, and
+`hexos.tf` are all applied: both Talos worker VMs and the HexOS VM have been
+running in production for a while now — see `talos/README.md` and
+`docs/hexos-install.md` for their current state. DHCP reservations for both
+fixed worker MACs (`02:00:00:00:00:31` → `.31`, `...:32` → `.32`) are in place
+on the UCG.
+
+Known follow-up, not a blocker:
 
 - Pin `checksum`/`checksum_algorithm` on the `proxmox_download_file` resource once
   we have a checksum for the Image Factory qcow2 (Image Factory doesn't publish one
   alongside the image the way GitHub releases do)
-- Verify the disk actually grows to `size = 64` (GB) on import rather than staying
-  at the source image's native (much smaller) size — untested
-- Once applied, add DHCP reservations on the UCG for both fixed MACs
-  (`02:00:00:00:00:31` → `.31`, `...:32` → `.32`)
-- `hexos.tf` written (2026-09-13) — IOMMU is on, both target drives sit alone
-  in their own IOMMU group (clean passthrough, no ACS override needed), see
-  `docs/hexos-install.md`. Installer ISO is downloaded by Proxmox directly
-  (`proxmox_download_file`, same pattern as the Talos qcow2) — HexOS's own
-  site only offers a USB-flashing tool, but it's TrueNAS SCALE underneath and
-  a plain ISO exists at `downloads.hexos.com`. **Not applied yet.**
 
 ## Auth
 
