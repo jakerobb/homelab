@@ -1,12 +1,12 @@
 # Talos cluster config
 
-## Current state (as of 2026-09-07)
+## Current state (as of 2026-09-21)
 
-- **Talos v1.13.9** on control planes (upgrade from v1.11.5 staged 2026-09-17, not yet applied to
-  the live cluster — see below), **Kubernetes v1.34.1** (unchanged; v1.13.9 supports Kubernetes
-  1.31-1.36, so no forced Kubernetes bump alongside this one).
+- **Talos v1.14.1** on all 5 nodes (control planes and both workers), **Kubernetes v1.37.0**.
+  Both already fully upgraded — see "Talos control-plane upgrade" and "Talos v1.14.1 upgrade
+  blocked by Pi5 EFI-variable firmware bug" below for how the control planes got there.
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
-  Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.13.9-9`,
+  Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.1-1`,
   since stock Talos doesn't support the Pi5 directly (no NVMe-capable U-Boot in the official
   `rpi_5` overlay — see [siderolabs/sbc-raspberrypi#96](https://github.com/siderolabs/sbc-raspberrypi/issues/96)).
   Previously `ghcr.io/talos-rpi5/installer` (`talos-rpi5/talos-builder`) — switched 2026-09-17
@@ -15,10 +15,21 @@
   same `talos-rpi5/sbc-raspberrypi5` overlay and `talos-rpi5/u-boot` fork for the actual NVMe-boot
   fix (credited, not reinvented) while tracking current Talos releases itself — see its own
   [FUTURE_WORK.md](https://github.com/yama6a/talos-raspberry-pi5/blob/main/FUTURE_WORK.md): the
-  goal is to retire itself once that U-Boot patch lands upstream. **Any amd64 worker (e.g. the
-  MS-A2 Talos VM) must use the standard `ghcr.io/siderolabs/installer:v1.11.5` / stock qcow2 —
-  do not reuse the rpi5 installer image for it.**
-- CNI: Cilium v1.20.1 (upgraded from 1.19.5 2026-09-15, see below), with
+  goal is to retire itself once that U-Boot patch lands upstream.
+  **`v1.14.1-1`'s plain tag is not what's actually running on these 3 nodes** — it still ships the
+  broken (unpatched) `u-boot.bin` (confirmed 2026-09-21: no EFI-variable fix in the fork's commits
+  since), so it's only safe as a *version/architecture reference*, never as a real `talosctl
+  upgrade --image` target. See "Talos v1.14.1 upgrade blocked by Pi5 EFI-variable firmware bug"
+  and "Machine-config install.image drift" below before touching any control-plane install image.
+  **Any amd64 worker (e.g. the MS-A2 Talos VM) must use a Factory schematic image
+  (`factory.talos.dev/installer/<schematic-id>:<version>`) — `ghcr.io/siderolabs/installer` doesn't
+  exist for recent releases, and the rpi5 installer image must never be reused for amd64 hardware.**
+  Currently `factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.1`
+  (the `iscsi-tools` + `util-linux-tools` schematic — see "iscsi-tools extension" below), confirmed
+  against both workers' live `get extensions` output and correctly persisted in machine config as
+  of 2026-09-21.
+- CNI: Cilium v1.20.2 (patch-bumped from 1.20.1 2026-09-16, itself upgraded from 1.19.5 2026-09-15,
+  see below), with
   `kubeProxyReplacement` enabled, full eBPF host routing
   (`bpf.masquerade: true`, `Host: BPF` — not the `Legacy`/iptables fallback),
   and **L2 announcements** for LoadBalancer IPs (see `cilium/values.yaml`).
@@ -499,6 +510,10 @@ No need to touch `ubootefi.var` for this to work.
    replica occasionally crash-looping if it hit a flaky-API window during
    the reboot — harmless, `kubectl delete pod` for a clean retry if it
    doesn't self-heal).
+5. **Do not patch `.machine.install.image` to the plain tag afterward** —
+   see "Machine-config install.image drift" below for why that field can't
+   safely be made to look current for these nodes. Leave it stale/unfixed;
+   don't paper over it with a value that would be worse if ever used.
 
 Build once on rpi5-1 (arm64, matches the target hardware — no
 cross-compilation), push to `ttl.sh` (anonymous, no auth needed; these
@@ -517,6 +532,37 @@ Image Factory schematic image (see the worker-upgrade notes; correct
 reference is `factory.talos.dev/installer/<schematic-id>:v1.14.1`, not
 `ghcr.io/siderolabs/installer:v1.14.1`, which doesn't exist for recent
 releases).
+
+## Machine-config install.image drift found and partially fixed (2026-09-21)
+
+A scheduled cluster health check found all 5 nodes' persisted machine config
+(`.machine.install.image`) still pointed at the **original, abandoned**
+`ghcr.io/talos-rpi5/installer:v1.11.5` — stale on every node despite the
+control-plane fork switch (2026-09-17) and the v1.14.1 upgrades (both above)
+having actually happened. `talosctl upgrade --image <x>` does not rewrite
+this field as a side effect; only an explicit `talosctl patch machineconfig`
+(or a full `apply-config`) does. Harmless day-to-day (nothing currently
+running reads this field), but it matters for whatever install action next
+consumes it — a wipe/reinstall, or `talosctl apply-config` from a
+regenerated config.
+
+**Workers: fixed.** Patched both to
+`factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.1`
+(the confirmed-live `iscsi-tools` + `util-linux-tools` schematic — see
+"iscsi-tools extension" above) via `talosctl patch machineconfig`, which
+applies without a reboot. Verified both nodes stayed `Ready` throughout.
+
+**Control planes: deliberately left as-is, not a shortcut.** There is no
+durable value safe to put here. Setting it to the plain
+`ghcr.io/yama6a/talos-raspberry-pi5:v1.14.1-1` tag would look correct but
+is exactly the image the section above says never to use directly — it
+would silently reintroduce the broken `u-boot.bin` the moment anything
+actually installs from it, since the real fix only exists in a one-off
+combined image (built fresh, pushed to ephemeral `ttl.sh`, already expired).
+Persisting a plausible-looking-but-landmined value felt worse than leaving
+the obviously-stale one. If a control plane ever needs a real reinstall,
+follow "Full sequence per node" above from scratch — don't trust this field,
+and don't skip the U-Boot patch step because the config looks current.
 
 ## Kubernetes discovery registry: leave the `kubernetes` one disabled (found/fixed 2026-09-18)
 
@@ -777,6 +823,23 @@ from-scratch worker rebuild matches what's actually running.
 
 Verify with `talosctl -n <worker-ip> get extensions` — expect an
 `iscsi-tools` entry alongside the `schematic` entry matching the ID above.
+
+**Schematic ID changed with the v1.14.1 upgrade** — both workers now report
+schematic `613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245`
+(confirmed 2026-09-21 via `get extensions` on both), which also picked up
+`util-linux-tools` alongside `iscsi-tools`; current reference is
+`factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.1`.
+Unlike the control planes, workers have no firmware landmine, so **after any
+future worker upgrade, always confirm `talosctl -n <worker-ip> get
+machineconfig -o yaml` shows this same `factory.talos.dev/installer/...`
+value under `.machine.install.image`** (matching whatever schematic/version
+was actually just installed) — `talosctl upgrade --image <x>` does not
+rewrite that field on its own, so it silently drifted from `v1.11.5` all the
+way through the v1.14.1 bump without anyone noticing until a scheduled
+health check caught it (see "Machine-config install.image drift" above). If
+it's stale, `talosctl patch machineconfig -n <worker-ip> -p
+'[{"op":"replace","path":"/machine/install/image","value":"<correct
+factory.talos.dev URL>"}]'` fixes it without a reboot.
 
 ## kube-scheduler / kube-controller-manager metrics bind address (fixed 2026-09-20)
 

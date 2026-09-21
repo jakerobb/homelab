@@ -41,13 +41,15 @@ auto-creating DNS records — see [`argocd/README.md`](argocd/README.md#dns--tls
 First real `HTTPRoute` is ArgoCD's own UI (`argocd.jakerobb.org`).
 
 ## etcd / control-plane backups
-**Local backup done (2026-09-13).** Daily `talosctl etcd snapshot` via
+**Done.** Daily `talosctl etcd snapshot` via
 [`scripts/etcd-snapshot-backup.sh`](scripts/etcd-snapshot-backup.sh), stored
-on rpi5-1 (`~/backups/etcd`, 30-day retention) — see
-[`docs/etcd-backup.md`](docs/etcd-backup.md). Deliberately local-only for
-now; shipping a copy off-box (e.g. B2, matching the P3 Plus backup pattern)
-is a deferred follow-up. Restore procedure also not yet exercised — worth
-testing before relying on it in a real incident.
+on rpi5-1 (`~/backups/etcd`, 30-day retention) and synced to a dedicated,
+scoped-key B2 bucket (added 2026-09-21). Restore procedure confirmed
+working 2026-09-21 with a full live drill against production — see
+[`docs/etcd-backup.md`](docs/etcd-backup.md#restore) for the runbook,
+timeline, and quorum-safety mechanics. Recurring follow-up, not a one-off:
+**quarterly restore drill**, next due ~2026-12-21 — worth a reminder closer
+to the date rather than relying on this list alone.
 
 ## HexOS storage
 **Core work done — started 2026-09-13, iSCSI path completed 2026-09-15.**
