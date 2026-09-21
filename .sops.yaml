@@ -15,3 +15,7 @@ creation_rules:
     key_groups:
       - age:
           - age1nqvgqc45f5j9y9ch0lyccdefeazs26xkp732rujp23nqeqmdjefshruqs8
+  - path_regex: terraform/.*/secrets/.*\.sops\.(yaml|json|env)$
+    key_groups:
+      - age:
+          - age1nqvgqc45f5j9y9ch0lyccdefeazs26xkp732rujp23nqeqmdjefshruqs8

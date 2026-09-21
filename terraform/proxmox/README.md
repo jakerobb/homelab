@@ -27,11 +27,21 @@ assumed defaults. **Not applied yet.** Known follow-ups before/at first apply:
 ## Auth
 
 Uses an API token, not the root password — see the comment in `providers.tf` for how
-to create one after install. Set it via environment variable, never in a `.tf`/`.tfvars`
-file:
+to create one after install. Never put it in a `.tf`/`.tfvars` file.
+
+**Run via `./tf.sh` instead of `terraform` directly** (added 2026-09-21, so the token
+never needs pasting into a shell by hand): `./tf.sh plan`, `./tf.sh apply`, etc. — a thin
+wrapper that decrypts `secrets/proxmox-api-token.sops.yaml` (SOPS + age, same repo key as
+everywhere else — see `talos/README.md#secrets-sops--age`) and injects it as
+`TF_VAR_proxmox_api_token` for just that one command, same `sops exec-env` pattern as
+`scripts/etcd-snapshot-backup.sh`'s B2 credentials. One-time setup, see
+`secrets/proxmox-api-token.yaml.example`.
+
+Plain manual export still works too, if you ever need it outside the wrapper:
 
 ```bash
 export TF_VAR_proxmox_api_token="terraform@pve!provider=<uuid>"
+terraform plan   # not ./tf.sh, since the wrapper would override this with the sops value
 ```
 
 ## Resources
