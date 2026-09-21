@@ -69,7 +69,22 @@ spec:
               receiver: ntfy
               group_by: ["alertname", "namespace"]
               group_wait: 30s
-              group_interval: 5m
+              # 5m (the chart's unset-but-effective default) sat between a
+              # 2026-09-21 incident's FIRING and RESOLVED ntfy messages —
+              # once a group has sent its first notification, Alertmanager
+              # won't send another update for it (including a resolve)
+              # until group_interval passes, regardless of how fast the
+              # underlying alert actually cleared. Prometheus's own
+              # evaluationInterval/scrapeInterval are both 30s (not the
+              # bottleneck), so 1m here gets a resolved notification out
+              # about as fast as this pipeline can detect one. Deliberately
+              # NOT touching global.resolve_timeout (still the chart's
+              # default 5m) — that one governs how long Alertmanager waits
+              # before assuming an alert resolved because Prometheus itself
+              # went silent, which is a different failure mode; lowering it
+              # would trade a slow-but-correct resolve for a fast-but-wrong
+              # "all clear" during an actual Prometheus outage.
+              group_interval: 1m
               # Home-lab pace, not paging pace — a still-firing alert gets
               # re-sent at most every 4h instead of Alertmanager's 4h
               # chart-default-adjacent-but-unset behavior, made explicit.
