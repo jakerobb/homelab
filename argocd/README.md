@@ -50,7 +50,7 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
 - **Sync policy: fully automated (`selfHeal: true`, `prune: true`)** on every
   app managed under `apps/`. Chosen deliberately over the safer
   automated-no-prune middle ground: nothing stateful (PVCs etc.) is under
-  ArgoCD's management yet — see [`../TODO.md`](../TODO.md#hexos-storage) — so
+  ArgoCD's management yet — see [`../todo/READY.md`](../todo/READY.md#hexos-storage) — so
   prune's main hazard (deleting real stateful data that's missing from a
   manifest) doesn't apply yet. **Revisit this once storage-backed workloads
   (e.g. an NFS-backed `StorageClass` from the HexOS TODO) go under ArgoCD's
@@ -166,7 +166,7 @@ on every device, no manually-added DNS entries per app:
 
 ## Authelia SSO (decided 2026-09-13)
 
-Fronting **ArgoCD only** for now — see [`../TODO.md`](../TODO.md) for the
+Fronting **ArgoCD only** for now — see [`../todo/READY.md`](../todo/READY.md) for the
 per-workload plan to migrate everything currently on the RPi5 16GB's Docker
 Compose stack (Grafana, NetworkOptimizer, etc.) into the cluster one at a
 time; those get added to Authelia's `access_control` as they land, not now.
@@ -185,7 +185,7 @@ time; those get added to Authelia's `access_control` as they land, not now.
   It's a deliberate bridge, not a long-term answer: PVs are backed by a
   directory on whichever single node the pod lands on, no redundancy. Fine
   for Authelia's small SQLite file; superseded once the
-  [HexOS storage TODO](../TODO.md#hexos-storage) provides a real NFS/SMB
+  [HexOS storage TODO](../todo/READY.md#hexos-storage) provides a real NFS/SMB
   `StorageClass`. `reclaimPolicy: Retain` (not the chart's `Delete` default)
   since this is also the first PVC-backed workload under ArgoCD's
   fully-automated `prune: true` — see the "Sync policy" bullet above.
@@ -194,7 +194,7 @@ time; those get added to Authelia's `access_control` as they land, not now.
   [`install/values.yaml`](install/values.yaml)), so there's no need for
   Cilium's Gateway API `ExternalAuth` HTTPRoute filter — which isn't
   available yet anyway at the cluster's current Cilium version (1.19.5 vs.
-  the 1.20+ it needs; see [`../TODO.md`](../TODO.md)). That filter only
+  the 1.20+ it needs; see [`../todo/DONE.md`](../todo/DONE.md#gateway-api-forward-auth-cilium-externalauth-filter)). That filter only
   becomes relevant once a Compose app that *doesn't* speak OIDC natively
   (NetworkOptimizer, change-detection, etc.) actually migrates in.
 - **Exposure:** `HTTPRoute` on `homelab-gateway` (auto-created by the
@@ -269,7 +269,7 @@ time; those get added to Authelia's `access_control` as they land, not now.
 
 Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
 (`docker-compose/docker-compose.yml`) — see the
-[`TODO.md`](../TODO.md#compose-workload-migration) note this replaces.
+[`READY.md`](../todo/READY.md#compose-workload-migration) note this replaces.
 
 - **PR-based, not in-place patching.** Watchtower silently swaps running
   containers; that model fights GitOps (git is supposed to be the source of
@@ -383,7 +383,7 @@ chart `kube-prometheus-stack` from `prometheus-community`.
 - **Grafana still disabled.** Today's actual goal is just feeding OpenLens,
   and the existing Compose-stack Grafana on the 16GB Pi already covers
   dashboarding until that workload migrates in (see
-  [`TODO.md`](../TODO.md#compose-workload-migration)).
+  [`READY.md`](../todo/READY.md#compose-workload-migration)).
 - **Alertmanager enabled 2026-09-20** (was disabled at initial deploy — no
   notification receiver was wired up yet, see git history for this section's
   original wording). Surfaced by a scheduled health check: Prometheus had
@@ -430,7 +430,7 @@ chart `kube-prometheus-stack` from `prometheus-community`.
 - **Storage:** `hexos-iscsi` (already the cluster default StorageClass, with
   `reclaimPolicy: Retain` — see [`democratic-csi`](apps/democratic-csi/application.yaml)),
   10Gi, 10-day retention. Deliberately modest — no VictoriaMetrics
-  remote-write yet (see [`TODO.md`](../TODO.md#metrics-prometheus--timeseries-db)),
+  remote-write yet (see [`READY.md`](../todo/READY.md#log-and-metrics-aggregation)),
   so this is a bridge, not the long-term store.
 - **Kubelet scrape TLS:** `insecureSkipVerify` is already the chart default
   for the kubelet `ServiceMonitor` — same call already made for

@@ -1,6 +1,6 @@
 # Closes the other half of metrics-server's TODO (see
 # argocd/apps/metrics-server/application.yaml and
-# TODO.md#metrics-prometheus--timeseries-db): OpenLens's own visual metrics
+# todo/DONE.md#metrics-instant-metrics-metrics-server--kube-prometheus-stack): OpenLens's own visual metrics
 # (the "Cluster" dashboard's CPU/Memory graphs, and even the plain usage bars
 # on the Nodes list) all run through a Prometheus it can query, separately
 # from the Kubernetes Metrics API metrics-server provides for `kubectl top`.
@@ -8,7 +8,7 @@
 # Grafana still disabled deliberately for now:
 # - grafana.enabled: false — today's actual goal is just feeding OpenLens;
 #   the existing Compose-stack Grafana on the 16GB Pi already covers
-#   dashboarding until that workload migrates in (see TODO.md).
+#   dashboarding until that workload migrates in (see todo/READY.md).
 #
 # Alertmanager enabled 2026-09-20, once ntfy actually landed in the cluster
 # (argocd/apps/ntfy/) — see argocd/README.md's kube-prometheus-stack section
@@ -129,7 +129,8 @@ spec:
             serviceMonitorSelectorNilUsesHelmValues: false
             podMonitorSelectorNilUsesHelmValues: false
             ruleSelectorNilUsesHelmValues: false
-            # No VictoriaMetrics remote-write yet (see TODO.md), so keep
+            # No VictoriaMetrics remote-write yet (see
+            # todo/READY.md#log-and-metrics-aggregation), so keep
             # local retention/storage modest — this is a bridge, not the
             # long-term store.
             retention: 10d

@@ -12,7 +12,7 @@
 #     as good a fit for a square tile as this.)
 #   network-optimizer.png - docs/images/app-logo-v2.png from
 #     github.com/Ozark-Connect/NetworkOptimizer -- turns out this Compose
-#     app (see TODO.md's Compose migration notes) is a published project
+#     app (see todo/READY.md's Compose migration notes) is a published project
 #     with its own logo, not the bespoke no-icon-exists tool assumed
 #     earlier. 522x319, not square -- will letterbox some in a square tile.
 #   modbus.png - the Modbus Organization's own logo (main_logo.png from

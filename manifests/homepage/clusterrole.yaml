@@ -10,7 +10,7 @@
 # `metrics.k8s.io` is dropped: no metrics-server is installed on this cluster
 # yet (verified via `kubectl top nodes` -> "Metrics API not available"), so
 # granting it would be dead weight — add it back if that ever changes (see
-# TODO.md's metrics item).
+# todo/READY.md's metrics item).
 #
 # Read-only (get/list) everywhere; Homepage never needs to mutate cluster
 # state, only enumerate it for discovery + the (currently unused) cluster

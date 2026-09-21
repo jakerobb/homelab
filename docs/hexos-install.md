@@ -175,7 +175,7 @@ Cosmetic only.
       striping it into the pool's capacity, so `data` is really a single vdev
       on the P3 Plus (4TB) plus that log device, not a 6TB stripe — actual
       usable space is ~4TB. Also hosts `data/k8s-iscsi` for the cluster's
-      `democratic-csi` StorageClass (see [`TODO.md`](../TODO.md#hexos-storage)).
+      `democratic-csi` StorageClass (see [`DONE.md`](../todo/DONE.md#hexos-storage)).
 - [x] Set up an NFS or SMB share, test from another device on the network.
       Done 2026-09-18: new dataset `data/shared` (Generic preset, so both
       protocols share consistent permissions on the same files). NFS export
@@ -199,7 +199,7 @@ Cosmetic only.
       truenas.lan:/mnt/data/shared <mountpoint>`.
 - [x] Once the pool is confirmed healthy, `rclone copy` the archived data back
       down from B2. Done 2026-09-20 from the Intel MacBook Pro, mounted over
-      NFSv3 onto `data/shared` — see [`TODO.md`](../TODO.md#hexos-storage)
+      NFSv3 onto `data/shared` — see [`DONE.md`](../todo/DONE.md#hexos-storage)
       for the full writeup (remote name, duration, file count).
 - [x] Verify restored data integrity. `rclone check` against the B2 remote:
       0 differences, 318821 matching files. Confirmed 2026-09-20 via the

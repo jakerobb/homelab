@@ -7,7 +7,7 @@
 # One `from` entry per namespace that has an HTTPRoute referencing Authelia
 # this way. homepage/httproute.yaml was the first; searxng/httproute.yaml is
 # the second. Add another entry here (not a second ReferenceGrant) as more
-# apps adopt the ExternalAuth pattern from TODO.md's "Gateway API forward-auth"
+# apps adopt the ExternalAuth pattern from todo/DONE.md's "Gateway API forward-auth"
 # list.
 apiVersion: gateway.networking.k8s.io/v1
 kind: ReferenceGrant

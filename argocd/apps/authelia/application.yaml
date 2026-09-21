@@ -1,5 +1,5 @@
 # Authelia, fronting ArgoCD only for now (see argocd/README.md for the
-# full writeup and TODO.md for the Compose-workload migrations this doesn't
+# full writeup and todo/READY.md for the Compose-workload migrations this doesn't
 # cover yet). Deliberately light: file-based user database (SQLite via
 # `storage.local`, no Postgres) and memory-based sessions (no Redis) — see
 # argocd/README.md for why that's an acceptable trade for a homelab.
@@ -8,7 +8,7 @@
 # argocd/install/values.yaml) rather than Gateway-level forward-auth —
 # ArgoCD supports OIDC natively, so there's no need for Cilium's
 # ExternalAuth HTTPRoute filter (which isn't available yet at the cluster's
-# current Cilium version anyway — see TODO.md).
+# current Cilium version anyway — see todo/DONE.md).
 #
 # Secrets: authelia-secrets / users-database / oidc-jwk (SOPS-encrypted
 # under argocd/secrets/, applied out-of-band — same caveat as the
@@ -62,7 +62,7 @@ spec:
           # sessions, so the old SQLite DB/2FA registrations weren't worth
           # preserving. storageClassName is immutable on an existing PVC, so
           # this requires deleting the old `authelia` PVC once synced (see
-          # TODO.md/session notes) before the chart can recreate it here.
+          # todo/READY.md/session notes) before the chart can recreate it here.
           storageClass: hexos-iscsi
           size: 200Mi
 
@@ -122,7 +122,7 @@ spec:
           # app gated via the Gateway-level ExternalAuth filter instead —
           # this rule is what it's actually checking against. Add a rule per
           # app as each one moves off Compose and gets its own HTTPRoute (see
-          # TODO.md).
+          # todo/READY.md).
           access_control:
             default_policy: 'deny'
             rules:

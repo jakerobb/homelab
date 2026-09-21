@@ -1,5 +1,5 @@
 # First real use of Cilium 1.20's GEP-1494 `ExternalAuth` HTTPRoute filter in
-# this cluster (see TODO.md's "Gateway API forward-auth" entry — the Cilium
+# this cluster (see todo/DONE.md's "Gateway API forward-auth" entry — the Cilium
 # upgrade was done 2026-09-15, this filter is the "remains" part). Delegates
 # the auth decision to Authelia's ext-authz endpoint entirely at the Gateway
 # — this Deployment has zero auth code/session handling of its own.

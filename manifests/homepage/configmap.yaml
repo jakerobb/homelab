@@ -67,7 +67,7 @@ data:
   # Manually-entered apps, alphabetical by name. This is deliberately a
   # snapshot of everything currently proxied by docker-compose/caddy/Caddyfile
   # plus the two apps already live in the cluster (ArgoCD, Authelia) — as
-  # each Compose app migrates into the cluster per TODO.md's "Compose workload
+  # each Compose app migrates into the cluster per todo/READY.md's "Compose workload
   # migration" plan, delete its entry here and annotate its new HTTPRoute
   # instead (see kubernetes.yaml above) so it becomes self-maintaining.
   #

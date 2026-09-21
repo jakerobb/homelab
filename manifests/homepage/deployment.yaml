@@ -50,7 +50,7 @@ spec:
             # which is what actually 500'd every request (EACCES — non-root
             # UID, no writable volume there). Also just the right call for a
             # k8s app: let whatever aggregates container stdout handle this
-            # (see TODO.md's Kubernetes log aggregation item) instead of a
+            # (see todo/READY.md's Kubernetes log aggregation item) instead of a
             # log file nothing ever reads.
             - name: LOG_TARGETS
               value: "stdout"
@@ -127,7 +127,7 @@ spec:
             name: homepage-icons
         # Applied out-of-band via `sops -d ... | kubectl apply -f -` — see
         # each secret's own comment header. Not ArgoCD-managed (no KSOPS
-        # yet, see TODO.md), so these Secrets must already exist in the
+        # yet, see todo/READY.md), so these Secrets must already exist in the
         # `homepage` namespace before this Deployment will come up healthy.
         - name: proxmox-credentials
           secret:
