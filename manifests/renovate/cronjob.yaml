@@ -33,7 +33,7 @@ spec:
               # Pinned, not :latest — this tag is itself now tracked by the
               # kubernetes manager (see renovate.json), so Renovate will open
               # a PR against itself when a new version ships.
-              image: renovate/renovate:44.95.0
+              image: renovate/renovate:44.105.1
               args:
                 - jakerobb/homelab
               env:
