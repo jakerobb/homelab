@@ -67,6 +67,16 @@ resource "proxmox_virtual_environment_vm" "hexos" {
   node_name = var.proxmox_node_name
   name      = "hexos"
 
+  # Never let an apply silently power-cycle the NAS (added 2026-09-21, after
+  # an apply auto-rebooted this VM to apply an ide3 change and it failed to
+  # come back up on its own — see docs/hexos-install.md#terraform-reboot-gate
+  # for the incident). false means: a change that *requires* taking the VM
+  # offline now fails the apply instead of doing it automatically, and a
+  # change that applies live but still wants a reboot just warns instead of
+  # rebooting. Either way, restarting hexos becomes a deliberate, separate,
+  # manual step — plan first, confirm what it wants to do, decide when.
+  reboot_after_update = false
+
   machine = "q35" # required for PCIe passthrough (i440fx doesn't do it cleanly)
   bios    = "ovmf"
 
