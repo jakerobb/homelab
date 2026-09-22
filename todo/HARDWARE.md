@@ -22,8 +22,6 @@ This document enumerates my hardware plans.
 * Choose locations outside the rack to mount the Zigbee and Z-Wave gateways, and run CAT6 cables from the rack to those
   locations. (Freeing up space on the crowded rack shelf!)
 * Move the RPi mount to the back rail to free up space in the rack
-    * Reorder the cables from the rack switch to the Talos controller nodes; they are currently in a weird order (port
-      9 -> cp3, port 10 -> cp1, port 11 -> cp2).
 * Move the PDU Pro to the back rail to free up space in the rack.
     * This will require cutting power to _everything_. Need to figure out how to prep for that.
 * Figure out why the WLED controller is offline. Did a power connection from the Meanwell PSU come loose?
