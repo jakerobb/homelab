@@ -1,0 +1,25 @@
+# Bound to the built-in cluster-admin ClusterRole — matches the upstream
+# Helm chart's own default (confirmed against charts/headlamp/values.yaml),
+# and what Jake's own kubeconfig from the jump box already grants via
+# kubectl/talosctl. Deliberate call (2026-09-21): Headlamp runs in
+# `-in-cluster` mode using this ServiceAccount's own token for every API
+# call it makes, not a per-user token — the OIDC login below authenticates
+# *who can reach the Headlamp UI at all*, but doesn't map claims to
+# per-user RBAC (that needs kube-apiserver's own --oidc-* flags wired up,
+# a separate and much bigger cluster change, not done here). So every
+# Authelia user who logs in gets full cluster-admin through Headlamp,
+# same as everyone using kubectl from the jump box today — no new blast
+# radius for a single-admin homelab, but revisit if a second, less-trusted
+# user ever gets an Authelia account.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: headlamp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: headlamp
+    namespace: headlamp

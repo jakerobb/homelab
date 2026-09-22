@@ -27,7 +27,9 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   [`apps/`](apps/) by the root `Application` in
   [`bootstrap/root-app.yaml`](bootstrap/root-app.yaml), which is the second
   and last manual step. Add new apps by dropping an `Application` manifest
-  anywhere under `apps/` — the root app recurses.
+  anywhere under `apps/` — the root app recurses. See
+  [`docs/adding-an-app.md`](../docs/adding-an-app.md) for the full
+  checklist (file layout, exposure, auth, secrets, Homepage discovery).
   - **Convention (settled 2026-09-17): `apps/` holds only `Application`
     manifests, never an app's actual resources.** Early on, a few simple
     apps (`homepage`, `renovate`) were added as raw manifests directly under
@@ -572,6 +574,78 @@ call as homepage/searxng.
   discovery** (on the new `HTTPRoute`), replacing the manual `services.yaml`
   entry it had before — same pattern searxng's `httproute.yaml` established
   first.
+
+## Headlamp (decided and deployed 2026-09-21)
+
+Kubernetes GUI, replacing OpenLens (unmaintained upstream). Chosen over
+FreeLens/Portainer/Rancher specifically for OIDC: it's the only one of the
+four with free, native (non-proxy, non-paid-tier) OIDC login support, and
+it's the official Kubernetes SIG-UI-recommended successor to the now-archived
+Kubernetes Dashboard. Deployed as [`apps/headlamp/`](apps/headlamp/application.yaml),
+bare manifests (no official chart — see the reasoning at the top of
+[`manifests/headlamp/deployment.yaml`](../manifests/headlamp/deployment.yaml))
+at [`manifests/headlamp/`](../manifests/headlamp/).
+
+- **Auth: real OIDC, not Gateway forward-auth** — same call already made for
+  ArgoCD (see "Authelia SSO" above), for the same reason: Headlamp supports
+  OIDC login natively, so stacking Cilium's `ExternalAuth` filter in front
+  would just mean logging into Authelia twice against the same IdP.
+- **RBAC: cluster-admin, no per-user distinction** (decided with Jake
+  2026-09-21) — see the comment on
+  [`manifests/headlamp/clusterrolebinding.yaml`](../manifests/headlamp/clusterrolebinding.yaml).
+  Headlamp runs in `-in-cluster` mode using its own ServiceAccount's token
+  for every API call; OIDC only gates who can reach the UI, not what they
+  can do once in. Fine for a single-admin homelab; revisit (real
+  kube-apiserver OIDC + per-user RBAC) if a second, less-trusted user ever
+  gets an Authelia account.
+- **Exposure:** `HTTPRoute` on `homelab-gateway`
+  ([`manifests/headlamp/httproute.yaml`](../manifests/headlamp/httproute.yaml)),
+  hostname `headlamp.jakerobb.org`, discovered by Homepage via
+  `gethomepage.dev/*` annotations into the Infrastructure tab.
+- **Secrets:** same out-of-band pattern as Cloudflare/Authelia/Renovate above
+  (no SOPS/KSOPS wired into ArgoCD sync yet). Two things need generating
+  together — the plaintext client secret (goes in the k8s Secret Headlamp
+  reads) and its pbkdf2-sha512 hash (goes in Authelia's client config, safe
+  to commit since it's one-way, same as ArgoCD's own client above):
+
+  ```bash
+  docker run --rm authelia/authelia:4.39.28 authelia crypto hash generate pbkdf2 --variant sha512 --random
+  ```
+
+  This prints a `Random Password:` and a `Digest:` line. Paste the `Digest`
+  value over the `CHANGEME-see-argocd/README.md#headlamp` placeholder in
+  [`apps/authelia/application.yaml`](apps/authelia/application.yaml)'s
+  `headlamp` client — safe to commit, it's a one-way hash. Keep the
+  `Random Password` value for the next step only; it's the real secret and
+  shouldn't be pasted anywhere else:
+
+  ```bash
+  read -rsp "Headlamp OIDC client secret (the Random Password from above): " SECRET; echo
+  cat > argocd/secrets/headlamp-oidc-client-secret.sops.yaml <<EOF
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: headlamp-oidc-client-secret
+    namespace: headlamp
+  stringData:
+    client-secret: ${SECRET}
+  EOF
+  sops -e -i argocd/secrets/headlamp-oidc-client-secret.sops.yaml
+  unset SECRET
+  ```
+
+  Apply once the `headlamp` namespace exists (after `root-app.yaml` has
+  synced at least once):
+
+  ```bash
+  export KUBECONFIG=~/.kube/config
+  sops -d argocd/secrets/headlamp-oidc-client-secret.sops.yaml | kubectl apply -f -
+  ```
+
+  `git add argocd/secrets/headlamp-oidc-client-secret.sops.yaml` and
+  commit — safe, it's encrypted. Until both this and the `Digest` edit
+  above are done, Headlamp's pod runs fine but its OIDC login will fail
+  (`invalid_client` from Authelia).
 
 ## Bootstrap (one-time, manual)
 

@@ -1,0 +1,91 @@
+# Bare Deployment, not the official Helm chart — the chart's own
+# `config.oidc.secret.existingSecret` wiring has multiple open upstream bugs
+# as of chart/app v0.45.0 (kubernetes-sigs/headlamp#2022, #2485, #4080: wrong
+# env var names, existing-secret values not actually reaching the container),
+# and ArgoCD has no SOPS/KSOPS decryption anyway (see argocd/README.md), so
+# there's no way to hand the chart a secret via `helm.valuesObject` without
+# committing the plaintext client secret to git. Setting the documented
+# HEADLAMP_CONFIG_OIDC_* env vars directly (https://headlamp.dev/docs/latest/installation/in-cluster/oidc/)
+# sidesteps the chart entirely and matches this repo's existing "bare
+# Deployment for a simple app" precedent (searxng, ntfy, homepage).
+#
+# Image/port/probe/securityContext defaults below are lifted straight from
+# the official chart's own values.yaml so this behaves the same as an
+# official install would — only the OIDC wiring and RBAC (clusterrolebinding.yaml)
+# are hand-rolled.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headlamp
+  namespace: headlamp
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: headlamp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: headlamp
+    spec:
+      serviceAccountName: headlamp
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: headlamp
+          # renovate: datasource=github-releases depName=kubernetes-sigs/headlamp
+          image: ghcr.io/headlamp-k8s/headlamp:v0.45.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - -in-cluster
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            # Not secret — the client ID and issuer URL are both public by
+            # design (visible in every OIDC redirect URL/discovery doc
+            # anyway). Only the client secret needs to come from a Secret.
+            - name: HEADLAMP_CONFIG_OIDC_CLIENT_ID
+              value: headlamp
+            - name: HEADLAMP_CONFIG_OIDC_IDP_ISSUER_URL
+              value: https://auth.jakerobb.org
+            # Matches this client's `scopes` list in
+            # argocd/apps/authelia/application.yaml exactly — Authelia
+            # rejects a request for any scope the client isn't registered
+            # for. No `groups` scope: Headlamp doesn't use it for anything
+            # (no per-user RBAC — see clusterrolebinding.yaml's comment),
+            # and it's non-standard pre-0.3.0 baggage upstream dropped.
+            - name: HEADLAMP_CONFIG_OIDC_SCOPES
+              value: openid,profile,email
+            - name: HEADLAMP_CONFIG_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: headlamp-oidc-client-secret
+                  key: client-secret
+          ports:
+            - name: http
+              containerPort: 4466
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi

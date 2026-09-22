@@ -134,6 +134,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'search.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'headlamp.jakerobb.org'
+                policy: 'two_factor'
 
           identity_providers:
             oidc:
@@ -160,6 +162,31 @@ spec:
                     - 'profile'
                     - 'email'
                     - 'groups'
+                  grant_types:
+                    - 'authorization_code'
+                    - 'refresh_token'
+                  response_types:
+                    - 'code'
+                  token_endpoint_auth_method: 'client_secret_basic'
+                  authorization_policy: 'two_factor'
+                - client_id: 'headlamp'
+                  client_name: 'Headlamp'
+                  # pbkdf2-sha512 hash of the plaintext secret Headlamp
+                  # itself holds via the headlamp-oidc-client-secret Secret
+                  # (argocd/secrets/headlamp-oidc-client-secret.sops.yaml,
+                  # applied out-of-band — see argocd/README.md's Headlamp
+                  # section for the generation command). Placeholder below
+                  # until that's run: Headlamp's OIDC login will fail (not
+                  # the whole app, just the login flow) until this is a
+                  # real hash.
+                  client_secret: 'CHANGEME-see-argocd/README.md#headlamp'
+                  public: false
+                  redirect_uris:
+                    - 'https://headlamp.jakerobb.org/oidc-callback'
+                  scopes:
+                    - 'openid'
+                    - 'profile'
+                    - 'email'
                   grant_types:
                     - 'authorization_code'
                     - 'refresh_token'

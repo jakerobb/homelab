@@ -1,0 +1,7 @@
+# Explicit, labeled Namespace rather than relying on CreateNamespace=true —
+# applied by headlamp's own Application (argocd/apps/headlamp/application.yaml)
+# alongside the rest of this directory. Same reasoning as searxng/namespace.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headlamp
