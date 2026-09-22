@@ -177,6 +177,17 @@ spec:
                   public: false
                   redirect_uris:
                     - 'https://argocd.jakerobb.org/auth/callback'
+                  # Confirmed 2026-09-22: this was the same missing-claim
+                  # gap that broke Headlamp's login (see claims_policies
+                  # above) — ArgoCD's RBAC subject-matching
+                  # (argocd/README.md's "RBAC" section) reads the `email`
+                  # claim, which Authelia never put in the ID token without
+                  # this reference. Reuses the same policy rather than a
+                  # dedicated one; it doesn't cover `groups` (ArgoCD
+                  # requests that scope too, below), but no policy.csv rule
+                  # uses groups today, so that's a latent-not-active gap,
+                  # not part of this fix.
+                  claims_policy: 'email_identity'
                   scopes:
                     - 'openid'
                     - 'profile'

@@ -829,6 +829,36 @@ Verified failover works: `talosctl -n 192.168.102.11 reboot` while watching
 moved to `talos-cp-2` within the outage window, and `kubectl` against
 `https://192.168.102.10:6443` never dropped.
 
+## Pi 5 NIC watchdog mitigation (added 2026-09-18)
+
+Deployed as a `DaemonSet` on the 3 control-plane Pis
+([`patches/control-plane/nic-watchdog-mitigation.yaml`](patches/control-plane/nic-watchdog-mitigation.yaml)),
+looping every 30s to disable TSO/GSO offload and EEE (Energy Efficient
+Ethernet) on `end0` via `ethtool`:
+
+```
+ethtool -K end0 tso off gso off
+ethtool --set-eee end0 eee off
+```
+
+This is a known Raspberry Pi 5 onboard-NIC issue — the offload/EEE
+combination can trigger a kernel `NETDEV WATCHDOG: end0: transmit queue
+timed out` hang. Disabling both is the standard community mitigation.
+
+**Why it has to keep running rather than being applied once:** these are
+runtime `ethtool` settings, not persistent config — the kernel/driver
+resets them to their (broken) defaults on reboot and on link
+renegotiation/reset, and Talos being immutable has no native machine-config
+knob or `udev`/`ethtool.conf`-equivalent hook to reapply them once at boot.
+A `DaemonSet` that continuously re-asserts the settings is the practical
+workaround given that constraint. If Talos ever exposes NIC offload/EEE
+settings natively, this can likely be replaced with a proper machine-config
+patch.
+
+Not yet recorded: the specific symptom (e.g. an actual `NETDEV WATCHDOG` log
+line) that prompted adding this, and whether it's been confirmed to prevent
+recurrence since. Worth capturing here if/when that's dug up.
+
 ## Layout
 
 - `cilium/` — Cilium Helm values, LB/L2-announcement CRDs, and the Gateway
