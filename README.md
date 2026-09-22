@@ -340,7 +340,7 @@ We also subscribe to several streaming TV services:
 - Disney+/Hulu
 - HBO
 - Paramount+
-- Peacock
+- Peacock ($19.99 / month)
 - Discovery+
 - YouTube Premium
 
