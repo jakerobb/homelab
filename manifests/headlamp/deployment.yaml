@@ -70,6 +70,18 @@ spec:
                 secretKeyRef:
                   name: headlamp-oidc-client-secret
                   key: client-secret
+            # Turns on the Prometheus plugin bundled in the image at
+            # /headlamp/static-plugins/prometheus/ (added 2026-09-22) — the
+            # official Helm chart sets this by default
+            # (config.staticPlugins.enabled), but a bare Deployment gets
+            # nothing here unless set explicitly, so the plugin was
+            # otherwise present but unreachable. Auto-detection (which
+            # every browser session gets for free, no per-user
+            # configuration needed) is handled entirely on the Prometheus
+            # side — see the `headlamp-prometheus: "true"` Service label in
+            # argocd/apps/kube-prometheus-stack/application.yaml.
+            - name: HEADLAMP_STATIC_PLUGINS_DIR
+              value: /headlamp/static-plugins
           ports:
             - name: http
               containerPort: 4466

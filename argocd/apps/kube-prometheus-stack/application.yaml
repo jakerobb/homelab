@@ -122,6 +122,20 @@ spec:
           # it — same "not worth chasing" call as local-path-provisioner's.
           revisionHistoryLimit: 2
         prometheus:
+          # Headlamp's bundled Prometheus plugin (manifests/headlamp/deployment.yaml)
+          # auto-detects a Prometheus Service by this exact label — added
+          # 2026-09-22 so every browser session finds it automatically,
+          # instead of each one needing a manual, localStorage-only
+          # Settings > Plugins > Prometheus override (Headlamp has no
+          # cluster-side/ConfigMap way to set that declaratively as of
+          # v0.45.0 — see kubernetes-sigs/headlamp#3979, still an open
+          # proposal). This is the chart's own `service.labels`, so it's
+          # part of the declared Helm values ArgoCD's selfHeal enforces —
+          # unlike a raw `kubectl label` on this Service, which selfHeal
+          # would just strip back out on the next reconcile.
+          service:
+            labels:
+              headlamp-prometheus: "true"
           prometheusSpec:
             # Cluster-wide discovery — without this, only the chart's own
             # bundled ServiceMonitors get scraped, and a future app's
