@@ -65,6 +65,16 @@ transforms:
   # fields") before adding these. One per source since each has different
   # field names for its message/attributes (matching the per-sink
   # `_msg_field`/`_stream_fields` VictoriaLogs config below).
+  #
+  # Gotcha found live (2026-09-22): `to_string(.missing_field) ?? fallback`
+  # does NOT fall through the way it looks like it should — VRL's
+  # to_string() returns "" (no error at all) for an absent field, so `??`
+  # never triggers and just locks onto the empty string from whichever
+  # field was checked first. Confirmed via `vector vrl`: `to_string(.msg) ??
+  # to_string(.message) ?? to_string(.name)` against `{"message": "hello
+  # world"}` returned `""`, not `"hello world"`. Any multi-field fallback
+  # below checks emptiness explicitly (`if body == "" { ... }`) instead of
+  # relying on `??` to skip a genuinely-absent field.
   docker_otlp:
     type: remap
     inputs:
@@ -76,7 +86,12 @@ transforms:
         "resourceLogs": [{
           "resource": {
             "attributes": [
-              {"key": "host.name", "value": {"stringValue": to_string(.host) ?? "rpi5-1"}},
+              # docker_logs source's own `.host` is the *container's* own
+              # hostname (Docker defaults that to the short container ID)
+              # -- not the Vector host machine. Found live: logs were
+              # showing up tagged e.g. "9c01ab64c2a1" instead of "rpi5-1".
+              # Hardcode it, same as the other two sources below.
+              {"key": "host.name", "value": {"stringValue": "rpi5-1"}},
               {"key": "source_type", "value": {"stringValue": "docker"}}
             ]
           },
@@ -100,7 +115,9 @@ transforms:
     inputs:
       - unifi_cef
     source: |
-      body = to_string(.msg) ?? to_string(.message) ?? to_string(.name) ?? ""
+      body = to_string(.msg) ?? ""
+      if body == "" { body = to_string(.message) ?? "" }
+      if body == "" { body = to_string(.name) ?? "" }
       ts_ns = to_string(to_unix_timestamp!(.timestamp, unit: "nanoseconds"))
       . = {
         "resourceLogs": [{

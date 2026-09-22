@@ -891,8 +891,27 @@ it's earned it" call as Alertmanager) and SigNoz's OTel Collector.
   but valid envelope (timestamp, message body, a handful of attributes
   matching what VictoriaLogs's `_stream_fields` already considered
   important per source) rather than dumping every raw field generically.
-- Verified end-to-end: `signoz_logs.distributed_logs_v2` shows real rows
-  tagged `host.name = 'rpi5-1'` within seconds of Vector restarting.
+- **Gotcha — `to_string(.missing) ??  fallback` doesn't fall through:** UniFi log bodies were landing
+  completely empty despite `.message` genuinely having real content one
+  field over. Root cause, confirmed via `vector vrl`: VRL's `to_string()`
+  returns `""` for a field that doesn't exist at all — **no error** — so
+  `to_string(.msg) ?? to_string(.message) ?? to_string(.name)` locks onto
+  the first field's empty string and never tries the rest; `??` only ever
+  catches genuine errors, and an absent field apparently isn't one for this
+  function. Fixed by checking emptiness explicitly
+  (`if body == "" { body = to_string(.message) ?? "" }`) instead of
+  chaining on error-fallthrough. Same session also caught `docker_otlp`
+  tagging every log with the *container's* own hostname (Docker defaults
+  that to its short container ID) instead of the host machine — the
+  `docker_logs` source's `.host` field was never actually absent, just
+  wrong, so the same `?? "rpi5-1"` pattern silently never triggered there
+  either. Fixed by hardcoding `"rpi5-1"` outright, same as the other two
+  sources already did.
+- Verified end-to-end, post-fix: real UniFi message bodies
+  (`kernel: [DHCP-SM]...`, `mcad[...]: wireless_agg_stats...`) landing
+  correctly, and docker logs consistently tagged `host.name = 'rpi5-1'`
+  with zero stray container-ID hostnames across a tight (15s) fresh
+  window in `signoz_logs.distributed_logs_v2`.
 
 ### Exposure: Gateway + Authelia forward-auth
 
