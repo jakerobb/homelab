@@ -1,0 +1,33 @@
+# kube-apiserver OIDC trust for Authelia (added 2026-09-21) — lets Headlamp's
+# native OIDC login actually authenticate to the Kubernetes API, not just to
+# Headlamp's own UI. See argocd/README.md's Headlamp section and
+# docs/adding-an-app.md for the fuller writeup of why this was needed (native
+# OIDC in an app like Headlamp means the app hands the user's ID token
+# straight to the API server — unlike ArgoCD, where OIDC never touches
+# Kubernetes auth at all).
+#
+# - oidc-client-id: 'headlamp' — must match the `aud` claim Authelia puts in
+#   tokens it issues to the `headlamp` OIDC client
+#   (argocd/apps/authelia/application.yaml). Reusing that client rather than
+#   registering a separate one for "kubernetes" specifically — Headlamp is
+#   the only thing presenting these tokens to the API server today.
+# - oidc-username-claim: 'email' — same reasoning as ArgoCD's own RBAC
+#   section in argocd/README.md: Authelia fills `sub` with an opaque
+#   per-user UUID, useless for a human-readable RBAC subject. Kubernetes
+#   also skips its usual `<issuer>#` username prefixing automatically when
+#   the claim is `email` — oidc-username-prefix below is still set
+#   explicitly rather than relying on that implicit behavior.
+# - No oidc-groups-claim: nothing needs group-based RBAC here — the
+#   ClusterRoleBinding below targets the single email identity directly,
+#   matching the "cluster-admin, no per-user distinction" call already made
+#   for Headlamp's own ServiceAccount (manifests/headlamp/clusterrolebinding.yaml).
+# - No oidc-ca-file: auth.jakerobb.org's cert is real Let's Encrypt (via
+#   cert-manager), already in kube-apiserver's default system CA trust —
+#   only a private/internal CA would need this.
+cluster:
+  apiServer:
+    extraArgs:
+      oidc-issuer-url: https://auth.jakerobb.org
+      oidc-client-id: headlamp
+      oidc-username-claim: email
+      oidc-username-prefix: '-'

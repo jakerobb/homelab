@@ -1,0 +1,28 @@
+# Real Kubernetes RBAC for the identity kube-apiserver now trusts via OIDC
+# (talos/patches/control-plane/oidc.yaml) — distinct from clusterrolebinding.yaml,
+# which binds Headlamp's own ServiceAccount (used for its backend's own
+# needs, not for requests carrying a user's OIDC token). Once a request
+# authenticates via `--oidc-username-claim=email`, kube-apiserver sees the
+# Kubernetes username `jakerobb@gmail.com` — no `<issuer>#` prefix, since
+# that prefixing is automatically skipped for the `email` claim — and this
+# is what grants that identity access. Same subject as ArgoCD's own
+# `policy.csv` admin rule (argocd/README.md's Authelia SSO section), just
+# expressed as native Kubernetes RBAC instead of ArgoCD's own RBAC system.
+#
+# Not headlamp-specific despite living in this directory — any future app
+# whose users authenticate straight to the Kubernetes API via this same
+# OIDC issuer/claim would rely on this same binding. Revisit (real
+# per-user/group RBAC) if a second, less-trusted identity ever needs
+# Kubernetes API access through this path.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oidc-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: User
+    name: jakerobb@gmail.com
+    apiGroup: rbac.authorization.k8s.io

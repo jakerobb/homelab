@@ -811,6 +811,81 @@ it's stale, `talosctl patch machineconfig -n <worker-ip> -p
 '[{"op":"replace","path":"/machine/install/image","value":"<correct
 factory.talos.dev URL>"}]'` fixes it without a reboot.
 
+## kube-apiserver OIDC trust for Authelia (added 2026-09-21)
+
+Headlamp ([`argocd/apps/headlamp/`](../argocd/apps/headlamp/application.yaml))
+supports native OIDC login, but that turned out to mean something different
+than expected: it hands the user's Authelia ID token straight to the
+**Kubernetes API server** as the request's bearer credential (the same
+pattern as a `kubectl` OIDC auth plugin), not just an app-level login screen
+the way ArgoCD's OIDC is. Discovered live — first login attempt got
+`invalid_client` (a separate, already-fixed Authelia-side issue), then once
+that cleared, "The cluster did not accept your sign-in... Its API server
+may not trust this OIDC provider," because nothing had ever told
+`kube-apiserver` to trust `auth.jakerobb.org`.
+
+Fix, committed at
+[`talos/patches/control-plane/oidc.yaml`](patches/control-plane/oidc.yaml)
+(applied to all 3 control planes, no reboot needed — same
+`cluster.apiServer.extraArgs` mechanism as the metrics-bind-address fix
+below):
+
+```yaml
+cluster:
+  apiServer:
+    extraArgs:
+      oidc-issuer-url: https://auth.jakerobb.org
+      oidc-client-id: headlamp
+      oidc-username-claim: email
+      oidc-username-prefix: '-'
+```
+
+```bash
+talosctl patch machineconfig -e <cp-ip> -n <cp-ip> -p @oidc.yaml --mode=no-reboot
+```
+
+- **`oidc-client-id: headlamp`** — reuses the existing `headlamp` OIDC
+  client (`argocd/apps/authelia/application.yaml`) as the trusted audience,
+  rather than registering a separate client just for Kubernetes. Headlamp
+  is the only thing presenting these tokens to the API server today; add a
+  distinct client/audience if a second OIDC-native app ever needs direct
+  Kubernetes API access.
+- **`oidc-username-claim: email`**, same reasoning as ArgoCD's own RBAC
+  section above — Authelia's `sub` claim is an opaque per-user UUID, useless
+  as an RBAC subject. Kubernetes also skips its usual `<issuer>#` username
+  prefix automatically for the `email` claim, confirmed live (the
+  ClusterRoleBinding below matches the bare email with no prefix); the
+  explicit `-` prefix override is there for clarity, not because the
+  implicit skip was in doubt.
+- **No `oidc-groups-claim`**: RBAC binds the single email identity directly
+  (see below) rather than a group, matching the "cluster-admin, no per-user
+  distinction" call already made for Headlamp's own ServiceAccount
+  (`manifests/headlamp/clusterrolebinding.yaml`'s comment).
+- **No `oidc-ca-file`**: `auth.jakerobb.org` carries a real Let's Encrypt
+  cert (cert-manager), already covered by `kube-apiserver`'s default system
+  CA trust — confirmed working with no CA override needed. Would only be
+  necessary for an internal/private CA.
+- **RBAC:** a `ClusterRoleBinding` (`oidc-admin`, committed at
+  [`manifests/headlamp/clusterrolebinding-oidc-user.yaml`](../manifests/headlamp/clusterrolebinding-oidc-user.yaml),
+  applied directly rather than waiting on a git-push-then-ArgoCD-sync round
+  trip during the initial live test) binds Kubernetes username
+  `jakerobb@gmail.com` to `cluster-admin` — same subject as ArgoCD's own
+  `policy.csv` admin rule, just expressed as native Kubernetes RBAC instead
+  of ArgoCD's own RBAC system.
+- **Rollout, one control plane at a time:** patched cp1, waited for its
+  `kube-apiserver` static pod to pick up the new args (confirmed via its
+  live `command` args, not just `Running` status — the pod's reported AGE/
+  restart count didn't reliably reset on this kind of update, so checking
+  the actual flags was the only trustworthy signal), then cp2, then cp3.
+  Each individual node's direct IP (and, briefly, the VIP itself whenever
+  it happened to be sitting on the node currently restarting) returned
+  connection-refused for a few seconds mid-restart — expected, and why
+  Talos's own docs and this repo's other rolling changes check the VIP or
+  another node rather than hammering the one that's momentarily down.
+- **Also updated** the shared `~/talos/homelab/controlplane.yaml` template
+  on rpi5-1 (same `cluster.apiServer.extraArgs` block) so a future
+  from-scratch control-plane node gets this by default.
+
 ## kube-scheduler / kube-controller-manager metrics bind address (fixed 2026-09-20)
 
 Both components' secure metrics port (`:10259` / `:10257`) defaulted to
