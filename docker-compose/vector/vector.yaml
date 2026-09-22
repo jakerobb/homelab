@@ -58,6 +58,100 @@ transforms:
       # journald source exposes it as _SYSTEMD_UNIT (may be absent for kernel).
       .unit = to_string(._SYSTEMD_UNIT) ?? "kernel"
 
+  # Reshape into valid OTLP JSON (resourceLogs/scopeLogs/logRecords) before
+  # the opentelemetry sink's `otlp` codec — that codec is a passthrough for
+  # already-OTLP-shaped events, not a converter; found live (Vector 0.58.0
+  # refused every event with "Log event does not contain OTLP top-level
+  # fields") before adding these. One per source since each has different
+  # field names for its message/attributes (matching the per-sink
+  # `_msg_field`/`_stream_fields` VictoriaLogs config below).
+  docker_otlp:
+    type: remap
+    inputs:
+      - docker
+    source: |
+      body = to_string(.message) ?? ""
+      ts_ns = to_string(to_unix_timestamp!(.timestamp, unit: "nanoseconds"))
+      . = {
+        "resourceLogs": [{
+          "resource": {
+            "attributes": [
+              {"key": "host.name", "value": {"stringValue": to_string(.host) ?? "rpi5-1"}},
+              {"key": "source_type", "value": {"stringValue": "docker"}}
+            ]
+          },
+          "scopeLogs": [{
+            "scope": {},
+            "logRecords": [{
+              "timeUnixNano": ts_ns,
+              "body": {"stringValue": body},
+              "attributes": [
+                {"key": "container_name", "value": {"stringValue": to_string(.container_name) ?? ""}},
+                {"key": "container_id", "value": {"stringValue": to_string(.container_id) ?? ""}},
+                {"key": "stream", "value": {"stringValue": to_string(.stream) ?? ""}}
+              ]
+            }]
+          }]
+        }]
+      }
+
+  unifi_otlp:
+    type: remap
+    inputs:
+      - unifi_cef
+    source: |
+      body = to_string(.msg) ?? to_string(.message) ?? to_string(.name) ?? ""
+      ts_ns = to_string(to_unix_timestamp!(.timestamp, unit: "nanoseconds"))
+      . = {
+        "resourceLogs": [{
+          "resource": {
+            "attributes": [
+              {"key": "host.name", "value": {"stringValue": "unifi"}},
+              {"key": "source_type", "value": {"stringValue": "unifi"}}
+            ]
+          },
+          "scopeLogs": [{
+            "scope": {},
+            "logRecords": [{
+              "timeUnixNano": ts_ns,
+              "body": {"stringValue": body},
+              "attributes": [
+                {"key": "deviceVendor", "value": {"stringValue": to_string(.deviceVendor) ?? ""}},
+                {"key": "deviceProduct", "value": {"stringValue": to_string(.deviceProduct) ?? ""}}
+              ]
+            }]
+          }]
+        }]
+      }
+
+  pi_journal_otlp:
+    type: remap
+    inputs:
+      - pi_journal_tag
+    source: |
+      body = to_string(.message) ?? ""
+      ts_ns = to_string(to_unix_timestamp!(.timestamp, unit: "nanoseconds"))
+      . = {
+        "resourceLogs": [{
+          "resource": {
+            "attributes": [
+              {"key": "host.name", "value": {"stringValue": "rpi5-1"}},
+              {"key": "source_type", "value": {"stringValue": "pi-journal"}}
+            ]
+          },
+          "scopeLogs": [{
+            "scope": {},
+            "logRecords": [{
+              "timeUnixNano": ts_ns,
+              "body": {"stringValue": body},
+              "attributes": [
+                {"key": "unit", "value": {"stringValue": to_string(.unit) ?? ""}}
+              ]
+            }]
+          }]
+        }]
+      }
+
 sinks:
   vlogs:
     type: elasticsearch
@@ -106,3 +200,25 @@ sinks:
       _msg_field: message
       _time_field: timestamp
       _stream_fields: source_type,host,unit
+
+  # Dual-shipped alongside VictoriaLogs above (decided 2026-09-22) — SigNoz
+  # is on trial, VictoriaLogs stays as the proven fallback until it's earned
+  # full replacement (same "don't tear down until it's proven" call already
+  # made for Alertmanager). One combined sink covers all three sources; OTLP
+  # doesn't need VictoriaLogs's per-source _msg_field/_stream_fields
+  # juggling — the otlp codec just carries the whole Vector event across as
+  # the log record's body/attributes. See argocd/README.md's SigNoz section
+  # and argocd/apps/signoz/httproute-otel.yaml for the ingestion endpoint —
+  # unauthenticated on purpose (machine-to-machine OTLP, not a human page).
+  signoz_otel:
+    type: opentelemetry
+    inputs:
+      - docker_otlp
+      - unifi_otlp
+      - pi_journal_otlp
+    protocol:
+      type: http
+      uri: https://otel.jakerobb.org/v1/logs
+      method: post
+      encoding:
+        codec: otlp

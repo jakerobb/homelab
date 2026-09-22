@@ -856,13 +856,43 @@ false`) rather than prefixing `http://` and pointing at `4318` — one fewer
 moving part, matches `signoz-otel-collector`'s plain `otlp.protocols.grpc`
 endpoint.
 
-**Deliberately deferred, not done:** piping rpi5-1's own Compose-host logs
-(Vector → VictoriaLogs today, see `docker-compose/vector/vector.yaml`) into
-SigNoz's OTel Collector too. `k8s-infra` already covers the core in-cluster
-ask; adding a second Vector sink (`opentelemetry` type, OTLP) would need
-the collector reachable from outside the cluster (Vector runs on rpi5-1,
-not in-cluster) — a LoadBalancer Service off the existing L2 pool, or
-routed through the Gateway. Explicit follow-up, not started.
+**Done (2026-09-22): rpi5-1's own Compose-host logs, dual-shipped.** Vector
+(`docker-compose/vector/vector.yaml`) now sends every source (`docker`,
+UniFi CEF syslog, journald) to both VictoriaLogs (unchanged, kept as the
+proven fallback during SigNoz's trial period — same "don't tear down until
+it's earned it" call as Alertmanager) and SigNoz's OTel Collector.
+
+- **Ingestion path:** a second, dedicated `HTTPRoute`
+  ([`apps/signoz/httproute-otel.yaml`](apps/signoz/httproute-otel.yaml)),
+  `otel.jakerobb.org`, deliberately separate from the UI's
+  Authelia-gated route — an interactive login filter would just break
+  Vector's plain OTLP/HTTP POSTs, and mixing an authenticated human route
+  with an unauthenticated machine one under the same hostname is easy to
+  get wrong later. Same trust model as everything else on this Gateway (LB
+  pool IP is LAN-only regardless of the public DNS record).
+- **Gotcha, real leftover DNS:** `otel.jakerobb.org` already existed as a
+  stale Cloudflare CNAME (`→ caddy.lan → rpi5-1.lan`) from the old Caddy
+  setup, predating this repo's Compose capture. external-dns still created
+  the new `A` record cleanly (Cloudflare allowed the replacement), but
+  rpi5-1's own Unbound resolver kept serving the old cached CNAME chain
+  until manually flushed (`unbound-control flush otel.jakerobb.org` +
+  the two names in the chain) — worth checking for on any future
+  Compose→cluster hostname reuse, same as the TXT-ownership gotcha in
+  `docs/adding-an-app.md` §3.
+- **Gotcha, the `otlp` codec is a passthrough, not a converter:** Vector's
+  `opentelemetry` sink refused every event
+  (`"Log event does not contain OTLP top-level fields"`) until a `remap`
+  transform ahead of it built the actual
+  `resourceLogs`/`scopeLogs`/`logRecords` structure by hand — the codec
+  only serializes events already shaped that way (e.g. from Vector's own
+  `opentelemetry` *source*), it doesn't wrap arbitrary log fields into
+  OTLP on its own. One transform per source
+  (`docker_otlp`/`unifi_otlp`/`pi_journal_otlp`), each building a minimal
+  but valid envelope (timestamp, message body, a handful of attributes
+  matching what VictoriaLogs's `_stream_fields` already considered
+  important per source) rather than dumping every raw field generically.
+- Verified end-to-end: `signoz_logs.distributed_logs_v2` shows real rows
+  tagged `host.name = 'rpi5-1'` within seconds of Vector restarting.
 
 ### Exposure: Gateway + Authelia forward-auth
 
