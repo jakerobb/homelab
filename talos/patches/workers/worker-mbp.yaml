@@ -9,9 +9,25 @@ machine:
   # than left to the shared worker.yaml template because the disk device
   # name is hypervisor-specific: UTM's imported qcow2 shows up as /dev/sda
   # (SATA/AHCI emulation), not /dev/nvme0n1 like the Proxmox-based workers.
+  # Schematic includes extraKernelArgs: [tsc=reliable] on top of the usual
+  # iscsi-tools/util-linux-tools extensions — added 2026-09-22 to fix
+  # recurring NodeClockNotSynchronising alerts. Root cause: under QEMU/UTM,
+  # the hypervisor briefly pausing/scheduling the vCPU makes the kernel's
+  # acpi_pm watchdog misread normal scheduling jitter as real TSC drift,
+  # eventually demoting the clocksource ("Marking clocksource 'tsc' as
+  # unstable") even though Talos's own NTP sync (time.cloudflare.com) was
+  # never actually wrong — the alert was on node-exporter's lower-level
+  # kernel timex metric, not Talos's NTP status. tsc=reliable is the
+  # standard workaround for this exact false-positive-under-virtualization
+  # pattern (tells the kernel to trust TSC and ignore the watchdog).
+  # Confirmed this field only works via a schematic customization, not the
+  # machine.install.extraKernelArgs machine-config field — Talos warns
+  # "extra kernel arguments are not supported when booting using SDBoot"
+  # and silently no-ops it. Only Proxmox-based workers unaffected (real
+  # hardware host, no hypervisor scheduling jitter to misread).
   install:
     disk: /dev/sda
-    image: factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.1
+    image: factory.talos.dev/installer/0b0257c7d2fd5e4693af3859e726ce2216f60d8456d330009efb1ac249789386:v1.14.1
   # Needed for democratic-csi's iSCSI node driver, same as worker-1/worker-2
   # — see talos/README.md#iscsi-tools-extension-added-2026-09-15.
   kernel:

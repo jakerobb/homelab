@@ -21,10 +21,34 @@ Download from [mac.getutm.app](https://mac.getutm.app/) and install normally.
 ## 2. Get the current Talos image
 
 **Check `talos/README.md`'s "Current state" section first** for the
-currently-correct Talos version and Factory schematic ID (the
-`iscsi-tools`+`util-linux-tools` one — needed for `hexos-iscsi` PVCs to mount
-on this node) — don't reuse a version/ID from an old runbook run, that
-section is the source of truth and moves as the cluster changes.
+currently-correct Talos version — don't reuse a version from an old runbook
+run, that section is the source of truth and moves as the cluster changes.
+
+**Don't just reuse the shared `iscsi-tools`+`util-linux-tools` schematic ID
+as-is** — that one's shared with the Proxmox (real-hardware) workers.
+UTM/QEMU VMs specifically need one more customization on top:
+`extraKernelArgs: [tsc=reliable]`, working around a QEMU/UTM-specific
+false-positive clock-instability issue found on `talos-worker-mbp` (see
+`talos/README.md`'s "Additional worker: talos-worker-mbp" section for the
+full diagnosis — recurring `NodeClockNotSynchronising` alerts from the
+kernel's `acpi_pm` watchdog misreading normal hypervisor scheduling jitter
+as real TSC drift). Request a fresh schematic with both the extensions and
+this kernel arg:
+```bash
+curl -X POST --data-binary @- https://factory.talos.dev/schematics <<'EOF'
+customization:
+  systemExtensions:
+    officialExtensions:
+      - siderolabs/iscsi-tools
+      - siderolabs/util-linux-tools
+  extraKernelArgs:
+    - tsc=reliable
+EOF
+```
+Use the returned schematic ID for everything below — **don't** try to add
+this kernel arg later via `machine.install.extraKernelArgs` in a machine
+config patch; Talos silently no-ops it with a `"not supported when booting
+using SDBoot"` warning. It only works baked into the installer image itself.
 
 Download **both** of these onto the Mac (URLs follow this pattern, substitute
 the current schematic ID/version):

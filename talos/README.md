@@ -1018,6 +1018,37 @@ Mac Studio's turn):**
   doesn't grow it automatically, so it needed a manual resize to 64GB before
   installing (see the runbook).
 
+**Found and fixed after the fact (2026-09-22): recurring
+`NodeClockNotSynchronising` alerts.** Root cause was the kernel's
+clocksource, not NTP — Talos's own NTP sync (`time.cloudflare.com`) was
+never actually wrong (`talosctl get timestatus` showed synced throughout).
+Under QEMU/UTM, the hypervisor briefly pausing/scheduling the vCPU makes
+the kernel's `acpi_pm` watchdog misread ordinary scheduling jitter as real
+TSC drift; dmesg showed escalating `"clocksource: timekeeping watchdog...
+wd-wd read-back delay"` warnings roughly every 10-20 minutes since boot,
+eventually demoting the clocksource entirely
+(`"Marking clocksource 'tsc' as unstable"`) — node-exporter's kernel timex
+metric flapped during those windows even though nothing was really wrong.
+Standard fix for this exact false-positive-under-virtualization pattern:
+`tsc=reliable` on the kernel command line. **Confirmed this only works as
+a Factory schematic customization
+(`customization.extraKernelArgs: [tsc=reliable]`), not the
+`machine.install.extraKernelArgs` machine-config field** — Talos accepts
+that field silently but warns `"extra kernel arguments are not supported
+when booting using SDBoot"` and never actually applies it (verified: kernel
+cmdline unchanged after a no-reboot patch). Fixed by requesting a new
+schematic with the same `iscsi-tools`+`util-linux-tools` extensions plus
+that kernel arg, then a real `talosctl upgrade --image
+factory.talos.dev/installer/0b0257c7d2fd5e4693af3859e726ce2216f60d8456d330009efb1ac249789386:v1.14.1`
+(reinstalls the boot entry with the arg actually baked in — confirmed via
+`talosctl read /proc/cmdline` showing `tsc=reliable` post-upgrade). Same
+`install.image` drift as always after a `talosctl upgrade` — patched
+separately, and
+[`patches/workers/worker-mbp.yaml`](patches/workers/worker-mbp.yaml)
+updated to match. **Likely worth baking into the Mac Studio's schematic
+from the start** rather than waiting to hit the same alert again — real
+hardware (the Proxmox workers) isn't affected, only UTM/QEMU VMs are.
+
 ## kube-apiserver OIDC trust for Authelia (added 2026-09-21)
 
 Headlamp ([`argocd/apps/headlamp/`](../argocd/apps/headlamp/application.yaml))
