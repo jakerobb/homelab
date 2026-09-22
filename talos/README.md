@@ -95,16 +95,124 @@ secrets bundle — no more hard dependency on rpi5-1 surviving.
 - To decrypt/use: `export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt` then
   `sops --decrypt talos/secrets.sops.yaml`.
 
-**Scope note:** this only brings the *secrets bundle* into the repo. The full
-per-node machine configs (`controlplane.yaml`/`worker.yaml`) are still generated
-directly with `talosctl` on demand (using this decrypted secrets bundle), not
-via [Talhelper](https://github.com/budimanjojo/talhelper)'s declarative
-`talconfig.yaml`. Adopting Talhelper fully would mean reverse-engineering every
-setting already baked into the existing `controlplane.yaml` (KubePrism port,
-kube-proxy disablement, disk selectors, kubelet extra args, etc.) — deliberately
-deferred rather than guessed at, to avoid drifting the config used to actually
-generate a new node away from what's already running. Worth revisiting as a
-follow-up once there's time to diff it carefully against the live config.
+**Scope note:** this brings the *secrets bundle* into the repo; the rendered
+per-node machine configs (`controlplane.yaml`/`worker.yaml`) are still
+generated directly with `talosctl` on demand (using this decrypted secrets
+bundle) rather than committed — see "Talos config: fully reproducible from
+committed inputs" below for the exact, now-verified command and why that's
+safe. Still not using [Talhelper](https://github.com/budimanjojo/talhelper)'s
+declarative `talconfig.yaml` — with every setting in the rendered config now
+accounted for by a committed patch (same section below), there's no remaining
+correctness reason to adopt it; it'd be a workflow-ergonomics change at this
+point, not a reproducibility one.
+
+## Talos config: fully reproducible from committed inputs (2026-09-22)
+
+Confirmed and closed the gap the "Scope note" above used to flag: every
+non-secret setting in the live `controlplane.yaml`/`worker.yaml` on rpi5-1
+is now accounted for by a committed patch, and a fresh render from
+`secrets.sops.yaml` + `talosctl gen config` + `talos/patches/*` reproduces
+the live files exactly (modulo node identity and a couple of harmless,
+explicitly-noted quirks below). `rpi5-1`'s copies are no longer the only
+record of how this cluster is actually configured — they're a regenerable
+build artifact again.
+
+**Method** (redoing this after a future config change, or just re-verifying):
+
+1. On rpi5-1, render a patch-free baseline from the real secrets bundle,
+   reusing its CA/tokens rather than generating new ones:
+   ```bash
+   cd ~/talos/homelab
+   talosctl gen config homelab https://192.168.102.11:6443 \
+     --with-secrets secrets.yaml \
+     --install-disk /dev/nvme0n1 \
+     --install-image ghcr.io/talos-rpi5/installer:v1.11.5 \
+     --additional-sans 192.168.102.11,192.168.102.12,192.168.102.13 \
+     --kubernetes-version 1.37.0 \
+     --talos-version v1.11 \
+     --output-dir /tmp/gen-config-diff
+   ```
+   `--talos-version v1.11` matters: without it, current `talosctl` (v1.14.1)
+   emits the newer multi-document config format (settings like KubePrism,
+   the kubelet config, and pod/service subnets split into their own
+   `apiVersion: v1alpha1 / kind: Kube*Config` documents) instead of the
+   single legacy `v1alpha1 Config` document this cluster was originally
+   bootstrapped with and that `talosctl patch machineconfig` targets —
+   comparing the two formats directly produces spurious diffs on
+   every field, not real gaps. Pin `--kubernetes-version` to the cluster's
+   actual running version (`kubectl get nodes`) too, or every component
+   image tag (`kube-apiserver`, `kubelet`, etc.) shows as a false diff.
+   The cluster name/endpoint/disk/image flags above are the original
+   bootstrap invocation (recovered from rpi5-1's shell history) — don't
+   guess at them from scratch.
+2. Apply every committed patch (all of `talos/patches/control-plane/*.yaml`
+   except the per-node hostname patches `cp1.yaml`/`cp2.yaml`/`cp3.yaml`,
+   plus `talos/patches/discovery-registry-fix.yaml` and
+   `talos/patches/kubelet-log-limits.yaml`, for `controlplane.yaml`; just
+   `kubelet-log-limits.yaml` for `worker.yaml` — the per-worker hostname
+   *and* iSCSI kernel-module/extraMounts patches
+   (`talos/patches/workers/worker-{1,2}.yaml`) are deliberately per-node,
+   same as the control-plane hostname patches, and not folded into the
+   shared template) with `talosctl machineconfig patch <base> -p @<patch>
+   ... -o <out>` (offline, no cluster access needed).
+3. Diff **structurally** (parsed YAML, not text) against each live node's
+   actual machine config — pull that directly from the node rather than
+   trusting the on-disk file, since it can drift (see below):
+   `talosctl -e <ip> -n <ip> get machineconfig -o yaml`, extract `.spec`.
+   Redact anything secret-shaped (keys, certs, tokens, long base64/PEM
+   blobs) before ever printing a diff — several fields here (`certSANs`,
+   the discovery `clusterSecret`, etc.) are real key material.
+
+**What this found:** one real, previously-undocumented gap —
+`cluster.network.cni.name: none` and `cluster.proxy.disabled: true` were
+live on all 3 control planes (Cilium fully replaces both Flannel and
+kube-proxy — see "Ingress: Gateway API" and the Cilium values below) but
+existed in no committed patch anywhere. Added
+[`talos/patches/control-plane/disable-flannel-kubeproxy.yaml`](patches/control-plane/disable-flannel-kubeproxy.yaml)
+to close it. Verified as a true no-op before trusting it: `talosctl patch
+machineconfig` reported **"Apply was skipped: no changes detected"** on
+all 3 control planes (cp1, then cp2, then cp3, checking `kubectl get
+nodes` stayed `Ready` and the VIP stayed reachable after each) — not just
+"didn't break anything," but confirmation the live setting and the new
+patch are byte-identical. Everything else the original investigation
+flagged (KubePrism, `disableManifestsDirectory`, pod/service subnets, the
+base kubelet config, the disk selector) turned out to already be either a
+`talosctl` v1.14.1 default or covered by an existing patch — genuinely
+nothing else to add.
+
+**Also found and fixed:** the on-disk `controlplane.yaml`/`worker.yaml`
+templates on rpi5-1 had themselves drifted from what several existing
+patches (`vip.yaml` in particular — the whole `machine.network` block was
+missing) claimed to have been folded into them, most likely from a plain
+`talosctl gen config` re-run during the 2026-09-21 install-image-drift
+investigation above that overwrote the manually-patched copies. They also
+carried a dead `machine.nodeLabels.bgp-speaker: true` — a leftover from
+the abandoned BGP approach (see "Why L2 announcements instead of BGP")
+that was never actually applied to any live node (confirmed via each
+node's real `machineconfig`). Regenerated both files via the method above
+(baseline + every non-per-node patch) and replaced the on-disk copies;
+backups of the pre-regeneration files are at
+`~/talos/backup-2026-09-22/*.bak` on rpi5-1. Per-node hostnames and the
+worker iSCSI settings are intentionally *not* in these shared templates —
+apply `cp{1,2,3}.yaml` / `worker-{1,2}.yaml` on top when actually
+provisioning a specific node, matching how they're applied live today.
+
+**Known, harmless residual diffs** (don't re-investigate these — traced to
+their root cause already, both cosmetic):
+- **cp1** carries an explicit `cluster.discovery.registries.service.disabled:
+  false` where a from-scratch render omits the key (same effective value,
+  Talos's default) — cp1 never got `discovery-registry-fix.yaml` applied
+  (it didn't need the `kubernetes` half of the fix — see "Kubernetes
+  discovery registry" above), so it never picked up the redundant explicit
+  `service.disabled: false` either.
+- **cp2/cp3** have one fewer duplicate `192.168.102.11` entry in
+  `apiServer.certSANs` than a fresh render produces — harmless (duplicate
+  SAN entries don't affect TLS validity either way), just an artifact of
+  exactly how cp1's original bootstrap `--additional-sans` differed from
+  whatever regenerated cp2/cp3's config later.
+- **Workers':** `machine.install.image` still (correctly) differs — see
+  "Machine-config install.image drift" above for why that field is
+  deliberately never persisted to a committed patch for either node type.
 
 ## Ingress: Gateway API (decided and deployed 2026-09-13)
 
@@ -725,12 +833,19 @@ moved to `talos-cp-2` within the outage window, and `kubectl` against
 
 - `cilium/` — Cilium Helm values, LB/L2-announcement CRDs, and the Gateway
   API `Gateway` (ingress), applied to the existing cluster.
-- `patches/control-plane/` — per-node Talos config patches for the existing 3 Pi
-  control-plane nodes: hostname patches (`cp1.yaml`/`cp2.yaml`/`cp3.yaml`)
-  plus the shared VIP patch (`vip.yaml`, identical across all 3).
-- `patches/workers/` — patches for the two MS-A2 worker VMs (hostname only,
-  matching the control-plane patch style — IP addressing is handled via DHCP
-  reservation on the UCG, not in Talos config).
+- `patches/control-plane/` — Talos config patches for the existing 3 Pi
+  control-plane nodes: per-node hostname patches (`cp1.yaml`/`cp2.yaml`/
+  `cp3.yaml`) plus shared patches applied identically to all 3
+  (`vip.yaml`, `oidc.yaml`, `metrics-bind-address.yaml`,
+  `disable-flannel-kubeproxy.yaml`; `node-tuning-namespace.yaml`/
+  `nic-watchdog-mitigation.yaml` are plain Kubernetes manifests applied via
+  `kubectl`, not Talos machine-config patches).
+- `patches/workers/` — per-node patches for the two MS-A2 worker VMs
+  (hostname plus the iSCSI kernel-module/extraMounts settings — see
+  "iscsi-tools extension" below).
+- `discovery-registry-fix.yaml`, `kubelet-log-limits.yaml` — shared
+  Talos machine-config patches applied to all 5 nodes (control planes and
+  workers alike).
 
 ## MS-A2 workers: decided values (2026-09-11)
 

@@ -1,0 +1,18 @@
+# Talos installs its own default CNI (Flannel) and kube-proxy unless told
+# not to. Both are unwanted here — Cilium (kubeProxyReplacement enabled,
+# full eBPF host routing, see ../../cilium/values.yaml) replaces kube-proxy
+# entirely, and Cilium is the only CNI this cluster runs. Without this,
+# Flannel and kube-proxy would come up alongside Cilium at bootstrap and
+# fight over the same pod/service networking.
+#
+# This has been live since Cilium was first installed — confirmed
+# 2026-09-22 against all 3 control planes' actual machine config
+# (`talosctl get machineconfig`) — just never previously captured as a
+# committed patch. See talos/README.md's "Talos config: fully reproducible
+# from committed inputs" section for how this gap was found.
+cluster:
+  network:
+    cni:
+      name: none
+  proxy:
+    disabled: true
