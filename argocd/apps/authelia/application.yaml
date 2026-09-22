@@ -175,11 +175,12 @@ spec:
                   # itself holds via the headlamp-oidc-client-secret Secret
                   # (argocd/secrets/headlamp-oidc-client-secret.sops.yaml,
                   # applied out-of-band — see argocd/README.md's Headlamp
-                  # section for the generation command). Placeholder below
-                  # until that's run: Headlamp's OIDC login will fail (not
-                  # the whole app, just the login flow) until this is a
-                  # real hash.
-                  client_secret: 'CHANGEME-see-argocd/README.md#headlamp'
+                  # section). Computed 2026-09-21 by feeding the
+                  # already-applied Secret's value into the running
+                  # Authelia pod's own `authelia crypto hash generate
+                  # pbkdf2` — matches the Secret exactly, never printed
+                  # anywhere as plaintext.
+                  client_secret: '$pbkdf2-sha512$310000$RZRmapFtgOZGwSpzvBKNHQ$9DmfwtdpdeFlYrzHPXtUi5xaXULRgHYtCuno/jDC6kmnG4kWr65Zptmp8ifo22yO97hbojifZLlngaGG/zQO1Q'
                   public: false
                   redirect_uris:
                     - 'https://headlamp.jakerobb.org/oidc-callback'
