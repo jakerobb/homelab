@@ -146,6 +146,26 @@ spec:
                   use: 'sig'
                   key:
                     path: '/secrets/oidc-jwk/oidc.jwk.RS256.pem'
+              # Authelia 4.38+ puts no identity-revealing claims (email,
+              # name, etc.) in the ID token by default, regardless of the
+              # client's requested `scopes` — found the hard way (2026-09-22):
+              # kube-apiserver's OIDC authenticator only ever reads the ID
+              # token itself (never calls /userinfo), so Headlamp's
+              # `oidc-username-claim: email` (talos/patches/control-plane/oidc.yaml)
+              # rejected every token with "claim not present" until a
+              # client explicitly references a policy here. Named generically
+              # (not `headlamp`) since ArgoCD's client below requests the
+              # same `email` scope for its own RBAC subject matching
+              # (argocd/README.md's "RBAC" section) and likely has this
+              # exact same latent gap — not fixed here since that's
+              # unverified and a separate change, but this policy is ready
+              # to reuse for it.
+              claims_policies:
+                email_identity:
+                  id_token:
+                    - 'email'
+                    - 'email_verified'
+                    - 'preferred_username'
               clients:
                 - client_id: 'argocd'
                   client_name: 'ArgoCD'
@@ -184,6 +204,7 @@ spec:
                   public: false
                   redirect_uris:
                     - 'https://headlamp.jakerobb.org/oidc-callback'
+                  claims_policy: 'email_identity'
                   scopes:
                     - 'openid'
                     - 'profile'
