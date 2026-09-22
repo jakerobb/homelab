@@ -52,6 +52,13 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 15
+            # Default (1s) is too tight under real node contention — found
+            # 2026-09-22 when ntfy crash-looped (7 restarts/hour) purely
+            # from missing the default timeout while its node was under
+            # memory pressure from unrelated pod churn, not from ntfy
+            # itself being unhealthy. 3s gives real slack for transient
+            # load without masking an actually-stuck process.
+            timeoutSeconds: 3
           resources:
             requests:
               cpu: 25m
