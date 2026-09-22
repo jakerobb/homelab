@@ -956,6 +956,68 @@ it's stale, `talosctl patch machineconfig -n <worker-ip> -p
 '[{"op":"replace","path":"/machine/install/image","value":"<correct
 factory.talos.dev URL>"}]'` fixes it without a reboot.
 
+## Additional worker: talos-worker-mbp (added 2026-09-22)
+
+A third worker, built from an idle 2018 15" MacBook Pro (32GB RAM, on the
+Server VLAN via a Plugable TBT3-UDV dock) running Talos in a UTM VM —
+deliberately temporary, a stopgap until a Mac Studio (96GB RAM) joins as a
+worker in ~November 2026. Hosts [SigNoz](../argocd/apps/signoz/) for cluster
+observability; its persistent storage is entirely on `hexos-iscsi`
+specifically so this node stays disposable — retiring it later is just
+cordon/drain, no data migration.
+
+**Deliberate exception to the "naming decoupled from hardware" rule** (see
+"MS-A2 workers: decided values" above): named `talos-worker-mbp`, not
+`talos-worker-3`. That rule exists so a worker's name doesn't imply which box
+it runs on *long-term* — doesn't apply here since this node is explicitly
+short-lived and hardware-identified on purpose. The Mac Studio's worker,
+when it arrives, should get a normal decoupled `talos-worker-N` name instead,
+since it isn't a stopgap.
+
+`192.168.102.34` (next free `.31+` slot), MAC `02:00:00:00:00:34`, same
+`iscsi-tools`+`util-linux-tools` schematic and version as the Proxmox
+workers (see "iscsi-tools extension" above) — same command to check for
+drift later: `talosctl -n 192.168.102.34 get machineconfig -o yaml`.
+
+Not Terraform-managed (no Proxmox involved — this is a real physical Mac, out
+of `terraform/proxmox/`'s scope) — provisioned by hand per
+[`docs/utm-talos-worker.md`](../docs/utm-talos-worker.md), written generically
+enough to reuse for the Mac Studio.
+
+**Gotchas found provisioning this node (both fixed, worth knowing for the
+Mac Studio's turn):**
+- **The Factory `nocloud-amd64.qcow2` image doesn't work for a plain
+  UTM/QEMU import the way it does for the Proxmox workers.** Booting it
+  directly gets stuck forever at `downloading config {platform: nocloud}` —
+  `apid`'s maintenance service never starts (`service[apid](Waiting): Waiting
+  for config to be ready`), because the `nocloud` platform variant expects a
+  real NoCloud metadata source (cidata ISO or network service) and doesn't
+  fall back to interactive maintenance mode the way a bare-metal boot does.
+  Fix: boot from the Factory **`metal-amd64.iso`** instead (same
+  schematic/version) as a CD-ROM, with the target qcow2 still attached as the
+  real boot disk — `metal` platform goes straight into interactive
+  maintenance mode, `talosctl apply-config --insecure` installs onto the
+  qcow2 disk normally, and the ISO can be detached after.
+- **The shared `~/talos/homelab/worker.yaml` template on rpi5-1 had a stale
+  `install.image`** (`ghcr.io/talos-rpi5/installer:v1.11.5`, an arm64 Pi5
+  image, never updated when the Proxmox workers moved to the Factory
+  schematic image) — caught by generating this node's config from that
+  template and comparing against the live Proxmox workers' actual
+  `install.image` before trusting it. Fixed directly on rpi5-1 (not
+  committed — same as the rest of `~/talos/homelab/`, see "Where the secrets
+  actually live" above). **`install.disk` was already correct as-is
+  (`/dev/nvme0n1`)** and deliberately *not* changed to this node's
+  `/dev/sda` — that field is genuinely hypervisor-specific (UTM/QEMU's
+  imported disk shows up via SATA/AHCI emulation, not virtio-blk-as-NVMe like
+  Proxmox), so it stays a per-node patch override
+  ([`patches/workers/worker-mbp.yaml`](patches/workers/worker-mbp.yaml)),
+  same pattern as the hostname/iSCSI overrides every worker patch already
+  carries.
+- The Factory qcow2's default disk size is a few GB, same as the Proxmox
+  workers' image before Terraform's `size = 64` grows it on import — UTM
+  doesn't grow it automatically, so it needed a manual resize to 64GB before
+  installing (see the runbook).
+
 ## kube-apiserver OIDC trust for Authelia (added 2026-09-21)
 
 Headlamp ([`argocd/apps/headlamp/`](../argocd/apps/headlamp/application.yaml))

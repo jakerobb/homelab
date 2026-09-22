@@ -8,13 +8,6 @@ observable cluster before we bring in critical workloads.
 
 Pull requests should trigger a `terraform plan`; merges to `main` should trigger `terraform apply`. 
 
-## Log and Metrics aggregation
-
-Ship pod and node logs to a long-term log aggregator rather than logs only being reachable via `kubectl logs` per-pod.
-`metrics-server` and `kube-prometheus-stack` are already deployed and covering instant metrics/querying, but Prometheus
-only has its own short-lived (10-day) local storage — remote-writing to a proper timeseries database is still open. This
-will replace the observability stack running on the Pi. Re-evaluate what solutions make the most sense in K8s.
-
 ## ArgoCD-native SOPS decryption (KSOPS)
 
 Every SOPS-encrypted secret under `argocd/secrets/` is currently applied out-of-band by hand

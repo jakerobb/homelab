@@ -58,6 +58,31 @@ was added too (Grafana still off; Alertmanager was off initially but has since b
 Remote-writing to a proper timeseries database instead of relying on Prometheus's own short-lived (10-day) local storage
 is still open, tracked separately.
 
+## Log and Metrics aggregation (SigNoz)
+
+**Done (2026-09-22).** Replaces the "re-evaluate what solutions make sense"
+placeholder — landed on [SigNoz](https://signoz.io) (logs/metrics/traces in
+one stack), running on a new third worker,
+[`talos-worker-mbp`](../talos/README.md#additional-worker-talos-worker-mbp-added-2026-09-22)
+(a temporary UTM VM on an idle MacBook Pro, deliberately disposable — every
+stateful piece is on `hexos-iscsi`). Full writeup, every gotcha found, and
+the corrected metrics-ingestion approach (federation, not remote_write — the
+original assumption didn't hold up) are in
+[`../argocd/README.md`](../argocd/README.md#signoz-decided-and-deployed-2026-09-22).
+Ship-pod-and-node-logs and remote-write-to-a-proper-timeseries-database are
+both closed: `signoz/k8s-infra`'s DaemonSet tails container logs
+cluster-wide, and `kube-prometheus-stack`'s Prometheus is federated into
+SigNoz's ClickHouse-backed store rather than relying on its own 10-day local
+retention. `kube-prometheus-stack` itself stays in place — Alertmanager and
+its ntfy routing are untouched, and Headlamp's Prometheus plugin (confirmed
+viable against SigNoz's real Prometheus-API-compatible endpoint, not yet
+switched over) is the only path that could eventually make it removable.
+Storage validated with a real `fio` benchmark before trusting
+`hexos-iscsi` for ClickHouse's latency-sensitive workload (~3000 IOPS/
+direction, ~1.3ms average latency — see the linked writeup for full
+numbers). Not done: piping rpi5-1's own Compose-host logs (Vector) into the
+same collector — explicit follow-up, not started.
+
 ## Proxmox host config backup
 
 **Done — deployed and running since 2026-09-11.** Daily cron on the Proxmox host itself tars up `/etc/pve`, network

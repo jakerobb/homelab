@@ -33,6 +33,8 @@ Passwords and other secrets are in 1Password in the Tech vault, which is shared 
         - MS-A2 (`.21`) running Proxmox VE, hosting:
             - two Talos worker VMs — `talos-worker-1` (`.31`) and `talos-worker-2` (`.32`)
             - TrueNAS / HexOS (`.33`)
+        - MacBook Pro (see "On top of the rack" below), running a third Talos
+          worker VM — `talos-worker-mbp` (`.34`) — under UTM
 - **Kubernetes cluster:** Talos + Kubernetes (see [`talos/README.md`](talos/README.md#current-state) for current
   versions), Cilium CNI with `kubeProxyReplacement`, full eBPF host routing, and L2 announcements for LoadBalancer IPs
   (`192.168.102.128/26`). Details and gotchas live in [`talos/README.md`](talos/README.md).
@@ -120,7 +122,10 @@ simple spring-clips. The back can be removed as well, but this requires a #2 Phi
 ### On top of the rack
 
 - **2018 MacBook Pro 15" / 32GB / 500GB** — connected via a **Plugable TBT3-UDV dock** to the network and to the Comet
-  X. Currently idle; earmarked as a possible future Talos K8s worker (running Talos in a UTM VM), on hold for now.
+  X. Runs a Talos worker VM under UTM, `talos-worker-mbp` (`192.168.102.34`) — a deliberately temporary stopgap until
+  the Mac Studio (see `todo/HARDWARE.md`) arrives and takes over worker duty. See
+  [`docs/utm-talos-worker.md`](docs/utm-talos-worker.md) for the runbook and
+  [`talos/README.md`](talos/README.md#additional-worker-talos-worker-mbp-added-2026-09-22) for the decision writeup.
 
 ### Elsewhere in the crawlspace
 
@@ -308,6 +313,7 @@ The Kubernetes cluster includes the following workloads:
 * ntfy-alertmanager
 * renovate
 * searxng
+* SigNoz
 
 ## External Dependencies
 

@@ -1,0 +1,56 @@
+# Cluster-wide pod/node log collection + host metrics for SigNoz — the
+# main signoz chart (argocd/apps/signoz/) has no DaemonSet of its own and
+# doesn't tail container logs at all; k8s-infra is SigNoz's actual answer to
+# that (confirmed live: `helm show values signoz/k8s-infra` — a DaemonSet
+# ("otelAgent") tailing /var/log/pods/*/*/*.log by default, plus a small
+# cluster-level Deployment for K8s object/event metrics). This is the piece
+# that actually closes the "ship pod and node logs" half of
+# todo/READY.md#log-and-metrics-aggregation, not just the metrics side.
+#
+# Same destination namespace as the main signoz app (shared, tightly
+# coupled — same pattern as cert-manager-config sharing cert-manager's
+# namespace), separate Application object so its own sync/health status
+# doesn't get folded into the main app's.
+#
+# otelAgent's default tolerations (`- operator: Exists`) already run it on
+# every node including the tainted Pi5 control planes, for full-cluster
+# coverage — same reasoning node-exporter already needed
+# (talos/README.md/argocd/README.md's kube-prometheus-stack section).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: signoz-k8s-infra
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.signoz.io
+    chart: k8s-infra
+    targetRevision: 0.17.1
+    helm:
+      releaseName: signoz-k8s-infra
+      valuesObject:
+        # The chart's default exporter is otlphttp (presets.otlphttpExporter),
+        # not otlp/grpc — a bare host:port here (no scheme) fails outright
+        # ("unsupported protocol scheme") against the HTTP exporter, found
+        # live via otel-deployment's logs. Switch to the grpc exporter
+        # instead (matches signoz-otel-collector's plain `otlp.protocols.grpc`
+        # endpoint on 4317, no scheme prefix needed) rather than prefixing
+        # http:// and pointing at 4318 — simpler, one less moving part.
+        presets:
+          otlpExporter:
+            enabled: true
+          otlphttpExporter:
+            enabled: false
+        otelCollectorEndpoint: signoz-otel-collector.signoz.svc.cluster.local:4317
+        otelInsecure: true
+        clusterName: homelab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: signoz
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true

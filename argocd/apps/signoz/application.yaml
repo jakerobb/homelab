@@ -1,0 +1,148 @@
+# Cluster observability (logs/metrics/traces) — closes out the
+# "Log and Metrics aggregation" item in todo/READY.md. Runs on
+# talos-worker-mbp (see talos/README.md#additional-worker-talos-worker-mbp-added-2026-09-22),
+# a deliberately temporary/disposable node — hence the hard requirement
+# below that every stateful piece lives on hexos-iscsi, never node-local.
+#
+# Chart: verified live against charts.signoz.io (0.142.1, the current
+# stable as of 2026-09-22) rather than assumed — don't trust an older
+# version's values shape if bumping targetRevision later. Architecture is
+# heavier than older docs suggest: ClickHouse is deployed via a bundled
+# Altinity clickhouse-operator (CRD-based, ClickHouseInstallation), with
+# ZooKeeper still in the mix. PostgreSQL and Redpanda (a Kafka-style queue)
+# are real chart components but default OFF (redpanda alone defaults to
+# 3 replicas x 7 CPU / 28GB RAM each — never enable without deliberately
+# revisiting node resource budget first) — left disabled here too; SigNoz's
+# own internal SQLite (signoz.persistence) and the otel-collector's direct
+# ClickHouse exporters are sufficient for a single-node homelab deployment.
+#
+# CRDs (clickhouse-operator's 3 CustomResourceDefinitions, shipped in the
+# chart's crds/ folder) are NOT installed by ArgoCD's Helm source (it never
+# processes crds/, same reasoning as kube-prometheus-stack) — installed
+# manually once, see argocd/README.md's SigNoz section for the exact command
+# and why this doesn't need vendoring into this repo (real upstream chart to
+# helm pull from, per docs/adding-an-app.md #7).
+#
+# Metrics ingestion: SigNoz does NOT accept Prometheus remote_write despite
+# some marketing copy implying otherwise — confirmed directly against a
+# SigNoz maintainer (github.com/SigNoz/signoz/discussions/9489) and this
+# chart's own otel-collector pipeline (metrics pipeline only takes `otlp` by
+# default, no prometheusremotewrite receiver anywhere). Instead,
+# otelCollector.config below adds a real `prometheus` receiver that scrapes
+# kube-prometheus-stack's Prometheus via its /federate endpoint — leaves
+# kube-prometheus-stack's own scraping/alerting/local-retention completely
+# untouched, SigNoz just becomes another read-only consumer of the same data.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: signoz
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.signoz.io
+    chart: signoz
+    targetRevision: 0.142.1
+    helm:
+      releaseName: signoz
+      valuesObject:
+        global:
+          storageClass: hexos-iscsi
+        clickhouse:
+          # SigNoz's own stated ~4GB practical floor for ClickHouse, with
+          # headroom — chart default (100m/200Mi, no limits at all) is only
+          # sized for a toy/eval install.
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 6Gi
+          persistence:
+            storageClass: hexos-iscsi
+            size: 30Gi
+          zookeeper:
+            persistence:
+              storageClass: hexos-iscsi
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+        signoz:
+          persistence:
+            storageClass: hexos-iscsi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+        otelCollector:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          config:
+            receivers:
+              prometheus:
+                config:
+                  scrape_configs:
+                    - job_name: federate-kube-prometheus-stack
+                      scrape_interval: 60s
+                      honor_labels: true
+                      metrics_path: /federate
+                      params:
+                        # A catch-all `{__name__=~".+"}` matcher silently
+                        # returns zero bytes against this Prometheus's
+                        # /federate endpoint (confirmed live: HTTP 200, empty
+                        # body) -- Prometheus's own docs discourage
+                        # replicating the whole dataset this way regardless.
+                        # Curated per-job selectors instead, matching exactly
+                        # what the task asked for (kube-state-metrics,
+                        # node-exporter, scheduler, controller-manager) --
+                        # deliberately NOT kubelet/cadvisor or apiserver,
+                        # confirmed live to balloon a single scrape to 67MB
+                        # (kubelet alone) vs. 11.6MB for this set, from
+                        # per-container-per-node cardinality that isn't part
+                        # of what was actually requested.
+                        match[]:
+                          - '{job="kube-state-metrics"}'
+                          - '{job="node-exporter"}'
+                          - '{job="kube-scheduler"}'
+                          - '{job="kube-controller-manager"}'
+                          - 'up'
+                      static_configs:
+                        - targets:
+                            - kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+            service:
+              pipelines:
+                metrics:
+                  receivers: [otlp, prometheus]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: signoz
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+    # signoz-k8s-infra's otelAgent DaemonSet needs hostPath mounts + hostPorts
+    # to tail node-level logs — same "baseline blocks host access" gap
+    # kube-prometheus-stack's node-exporter hit first (Talos's cluster-wide
+    # PodSecurity default is `baseline` everywhere except kube-system). Set
+    # here since this app owns the shared `signoz` namespace
+    # (CreateNamespace=true above); signoz-k8s-infra reuses it.
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged

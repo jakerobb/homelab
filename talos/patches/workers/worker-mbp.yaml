@@ -1,0 +1,35 @@
+machine:
+  network:
+    hostname: talos-worker-mbp
+  # UTM/QEMU under macOS on the 2018 MacBook Pro — a temporary stopgap worker
+  # until the Mac Studio arrives (~Nov 2026), hence the hardware-identifying
+  # name instead of the usual decoupled talos-worker-N convention (see
+  # talos/README.md's "MS-A2 workers: decided values" for why every other
+  # node is named that way). install.disk/image are overridden here rather
+  # than left to the shared worker.yaml template because the disk device
+  # name is hypervisor-specific: UTM's imported qcow2 shows up as /dev/sda
+  # (SATA/AHCI emulation), not /dev/nvme0n1 like the Proxmox-based workers.
+  install:
+    disk: /dev/sda
+    image: factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.1
+  # Needed for democratic-csi's iSCSI node driver, same as worker-1/worker-2
+  # — see talos/README.md#iscsi-tools-extension-added-2026-09-15.
+  kernel:
+    modules:
+      - name: iscsi_tcp
+  kubelet:
+    extraMounts:
+      - destination: /etc/iscsi
+        type: bind
+        source: /etc/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
+      - destination: /var/lib/iscsi
+        type: bind
+        source: /var/lib/iscsi
+        options:
+          - bind
+          - rshared
+          - rw

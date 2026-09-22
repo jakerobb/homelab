@@ -681,3 +681,222 @@ Bump the chart version in the `helm install` command above (now that it's
 already installed, `helm upgrade` instead) and re-run with the same
 `-f argocd/install/values.yaml`. This is the one recurring manual step, by
 design — see "Bootstrap pattern" above.
+
+## SigNoz (decided and deployed 2026-09-22)
+
+Cluster observability (logs/metrics/traces in one stack) — closes out
+`todo/READY.md`'s "Log and Metrics aggregation" item. Runs on
+`talos-worker-mbp` (see
+[`talos/README.md`](../talos/README.md#additional-worker-talos-worker-mbp-added-2026-09-22)),
+a deliberately temporary node — every stateful piece is on `hexos-iscsi`
+specifically so retiring that node later needs no data migration.
+
+**Chart:** `signoz/signoz` from `https://charts.signoz.io`, `0.142.1` —
+verified live (`helm show values`), not assumed. Architecture is heavier
+than older docs suggest: ClickHouse deploys via a bundled Altinity
+`clickhouse-operator` (CRD-based `ClickHouseInstallation`), with ZooKeeper
+still in the mix. PostgreSQL and Redpanda (a Kafka-style queue) are real
+chart components but default **off** — redpanda alone defaults to 3
+replicas × 7 CPU / 28GB RAM each, never enable without deliberately
+revisiting the node's resource budget first.
+
+**CRDs:** the clickhouse-operator's 3 CRDs (shipped in the chart's `crds/`
+folder, which ArgoCD's Helm source never processes — same reasoning as
+`kube-prometheus-stack`) were installed once, out-of-band:
+```bash
+helm pull signoz/signoz --version 0.142.1 --untar --untardir /tmp/signoz-chart
+kubectl create -f /tmp/signoz-chart/signoz/charts/clickhouse/crds/
+```
+Re-run against any future chart bump that touches ClickHouse's CRD schema.
+
+**Storage:** `global.storageClass: hexos-iscsi`, set again explicitly per
+component (`clickhouse.persistence`, `clickhouse.zookeeper.persistence`,
+`signoz.persistence`) rather than trusting only the global default — cheap
+insurance, confirmed live via `helm template` that all three actually
+resolve to `hexos-iscsi` before ever applying. ClickHouse PVC bumped to
+`30Gi` (chart default `20Gi`).
+
+**Storage validated before trusting it** (per the task's own requirement —
+first real database-shaped, latency-sensitive small-random-I/O workload on
+`hexos-iscsi`; everything else there today, like Authelia's SQLite file, is
+much lighter): a throwaway `fio` 4K random read/write benchmark
+(`iodepth=8`, `direct=1`) pinned to `talos-worker-mbp` via `nodeSelector`
+against a fresh `hexos-iscsi` PVC —
+
+```
+READ:  IOPS=2997, BW=11.7MiB/s, avg latency=1.27ms, p99=2.8ms, p99.9=5.4ms
+WRITE: IOPS=2988, BW=11.7MiB/s, avg latency=1.34ms, p99=3.2ms, p99.9=6.8ms
+```
+
+Good enough for ClickHouse's needs on a homelab-scale deployment — sub-2ms
+average latency at ~3000 IOPS/direction, comparable to a reasonable
+consumer SSD despite being network-attached iSCSI.
+
+**Resource budget** (chart defaults are token-sized — 100m/200Mi requests,
+*no limits at all* — fine for a toy install, not for real use):
+
+| Component | Requests | Limits |
+|---|---|---|
+| ClickHouse | 500m / 2Gi | 2 / 6Gi |
+| ZooKeeper | 100m / 256Mi | 500m / 512Mi |
+| SigNoz core | 100m / 256Mi | 500m / 1Gi |
+| otel-collector | 100m / 256Mi | 1 / 1Gi |
+
+Comfortably under the VM's 24GB even with Cilium/node-exporter/kubelet
+overhead on the same node.
+
+### Gotcha: nothing works until first-run signup is completed
+
+The otel-collector's baked-in `ConfigMap` is only a *bootstrap* config — the
+real running pipeline is activated dynamically via OpAmp, which requires an
+org to exist. Every agent-registration attempt fails
+(`"cannot create agent without orgId"`, logged repeatedly by `signoz-0`)
+until SigNoz's own first-run signup (creating the initial admin
+account/org) is completed through its web UI. Until that happens, the
+collector's extensions/healthcheck report `ready` — looking healthy — while
+literally zero receivers/exporters/pipelines are actually running, silently
+dropping everything. Completed via `kubectl port-forward svc/signoz
+8080:8080` and the signup form at `/`; the admin credential is stored
+encrypted at
+[`argocd/secrets/signoz-admin-credentials.sops.yaml`](secrets/signoz-admin-credentials.sops.yaml)
+(not a Kubernetes `Secret` consumed by any pod — SigNoz keeps its own users
+in ClickHouse — this file exists purely as a durable encrypted record, same
+SOPS+age convention as everything else here). A `ConfigMap` change also
+doesn't hot-reload into the collector Deployment — `kubectl rollout
+restart` is needed after any `otelCollector.config` edit for it to actually
+take effect.
+
+### Metrics: federation, not remote_write (task assumption corrected)
+
+The task's original plan assumed SigNoz accepts Prometheus `remote_write`
+directly. **Confirmed false** — checked rather than configured blind:
+this chart's otel-collector metrics pipeline only takes an `otlp` receiver
+by default (no `prometheusremotewrite` receiver anywhere), and a SigNoz
+maintainer directly confirmed "No" to both a remote_write endpoint and
+direct Prometheus scraping
+([SigNoz/signoz#9489](https://github.com/SigNoz/signoz/discussions/9489)) —
+SigNoz wants OTLP, with Prometheus-format metrics going through an OTel
+Collector `prometheus` receiver first.
+
+Fix: `otelCollector.config` in
+[`apps/signoz/application.yaml`](apps/signoz/application.yaml) adds a real
+`prometheus` receiver scraping `kube-prometheus-stack`'s Prometheus via its
+`/federate` endpoint — `kube-prometheus-stack` itself is completely
+untouched, SigNoz just becomes another read-only consumer of the same data.
+(Considered and rejected: switching `kube-prometheus-stack`'s Prometheus to
+Agent mode — it only *outputs* via remote_write, so it wouldn't have solved
+the receiving-side gap either, and Agent mode drops local storage/rule
+evaluation entirely, which the existing Alertmanager/ntfy alerting depends
+on. Federation leaves that completely undisturbed.)
+
+**Second gotcha, found live:** a catch-all `match[]={__name__=~".+"}`
+silently returns **zero bytes** (`HTTP 200`, empty body) against this
+Prometheus's `/federate` endpoint — confirmed via direct `curl` from inside
+the cluster. Prometheus's own docs discourage replicating the whole dataset
+via federation anyway. Fixed with curated per-job selectors matching
+exactly what the task asked for:
+```
+match[]:
+  - '{job="kube-state-metrics"}'
+  - '{job="node-exporter"}'
+  - '{job="kube-scheduler"}'
+  - '{job="kube-controller-manager"}'
+  - 'up'
+```
+Deliberately **excludes** `kubelet`/cadvisor and `apiserver` — confirmed
+live that including `kubelet` alone balloons a single scrape from 11.6MB to
+67MB, from per-container-per-node cardinality that isn't part of what was
+actually requested. `scrape_interval: 60s` (not the receiver's usual `30s`)
+given the payload size. Verified end-to-end: `kube_pod_info`,
+`node_cpu_seconds_total`, `up`, `node_memory_MemAvailable_bytes`,
+`kube_deployment_status_replicas` all present in
+`signoz_metrics.distributed_time_series_v4` after a scrape cycle.
+
+### Logs + host metrics: signoz/k8s-infra, not the main chart
+
+The main `signoz` chart has no DaemonSet of its own and doesn't tail
+container logs at all — confirmed by rendering it (`kind: DaemonSet`
+appears zero times). SigNoz's actual answer is a separate chart,
+`signoz/k8s-infra` (0.17.1,
+[`apps/signoz-k8s-infra/application.yaml`](apps/signoz-k8s-infra/application.yaml)),
+deployed into the same `signoz` namespace as its own `Application` (same
+pattern as `cert-manager-config` sharing `cert-manager`'s namespace) — a
+DaemonSet (`otelAgent`) tailing `/var/log/pods/*/*/*.log` by default plus a
+small cluster-level `Deployment` (`otelDeployment`) for K8s object/event
+metrics. This is the piece that actually closes the "ship pod and node
+logs" half of `todo/READY.md`, not just the metrics side. Runs on all 6
+nodes including the tainted arm64 Pi5 control planes (default tolerations
+`- operator: Exists`, confirmed multi-arch image support live).
+
+**Same PodSecurity gap `kube-prometheus-stack`'s `node-exporter` hit
+first:** `otelAgent`'s hostPath mounts + hostPorts violate Talos's
+cluster-wide `baseline` PodSecurity default (every namespace except
+`kube-system`). Fixed identically — `managedNamespaceMetadata` on the main
+`signoz` app (which owns the shared namespace via `CreateNamespace=true`):
+```yaml
+managedNamespaceMetadata:
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+```
+**Gotcha:** the DaemonSet controller doesn't proactively retry
+`FailedCreate` pods once the namespace is relabeled — it sat at
+`CURRENT: 0` indefinitely even minutes after the fix. `kubectl rollout
+restart daemonset` forced an immediate retry, which then succeeded cleanly.
+
+**Gotcha, `k8s-infra`'s own OTLP exporter:** the chart's default is the
+`otlphttp` exporter (`presets.otlphttpExporter.enabled: true`), not `otlp`
+(grpc) — pointing `otelCollectorEndpoint` at `<host>:4317` (the grpc port,
+bare `host:port`) against the *HTTP* exporter fails outright
+(`"unsupported protocol scheme"`, since there's no `http://` prefix and the
+wrong port besides). Fixed by explicitly switching to the grpc exporter
+(`presets.otlpExporter.enabled: true`, `presets.otlphttpExporter.enabled:
+false`) rather than prefixing `http://` and pointing at `4318` — one fewer
+moving part, matches `signoz-otel-collector`'s plain `otlp.protocols.grpc`
+endpoint.
+
+**Deliberately deferred, not done:** piping rpi5-1's own Compose-host logs
+(Vector → VictoriaLogs today, see `docker-compose/vector/vector.yaml`) into
+SigNoz's OTel Collector too. `k8s-infra` already covers the core in-cluster
+ask; adding a second Vector sink (`opentelemetry` type, OTLP) would need
+the collector reachable from outside the cluster (Vector runs on rpi5-1,
+not in-cluster) — a LoadBalancer Service off the existing L2 pool, or
+routed through the Gateway. Explicit follow-up, not started.
+
+### Exposure: Gateway + Authelia forward-auth
+
+`signoz.jakerobb.org` via the shared `homelab-gateway`
+([`apps/signoz/httproute.yaml`](apps/signoz/httproute.yaml) — sits beside
+`application.yaml` rather than under a `manifests/signoz/` dir, since
+`signoz` itself sources entirely from the external chart; same "small
+resource tightly coupled to its parent app" exception as
+`apps/authelia/referencegrant.yaml`, picked up by root's own recursive
+directory scan). Gated by Authelia's `ExternalAuth` forward-auth filter
+(same pattern as `searxng`), **not** native OIDC — SigNoz Community
+Edition's OIDC support is enterprise/cloud-only (checked against SigNoz's
+own docs/changelog before assuming otherwise). Needs the matching
+`access_control` rule (`apps/authelia/application.yaml`) and
+`ReferenceGrant` entry (`apps/authelia/referencegrant.yaml`) — both added.
+
+### Headlamp's Prometheus plugin: confirmed viable, not yet switched over
+
+FreeLens is out — Jake is standardizing on Headlamp. Headlamp's *core*
+resource-usage display depends on `metrics-server`, not Prometheus at all
+(unaffected either way). Separately, Headlamp ships a built-in, manually
+enabled Prometheus plugin (Settings → Plugins → Prometheus, auto-detect
+off, custom service address) that can point at any Prometheus-API-shaped
+endpoint.
+
+**Confirmed live:** SigNoz genuinely exposes a real Prometheus-HTTP-API-
+compatible endpoint (`/api/v1/query`, `/api/v1/query_range`) — not just a
+custom schema. `curl`'d it directly (via a browser-session JWT for the
+test) and got back correctly-shaped Prometheus vector results, including
+the federated `up` series. It requires `Authorization: Bearer <token>` —
+SigNoz's Settings → API Keys is the durable way to mint one (the JWT used
+for this test is a short-lived login-session token, not meant for this).
+**Not yet wired into Headlamp** — that's Jake's hands, pointing Headlamp's
+plugin at `https://signoz.jakerobb.org` (once exposure is live) with a
+real API key, and reporting back whether the plugin's UI actually
+round-trips correctly end-to-end. Only remove `kube-prometheus-stack` if
+that's a clean yes.

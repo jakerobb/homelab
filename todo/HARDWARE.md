@@ -6,11 +6,10 @@ This document enumerates my hardware plans.
 
 ### Additional K8s nodes
 
-* I have a 2018 15" Macbook Pro with 32GB of RAM sitting idle with a connection to the Server VLAN. I plan to run a
-  Talos worker in a VM on this machine.
 * I have an M5 Ultra Mac Studio with 96GB of RAM on order; it should arrive in November. I plan to run a Talos worker in
   a VM on this machine.
-* Once all workloads have been migrated off, rpi5-1 (a 16GB Raspberry Pi 5) will be converted into a Talos worker node.
+* Once all Compose workloads have been migrated off, rpi5-1 (a 16GB Raspberry Pi 5) will be converted into a Talos
+  worker node.
     * Before I can do this, I'll need to designate a new "jump box." My current thought is that I should get another 4GB
       Raspberry Pi 5, like the ones I'm using for the control plane. Then I can just move rpi5-1's SSD over, and it can
       just work without any configuration effort -- it wouldn't even need a new hostname.

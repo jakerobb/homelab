@@ -1,0 +1,60 @@
+# Sits alongside application.yaml rather than under a manifests/signoz/ dir
+# — signoz itself is sourced entirely from the external Helm chart (no git
+# path to add a sibling manifest into), so this follows the same "small
+# resource tightly coupled to its parent app" exception as
+# argocd/apps/authelia/referencegrant.yaml: root's own recursive directory
+# scan over argocd/apps/ picks this up directly, no separate Application
+# needed just for one HTTPRoute.
+#
+# Gated by Authelia forward-auth (ExternalAuth), not native OIDC — SigNoz
+# Community Edition's OIDC support is enterprise/cloud-only (checked against
+# SigNoz's own docs/changelog before assuming otherwise). Same pattern as
+# searxng/homepage: requires the matching ReferenceGrant entry
+# (argocd/apps/authelia/referencegrant.yaml) and access_control rule
+# (argocd/apps/authelia/application.yaml) for signoz.jakerobb.org.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: signoz
+  namespace: signoz
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: SigNoz
+    gethomepage.dev/description: Logs, metrics, and traces
+    gethomepage.dev/icon: signoz.png
+    gethomepage.dev/group: Monitoring
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - signoz.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: signoz
+          port: 8080
