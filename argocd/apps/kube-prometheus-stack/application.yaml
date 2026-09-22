@@ -98,6 +98,22 @@ spec:
                 - receiver: "null"
                   matchers:
                     - alertname = "Watchdog"
+                # InfoInhibitor is a meta-alert, not a real one — it fires
+                # whenever a severity="info" alert is active with nothing
+                # more severe alongside it in the same namespace, and per
+                # its own annotation is meant to be routed to null (its
+                # actual job, inhibiting other info-level alerts, is a
+                # separate `inhibit_rules` config this repo doesn't have
+                # yet — not added here, this is just the notification-noise
+                # fix). Found live 2026-09-22: a SigNoz rollout produced one
+                # transient info-level condition, and this alert — meant to
+                # be invisible — reached ntfy instead
+                # (github.com/prometheus-operator/kube-prometheus's
+                # default rule set assumes the null-routing is already
+                # there).
+                - receiver: "null"
+                  matchers:
+                    - alertname = "InfoInhibitor"
             receivers:
               - name: ntfy
                 webhook_configs:
