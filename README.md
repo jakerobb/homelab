@@ -332,7 +332,7 @@ Applications
 ### Critical
 
 * I use Claude Code to help keep everything running smoothly. It checks for issues daily and fixes them automatically.
-  There's a $20/month subscription.
+  There's a $200/year ($17/month) subscription.
 * I use Backblaze B2 to keep offsite backups of important data. The cost varies depending on how much we store.
   Currently under $20/month.
 * I use CloudFlare for DNS. It's free.
@@ -340,7 +340,8 @@ Applications
 * I use Akamai/Linode to serve my personal website. If I'm dead, I would really like this to remain up.
   Currently ~$90/month; I am working to move as much as possible in-house. I should be able to get it down to $5/month.
 * We have an Apple One Premier subscription. This provides cloud storage for our photo libraries and phone backups, as
-  well as Apple TV, Apple Music, Apple News, Apple Arcade, and Apple Fitness. Currently $39.95/mo.
+  well as Apple TV, Apple Music, Apple News, Apple Arcade, and Apple Fitness. Currently $39.95/mo. We use TV and Music
+  extensively, but they are technically optional; this is here for the cloud storage part.
 
 ### Optional
 
