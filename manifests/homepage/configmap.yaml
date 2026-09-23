@@ -176,8 +176,10 @@ data:
             icon: argo-cd.png
             href: https://argocd.jakerobb.org
 
-  # Cluster/node widget deliberately omitted: needs metrics-server, which
-  # isn't installed (see clusterrole.yaml).
+  # Cluster/node widget reads the Kubernetes Metrics API (metrics-server,
+  # argocd/apps/metrics-server/) via this pod's ServiceAccount — needs the
+  # `metrics.k8s.io` rule in clusterrole.yaml. Same numbers as `kubectl top
+  # nodes`.
   #
   # Open-Meteo needs no API key/account (gethomepage.dev/widgets/info/openmeteo/).
   # Coordinates for zip 48864 (Okemos, MI).
@@ -196,6 +198,18 @@ data:
   # the SSO cookie cross-subdomain — not worth the complexity for
   # autocomplete alone.
   widgets.yaml: |
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: cluster
+        nodes:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
     - openmeteo:
         label: Okemos, MI
         latitude: 42.704994

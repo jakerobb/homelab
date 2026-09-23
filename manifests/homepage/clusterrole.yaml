@@ -7,14 +7,11 @@
 # code unconditionally lists Ingresses on startup regardless of the
 # `gateway`/`ingress` toggles in kubernetes.yaml — found live 2026-09-16 as a
 # `403 Forbidden` in the logs (non-fatal, just noisy) after trimming it.
-# `metrics.k8s.io` is dropped: no metrics-server is installed on this cluster
-# yet (verified via `kubectl top nodes` -> "Metrics API not available"), so
-# granting it would be dead weight — add it back if that ever changes (see
-# todo/READY.md's metrics item).
+# `metrics.k8s.io` backs the cluster/node resource widget in widgets.yaml
+# (configmap.yaml) — served by metrics-server (argocd/apps/metrics-server/).
 #
 # Read-only (get/list) everywhere; Homepage never needs to mutate cluster
-# state, only enumerate it for discovery + the (currently unused) cluster
-# widget.
+# state, only enumerate it for discovery + the cluster widget.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -31,4 +28,7 @@ rules:
     verbs: [get, list]
   - apiGroups: [gateway.networking.k8s.io]
     resources: [httproutes, gateways]
+    verbs: [get, list]
+  - apiGroups: [metrics.k8s.io]
+    resources: [nodes, pods]
     verbs: [get, list]
