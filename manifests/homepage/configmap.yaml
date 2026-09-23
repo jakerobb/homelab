@@ -199,6 +199,10 @@ data:
   # the SSO cookie cross-subdomain — not worth the complexity for
   # autocomplete alone.
   widgets.yaml: |
+    - search:
+        provider: custom
+        url: https://search.jakerobb.org/search?q=
+        target: _blank
     - openmeteo:
         label: Okemos, MI
         latitude: 42.704994
@@ -206,10 +210,6 @@ data:
         timezone: America/New_York
         units: imperial
         cache: 5
-    - search:
-        provider: custom
-        url: https://search.jakerobb.org/search?q=
-        target: _blank
     - kubernetes:
         href: https://headlamp.jakerobb.org
         cluster:
