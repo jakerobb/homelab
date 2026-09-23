@@ -931,68 +931,98 @@ own docs/changelog before assuming otherwise). Needs the matching
 ### ClickHouse CPU tuning (2026-09-23)
 
 **Symptom:** ClickHouse (`chi-signoz-clickhouse-cluster-0-0-0`) sat at a
-steady ~1.7–1.9 cores in `kubectl top` against a 2-core limit, putting
-`talos-worker-mbp` at ~46–50% CPU, for a homelab-sized ingest volume.
+steady ~1.7–1.9 cores in `kubectl top`, right at its 2-core limit, putting
+`talos-worker-mbp` at ~46–50% CPU for a homelab-sized ingest volume.
 (Separately, an SELinux audit flood on the same volume turned out *not* to
 be the cause; see `talos/README.md` "SELinux labels on iSCSI volumes".)
 
-**Where the CPU actually went** (10-minute window, from ClickHouse's own
-`system.metric_log`, `query_log`, `part_log` and `trace_log`):
+**Result** (10-minute windows, from ClickHouse's own `system.metric_log`,
+`query_log` and `part_log`, plus `kubectl top`):
 
-| | Baseline |
-|---|---|
-| ClickHouse self-reported CPU (`OSCPUVirtualTimeMicroseconds`) | 1.13 cores |
-| INSERT queries | 8,447 (~14/sec) |
-| New parts, `signoz_logs.logs_v2` / `tag_attributes_v2` | 595 / 600 |
-| New parts, `signoz_metrics.samples_v4` | 146 |
-| `system.trace_log` rows written | 1.23M |
-| Merge CPU: `system.trace_log` | ~88 CPU-s |
-| Merge CPU: `signoz_logs.logs_v2` | ~86 CPU-s (re-merging only ~85 MiB) |
-| INSERT CPU (all tables) | ~46 CPU-s |
+| | Before | After |
+|---|---|---|
+| ClickHouse pod CPU (`kubectl top`) | 1.7–1.9 cores | 0.32–0.41 cores |
+| `talos-worker-mbp` node CPU | 2.74 cores (46%) | 1.16 cores (19%) |
+| ClickHouse self-reported CPU (`OSCPUVirtualTimeMicroseconds`) | 1.13 cores | 0.19 cores |
+| MergeMutate thread CPU (sampled from `/proc/<pid>/task/*/stat`) | 1.48 cores | 0.06 cores |
+| Failed merges on `system.metric_log` | ~120 (7,169/hour) | 0 |
+| INSERT queries | 8,447 | 1,254 |
+| New parts, `logs_v2` / `tag_attributes_v2` / `samples_v4` | 595 / 600 / 146 | 60 / 60 / 59 |
+| Merge CPU, `logs_v2` | ~86 CPU-s | ~8 CPU-s |
+| INSERT CPU (all tables) | ~46 CPU-s | ~9 CPU-s |
+| `system.trace_log` rows written | 1.23M | 0 (table removed) |
 
-Two separate problems:
+Three separate problems, found in this order:
 
 1. **ClickHouse profiling itself.** The chart enables `trace_log` (plus
    `zookeeper_log`, `processors_profile_log` and `query_thread_log`), and
-   ClickHouse 25.x's global profiler samples every thread every 10s. With
-   a 512-thread background schedule pool, that plus merge memory-profiler
-   stack traces came to ~2,000 trace rows/sec. `trace_log` had grown to
+   ClickHouse 25.x's global profiler samples every thread every 10s. Across
+   a 512-thread background schedule pool, plus merge memory-profiler stack
+   traces, that came to ~2,000 trace rows/sec. `trace_log` had grown to
    **3.16 GiB / 114M rows**, bigger than all the real SigNoz data combined
-   (~350 MiB), and merging it cost as much CPU as merging the actual logs.
-   On top of that comes the unmeasured cost of capturing stack traces.
+   (~350 MiB), and merging it cost ~88 CPU-s per 10 minutes.
 2. **No batching on ingest.** The chart's otel-collector `batch` processor is
    `send_batch_size: 50000, timeout: 1s`. Homelab volume never gets near
-   50k, so it flushes every second: one INSERT/sec into each of `logs_v2`,
-   `tag_attributes_v2`, the logs resource/key tables, metadata, and so on.
-   Each INSERT creates a new part, and `logs_v2`'s skip indexes make its
-   merges expensive, so the same small amount of data got re-merged
-   constantly.
+   50k, so it flushed every second: one INSERT/sec into each of `logs_v2`,
+   `tag_attributes_v2`, the resource/key tables, metadata, and so on. Each
+   INSERT is a new part, and `logs_v2`'s skip indexes make its merges
+   expensive.
+3. **The actual bulk of the CPU: a `system.metric_log` merge failure loop.**
+   Fixing 1 and 2 only moved ClickHouse's own number from 1.13 to 0.93
+   cores. Per-thread `/proc` sampling then showed the MergeMutate threads
+   alone at ~1.5 cores, far more than `part_log`'s successful-merge
+   accounting explained. The cause: `metric_log` has **~1,550 columns** and
+   small row counts, so ClickHouse chose *horizontal* merges, which buffer
+   every column of every source part at once. Merging 8–14 parts wanted
+   more than the 5.4 GiB server memory cap, so every attempt died with
+   `MEMORY_LIMIT_EXCEEDED` (error 241) after doing most of the work, then
+   retried: about 2 failures/sec, 67k in total, going back to 2026-09-22
+   19:01, i.e. essentially since SigNoz was deployed. The only visible trace
+   was `part_log` rows with `error = 241`, which is worth checking first if
+   ClickHouse CPU looks high again:
+   ```sql
+   SELECT table, error, count() FROM system.part_log
+   WHERE event_time > now() - INTERVAL 1 HOUR AND error != 0 GROUP BY ALL
+   ```
+   (Error 389, "part was deduplicated", also shows up there for
+   `tag_attributes_v2`. That's normal insert deduplication, not a failure.)
 
 **Fix** (all in [`apps/signoz/application.yaml`](apps/signoz/application.yaml)):
-- `clickhouse.files."config.d/zz-homelab-tuning.xml"`: global profiler off,
-  and `trace_log`, `zookeeper_log`, `processors_profile_log`,
-  `query_thread_log` removed (`remove="1"`). The `zz-` prefix makes it sort
-  after the operator's `01-clickhouse-*.xml` system-log definitions.
-  `query_log`, `part_log`, `metric_log`, `text_log`, `error_log` and
-  `asynchronous_metric_log` are kept, since they're cheap and are exactly
-  what this diagnosis ran on.
+- `clickhouse.files."config.d/zz-homelab-tuning.xml"`:
+  - global profiler off
+  - `trace_log`, `zookeeper_log`, `processors_profile_log` and
+    `query_thread_log` removed (`remove="1"`)
+  - `metric_log` redefined with the operator's same engine/TTL/flush plus
+    `SETTINGS vertical_merge_algorithm_min_rows_to_activate = 1,
+    vertical_merge_algorithm_min_columns_to_activate = 1`, forcing vertical
+    (column-at-a-time) merges
+
+  The `zz-` prefix sorts it after the operator's `01-clickhouse-*.xml`
+  system-log definitions, so it wins. `query_log`, `part_log`,
+  `metric_log`, `text_log`, `error_log` and `asynchronous_metric_log` are
+  kept: they're cheap and are exactly what this diagnosis ran on.
 - `clickhouse.profiles`: per-query profilers off and
   `log_processors_profiles: 0` for the `default` profile, which the
   collector's `admin` user also uses.
-- `otelCollector.config.processors.batch.timeout: 10s`: logs can take up
-  to 10s longer to appear in SigNoz.
-- **Not done: `async_insert`.** Collector-side batching gets the same
-  "fewer, bigger inserts" effect without adding a second buffering layer
-  with its own flush and durability semantics. Revisit only if part counts
-  stay high after the batch change.
+- `otelCollector.config.processors.batch.timeout: 10s`: ~10x fewer
+  inserts/parts. Logs can take up to 10s longer to appear in SigNoz.
+- **Not done: `async_insert`.** Collector-side batching already gets
+  "fewer, bigger inserts" without a second buffering layer with its own
+  flush and durability semantics.
+- **Not done: `metric_log`'s `<schema_type>transposed</schema_type>`**
+  (ClickHouse 25.x's narrow metric/value layout). It would also fix the wide
+  merges, but it's a bigger change than the merge setting, and the setting
+  was enough.
 
-Removing a system log from config doesn't drop the existing table, so the
-old `system.trace_log` (3+ GiB) and `system.zookeeper_log` stay on disk
-until someone drops them by hand
-(`DROP TABLE system.trace_log` / `system.zookeeper_log`). ClickHouse won't
-recreate them while they're removed from config.
-
-**After:** _pending, measured once the change is synced._
+The metric_log fix was verified live first with `ALTER TABLE
+system.metric_log MODIFY SETTING ...` (same two settings) before being put
+in config. When ClickHouse sees a system log table whose definition doesn't
+match config, it renames the old one to `metric_log_0` and creates a new
+one; if that happens on the next restart, `metric_log_0` keeps the ALTERed
+settings (so its merges are fine too) and can be dropped whenever.
+The old `system.trace_log` and `system.zookeeper_log` (~4 GiB together)
+were dropped by hand, since removing a system log from config doesn't drop
+its existing table.
 
 ### Headlamp's Prometheus plugin: confirmed viable, not yet switched over
 

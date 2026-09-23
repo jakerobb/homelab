@@ -74,7 +74,19 @@ spec:
           # 01-clickhouse-*.xml system-log definitions in config.d, so
           # remove="1" wins. The useful diagnostic tables (query_log,
           # part_log, metric_log, text_log, error_log,
-          # asynchronous_metric_log) are left alone. If deep profiling is
+          # asynchronous_metric_log) are left alone.
+          #
+          # metric_log is redefined (same engine/TTL/flush as the operator's
+          # default) only to force vertical merges. It has ~1,550 columns
+          # and small row counts, so ClickHouse picks horizontal merges,
+          # which buffer every column of every source part at once. Merging
+          # 8-14 parts needed more than the 5.4 GiB server memory cap, so
+          # every attempt failed with MEMORY_LIMIT_EXCEEDED and retried:
+          # ~2 failures/sec since the day SigNoz was deployed, and ~1.5
+          # cores of MergeMutate thread CPU, which was the bulk of
+          # ClickHouse's usage. Vertical merges go one column at a time.
+          #
+          # If deep profiling is
           # ever needed, delete this file and the profiles below, then
           # restart ClickHouse.
           files:
@@ -86,6 +98,12 @@ spec:
                   <zookeeper_log remove="1"/>
                   <processors_profile_log remove="1"/>
                   <query_thread_log remove="1"/>
+                  <metric_log replace="1">
+                      <database>system</database>
+                      <table>metric_log</table>
+                      <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 30 DAY SETTINGS vertical_merge_algorithm_min_rows_to_activate = 1, vertical_merge_algorithm_min_columns_to_activate = 1</engine>
+                      <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+                  </metric_log>
               </clickhouse>
           # Per-query profiler sampling off too (defaults to 1s per query
           # thread). Harmless without trace_log, but explicit is clearer.
