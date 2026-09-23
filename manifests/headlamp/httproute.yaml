@@ -11,7 +11,6 @@
 #
 # gethomepage.dev/* annotations opt this into Homepage's Kubernetes
 # discovery (see manifests/homepage/configmap.yaml's kubernetes.yaml),
-# landing it in the Infrastructure tab per Jake's ask (2026-09-21).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -22,7 +21,7 @@ metadata:
     gethomepage.dev/name: Headlamp
     gethomepage.dev/description: Kubernetes cluster GUI
     gethomepage.dev/icon: headlamp.png
-    gethomepage.dev/group: Infrastructure
+    gethomepage.dev/group: Apps
 spec:
   parentRefs:
     - name: homelab-gateway

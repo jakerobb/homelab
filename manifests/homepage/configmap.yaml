@@ -86,13 +86,16 @@ data:
         - Home Assistant:
             icon: home-assistant.png
             href: https://homeassistant.jakerobb.org
-    - Services:
-        - Change Detection:
-            icon: changedetection.png
-            href: https://changedetection.jakerobb.org
         - KVM:
             icon: glinet.png
             href: https://kvm.jakerobb.org
+    - Services:
+        - Authelia:
+            icon: authelia.png
+            href: https://auth.jakerobb.org
+        - Change Detection:
+            icon: changedetection.png
+            href: https://changedetection.jakerobb.org
         - Modbus Controller:
             icon: /icons/modbus.png
             href: https://modbus.jakerobb.org
@@ -124,9 +127,6 @@ data:
         - Network Optimizer:
             icon: /icons/network-optimizer.png
             href: https://optimizer.jakerobb.org
-        # ntfy moved to gethomepage.dev/* annotation-based discovery
-        # (manifests/ntfy/httproute.yaml) 2026-09-20, same pattern as
-        # searxng — removed from here to avoid a duplicate tile.
         - NUT (UPS Monitoring):
             icon: nut.png
             href: https://nut.jakerobb.org
@@ -175,9 +175,6 @@ data:
         - ArgoCD:
             icon: argo-cd.png
             href: https://argocd.jakerobb.org
-        - Authelia:
-            icon: authelia.png
-            href: https://auth.jakerobb.org
 
   # Cluster/node widget deliberately omitted: needs metrics-server, which
   # isn't installed (see clusterrole.yaml).
