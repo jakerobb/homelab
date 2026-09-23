@@ -103,6 +103,13 @@ else
   sudo mkdir -p "${TELEGRAF_PREFIX}/bin" "${TELEGRAF_PREFIX}/var/log"
   sudo cp "${TMP_DIR}/telegraf-${TELEGRAF_VERSION}/usr/bin/telegraf" "${TELEGRAF_PREFIX}/bin/telegraf"
   sudo chmod 755 "${TELEGRAF_PREFIX}/bin/telegraf"
+  # Pre-create the log file owned by the account the LaunchDaemon will run
+  # as (below), not root -- launchd sets up StandardOutPath/StandardErrorPath
+  # for a UserName-scoped daemon in that user's context, and a root-owned
+  # parent directory it can't write into is a known cause of launchctl
+  # bootstrap's cryptic "Input/output error".
+  sudo touch "${TELEGRAF_PREFIX}/var/log/telegraf.log"
+  sudo chown "${MAC_USERNAME}" "${TELEGRAF_PREFIX}/var/log/telegraf.log"
 fi
 
 echo "==> Installing collector scripts and per-host telegraf.conf (host.name=${NODE_HOST_NAME}, prefix=${TELEGRAF_PREFIX})"
@@ -140,14 +147,26 @@ echo "==> Starting Telegraf"
 if [ "$INSTALL_METHOD" = "homebrew" ]; then
   brew services start telegraf
 else
+  PLIST_TMP="${TMP_DIR}/com.jakerobb.telegraf.plist"
   sed -e "s|@@TELEGRAF_PREFIX@@|${TELEGRAF_PREFIX}|g" -e "s|@@MAC_USERNAME@@|${MAC_USERNAME}|g" \
-    "${SCRIPT_DIR}/com.jakerobb.telegraf.plist" | sudo tee /Library/LaunchDaemons/com.jakerobb.telegraf.plist > /dev/null
+    "${SCRIPT_DIR}/com.jakerobb.telegraf.plist" > "$PLIST_TMP"
+  # Catches a substitution gone wrong (e.g. a value containing a character
+  # that broke the XML) before it becomes a much more cryptic launchctl
+  # failure.
+  plutil -lint "$PLIST_TMP"
+  sudo cp "$PLIST_TMP" /Library/LaunchDaemons/com.jakerobb.telegraf.plist
   sudo chown root:wheel /Library/LaunchDaemons/com.jakerobb.telegraf.plist
   sudo chmod 644 /Library/LaunchDaemons/com.jakerobb.telegraf.plist
   # bootout first (ignoring failure) so a re-run after fixing something
   # doesn't just fail on "service already bootstrapped".
   sudo launchctl bootout system/com.jakerobb.telegraf 2>/dev/null || true
-  sudo launchctl bootstrap system /Library/LaunchDaemons/com.jakerobb.telegraf.plist
+  if ! sudo launchctl bootstrap system /Library/LaunchDaemons/com.jakerobb.telegraf.plist; then
+    echo "launchctl bootstrap failed. Common causes: a leftover copy of this daemon still loaded from" >&2
+    echo "an earlier attempt (check: sudo launchctl print system/com.jakerobb.telegraf), or the log file" >&2
+    echo "at ${TELEGRAF_PREFIX}/var/log/telegraf.log not writable by ${MAC_USERNAME} (this script sets that" >&2
+    echo "up above, but worth confirming with: ls -l ${TELEGRAF_PREFIX}/var/log/telegraf.log)." >&2
+    exit 1
+  fi
 fi
 
 echo

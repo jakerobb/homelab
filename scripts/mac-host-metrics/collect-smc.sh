@@ -10,8 +10,13 @@ set -eu
 
 out="$(sudo -n /usr/bin/powermetrics --samplers smc -n1 -i1000 2>/dev/null)" || exit 0
 
-cpu_temp="$(printf '%s\n' "$out" | awk -F': ' '/CPU die temperature/{gsub(" C","",$2); print $2; exit}')"
-gpu_temp="$(printf '%s\n' "$out" | awk -F': ' '/GPU die temperature/{gsub(" C","",$2); print $2; exit}')"
+# split(...)[1] rather than stripping a fixed " C" suffix: found live that
+# this machine's temperature lines carry extra trailing annotation (e.g.
+# "93.60 C (fan)", not just "93.60 C"), so gsub(" C","",$2) left the
+# annotation behind in the value. Taking just the first whitespace-
+# delimited token of the field is robust to whatever trails it.
+cpu_temp="$(printf '%s\n' "$out" | awk -F': ' '/CPU die temperature/{split($2,a," "); print a[1]; exit}')"
+gpu_temp="$(printf '%s\n' "$out" | awk -F': ' '/GPU die temperature/{split($2,a," "); print a[1]; exit}')"
 fan_rpm="$(printf '%s\n' "$out" | awk -F'[: ]+' '/^Fan/{print $2; exit}')"
 
 [ -n "${cpu_temp:-}" ] && printf 'smc_temperature,sensor=cpu_die value=%s\n' "$cpu_temp"

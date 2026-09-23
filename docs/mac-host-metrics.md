@@ -178,6 +178,20 @@ All steps below run on the physical Mac itself.
 
 ## Gotchas found
 
+- **`collect-smc.sh`'s temperature values can carry trailing annotation text.** Found live on the 2018 MacBook Pro:
+  `powermetrics --samplers smc`'s `CPU die temperature` line reads `93.60 C (fan)`, not just `93.60 C` —
+  `gsub(" C","",$2)` only stripped the `" C"` and left `(fan)` stuck to the value (`value=93.60 (fan)`, a broken
+  line-protocol field). Fixed by taking just the first whitespace-delimited token of the field
+  (`split($2,a," "); print a[1]`) instead of trying to strip a specific fixed suffix — robust to whatever trails the
+  number, on any hardware.
+- **A `launchctl bootstrap` "Bootstrap failed: 5: Input/output error" is maddeningly generic** — it doesn't say what
+  actually went wrong. One concrete, self-inflicted cause this plist template can hit: it sets `UserName` to a
+  non-root account but points `StandardOutPath`/`StandardErrorPath` at a log file under a directory `sudo mkdir`
+  just created (owned by root) — launchd can't open that path in the daemon's own (non-root) user context, and that
+  failure surfaces as this exact error with no clearer message. `bootstrap.sh` now pre-creates and `chown`s the log
+  file to the target account before bootstrapping. It also runs `plutil -lint` on the rendered plist first, to rule
+  out a bad template substitution (e.g. a value with a character that breaks the XML) as a second possible cause of
+  the same unhelpful error.
 - **`brew --prefix` succeeding does not mean `brew install <formula>` will work.** `bootstrap.sh`'s first version used
   `command -v brew && brew --prefix` as a "does Homebrew work here" probe, on the theory that Homebrew refuses to run
   at all on an unsupported macOS. Found live on the 2018 MacBook Pro: `brew --prefix` succeeds fine (it's a read-only
