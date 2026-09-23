@@ -1,0 +1,144 @@
+#!/bin/bash
+# Single entry point for ../../docs/mac-host-metrics.md's setup steps --
+# run this instead of copy-pasting those steps one at a time over a
+# remote/KVM session. Safe to re-run: every step below either overwrites
+# in place or explicitly undoes its own prior state first.
+#
+# Usage: ./bootstrap.sh <node-host-name>
+#   e.g. ./bootstrap.sh talos-worker-mbp-host
+#   e.g. ./bootstrap.sh talos-worker-macstudio-host
+#
+# Auto-detects: CPU architecture (uname -m, picks the matching Telegraf
+# build + pinned checksum), and whether Homebrew is actually usable on
+# this Mac (some hosts here are too old for it -- see the doc's "Why
+# sudo is scoped" section and its Gotchas). Doesn't auto-detect: the
+# host name (SigNoz's host.name; would collide across Macs if guessed
+# from e.g. `hostname`, since this repo's node-naming convention isn't
+# derivable from that) -- hence the required argument.
+set -euo pipefail
+
+if [ "$EUID" -eq 0 ]; then
+  echo "Run this as your normal user, not with sudo -- it calls sudo internally only where actually needed." >&2
+  echo "(Running the whole thing as root would also make Telegraf/the sudoers rule apply to the wrong account.)" >&2
+  exit 1
+fi
+
+NODE_HOST_NAME="${1:-}"
+if [ -z "$NODE_HOST_NAME" ]; then
+  echo "Usage: $0 <node-host-name>" >&2
+  echo "  e.g.: $0 talos-worker-mbp-host" >&2
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAC_USERNAME="$(whoami)"
+
+# Bump after checking https://github.com/influxdata/telegraf/releases --
+# don't assume this is still current. Both checksums below were verified
+# live (downloaded and re-hashed, not just copied from the release notes)
+# as of 2026-09-22.
+TELEGRAF_VERSION=1.40.1
+
+for f in collect-therm.sh collect-power.sh collect-smc.sh telegraf.conf telegraf-powermetrics.sudoers com.jakerobb.telegraf.plist; do
+  if [ ! -f "${SCRIPT_DIR}/${f}" ]; then
+    echo "Missing ${SCRIPT_DIR}/${f} -- run this from a checkout of the homelab repo (scripts/mac-host-metrics/), not a copied-out single file." >&2
+    exit 1
+  fi
+done
+
+echo "==> Caching sudo credentials (you'll be prompted once)"
+sudo -v
+
+case "$(uname -m)" in
+  x86_64) GOARCH=amd64; TARBALL_SHA256="19b7886b3507d99f49b6459f892955ad60d4c367035887e2aa77c05d8fd0467a" ;;
+  arm64)  GOARCH=arm64; TARBALL_SHA256="0b7094777deb982d4f36291478035e6c146cb52436fc4b3ad200d4e71e2dc217" ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+echo "==> Detected architecture: $(uname -m) (telegraf ${GOARCH})"
+
+# `brew --prefix` is read-only and side-effect-free (unlike `brew install`,
+# which can pop a GUI Xcode Command Line Tools install prompt and hang a
+# non-interactive run forever) -- safe to use as a "does Homebrew actually
+# work here" probe. Known to fail outright on hardware whose macOS ceiling
+# predates Homebrew's current minimum (see the doc's Gotchas).
+if command -v brew >/dev/null 2>&1 && brew --prefix >/dev/null 2>&1; then
+  INSTALL_METHOD=homebrew
+  TELEGRAF_PREFIX="$(brew --prefix)"
+  echo "==> Homebrew is present and functional -- using it (prefix: ${TELEGRAF_PREFIX})"
+else
+  INSTALL_METHOD=manual
+  TELEGRAF_PREFIX=/usr/local
+  echo "==> Homebrew not usable on this Mac -- installing Telegraf ${TELEGRAF_VERSION} manually to ${TELEGRAF_PREFIX}"
+fi
+
+if [ "$INSTALL_METHOD" = "homebrew" ]; then
+  echo "==> brew install telegraf"
+  brew install telegraf
+else
+  TMP_DIR="$(mktemp -d)"
+  trap 'rm -rf "$TMP_DIR"' EXIT
+  TARBALL="telegraf-${TELEGRAF_VERSION}_darwin_${GOARCH}.tar.gz"
+  echo "==> Downloading ${TARBALL}"
+  curl -fsSL -o "${TMP_DIR}/${TARBALL}" "https://dl.influxdata.com/telegraf/releases/${TARBALL}"
+  echo "==> Verifying checksum"
+  (cd "$TMP_DIR" && echo "${TARBALL_SHA256}  ${TARBALL}" | shasum -a 256 -c -)
+  echo "==> Extracting and installing binary to ${TELEGRAF_PREFIX}/bin/telegraf"
+  tar xzf "${TMP_DIR}/${TARBALL}" -C "$TMP_DIR"
+  sudo mkdir -p "${TELEGRAF_PREFIX}/bin" "${TELEGRAF_PREFIX}/var/log"
+  sudo cp "${TMP_DIR}/telegraf-${TELEGRAF_VERSION}/usr/bin/telegraf" "${TELEGRAF_PREFIX}/bin/telegraf"
+  sudo chmod 755 "${TELEGRAF_PREFIX}/bin/telegraf"
+fi
+
+echo "==> Installing collector scripts and per-host telegraf.conf (host.name=${NODE_HOST_NAME}, prefix=${TELEGRAF_PREFIX})"
+sudo mkdir -p "${TELEGRAF_PREFIX}/etc/telegraf/scripts"
+sudo cp "${SCRIPT_DIR}"/collect-*.sh "${TELEGRAF_PREFIX}/etc/telegraf/scripts/"
+sudo chmod 755 "${TELEGRAF_PREFIX}"/etc/telegraf/scripts/collect-*.sh
+sed -e "s|@@TELEGRAF_PREFIX@@|${TELEGRAF_PREFIX}|g" -e "s|@@NODE_HOST_NAME@@|${NODE_HOST_NAME}|g" \
+  "${SCRIPT_DIR}/telegraf.conf" | sudo tee "${TELEGRAF_PREFIX}/etc/telegraf.conf" > /dev/null
+
+echo "==> Installing scoped sudoers rule for collect-smc.sh (account: ${MAC_USERNAME})"
+SUDOERS_TMP="$(mktemp)"
+sed "s|<mac-username>|${MAC_USERNAME}|g" "${SCRIPT_DIR}/telegraf-powermetrics.sudoers" > "$SUDOERS_TMP"
+sudo visudo -cf "$SUDOERS_TMP"
+sudo install -m 0440 -o root -g wheel "$SUDOERS_TMP" /etc/sudoers.d/telegraf-powermetrics
+rm -f "$SUDOERS_TMP"
+
+echo "==> Smoke-testing each collector script"
+for script in collect-therm.sh collect-power.sh collect-smc.sh; do
+  echo "--- ${script} ---"
+  # Deliberately not fatal (no `set -e` interaction) -- this is diagnostic
+  # output, not a precondition for the rest of the run. An empty result
+  # from collect-smc.sh specifically usually means the sudoers rule above
+  # hasn't taken effect yet, or (on unfamiliar hardware) powermetrics's
+  # SMC sensor labels don't match what the script greps for -- see the
+  # doc's Gotchas either way.
+  out="$("${TELEGRAF_PREFIX}/etc/telegraf/scripts/${script}" 2>&1)" || true
+  if [ -z "$out" ]; then
+    echo "(no output)"
+  else
+    echo "$out"
+  fi
+done
+
+echo "==> Starting Telegraf"
+if [ "$INSTALL_METHOD" = "homebrew" ]; then
+  brew services start telegraf
+else
+  sed -e "s|@@TELEGRAF_PREFIX@@|${TELEGRAF_PREFIX}|g" -e "s|@@MAC_USERNAME@@|${MAC_USERNAME}|g" \
+    "${SCRIPT_DIR}/com.jakerobb.telegraf.plist" | sudo tee /Library/LaunchDaemons/com.jakerobb.telegraf.plist > /dev/null
+  sudo chown root:wheel /Library/LaunchDaemons/com.jakerobb.telegraf.plist
+  sudo chmod 644 /Library/LaunchDaemons/com.jakerobb.telegraf.plist
+  # bootout first (ignoring failure) so a re-run after fixing something
+  # doesn't just fail on "service already bootstrapped".
+  sudo launchctl bootout system/com.jakerobb.telegraf 2>/dev/null || true
+  sudo launchctl bootstrap system /Library/LaunchDaemons/com.jakerobb.telegraf.plist
+fi
+
+echo
+echo "==> Done. Check SigNoz (signoz.jakerobb.org) Metrics Explorer for host.name = ${NODE_HOST_NAME}."
+if [ "$INSTALL_METHOD" = "manual" ]; then
+  echo "    Logs:   ${TELEGRAF_PREFIX}/var/log/telegraf.log"
+  echo "    Status: sudo launchctl print system/com.jakerobb.telegraf"
+else
+  echo "    Status: brew services info telegraf"
+fi
