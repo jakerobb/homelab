@@ -199,6 +199,11 @@ All steps below run on the physical Mac itself.
   stale ARP, Cilium L2-announcement leadership, the L7 LoadBalancer — note `ping` to a Cilium L7 Gateway VIP always
   fails by design, since only TCP 80/443 are forwarded — none of which was the problem). **Tell-tale:** the same
   destination works from an interactive shell but fails from a launchd-started process.
+- **Log rotation is done by Telegraf itself (`logfile_rotation_*` in `telegraf.conf`), not `newsyslog`.** launchd
+  keeps the `StandardOutPath` file open by file descriptor, so a rename-based rotation would leave Telegraf writing
+  into the rotated-away file. Telegraf logs to `telegraf.log` (10MB x 5 archives); launchd's stdout/stderr go to a
+  separate `telegraf-launchd.log`, which only catches crashes and startup output. When the network's down Telegraf
+  logs an error per minute, so unbounded growth was a real if slow risk.
 - **A `launchctl bootstrap` "Bootstrap failed: 5: Input/output error" is maddeningly generic** — it doesn't say what
   actually went wrong. The first attempt hit it with a non-root `UserName` daemon whose log file sat in a root-owned
   directory (a plausible but unconfirmed cause — it stopped happening after pre-creating the log file with the

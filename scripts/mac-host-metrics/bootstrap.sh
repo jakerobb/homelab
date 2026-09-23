@@ -163,7 +163,8 @@ fi
 echo
 echo "==> Done. Check SigNoz (signoz.jakerobb.org) Metrics Explorer for host.name = ${NODE_HOST_NAME}."
 if [ "$INSTALL_METHOD" = "manual" ]; then
-  echo "    Logs:   ${TELEGRAF_PREFIX}/var/log/telegraf.log"
+  echo "    Logs:   ${TELEGRAF_PREFIX}/var/log/telegraf.log (rotates at 10MB, 5 archives)"
+  echo "            ${TELEGRAF_PREFIX}/var/log/telegraf-launchd.log (crashes/startup output only)"
   echo "    Status: sudo launchctl print system/com.jakerobb.telegraf"
 else
   echo "    Status: brew services info telegraf"

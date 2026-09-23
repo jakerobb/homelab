@@ -37,8 +37,8 @@
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>@@TELEGRAF_PREFIX@@/var/log/telegraf.log</string>
+    <string>@@TELEGRAF_PREFIX@@/var/log/telegraf-launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>@@TELEGRAF_PREFIX@@/var/log/telegraf.log</string>
+    <string>@@TELEGRAF_PREFIX@@/var/log/telegraf-launchd.log</string>
 </dict>
 </plist>
