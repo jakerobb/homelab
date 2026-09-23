@@ -179,7 +179,8 @@ data:
   # Cluster/node widget reads the Kubernetes Metrics API (metrics-server,
   # argocd/apps/metrics-server/) via this pod's ServiceAccount — needs the
   # `metrics.k8s.io` rule in clusterrole.yaml. Same numbers as `kubectl top
-  # nodes`.
+  # nodes`. `href` makes the whole widget a link (any info widget supports
+  # it, via the shared Container component) — to Headlamp here.
   #
   # Open-Meteo needs no API key/account (gethomepage.dev/widgets/info/openmeteo/).
   # Coordinates for zip 48864 (Okemos, MI).
@@ -198,18 +199,6 @@ data:
   # the SSO cookie cross-subdomain — not worth the complexity for
   # autocomplete alone.
   widgets.yaml: |
-    - kubernetes:
-        cluster:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
-          label: cluster
-        nodes:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
     - openmeteo:
         label: Okemos, MI
         latitude: 42.704994
@@ -221,6 +210,16 @@ data:
         provider: custom
         url: https://search.jakerobb.org/search?q=
         target: _blank
+    - kubernetes:
+        href: https://headlamp.jakerobb.org
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: cluster
+        nodes:
+          show: false
 
   bookmarks.yaml: ""
   docker.yaml: ""
