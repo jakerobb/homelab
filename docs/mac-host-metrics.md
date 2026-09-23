@@ -28,14 +28,20 @@ InfluxDB), so it reuses both the tool and the existing external ingest route (`o
 `argocd/apps/signoz/httproute-otel.yaml`](../argocd/apps/signoz/httproute-otel.yaml)) with no new plumbing on the SigNoz
 side.
 
-## Why sudo is scoped instead of running Telegraf as root
+## Privilege model: scoped sudo (Homebrew) vs. root daemon (manual install)
 
 `powermetrics` needs root to read SMC sensors (temperature, fan RPM) — `sudo powermetrics --samplers smc` in the
-original ask. Running the whole Telegraf agent as root just to get that one reading would be a much bigger privilege
-grant than the task needs. Instead, Telegraf runs as your normal user, and only the one `collect-smc.sh` script
-escalates, via a `sudoers.d` rule scoped to that exact command line (see
-`scripts/mac-host-metrics/telegraf-powermetrics.sudoers`). `pmset -g therm` (thermal throttling) and `pmset -g batt`
-(power source) don't need root at all.
+original ask. `pmset -g therm` (thermal throttling) and `pmset -g batt` (power source) don't need root at all.
+
+- **Option A (Homebrew, `brew services`):** Telegraf runs as your normal user, and only `collect-smc.sh` escalates,
+  via a `sudoers.d` rule scoped to that exact command line (see
+  `scripts/mac-host-metrics/telegraf-powermetrics.sudoers`) — much less privilege than the task needs root for.
+- **Option B (manual LaunchDaemon) runs Telegraf as root.** That's not the preferred design, but it's forced on
+  macOS Sequoia and later: Local Network privacy denies non-root third-party processes launched by launchd access
+  to LAN addresses (see the Gotchas), and a bare CLI binary has no app identity to grant the permission to. Root
+  processes are exempt. The risk is contained by everything Telegraf executes (`collect-*.sh`) living in a
+  root-owned directory, so nothing unprivileged can swap in a script. The sudoers rule is still installed, since
+  it's harmless (root doesn't need it) and lets the smoke test run `collect-smc.sh` as your user.
 
 ## Setup
 
@@ -160,10 +166,10 @@ All steps below run on the physical Mac itself.
    ```bash
    brew services start telegraf
    ```
-   Option B (manual): install the LaunchDaemon this repo provides,
-   substituting the same two variables, then bootstrap it:
+   Option B (manual): install the LaunchDaemon this repo provides (runs as root — see the privilege-model section
+   above for why), substituting the prefix, then bootstrap it:
    ```bash
-   sed -e "s|@@TELEGRAF_PREFIX@@|${TELEGRAF_PREFIX}|g" -e "s|@@MAC_USERNAME@@|${MAC_USERNAME}|g" \
+   sed "s|@@TELEGRAF_PREFIX@@|${TELEGRAF_PREFIX}|g" \
      scripts/mac-host-metrics/com.jakerobb.telegraf.plist | sudo tee /Library/LaunchDaemons/com.jakerobb.telegraf.plist > /dev/null
    sudo chown root:wheel /Library/LaunchDaemons/com.jakerobb.telegraf.plist
    sudo chmod 644 /Library/LaunchDaemons/com.jakerobb.telegraf.plist
@@ -184,13 +190,20 @@ All steps below run on the physical Mac itself.
   line-protocol field). Fixed by taking just the first whitespace-delimited token of the field
   (`split($2,a," "); print a[1]`) instead of trying to strip a specific fixed suffix — robust to whatever trails the
   number, on any hardware.
+- **macOS Sequoia's Local Network privacy reports a permission denial as `no route to host`.** Found live: a
+  non-root LaunchDaemon (`UserName` set to the regular account) could never reach `otel.jakerobb.org`
+  (`192.168.102.128`, a LAN address) — Telegraf logged `dial tcp 192.168.102.128:443: connect: no route to host`
+  every minute — while `nc` and `curl` from an interactive iTerm shell worked fine (terminal
+  apps are exempt). There's no prompt and no log line; the kernel just drops the SYN. Root processes are exempt,
+  which is why Option B's plist has no `UserName` key. Hours went into ruling out everything else first (cable, sleep,
+  stale ARP, Cilium L2-announcement leadership, the L7 LoadBalancer — note `ping` to a Cilium L7 Gateway VIP always
+  fails by design, since only TCP 80/443 are forwarded — none of which was the problem). **Tell-tale:** the same
+  destination works from an interactive shell but fails from a launchd-started process.
 - **A `launchctl bootstrap` "Bootstrap failed: 5: Input/output error" is maddeningly generic** — it doesn't say what
-  actually went wrong. One concrete, self-inflicted cause this plist template can hit: it sets `UserName` to a
-  non-root account but points `StandardOutPath`/`StandardErrorPath` at a log file under a directory `sudo mkdir`
-  just created (owned by root) — launchd can't open that path in the daemon's own (non-root) user context, and that
-  failure surfaces as this exact error with no clearer message. `bootstrap.sh` now pre-creates and `chown`s the log
-  file to the target account before bootstrapping. It also runs `plutil -lint` on the rendered plist first, to rule
-  out a bad template substitution (e.g. a value with a character that breaks the XML) as a second possible cause of
+  actually went wrong. The first attempt hit it with a non-root `UserName` daemon whose log file sat in a root-owned
+  directory (a plausible but unconfirmed cause — it stopped happening after pre-creating the log file with the
+  daemon user's ownership; that's moot now that the daemon runs as root). `bootstrap.sh` still runs `plutil -lint`
+  on the rendered plist before installing it, to rule out a bad template substitution as another possible cause of
   the same unhelpful error.
 - **`brew --prefix` succeeding does not mean `brew install <formula>` will work.** `bootstrap.sh`'s first version used
   `command -v brew && brew --prefix` as a "does Homebrew work here" probe, on the theory that Homebrew refuses to run
@@ -200,9 +213,8 @@ All steps below run on the physical Mac itself.
   manual install path and only uses Homebrew when told to with `--homebrew`, since a person who's actually tried it
   once is more reliable here than any command-line probe.
 - `bootstrap.sh` refuses to run under `sudo` on purpose: `whoami` inside the script has to resolve to the real account
-  Telegraf will run as (it feeds both the sudoers rule and the LaunchDaemon's `UserName`), and running the whole
-  script as root would silently scope everything to `root` instead. It calls `sudo` itself wherever that's actually
-  needed.
+  (it feeds the sudoers rule), and Homebrew itself refuses to run as root. It calls `sudo` itself wherever that's
+  actually needed.
 - Homebrew's own minimum-macOS requirement moves forward over time and can outrun what old-but-still-useful hardware
   can run — this 2018 MacBook Pro's Sequoia ceiling was one release short of what Homebrew needed as of 2026-09-22.
   That's the entire reason Option B (manual tar.gz + a hand-rolled LaunchDaemon) exists above, as a real supported

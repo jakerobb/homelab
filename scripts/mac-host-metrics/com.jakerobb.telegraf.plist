@@ -7,21 +7,25 @@
   a launchd service definition at all, so this stands in for it.
 
   A LaunchDaemon (not a LaunchAgent) so it starts at boot before anyone
-  logs in -- this Mac runs headless most of the time. UserName below
-  demotes it from root (LaunchDaemons run as root by default) to the
-  regular account, matching the scoped-sudo design in
-  telegraf-powermetrics.sudoers: only collect-smc.sh's one `sudo -n`
-  invocation should ever touch root, not the whole agent.
+  logs in -- this Mac runs headless most of the time.
 
-  @@TELEGRAF_PREFIX@@ and @@MAC_USERNAME@@ are substituted at copy time
-  (see the doc's setup steps) -- not valid as-is.
+  Deliberately runs as root (no UserName key). macOS Sequoia's Local
+  Network privacy blocks non-root third-party processes launched by
+  launchd from reaching LAN addresses, and the kernel reports the denial
+  as EHOSTUNREACH ("no route to host") with no prompt and no log line --
+  found live: Telegraf as a non-root LaunchDaemon could never reach
+  otel.jakerobb.org (a LAN IP) while nc/curl from iTerm worked fine. Root
+  processes are exempt. Everything Telegraf executes lives in a
+  root-owned directory, so running as root doesn't open up script
+  tampering.
+
+  @@TELEGRAF_PREFIX@@ is substituted at copy time (see the doc's setup
+  steps) -- not valid as-is.
 -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
     <string>com.jakerobb.telegraf</string>
-    <key>UserName</key>
-    <string>@@MAC_USERNAME@@</string>
     <key>ProgramArguments</key>
     <array>
         <string>@@TELEGRAF_PREFIX@@/bin/telegraf</string>
