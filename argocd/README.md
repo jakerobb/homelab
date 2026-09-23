@@ -928,6 +928,72 @@ own docs/changelog before assuming otherwise). Needs the matching
 `access_control` rule (`apps/authelia/application.yaml`) and
 `ReferenceGrant` entry (`apps/authelia/referencegrant.yaml`) — both added.
 
+### ClickHouse CPU tuning (2026-09-23)
+
+**Symptom:** ClickHouse (`chi-signoz-clickhouse-cluster-0-0-0`) sat at a
+steady ~1.7–1.9 cores in `kubectl top` against a 2-core limit, putting
+`talos-worker-mbp` at ~46–50% CPU, for a homelab-sized ingest volume.
+(Separately, an SELinux audit flood on the same volume turned out *not* to
+be the cause; see `talos/README.md` "SELinux labels on iSCSI volumes".)
+
+**Where the CPU actually went** (10-minute window, from ClickHouse's own
+`system.metric_log`, `query_log`, `part_log` and `trace_log`):
+
+| | Baseline |
+|---|---|
+| ClickHouse self-reported CPU (`OSCPUVirtualTimeMicroseconds`) | 1.13 cores |
+| INSERT queries | 8,447 (~14/sec) |
+| New parts, `signoz_logs.logs_v2` / `tag_attributes_v2` | 595 / 600 |
+| New parts, `signoz_metrics.samples_v4` | 146 |
+| `system.trace_log` rows written | 1.23M |
+| Merge CPU: `system.trace_log` | ~88 CPU-s |
+| Merge CPU: `signoz_logs.logs_v2` | ~86 CPU-s (re-merging only ~85 MiB) |
+| INSERT CPU (all tables) | ~46 CPU-s |
+
+Two separate problems:
+
+1. **ClickHouse profiling itself.** The chart enables `trace_log` (plus
+   `zookeeper_log`, `processors_profile_log` and `query_thread_log`), and
+   ClickHouse 25.x's global profiler samples every thread every 10s. With
+   a 512-thread background schedule pool, that plus merge memory-profiler
+   stack traces came to ~2,000 trace rows/sec. `trace_log` had grown to
+   **3.16 GiB / 114M rows**, bigger than all the real SigNoz data combined
+   (~350 MiB), and merging it cost as much CPU as merging the actual logs.
+   On top of that comes the unmeasured cost of capturing stack traces.
+2. **No batching on ingest.** The chart's otel-collector `batch` processor is
+   `send_batch_size: 50000, timeout: 1s`. Homelab volume never gets near
+   50k, so it flushes every second: one INSERT/sec into each of `logs_v2`,
+   `tag_attributes_v2`, the logs resource/key tables, metadata, and so on.
+   Each INSERT creates a new part, and `logs_v2`'s skip indexes make its
+   merges expensive, so the same small amount of data got re-merged
+   constantly.
+
+**Fix** (all in [`apps/signoz/application.yaml`](apps/signoz/application.yaml)):
+- `clickhouse.files."config.d/zz-homelab-tuning.xml"`: global profiler off,
+  and `trace_log`, `zookeeper_log`, `processors_profile_log`,
+  `query_thread_log` removed (`remove="1"`). The `zz-` prefix makes it sort
+  after the operator's `01-clickhouse-*.xml` system-log definitions.
+  `query_log`, `part_log`, `metric_log`, `text_log`, `error_log` and
+  `asynchronous_metric_log` are kept, since they're cheap and are exactly
+  what this diagnosis ran on.
+- `clickhouse.profiles`: per-query profilers off and
+  `log_processors_profiles: 0` for the `default` profile, which the
+  collector's `admin` user also uses.
+- `otelCollector.config.processors.batch.timeout: 10s`: logs can take up
+  to 10s longer to appear in SigNoz.
+- **Not done: `async_insert`.** Collector-side batching gets the same
+  "fewer, bigger inserts" effect without adding a second buffering layer
+  with its own flush and durability semantics. Revisit only if part counts
+  stay high after the batch change.
+
+Removing a system log from config doesn't drop the existing table, so the
+old `system.trace_log` (3+ GiB) and `system.zookeeper_log` stay on disk
+until someone drops them by hand
+(`DROP TABLE system.trace_log` / `system.zookeeper_log`). ClickHouse won't
+recreate them while they're removed from config.
+
+**After:** _pending, measured once the change is synced._
+
 ### Headlamp's Prometheus plugin: confirmed viable, not yet switched over
 
 FreeLens is out — Jake is standardizing on Headlamp. Headlamp's *core*

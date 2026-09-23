@@ -62,6 +62,37 @@ spec:
           persistence:
             storageClass: hexos-iscsi
             size: 30Gi
+          # CPU tuning (2026-09-23), see argocd/README.md's SigNoz section
+          # for the measurements. The biggest single cost was ClickHouse
+          # profiling itself: the always-on global profiler plus merge
+          # memory-profiler samples wrote ~1.2M trace_log rows per 10
+          # minutes (3+ GiB table, more than all the real SigNoz data), and
+          # then spent as much CPU merging that table as merging logs_v2.
+          # Nobody reads trace_log/zookeeper_log/processors_profile_log/
+          # query_thread_log here, so they're removed outright. The
+          # zz- prefix sorts this after the operator's own
+          # 01-clickhouse-*.xml system-log definitions in config.d, so
+          # remove="1" wins. The useful diagnostic tables (query_log,
+          # part_log, metric_log, text_log, error_log,
+          # asynchronous_metric_log) are left alone. If deep profiling is
+          # ever needed, delete this file and the profiles below, then
+          # restart ClickHouse.
+          files:
+            config.d/zz-homelab-tuning.xml: |
+              <clickhouse>
+                  <global_profiler_real_time_period_ns>0</global_profiler_real_time_period_ns>
+                  <global_profiler_cpu_time_period_ns>0</global_profiler_cpu_time_period_ns>
+                  <trace_log remove="1"/>
+                  <zookeeper_log remove="1"/>
+                  <processors_profile_log remove="1"/>
+                  <query_thread_log remove="1"/>
+              </clickhouse>
+          # Per-query profiler sampling off too (defaults to 1s per query
+          # thread). Harmless without trace_log, but explicit is clearer.
+          profiles:
+            default/query_profiler_real_time_period_ns: "0"
+            default/query_profiler_cpu_time_period_ns: "0"
+            default/log_processors_profiles: "0"
           zookeeper:
             persistence:
               storageClass: hexos-iscsi
@@ -91,6 +122,17 @@ spec:
               cpu: "1"
               memory: 1Gi
           config:
+            processors:
+              # Chart default is timeout: 1s with send_batch_size: 50000.
+              # At homelab volume the size threshold is never reached, so it
+              # flushes every second: ~1 INSERT/sec into each of logs_v2,
+              # tag_attributes_v2 and friends, each creating a tiny part
+              # that ClickHouse then has to merge over and over (logs_v2's
+              # skip indexes make those merges expensive). 10s cuts part
+              # creation ~10x. The trade-off is up to 10s extra delay before
+              # a log line shows up in SigNoz, which doesn't matter here.
+              batch:
+                timeout: 10s
             receivers:
               prometheus:
                 config:
