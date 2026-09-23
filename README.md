@@ -126,6 +126,8 @@ simple spring-clips. The back can be removed as well, but this requires a #2 Phi
   the Mac Studio (see `todo/HARDWARE.md`) arrives and takes over worker duty. See
   [`docs/utm-talos-worker.md`](docs/utm-talos-worker.md) for the runbook and
   [`talos/README.md`](talos/README.md#additional-worker-talos-worker-mbp-added-2026-09-22) for the decision writeup.
+  A native Telegraf agent on the physical host itself (outside the VM) ships CPU die temp, thermal throttling, fan
+  RPM, power source, and host disk space to SigNoz — see [`docs/mac-host-metrics.md`](docs/mac-host-metrics.md).
 
 ### Elsewhere in the crawlspace
 
@@ -298,22 +300,32 @@ Proxmox runs on the MS-A2. It manages the following VMs:
 
 The Kubernetes cluster includes the following workloads:
 
+Infrastructure
+* Authelia
 * ArgoCD
 * Cilium
 * cert-manager
-* cert-manager-config
+  * cert-manager-config
 * external-dns
-* local-path-provisioner
-* democratic-csi
-* metrics-server
-* kube-prometheus-stack
-* Authelia
-* homepage
 * ntfy
 * ntfy-alertmanager
-* renovate
-* searxng
+
+Storage
+* local-path-provisioner
+* democratic-csi
+
+Observability
+* metrics-server
+* kube-prometheus-stack
 * SigNoz
+  * signoz-k8s-infra
+
+Operations
+* renovate
+
+Applications
+* homepage
+* searxng
 
 ## External Dependencies
 

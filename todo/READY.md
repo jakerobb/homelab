@@ -8,6 +8,28 @@ observable cluster before we bring in critical workloads.
 
 Pull requests should trigger a `terraform plan`; merges to `main` should trigger `terraform apply`. 
 
+## Alertmanager InfoInhibitor: full inhibit_rules cascade
+
+**Partially done.** `argocd/apps/kube-prometheus-stack/application.yaml` routes `InfoInhibitor` to the `null` receiver
+(2026-09-22, stops it from notifying ntfy — see the `Watchdog`-adjacent route), but that's only half of what the alert's
+own annotation says it's for: "should be routed to a null receiver **and configured to inhibit alerts with
+severity=info**." The actual inhibition (an info-level alert firing alongside something more severe in the same
+namespace shouldn't also notify separately) needs a real `inhibit_rules` block, which this repo doesn't have at all yet.
+Standard kube-prometheus-stack pairing for this is roughly:
+```yaml
+inhibit_rules:
+  - source_matchers: ['severity = critical']
+    target_matchers: ['severity =~ warning|info']
+    equal: ['namespace']
+  - source_matchers: ['severity = warning']
+    target_matchers: ['severity = info']
+    equal: ['namespace']
+  - source_matchers: ['alertname = InfoInhibitor']
+    target_matchers: ['severity = info']
+    equal: ['namespace']
+```
+Not added yet — worth confirming this doesn't unexpectedly swallow something currently useful before turning it on.
+
 ## Descheduler
 
 **Not started.** Kubernetes never rebalances already-running pods — the scheduler only places new/pending pods, so

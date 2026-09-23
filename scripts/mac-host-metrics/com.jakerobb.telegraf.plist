@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Only needed for the manual (non-Homebrew) install path in
+  ../../docs/mac-host-metrics.md -- `brew services` provides its own
+  LaunchAgent when Homebrew works, but the tar.gz release doesn't include
+  a launchd service definition at all, so this stands in for it.
+
+  A LaunchDaemon (not a LaunchAgent) so it starts at boot before anyone
+  logs in -- this Mac runs headless most of the time. UserName below
+  demotes it from root (LaunchDaemons run as root by default) to the
+  regular account, matching the scoped-sudo design in
+  telegraf-powermetrics.sudoers: only collect-smc.sh's one `sudo -n`
+  invocation should ever touch root, not the whole agent.
+
+  @@TELEGRAF_PREFIX@@ and @@MAC_USERNAME@@ are substituted at copy time
+  (see the doc's setup steps) -- not valid as-is.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jakerobb.telegraf</string>
+    <key>UserName</key>
+    <string>@@MAC_USERNAME@@</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>@@TELEGRAF_PREFIX@@/bin/telegraf</string>
+        <string>--config</string>
+        <string>@@TELEGRAF_PREFIX@@/etc/telegraf.conf</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>@@TELEGRAF_PREFIX@@/var/log/telegraf.log</string>
+    <key>StandardErrorPath</key>
+    <string>@@TELEGRAF_PREFIX@@/var/log/telegraf.log</string>
+</dict>
+</plist>

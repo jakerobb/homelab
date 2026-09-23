@@ -1,0 +1,13 @@
+# Install with `sudo visudo -f /etc/sudoers.d/telegraf-powermetrics`, then
+# paste this in (visudo validates syntax before it'll let you save, so a
+# typo here can't lock out sudo the way a raw edit could). Replace
+# <mac-username> with the account Telegraf actually runs as -- `whoami`
+# from the shell you'll use to `brew services start telegraf`.
+#
+# Scoped to this exact command line, not a blanket NOPASSWD for
+# powermetrics generally -- this hands out passwordless root for reading
+# SMC sensors and nothing else. If the command in collect-smc.sh ever
+# changes, this line has to change to match exactly, or sudo will just
+# prompt for a password again (which `sudo -n` there then treats as
+# failure, per its own comment).
+<mac-username> ALL=(root) NOPASSWD: /usr/bin/powermetrics --samplers smc -n1 -i1000

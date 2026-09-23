@@ -67,6 +67,19 @@ or similar are premature until there's a track record to design against. **Consi
 to design against on or after 2026-10-20** (one month from Alertmanager going live), assuming no issues surface before
 then.
 
+## SigNoz alerting -> ntfy-alertmanager direct integration
+
+**Waiting on:** enough time actually using SigNoz to know whether it's staying. SigNoz's own alert rules (evaluated
+against its ClickHouse-backed data, not Prometheus) can notify a generic Webhook channel, and that webhook's payload
+shape turned out to be the same "Alertmanager outbound notification" format `ntfy-alertmanager`
+([`../manifests/ntfy-alertmanager/`](../manifests/ntfy-alertmanager/)) already parses (built to consume real
+Alertmanager's webhook) — meaning SigNoz-native alerts could plausibly point straight at it, skipping Alertmanager
+entirely for that path, reusing the existing ntfy pipeline. Not verified live; found via docs comparison, not a real
+test POST. Deliberately not investigated further yet — see
+[`../argocd/README.md`](../argocd/README.md#signoz-decided-and-deployed-2026-09-22) for the SigNoz deployment itself.
+**Revisit on or after 2026-10-22** (one month from SigNoz going live), once there's a real opinion on whether SigNoz is
+worth keeping — no point building integration plumbing for a tool that might get replaced.
+
 ## Linode workload migration
 **Waiting on:** the Mac Studio being online and all home workloads being moved. 
 
