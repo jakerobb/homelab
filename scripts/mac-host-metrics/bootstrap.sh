@@ -4,17 +4,27 @@
 # remote/KVM session. Safe to re-run: every step below either overwrites
 # in place or explicitly undoes its own prior state first.
 #
-# Usage: ./bootstrap.sh <node-host-name>
+# Usage: ./bootstrap.sh [--homebrew] <node-host-name>
 #   e.g. ./bootstrap.sh talos-worker-mbp-host
-#   e.g. ./bootstrap.sh talos-worker-macstudio-host
+#   e.g. ./bootstrap.sh --homebrew talos-worker-macstudio-host
+#
+# Defaults to the manual binary + LaunchDaemon install path -- pass
+# --homebrew only once you've confirmed Homebrew actually works on this
+# particular Mac. There's no reliable way to auto-detect that: `brew
+# --prefix` (this script's first attempt) succeeds even on hardware where
+# `brew install <formula>` then fails, because the macOS-version gate only
+# bites during an actual install/build, not on basic queries -- found live
+# on the 2018 MacBook Pro, whose Sequoia ceiling is one release short of
+# what Homebrew currently needs. A hardcoded macOS-version check would
+# just be a second, differently-stale way to get this wrong (Homebrew's
+# own minimum floor moves over time -- see the doc's Gotchas), so this
+# asks you instead.
 #
 # Auto-detects: CPU architecture (uname -m, picks the matching Telegraf
-# build + pinned checksum), and whether Homebrew is actually usable on
-# this Mac (some hosts here are too old for it -- see the doc's "Why
-# sudo is scoped" section and its Gotchas). Doesn't auto-detect: the
-# host name (SigNoz's host.name; would collide across Macs if guessed
-# from e.g. `hostname`, since this repo's node-naming convention isn't
-# derivable from that) -- hence the required argument.
+# build + pinned checksum). Doesn't auto-detect: the host name (SigNoz's
+# host.name; would collide across Macs if guessed from e.g. `hostname`,
+# since this repo's node-naming convention isn't derivable from that) --
+# hence the required argument.
 set -euo pipefail
 
 if [ "$EUID" -eq 0 ]; then
@@ -23,10 +33,21 @@ if [ "$EUID" -eq 0 ]; then
   exit 1
 fi
 
+USE_HOMEBREW=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --homebrew) USE_HOMEBREW=1; shift ;;
+    --) shift; break ;;
+    -*) echo "Unknown option: $1" >&2; exit 1 ;;
+    *) break ;;
+  esac
+done
+
 NODE_HOST_NAME="${1:-}"
 if [ -z "$NODE_HOST_NAME" ]; then
-  echo "Usage: $0 <node-host-name>" >&2
+  echo "Usage: $0 [--homebrew] <node-host-name>" >&2
   echo "  e.g.: $0 talos-worker-mbp-host" >&2
+  echo "  e.g.: $0 --homebrew talos-worker-macstudio-host" >&2
   exit 1
 fi
 
@@ -56,19 +77,14 @@ case "$(uname -m)" in
 esac
 echo "==> Detected architecture: $(uname -m) (telegraf ${GOARCH})"
 
-# `brew --prefix` is read-only and side-effect-free (unlike `brew install`,
-# which can pop a GUI Xcode Command Line Tools install prompt and hang a
-# non-interactive run forever) -- safe to use as a "does Homebrew actually
-# work here" probe. Known to fail outright on hardware whose macOS ceiling
-# predates Homebrew's current minimum (see the doc's Gotchas).
-if command -v brew >/dev/null 2>&1 && brew --prefix >/dev/null 2>&1; then
+if [ "$USE_HOMEBREW" -eq 1 ]; then
   INSTALL_METHOD=homebrew
   TELEGRAF_PREFIX="$(brew --prefix)"
-  echo "==> Homebrew is present and functional -- using it (prefix: ${TELEGRAF_PREFIX})"
+  echo "==> --homebrew passed -- using Homebrew (prefix: ${TELEGRAF_PREFIX})"
 else
   INSTALL_METHOD=manual
   TELEGRAF_PREFIX=/usr/local
-  echo "==> Homebrew not usable on this Mac -- installing Telegraf ${TELEGRAF_VERSION} manually to ${TELEGRAF_PREFIX}"
+  echo "==> Installing Telegraf ${TELEGRAF_VERSION} manually to ${TELEGRAF_PREFIX} (pass --homebrew if you've confirmed Homebrew works on this Mac)"
 fi
 
 if [ "$INSTALL_METHOD" = "homebrew" ]; then

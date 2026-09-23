@@ -45,14 +45,17 @@ then, on the Mac itself, as your normal user (not via `sudo` — it calls `sudo`
 
 ```bash
 cd scripts/mac-host-metrics
-./bootstrap.sh talos-worker-mbp-host   # or e.g. talos-worker-macstudio-host
+./bootstrap.sh talos-worker-mbp-host                       # manual install (default)
+./bootstrap.sh --homebrew talos-worker-macstudio-host      # once you've confirmed Homebrew works there
 ```
 
-It auto-detects CPU architecture and whether Homebrew is actually usable on this particular Mac (see the Gotchas
-below for why that's not a given), and is safe to re-run — every step it takes either overwrites in place or
-explicitly undoes its own prior state first, so re-running after fixing something won't leave duplicate state behind.
-The only thing it can't figure out on its own is the host name, since this repo's node-naming convention isn't
-derivable from anything on the machine itself.
+It defaults to the manual binary + LaunchDaemon path and only uses Homebrew with an explicit `--homebrew` flag — it
+does *not* try to auto-detect whether Homebrew will work, because there's no reliable way to (see the Gotchas below;
+the obvious-looking check turned out to give a false positive on this exact hardware). It auto-detects CPU
+architecture, and is safe to re-run — every step it takes either overwrites in place or explicitly undoes its own
+prior state first, so re-running after fixing something won't leave duplicate state behind. The only thing it can't
+figure out on its own is the host name, since this repo's node-naming convention isn't derivable from anything on the
+machine itself.
 
 The rest of this section is the same setup as a manual walkthrough — useful for troubleshooting a failed bootstrap
 run, understanding what it's actually doing, or doing this on a Mac where you'd rather not run an unfamiliar script
@@ -175,6 +178,13 @@ All steps below run on the physical Mac itself.
 
 ## Gotchas found
 
+- **`brew --prefix` succeeding does not mean `brew install <formula>` will work.** `bootstrap.sh`'s first version used
+  `command -v brew && brew --prefix` as a "does Homebrew work here" probe, on the theory that Homebrew refuses to run
+  at all on an unsupported macOS. Found live on the 2018 MacBook Pro: `brew --prefix` succeeds fine (it's a read-only
+  query), but `brew install telegraf` itself failed — the macOS-version gate only bites during an actual
+  install/build, not on basic commands. The script no longer tries to auto-detect this at all; it defaults to the
+  manual install path and only uses Homebrew when told to with `--homebrew`, since a person who's actually tried it
+  once is more reliable here than any command-line probe.
 - `bootstrap.sh` refuses to run under `sudo` on purpose: `whoami` inside the script has to resolve to the real account
   Telegraf will run as (it feeds both the sudoers rule and the LaunchDaemon's `UserName`), and running the whole
   script as root would silently scope everything to `root` instead. It calls `sudo` itself wherever that's actually
