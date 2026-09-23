@@ -1,0 +1,59 @@
+# Gated by Authelia forward-auth, same pattern as homepage/httproute.yaml —
+# Glance's own built-in auth is off (no `auth:` block in glance.yml), since
+# a second login in front of an already-SSO'd dashboard would just be
+# friction.
+#
+# Requires a matching ReferenceGrant entry in the `authelia` namespace (see
+# argocd/apps/authelia/referencegrant.yaml) and an `access_control` rule for
+# glance.jakerobb.org in Authelia's config (see
+# argocd/apps/authelia/application.yaml) — without either, this route either
+# fails to program or falls through to Authelia's default_policy (deny).
+#
+# gethomepage.dev/* annotations: Glance is running alongside Homepage (not
+# replacing it, yet), so it gets a tile there like any other app.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: glance
+  namespace: glance
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: Glance
+    gethomepage.dev/description: Dashboard (trial alongside Homepage)
+    gethomepage.dev/icon: glance.png
+    gethomepage.dev/group: Apps
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - glance.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: glance
+          port: 8080

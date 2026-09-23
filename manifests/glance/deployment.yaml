@@ -1,0 +1,82 @@
+# Bare Deployment, no Helm chart — Glance publishes no official chart (only
+# unofficial community ones), and it's a single static Go binary with one
+# config file, so there's nothing for a chart to template anyway.
+#
+# No ServiceAccount/RBAC: the Kubernetes widget in glance.yml reads
+# Prometheus (kube-prometheus-stack, in-cluster, unauthenticated) rather
+# than the Kubernetes API, so this pod needs no cluster access of its own.
+#
+# The upstream image has no USER (runs as root by default); the binary
+# only needs to read its config/assets and bind 8080, so it's forced
+# non-root here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glance
+  namespace: glance
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: glance
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: glance
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: glance
+          image: docker.io/glanceapp/glance:v0.8.6
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            # Whole-directory mounts, not subPath — see
+            # manifests/homepage/deployment.yaml for that lesson. ConfigMap
+            # names are hash-suffixed by kustomization.yaml's generator.
+            - mountPath: /app/config
+              name: config
+              readOnly: true
+            - mountPath: /app/assets
+              name: assets
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: glance-config
+        - name: assets
+          configMap:
+            name: glance-assets

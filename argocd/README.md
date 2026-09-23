@@ -1045,3 +1045,40 @@ plugin at `https://signoz.jakerobb.org` (once exposure is live) with a
 real API key, and reporting back whether the plugin's UI actually
 round-trips correctly end-to-end. Only remove `kube-prometheus-stack` if
 that's a clean yes.
+
+## Glance (trial, deployed 2026-09-23)
+
+A second dashboard running alongside Homepage (not replacing it), as a
+declarative trial of [Glance](https://github.com/glanceapp/glance). Homarr
+was ruled out because its config lives in a database rather than files.
+Deployed as [`apps/glance/`](apps/glance/application.yaml) →
+[`manifests/glance/`](../manifests/glance/), at `glance.jakerobb.org`.
+
+- **Kustomize, not a plain manifest directory** (the first app here to use
+  it) — solely for `configMapGenerator`. Glance's file-watch auto-reload
+  doesn't survive a ConfigMap volume update (the atomic symlink swap
+  deletes the watched file, which Glance's docs say stops the watch for
+  good), so without a hash-suffixed ConfigMap name, config edits would
+  never reach a running pod. `glance.yml` and `custom.css` live as real
+  files in that directory; any edit rolls the pod on sync. See the
+  comment in [`kustomization.yaml`](../manifests/glance/kustomization.yaml).
+- **Auth: Gateway forward-auth** (same `ExternalAuth` filter as
+  homepage/searxng/signoz), Glance's own built-in login left off. Needed
+  the `access_control` rule in [`apps/authelia/application.yaml`](apps/authelia/application.yaml)
+  and a `glance` entry in [`apps/authelia/referencegrant.yaml`](apps/authelia/referencegrant.yaml).
+- **Kubernetes widget via Prometheus, not the Kubernetes API.** Glance has
+  no native Kubernetes widget; it's a `custom-api` widget querying
+  kube-prometheus-stack's Prometheus in-cluster (node-exporter +
+  kube-state-metrics). The Metrics API (what Homepage's widget uses)
+  returns quantity strings (`123456789n`, `1234Ki`) that Glance's template
+  language can't parse into numbers. Upshot: no ServiceAccount/RBAC for
+  this pod at all.
+- **Weather:** Glance's built-in `weather` widget (hourly bars) plus a
+  `custom-api` widget over Open-Meteo's daily forecast for today's
+  high/low and a 5-day view, which the built-in one lacks.
+- **App links are a static `bookmarks` list** mirroring Homepage's
+  (manual entries + annotation-discovered ones). Glance has no service
+  discovery, so a new app needs a line in `glance.yml` as well as its
+  `gethomepage.dev/*` annotations for as long as both dashboards run.
+- **Font:** Helvetica via `custom.css`, with `tabular-nums` so changing
+  numbers don't shift width (the stock JetBrains Mono gets that for free).

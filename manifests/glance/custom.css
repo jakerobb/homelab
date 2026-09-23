@@ -1,0 +1,61 @@
+/* Served at /assets/custom.css (glance-assets ConfigMap, see
+   kustomization.yaml) and loaded via glance.yml's theme.custom-css-file. */
+
+/* ---- Font ---------------------------------------------------------------
+   Glance hard-codes JetBrains Mono on body (static/css/site.css). Helvetica
+   is a system font (macOS/iOS), not a web font, so there's nothing to
+   load — other platforms fall back to Arial. Form controls don't inherit
+   font-family by default, hence the explicit list.
+
+   tabular-nums: Glance's widgets were laid out for a monospace font, where
+   every digit is the same width for free. With a proportional font,
+   updating numbers (temps, percentages) would otherwise shift sideways;
+   Helvetica has tabular figures, so this keeps them aligned. */
+body,
+input,
+button,
+textarea,
+select {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Forecast widget (glance.yml, css-class: forecast) ------------------ */
+.forecast .forecast-row {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr auto 5.5rem;
+    align-items: baseline;
+    gap: 0.75rem;
+}
+.forecast .forecast-desc {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.forecast .forecast-temps {
+    text-align: right;
+}
+
+/* ---- Kubernetes widget (glance.yml, css-class: k8s) --------------------- */
+.k8s .k8s-meter {
+    display: grid;
+    grid-template-columns: 3.5rem 1fr 3.5rem;
+    align-items: center;
+    gap: 0.75rem;
+}
+.k8s .k8s-bar {
+    height: 0.6rem;
+    border-radius: 0.3rem;
+    background: var(--color-widget-background-highlight);
+    overflow: hidden;
+}
+.k8s .k8s-bar > div {
+    height: 100%;
+    background: var(--color-primary);
+}
+.k8s .k8s-bar-hot > div {
+    background: var(--color-negative);
+}
+.k8s .k8s-pct {
+    text-align: right;
+}

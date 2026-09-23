@@ -138,6 +138,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'signoz.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'glance.jakerobb.org'
+                policy: 'two_factor'
 
           identity_providers:
             oidc:

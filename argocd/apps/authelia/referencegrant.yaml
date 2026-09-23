@@ -6,7 +6,8 @@
 #
 # One `from` entry per namespace that has an HTTPRoute referencing Authelia
 # this way. homepage/httproute.yaml was the first, searxng/httproute.yaml
-# the second, argocd/apps/signoz/httproute.yaml the third. Add another entry
+# the second, argocd/apps/signoz/httproute.yaml the third,
+# manifests/glance/httproute.yaml the fourth. Add another entry
 # here (not a second ReferenceGrant) as more apps adopt the ExternalAuth
 # pattern from todo/DONE.md's "Gateway API forward-auth" list.
 apiVersion: gateway.networking.k8s.io/v1
@@ -25,6 +26,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: signoz
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: glance
   to:
     - group: ""
       kind: Service

@@ -1,0 +1,278 @@
+# Glance config — trial dashboard running alongside Homepage
+# (manifests/homepage/). Docs: https://github.com/glanceapp/glance/blob/main/docs/configuration.md
+#
+# Edits here roll the pod automatically on sync (see kustomization.yaml's
+# configMapGenerator); Glance's own file-watch auto-reload doesn't survive
+# ConfigMap volume updates.
+
+server:
+  # Behind homelab-gateway — use X-Forwarded-* for client IP/scheme.
+  proxied: true
+  # /app/assets is the glance-assets ConfigMap (custom.css), served at /assets/.
+  assets-path: /app/assets
+
+theme:
+  # Helvetica + tabular numerals; see custom.css.
+  custom-css-file: /assets/custom.css
+
+branding:
+  app-name: Homelab
+  hide-footer: true
+
+pages:
+  - name: Home
+    width: wide
+    columns:
+      # ---- Left: weather -------------------------------------------------
+      - size: small
+        widgets:
+          # Built-in widget: current temp plus a 2-hour-bucket bar chart for
+          # the day (hover for exact temps; blue dots = likely precip).
+          # "Okemos, Michigan, United States" resolves to the Okemos, MI
+          # entry covering zip 48864 in Open-Meteo's geocoder (checked
+          # 2026-09-23); Glance's `location` takes a place name, not a zip.
+          - type: weather
+            location: Okemos, Michigan, United States
+            units: imperial
+            hour-format: 12h
+
+          # The built-in widget has no daily high/low or multi-day view, so
+          # this fills that in straight from Open-Meteo (same free, keyless
+          # API the built-in widget uses). Coordinates are Open-Meteo's own
+          # geocoding result for Okemos, MI, matching the widget above.
+          - type: custom-api
+            title: Forecast
+            title-url: https://open-meteo.com/en/docs?latitude=42.72226&longitude=-84.42747
+            css-class: forecast
+            cache: 1h
+            url: https://api.open-meteo.com/v1/forecast
+            parameters:
+              latitude: 42.72226
+              longitude: -84.42747
+              daily: weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max
+              temperature_unit: fahrenheit
+              timezone: America/Detroit
+              forecast_days: 5
+            # WMO weather codes: https://open-meteo.com/en/docs#weather_variable_documentation
+            template: |
+              {{ $j := .JSON }}
+              <ul class="list list-gap-10">
+              {{ range $i, $d := $j.Array "daily.time" }}
+                {{ $code := $j.Int (printf "daily.weather_code.%d" $i) }}
+                <li class="forecast-row">
+                  <span class="forecast-day color-highlight">{{ if eq $i 0 }}Today{{ else }}{{ $d.String "" | parseLocalTime "DateOnly" | formatTime "Mon" }}{{ end }}</span>
+                  <span class="forecast-desc color-subdue" title="WMO code {{ $code }}">
+                    {{- if eq $code 0 }}Clear
+                    {{- else if le $code 2 }}Partly cloudy
+                    {{- else if eq $code 3 }}Overcast
+                    {{- else if le $code 48 }}Fog
+                    {{- else if le $code 57 }}Drizzle
+                    {{- else if le $code 67 }}Rain
+                    {{- else if le $code 77 }}Snow
+                    {{- else if le $code 82 }}Showers
+                    {{- else if le $code 86 }}Snow showers
+                    {{- else }}Storms{{ end -}}
+                  </span>
+                  <span class="forecast-precip color-subdue">{{ $j.Int (printf "daily.precipitation_probability_max.%d" $i) }}%</span>
+                  <span class="forecast-temps"><span class="color-highlight">{{ $j.Float (printf "daily.temperature_2m_max.%d" $i) | printf "%.0f°" }}</span> <span class="color-subdue">{{ $j.Float (printf "daily.temperature_2m_min.%d" $i) | printf "%.0f°" }}</span></span>
+                </li>
+              {{ end }}
+              </ul>
+
+      # ---- Middle: search + app links ----------------------------------------
+      - size: full
+        widgets:
+          # Same SearXNG instance Homepage's search box uses; the Authelia
+          # SSO cookie covers the navigation, no extra login.
+          - type: search
+            search-engine: https://search.jakerobb.org/search?q={QUERY}
+            new-tab: true
+
+          # Every app on Homepage, both its manual services.yaml entries
+          # and its annotation-discovered HTTPRoutes (Headlamp, SearXNG,
+          # ntfy, SigNoz), in the same four groups, alphabetical within
+          # each. This is a static list — unlike Homepage, Glance has no
+          # Kubernetes discovery, so a new app needs a line here too.
+          #
+          # Icons: `di:` = homarr-labs/dashboard-icons, `sh:` = selfh.st,
+          # `mdi:` = Material Design (all loaded by the browser from
+          # jsDelivr). Modbus Controller, Modbus Relay, and Network
+          # Optimizer have no entry in either icon set; Homepage uses
+          # custom PNGs for those (manifests/homepage/icons-configmap.yaml),
+          # stand-in MDI glyphs here for now.
+          - type: bookmarks
+            groups:
+              - title: Apps
+                links:
+                  - title: Headlamp
+                    url: https://headlamp.jakerobb.org
+                    icon: di:headlamp
+                  - title: Home Assistant
+                    url: https://homeassistant.jakerobb.org
+                    icon: di:home-assistant
+                  - title: KVM
+                    url: https://kvm.jakerobb.org
+                    icon: di:glinet
+                  - title: SearXNG
+                    url: https://search.jakerobb.org
+                    icon: di:searxng
+              - title: Services
+                links:
+                  - title: Authelia
+                    url: https://auth.jakerobb.org
+                    icon: di:authelia
+                  - title: Change Detection
+                    url: https://changedetection.jakerobb.org
+                    icon: di:changedetection
+                  - title: Modbus Controller
+                    url: https://modbus.jakerobb.org
+                    icon: mdi:transit-connection-variant
+                  - title: Modbus Relay
+                    url: https://modbus-relay.jakerobb.org
+                    icon: mdi:electric-switch
+                  - title: Rack LED
+                    url: https://rack-led.jakerobb.org
+                    icon: di:wled.png
+                  - title: Scrypted
+                    url: https://scrypted.jakerobb.org
+                    icon: sh:scrypted
+                  - title: Z-Wave JS UI
+                    url: https://zwave.jakerobb.org
+                    icon: di:z-wave-js-ui
+                  - title: Zigbee2MQTT
+                    url: https://zigbee.jakerobb.org
+                    icon: di:zigbee2mqtt
+              - title: Monitoring
+                links:
+                  - title: Grafana
+                    url: https://grafana.jakerobb.org
+                    icon: di:grafana
+                  - title: InfluxDB
+                    url: https://influxdb.jakerobb.org
+                    icon: di:influxdb
+                  - title: Logs
+                    url: https://logs.jakerobb.org/select/vmui
+                    icon: di:victorialogs
+                  - title: Network Optimizer
+                    url: https://optimizer.jakerobb.org
+                    icon: mdi:speedometer
+                  - title: ntfy
+                    url: https://ntfy.jakerobb.org
+                    icon: di:ntfy
+                  - title: NUT (UPS Monitoring)
+                    url: https://nut.jakerobb.org
+                    icon: di:nut
+                  - title: SigNoz
+                    url: https://signoz.jakerobb.org
+                    icon: di:signoz
+              - title: Infrastructure
+                links:
+                  - title: ArgoCD
+                    url: https://argocd.jakerobb.org
+                    icon: di:argo-cd
+                  - title: HexOS/TrueNAS
+                    url: https://deck.hexos.com/dash
+                    icon: di:truenas-scale
+                  - title: Homepage
+                    url: https://home.jakerobb.org
+                    icon: sh:homepage
+                  - title: Proxmox
+                    url: https://proxmox.lan:8006
+                    icon: di:proxmox
+                  - title: UniFi Gateway
+                    url: https://gateway.jakerobb.org
+                    icon: di:unifi
+
+      # ---- Right: cluster ----------------------------------------------------
+      - size: small
+        widgets:
+          # Glance has no native Kubernetes widget, so this is a custom-api
+          # widget over kube-prometheus-stack's Prometheus (in-cluster,
+          # unauthenticated) — node-exporter for CPU/memory, kube-state-metrics
+          # for node/pod counts. Chosen over the Kubernetes Metrics API
+          # (what Homepage's widget reads) because metrics-server returns
+          # quantity strings like "123456789n"/"1234Ki", and Glance's
+          # template language has no string-to-number parsing; Prometheus
+          # returns plain decimal strings, which `.Float` parses directly.
+          #
+          # Main request = per-node CPU; everything else is a subrequest
+          # (fetched concurrently). Title links to Headlamp, same as
+          # Homepage's widget.
+          - type: custom-api
+            title: Kubernetes
+            title-url: https://headlamp.jakerobb.org
+            css-class: k8s
+            cache: 1m
+            url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+            parameters:
+              query: max by (nodename) ((1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) * on (instance) group_left (nodename) node_uname_info)
+            subrequests:
+              node-mem:
+                url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+                parameters:
+                  query: max by (nodename) ((1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on (instance) group_left (nodename) node_uname_info)
+              cluster-cpu:
+                url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+                parameters:
+                  query: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))
+              cluster-mem:
+                url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+                parameters:
+                  query: 1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)
+              nodes-ready:
+                url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+                parameters:
+                  query: sum(kube_node_status_condition{condition="Ready",status="true"})
+              nodes-total:
+                url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+                parameters:
+                  query: count(kube_node_info)
+              pods-running:
+                url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+                parameters:
+                  query: sum(kube_pod_status_phase{phase="Running"})
+            template: |
+              {{ $ready := (.Subrequest "nodes-ready").JSON.Int "data.result.0.value.1" }}
+              {{ $total := (.Subrequest "nodes-total").JSON.Int "data.result.0.value.1" }}
+              {{ $cpu := mul ((.Subrequest "cluster-cpu").JSON.Float "data.result.0.value.1") 100 }}
+              {{ $mem := mul ((.Subrequest "cluster-mem").JSON.Float "data.result.0.value.1") 100 }}
+              <div class="flex justify-between text-center">
+                <div>
+                  <div class="size-h3 {{ if lt $ready $total }}color-negative{{ else }}color-highlight{{ end }}">{{ $ready }}/{{ $total }}</div>
+                  <div class="size-h6">NODES</div>
+                </div>
+                <div>
+                  <div class="size-h3 color-highlight">{{ (.Subrequest "pods-running").JSON.Int "data.result.0.value.1" }}</div>
+                  <div class="size-h6">PODS</div>
+                </div>
+                <div>
+                  <div class="size-h3 color-highlight">{{ printf "%.0f" $cpu }}%</div>
+                  <div class="size-h6">CPU</div>
+                </div>
+                <div>
+                  <div class="size-h3 color-highlight">{{ printf "%.0f" $mem }}%</div>
+                  <div class="size-h6">MEM</div>
+                </div>
+              </div>
+              {{ $nodeMem := .Subrequest "node-mem" }}
+              <ul class="list list-gap-10 margin-top-15">
+              {{ range sortByString "metric.nodename" "asc" (.JSON.Array "data.result") }}
+                {{ $name := .String "metric.nodename" }}
+                {{ $c := mul (.Float "value.1") 100 }}
+                {{ $m := 0.0 }}
+                {{ range $nodeMem.JSON.Array "data.result" }}{{ if eq (.String "metric.nodename") $name }}{{ $m = mul (.Float "value.1") 100 }}{{ end }}{{ end }}
+                <li>
+                  <div class="color-highlight text-truncate">{{ $name }}</div>
+                  <div class="k8s-meter">
+                    <span class="size-h6">CPU</span>
+                    <div class="k8s-bar{{ if ge $c 80.0 }} k8s-bar-hot{{ end }}"><div style="width: {{ printf "%.0f" $c }}%"></div></div>
+                    <span class="size-h6 k8s-pct">{{ printf "%.0f" $c }}%</span>
+                  </div>
+                  <div class="k8s-meter">
+                    <span class="size-h6">MEM</span>
+                    <div class="k8s-bar{{ if ge $m 80.0 }} k8s-bar-hot{{ end }}"><div style="width: {{ printf "%.0f" $m }}%"></div></div>
+                    <span class="size-h6 k8s-pct">{{ printf "%.0f" $m }}%</span>
+                  </div>
+                </li>
+              {{ end }}
+              </ul>

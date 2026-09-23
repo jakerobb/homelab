@@ -1,0 +1,29 @@
+# Kustomize rather than the plain-manifest directory every other bare app
+# uses, for one reason: configMapGenerator. Glance's config auto-reload
+# watches the config *file*, and a ConfigMap volume update is an atomic
+# symlink swap that deletes the watched file out from under it ("Deleting a
+# config file will stop that file from being watched" — Glance's own docs),
+# so an edited ConfigMap would never actually reach a running pod. The
+# generator appends a content hash to each ConfigMap's name and rewrites
+# the Deployment's references to match, so any edit to glance.yml or
+# custom.css rolls the pod automatically on sync. Bonus: both files live
+# here as real files (editor syntax highlighting, no YAML-in-YAML
+# indentation) instead of block scalars inside a ConfigMap manifest.
+#
+# Old hash-suffixed ConfigMaps get cleaned up by the Application's
+# `prune: true`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: glance
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+configMapGenerator:
+  - name: glance-config
+    files:
+      - glance.yml
+  - name: glance-assets
+    files:
+      - custom.css
