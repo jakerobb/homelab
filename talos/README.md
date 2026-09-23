@@ -984,6 +984,20 @@ put `context=system_u:object_r:ephemeral_t:s0` in the StorageClass
 and write it. A `context=` mount labels the whole filesystem at mount time,
 so no relabeling pass and no xattr writes are needed.
 
+**Gotcha: the StorageClass option alone isn't enough.** democratic-csi runs
+the util-linux `mount` inside its own node container, and libmount silently
+drops every SELinux mount option (`context=`, `rootcontext=`, etc.) unless
+libselinux's `is_selinux_enabled()` returns true. That function needs both a
+mounted selinuxfs (Talos provides one) and an existing `/etc/selinux/config`,
+which the Debian-based driver image doesn't ship. The first rollout
+(2026-09-23) mounted cleanly, but `/proc/mounts` showed no `context=` and
+files stayed `unlabeled_t`. `LIBMOUNT_DEBUG=0xffff` showed the option being
+stripped before mount(2). Fix:
+[`argocd/apps/democratic-csi/selinux-config.yaml`](../argocd/apps/democratic-csi/selinux-config.yaml),
+a ConfigMap mounted at `/etc/selinux/config` in the node's csi-driver
+container. Worth knowing for any other CSI driver on Talos that does its
+mounting through userspace util-linux.
+
 A StorageClass's `mountOptions` only get copied into **newly provisioned**
 PVs. Every existing `hexos-iscsi` PV has to be patched by hand, and then its
 pod has to be restarted so the volume is actually remounted with the new
@@ -998,6 +1012,11 @@ kubectl -n signoz delete pod chi-signoz-clickhouse-cluster-0-0-0
 ```
 
 Verify on the node that the mount picked it up and the flood stopped:
+
+A pod restart on the **same node** still triggers a full
+NodeUnstage/NodeStage (verified), so deleting the pod is enough; there's no
+need to scale anything to zero. Check `/proc/mounts` for `context=`, not
+just a clean mount:
 
 ```bash
 talosctl -n 192.168.102.34 read /proc/mounts | grep ephemeral_t

@@ -65,6 +65,19 @@ spec:
               - context=system_u:object_r:ephemeral_t:s0
             secrets: {}
         volumeSnapshotClasses: []
+        # Without this, libmount drops the StorageClass's context= mount
+        # option. See selinux-config.yaml.
+        node:
+          driver:
+            extraVolumeMounts:
+              - name: selinux-config
+                mountPath: /etc/selinux/config
+                subPath: config
+                readOnly: true
+          extraVolumes:
+            - name: selinux-config
+              configMap:
+                name: selinux-config
         driver:
           # The chart's node DaemonSet template inspects
           # driver.config.driver at Helm render time (contains "iscsi" ...)

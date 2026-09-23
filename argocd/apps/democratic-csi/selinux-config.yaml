@@ -1,0 +1,25 @@
+# Mounted at /etc/selinux/config in democratic-csi's node csi-driver
+# container (see node.extraVolumes in application.yaml). Applied by the root
+# app, like namespace.yaml. The chart has no extraObjects hook for this.
+#
+# Why this is needed: the hexos-iscsi StorageClass passes
+# `context=system_u:object_r:ephemeral_t:s0` as a mount option (see
+# talos/README.md "SELinux labels on iSCSI volumes"). democratic-csi runs the
+# container's own util-linux `mount`, and libmount silently drops every
+# SELinux mount option unless libselinux's is_selinux_enabled() is true.
+# That function needs both a mounted selinuxfs (present, since Talos enables
+# SELinux) and an existing /etc/selinux/config, which this Debian-based image
+# doesn't ship. Without the file, the mount succeeds but the label never gets
+# applied (verified 2026-09-23 with LIBMOUNT_DEBUG).
+#
+# Only the file's existence matters to libmount. The contents just mirror
+# what Talos actually runs, so anything else in libselinux that parses it
+# isn't misled.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: selinux-config
+  namespace: democratic-csi
+data:
+  config: |
+    SELINUX=permissive
