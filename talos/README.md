@@ -966,8 +966,11 @@ it is logged as a denial. For most apps that's background noise (worker-2 had
 ~90 AVCs in its last 2000 audit lines). ClickHouse (SigNoz), though, churns
 parts constantly, and on `talos-worker-mbp` that came to **~300M audit records
 in 19h** (`audit_lost` climbing ~25–50k/sec, `audit: rate limit exceeded`
-every second in `talosctl dmesg`). The node sat at ~47% CPU with ClickHouse
-alone at ~1.65 cores. Nothing crashed and every health check stayed green.
+every second in `talosctl dmesg`). That buries every other audit record
+behind the rate limit. Nothing crashed and every health check stayed green.
+(ClickHouse's own ~1.8-core CPU usage was *not* caused by this, despite the
+timing: it stayed the same after the fix. It's part churn from small,
+unbatched log inserts, a separate SigNoz tuning issue.)
 The only place it showed up was `talosctl dmesg` /
 `talosctl logs auditd`:
 

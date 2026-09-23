@@ -54,8 +54,9 @@ spec:
             # denial (allowed, since permissive, but still logged). ClickHouse's
             # constant part churn made that ~25k audit events/sec on
             # talos-worker-mbp, blowing through the kernel's audit rate
-            # limit and wasting CPU. ephemeral_t is the label Talos gives
-            # its own user volumes, and pods can read and write it; this
+            # limit and burying every other audit record. ephemeral_t is
+            # the label Talos gives its own user volumes, and pods can read
+            # and write it; this
             # is Talos's documented fix for CSI volumes. See talos/README.md
             # "SELinux labels on iSCSI volumes".
             # Applies only to newly-provisioned PVs. Existing PVs need
