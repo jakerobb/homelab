@@ -4,13 +4,6 @@ Things we can't act on yet because they're waiting on something outside our cont
 stability/time window, or a precondition that hasn't happened. Check back here periodically; once an item's dependency
 clears, move it into the active backlog as regular actionable work.
 
-## Homepage TrueNAS widget — needs JSON-RPC API support
-
-**Waiting on:** a Homepage release whose `truenas` widget type (`argocd/apps/homepage/`) supports HexOS/TrueNAS's new
-JSON-RPC 2.0/ WebSocket API. The REST API it authenticates against today is deprecated and slated for **removal in HexOS
-v26.04**. Not urgent — HexOS isn't on that version yet — but the widget will silently break whenever it does update, so
-check for Homepage support before upgrading HexOS past 26.04.
-
 ## HexOS B2 backup bucket deletion
 
 **Waiting on:** enough elapsed time to trust the new non-redundant (striped, no AnyRaid) HexOS pool before deleting the

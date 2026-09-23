@@ -47,7 +47,22 @@ spec:
             allowVolumeExpansion: true
             parameters:
               fsType: ext4
-            mountOptions: []
+            # SELinux label for the whole filesystem (added 2026-09-23).
+            # Talos runs SELinux in permissive mode, and a freshly-formatted
+            # ext4 LUN has no xattr labels, so every file shows up as
+            # unlabeled_t. Each pod write to it is then logged as an AVC
+            # denial (allowed, since permissive, but still logged). ClickHouse's
+            # constant part churn made that ~25k audit events/sec on
+            # talos-worker-mbp, blowing through the kernel's audit rate
+            # limit and wasting CPU. ephemeral_t is the label Talos gives
+            # its own user volumes, and pods can read and write it; this
+            # is Talos's documented fix for CSI volumes. See talos/README.md
+            # "SELinux labels on iSCSI volumes".
+            # Applies only to newly-provisioned PVs. Existing PVs need
+            # spec.mountOptions patched by hand, plus a pod restart so the
+            # volume gets remounted (steps in that README section).
+            mountOptions:
+              - context=system_u:object_r:ephemeral_t:s0
             secrets: {}
         volumeSnapshotClasses: []
         driver:

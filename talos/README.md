@@ -956,6 +956,55 @@ it's stale, `talosctl patch machineconfig -n <worker-ip> -p
 '[{"op":"replace","path":"/machine/install/image","value":"<correct
 factory.talos.dev URL>"}]'` fixes it without a reboot.
 
+## SELinux labels on iSCSI volumes (found 2026-09-23)
+
+Talos runs SELinux in **permissive** mode (`selinux=1` on the kernel
+cmdline), and its `auditd` service logs every AVC denial even though nothing
+gets blocked. A freshly formatted `hexos-iscsi` ext4 LUN has no SELinux xattrs,
+so every file on it is `unlabeled_t`, and every write a pod (`pod_t`) makes to
+it is logged as a denial. For most apps that's background noise (worker-2 had
+~90 AVCs in its last 2000 audit lines). ClickHouse (SigNoz), though, churns
+parts constantly, and on `talos-worker-mbp` that came to **~300M audit records
+in 19h** (`audit_lost` climbing ~25–50k/sec, `audit: rate limit exceeded`
+every second in `talosctl dmesg`). The node sat at ~47% CPU with ClickHouse
+alone at ~1.65 cores. Nothing crashed and every health check stayed green.
+The only place it showed up was `talosctl dmesg` /
+`talosctl logs auditd`:
+
+```
+type=AVC ... avc: denied { write } ... comm="BgSchPool" ... dev="sdc"
+  scontext=system_u:system_r:pod_t:s0 tcontext=system_u:object_r:unlabeled_t:s0 tclass=dir permissive=1
+```
+
+Fix, per [Talos's SELinux docs](https://docs.siderolabs.com/talos/v1.14/security/selinux):
+put `context=system_u:object_r:ephemeral_t:s0` in the StorageClass
+`mountOptions`
+([`argocd/apps/democratic-csi/application.yaml`](../argocd/apps/democratic-csi/application.yaml)).
+`ephemeral_t` is the label Talos gives its own user volumes, and pods can read
+and write it. A `context=` mount labels the whole filesystem at mount time,
+so no relabeling pass and no xattr writes are needed.
+
+A StorageClass's `mountOptions` only get copied into **newly provisioned**
+PVs. Every existing `hexos-iscsi` PV has to be patched by hand, and then its
+pod has to be restarted so the volume is actually remounted with the new
+option:
+
+```bash
+for pv in $(kubectl get pv -o jsonpath='{range .items[?(@.spec.storageClassName=="hexos-iscsi")]}{.metadata.name}{"\n"}{end}'); do
+  kubectl patch pv "$pv" --type=merge -p '{"spec":{"mountOptions":["context=system_u:object_r:ephemeral_t:s0"]}}'
+done
+# then restart the consuming pods (ClickHouse first — it's the big one), e.g.
+kubectl -n signoz delete pod chi-signoz-clickhouse-cluster-0-0-0
+```
+
+Verify on the node that the mount picked it up and the flood stopped:
+
+```bash
+talosctl -n 192.168.102.34 read /proc/mounts | grep ephemeral_t
+talosctl -n 192.168.102.34 logs auditd --tail 2000 | grep -c 'type=AVC'
+talosctl -n 192.168.102.34 dmesg | tail -5   # no more "rate limit exceeded"
+```
+
 ## Additional worker: talos-worker-mbp (added 2026-09-22)
 
 A third worker, built from an idle 2018 15" MacBook Pro (32GB RAM, on the
