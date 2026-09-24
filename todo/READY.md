@@ -4,18 +4,6 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## Audit app memory requests against real usage
-
-**Not started.** Direct fallout from the Descheduler work (see
-[`DONE.md`](DONE.md#descheduler)) — worker-1/worker-2 both had real memory usage far
-above what was actually requested cluster-wide (78-80% used vs. 12-38% requested), meaning most apps here are running on
-guessed-low or copy-pasted chart-default requests rather than anything measured. This isn't just cosmetic: undersized
-requests are exactly what let the scheduler over-pack a node past what it can really handle (see the Descheduler entry), and it also
-means Kubernetes' OOM-kill prioritization (which weighs actual usage against requests) is working off bad data
-everywhere, not just for SigNoz. Go through each app under `argocd/apps/`/`manifests/`, compare `kubectl top pod`
-against its committed `resources.requests`, and correct the ones that are meaningfully off — most likely candidates are
-whatever's still on chart defaults rather than something set deliberately for this cluster.
-
 ## ArgoCD-native SOPS decryption (KSOPS)
 
 Every SOPS-encrypted secret under `argocd/secrets/` is currently applied out-of-band by hand

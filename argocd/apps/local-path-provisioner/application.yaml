@@ -36,6 +36,11 @@ spec:
           create: true
           defaultClass: false
           reclaimPolicy: Retain
+        # From 7-day usage (2026-09-24, peak 55Mi); the chart sets none.
+        resources:
+          requests:
+            cpu: 5m
+            memory: 64Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: local-path-storage

@@ -25,6 +25,21 @@ spec:
           revisionHistoryLimit: 2
         crds:
           enabled: true
+        # Requests from 7-day peaks (2026-09-24); the chart sets none.
+        resources:
+          requests:
+            cpu: 10m
+            memory: 96Mi
+        webhook:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 80Mi
+        cainjector:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 112Mi
         # DNS-01 self-check was failing zone-walk lookups through the
         # cluster's own resolver chain (CoreDNS -> Unbound on the LAN),
         # which returned an unrelated/bogus SOA answer for the query rather

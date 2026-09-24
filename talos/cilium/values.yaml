@@ -92,3 +92,24 @@ securityContext:
 # once it sees the CRDs.
 gatewayAPI:
   enabled: true
+
+# Requests from 7 days of Prometheus data (2026-09-24, see todo/DONE.md
+# "Audit app memory requests against real usage"). The chart sets none, so
+# the scheduler was counting ~2.3GB of real usage across six nodes as zero.
+# One value covers every node: the agent peaked at 395-450Mi on the control
+# planes, 509Mi on talos-worker-mbp and 228-263Mi on worker-1/-2. No limits:
+# an OOM-killed or throttled agent takes pod networking down with it.
+resources:
+  requests:
+    cpu: 100m
+    memory: 448Mi
+envoy:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+operator:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 160Mi

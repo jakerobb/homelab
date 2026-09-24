@@ -114,13 +114,15 @@ spec:
           zookeeper:
             persistence:
               storageClass: hexos-iscsi
+            # Memory raised 2026-09-24: it sat at ~475Mi, just under the old
+            # 512Mi limit (peak 508Mi over 7 days).
             resources:
               requests:
                 cpu: 100m
-                memory: 256Mi
+                memory: 512Mi
               limits:
                 cpu: 500m
-                memory: 512Mi
+                memory: 1Gi
         signoz:
           persistence:
             storageClass: hexos-iscsi
@@ -132,13 +134,16 @@ spec:
               cpu: 500m
               memory: 1Gi
         otelCollector:
+          # Raised 2026-09-24: OOM-killed that week at the old 1Gi limit
+          # (peak 1016Mi), and still peaking ~680Mi after the batch tuning
+          # below.
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 768Mi
             limits:
               cpu: "1"
-              memory: 1Gi
+              memory: 2Gi
           config:
             processors:
               # Chart default is timeout: 1s with send_batch_size: 50000.

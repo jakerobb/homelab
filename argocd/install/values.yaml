@@ -14,6 +14,42 @@ controller:
   # Chart default is 5 for the application-controller StatefulSet; same
   # policy as global above.
   revisionHistoryLimit: 2
+  # Requests for every component, from 7-day usage (2026-09-24). The chart
+  # sets none. The controller sits at ~450Mi and peaked at 643Mi.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 512Mi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 256Mi
+
+server:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 160Mi
+
+applicationSet:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 96Mi
+
+notifications:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 96Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
 
 configs:
   params:

@@ -867,7 +867,8 @@ recurrence since. Worth capturing here if/when that's dug up.
   control-plane nodes: per-node hostname patches (`cp1.yaml`/`cp2.yaml`/
   `cp3.yaml`) plus shared patches applied identically to all 3
   (`vip.yaml`, `oidc.yaml`, `metrics-bind-address.yaml`,
-  `disable-flannel-kubeproxy.yaml`; `node-tuning-namespace.yaml`/
+  `disable-flannel-kubeproxy.yaml`, `control-plane-resources.yaml`;
+  `node-tuning-namespace.yaml`/
   `nic-watchdog-mitigation.yaml` are plain Kubernetes manifests applied via
   `kubectl`, not Talos machine-config patches).
 - `patches/workers/` — per-node patches for the two MS-A2 worker VMs

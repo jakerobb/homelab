@@ -287,5 +287,40 @@ the exact policy. With today's usage (workers ~57%, `-mbp` ~25%) it correctly de
 the overload threshold lowered to 50% in a scratch copy, it picked evictions from both small workers and stopped at the
 per-node and per-run caps. One behaviour to know about: within a node, pods are evicted in order of lowest priority,
 then QoS class (BestEffort first), not largest first. After a big imbalance it can take a few nights to settle, and the
-largest pod isn't guaranteed to be the one that moves. The real fix for that is still "Audit app memory requests
-against real usage" in [`READY.md`](READY.md).
+largest pod isn't guaranteed to be the one that moves. The real fix for that is accurate requests, done in "Audit app
+memory requests against real usage" below.
+
+## Audit app memory requests against real usage
+
+**Done (2026-09-24). Goes live when merged, plus the manual steps below.** Requests were compared against 7 days of
+Prometheus history per workload (`container_memory_working_set_bytes` and CPU usage against
+`kube_pod_container_resource_requests`), not a single `kubectl top` reading. Before: about 40 containers had no requests
+at all, and the cluster requested 7.4Gi total while using far more. The rule used: memory request just above the 7-day
+peak, memory limit (where one exists) about 1.5-2x the request, CPU request about p95. No limits were added to
+cluster-critical components (Cilium, kube-apiserver), because an OOM kill there is an outage.
+
+What changed:
+
+- **Real problems fixed.** SigNoz's otel-collector was OOM-killed at its 1Gi limit (now 768Mi request / 2Gi limit).
+  ZooKeeper sat at ~475Mi against a 512Mi limit (now 512Mi / 1Gi).
+- **Big unrequested workloads.** Cilium agent/envoy/operator (`talos/cilium/values.yaml`), Prometheus (2Gi), all of
+  ArgoCD (`argocd/install/values.yaml`), SigNoz's k8s-infra otel agent (was the chart's 100Mi, real 65-386Mi by node),
+  democratic-csi, cert-manager, external-dns, kube-state-metrics, node-exporter, the prometheus-operator and its
+  config-reloader sidecars, local-path-provisioner.
+- **Control-plane static pods.** New Talos patch
+  [`../talos/patches/control-plane/control-plane-resources.yaml`](../talos/patches/control-plane/control-plane-resources.yaml):
+  kube-apiserver 512Mi -> 1536Mi (real 1.3-1.4Gi), controller-manager 256Mi -> 192Mi, scheduler 64Mi -> 96Mi.
+- **Small corrections.** Up: authelia, homepage, searxng, ntfy, renovate. Down: headlamp, metrics-server.
+- **Left alone.** ClickHouse: its 7-day numbers (CPU throttled, 2.5Gi peak) were from before the 2026-09-23 CPU tuning;
+  since then it peaks at 1.35Gi and ~0.2 cores, well inside 2Gi / 500m. The ClickHouse operator's two containers
+  (~100Mi together) still have no requests, because the signoz chart has no values key for them. One-shot hook Jobs too.
+
+Consequences worth knowing:
+
+- Projected memory requests with today's placement: control planes 86-90%, worker-1 86%, worker-2 ~97%, mbp 22%. The
+  biggest waste on the Pis is the otel agent's 384Mi (sized for mbp's pod count; it uses ~65Mi on a Pi), since a
+  DaemonSet can't have per-node requests. If a new DaemonSet ever won't fit on the control planes, look there first.
+- With honest requests the scheduler now knows worker-1/-2 are nearly full, so restarted pods will land on mbp. That is
+  the intended outcome, but it also means removing `talos-worker-mbp` before the Mac Studio arrives would leave pods
+  Pending, where before it would have silently over-packed the small workers.
+- The descheduler's `nodeFit: true` checks requests, so its eviction decisions are more accurate now too.
