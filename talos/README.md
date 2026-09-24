@@ -2,9 +2,9 @@
 
 ## Current state
 
-_(as of 2026-09-21)_
+_(as of 2026-09-24)_
 
-- **Talos v1.14.1** on all 5 nodes (control planes and both workers), **Kubernetes v1.37.0**.
+- **Talos v1.14.1** on all 5 nodes (control planes and both workers), **Kubernetes v1.37.1** (upgraded from v1.37.0 2026-09-24 via `talosctl upgrade-k8s --to 1.37.1`).
   Both already fully upgraded — see "Talos control-plane upgrade" and "Talos v1.14.1 upgrade
   blocked by Pi5 EFI-variable firmware bug" below for how the control planes got there.
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
@@ -128,7 +128,7 @@ build artifact again.
      --install-disk /dev/nvme0n1 \
      --install-image ghcr.io/talos-rpi5/installer:v1.11.5 \
      --additional-sans 192.168.102.11,192.168.102.12,192.168.102.13 \
-     --kubernetes-version 1.37.0 \
+     --kubernetes-version 1.37.1 \
      --talos-version v1.11 \
      --output-dir /tmp/gen-config-diff
    ```
