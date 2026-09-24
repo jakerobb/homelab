@@ -1082,3 +1082,42 @@ Deployed as [`apps/glance/`](apps/glance/application.yaml) →
   `gethomepage.dev/*` annotations for as long as both dashboards run.
 - **Font:** Helvetica via `custom.css`, with `tabular-nums` so changing
   numbers don't shift width (the stock JetBrains Mono gets that for free).
+
+## truenas-exporter (deployed 2026-09-24)
+
+Pool capacity/health for Glance's Storage widget, via Prometheus. Our own
+exporter, [`jakerobb/truenas-exporter`](https://github.com/jakerobb/truenas-exporter)
+(Go, `FROM scratch`, published to Docker Hub by that repo's GHA workflow),
+deployed as [`apps/truenas-exporter/`](apps/truenas-exporter/application.yaml) →
+[`manifests/truenas-exporter/`](../manifests/truenas-exporter/).
+
+- **Why not TrueNAS's built-in Graphite export + `graphite_exporter`:**
+  TrueNAS 25.10's generated `netdata.conf` sets `diskspace = no`, so the
+  export carries no pool-space metrics at all. Re-enabling it means
+  hand-editing `/etc/netdata/netdata.conf` on the HexOS host and redoing
+  that after every update — not declarative, and HexOS may not allow it.
+- **Why not REST from Glance directly:** TrueNAS 25.x answers the API key
+  with `403` on the (deprecated) REST API. It works only over the JSON-RPC
+  websocket API, which Glance's `custom-api` widget can't speak.
+- **Why our own exporter:** the existing community ones had 0–5 stars and a
+  single maintainer each, which is a poor fit for a code path holding a
+  TrueNAS API key. Ours is about 300 lines with one dependency.
+- **TLS:** `wss://` only (TrueNAS 25.04+ revokes API keys used over plain
+  `ws://`). TrueNAS still has its factory self-signed cert (CN=localhost),
+  so the exporter pins its SHA-256 fingerprint (`TRUENAS_TLS_FINGERPRINT` in
+  the Deployment) rather than skipping verification. If the cert is ever
+  regenerated, `truenas_up` goes to 0 and the pod logs the new fingerprint.
+- **Scraping:** a `ServiceMonitor` (first one in this repo outside
+  kube-prometheus-stack's own bundle), 60s interval. Each scrape opens a
+  fresh websocket session; there's no background polling.
+- **Metrics:** `truenas_pool_used_bytes`/`truenas_pool_available_bytes`
+  (usable space from the pool's root dataset, matching the TrueNAS UI) and
+  `truenas_pool_raw_*_bytes` (vdev capacity including parity), plus
+  `truenas_pool_healthy`, `truenas_pool_status`, `truenas_up`. See the
+  exporter's README for the full list.
+- **Secret:** a dedicated API key (not Homepage's, so retiring Homepage
+  doesn't break this), out-of-band as usual:
+
+  ```bash
+  sops -d argocd/secrets/truenas-api-key.truenas-exporter.sops.yaml | kubectl apply -f -
+  ```

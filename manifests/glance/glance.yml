@@ -276,3 +276,50 @@ pages:
                 </li>
               {{ end }}
               </ul>
+
+          # Pool capacity from our own truenas-exporter (manifests/truenas-exporter/,
+          # github.com/jakerobb/truenas-exporter) via Prometheus — TrueNAS's
+          # JSON-RPC API is websocket-only, which custom-api can't speak.
+          # used/available are the root dataset's usable-space numbers (what
+          # the TrueNAS UI shows), not raw vdev capacity. One query returns
+          # both per pool as a single series each, labelled by `metric`;
+          # `or` keeps the pool listed (as unhealthy) if TrueNAS is down.
+          # Title links to the HexOS dashboard, same as Homepage's tile.
+          - type: custom-api
+            title: Storage
+            title-url: https://deck.hexos.com/dash
+            css-class: storage
+            cache: 5m
+            url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
+            parameters:
+              query: label_replace(truenas_pool_used_bytes, "metric", "used", "", "") or label_replace(truenas_pool_available_bytes, "metric", "avail", "", "") or label_replace(truenas_pool_healthy, "metric", "healthy", "", "")
+            template: |
+              {{ $results := .JSON.Array "data.result" }}
+              {{ if eq (len $results) 0 }}
+                <p class="color-negative">No data from truenas-exporter.</p>
+              {{ end }}
+              <ul class="list list-gap-10">
+              {{ range $results }}{{ if eq (.String "metric.metric") "used" }}
+                {{ $pool := .String "metric.pool" }}
+                {{ $used := .Float "value.1" }}
+                {{ $avail := 0.0 }}
+                {{ $healthy := false }}
+                {{ range $results }}{{ if eq (.String "metric.pool") $pool }}
+                  {{ if eq (.String "metric.metric") "avail" }}{{ $avail = .Float "value.1" }}{{ end }}
+                  {{ if eq (.String "metric.metric") "healthy" }}{{ $healthy = eq (.Int "value.1") 1 }}{{ end }}
+                {{ end }}{{ end }}
+                {{ $total := add $used $avail }}
+                {{ $pct := mul (div $used $total) 100 }}
+                <li>
+                  <div class="flex justify-between items-baseline">
+                    <span class="color-highlight">{{ $pool }}</span>
+                    {{ if $healthy }}<span class="size-h6 color-positive">HEALTHY</span>{{ else }}<span class="size-h6 color-negative">UNHEALTHY</span>{{ end }}
+                  </div>
+                  <div class="k8s-bar{{ if ge $pct 80.0 }} k8s-bar-hot{{ end }} storage-bar"><div style="width: {{ printf "%.0f" $pct }}%"></div></div>
+                  <div class="flex justify-between size-h6">
+                    <span>{{ printf "%.2f" (div $used 1e12) }} TB used ({{ printf "%.0f" $pct }}%)</span>
+                    <span>{{ printf "%.2f" (div $avail 1e12) }} TB free</span>
+                  </div>
+                </li>
+              {{ end }}{{ end }}
+              </ul>

@@ -36,26 +36,31 @@ select {
     text-align: right;
 }
 
-/* ---- Kubernetes widget (glance.yml, css-class: k8s) --------------------- */
+/* ---- Usage bars (Kubernetes + Storage widgets) --------------------------- */
 .k8s .k8s-meter {
     display: grid;
     grid-template-columns: 3.5rem 1fr 3.5rem;
     align-items: center;
     gap: 0.75rem;
 }
-.k8s .k8s-bar {
+.k8s-bar {
     height: 0.6rem;
     border-radius: 0.3rem;
     background: var(--color-widget-background-highlight);
     overflow: hidden;
 }
-.k8s .k8s-bar > div {
+.k8s-bar > div {
     height: 100%;
     background: var(--color-primary);
 }
-.k8s .k8s-bar-hot > div {
+.k8s-bar-hot > div {
     background: var(--color-negative);
 }
 .k8s .k8s-pct {
     text-align: right;
+}
+
+/* ---- Storage widget (glance.yml, css-class: storage) --------------------- */
+.storage .storage-bar {
+    margin: 0.4rem 0;
 }

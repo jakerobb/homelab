@@ -1,0 +1,21 @@
+# Picked up by kube-prometheus-stack's Prometheus without any label
+# matching, since serviceMonitorSelectorNilUsesHelmValues is false there
+# (see argocd/apps/kube-prometheus-stack/application.yaml). The first
+# ServiceMonitor in this repo outside that chart's own bundled set.
+#
+# 60s interval: every scrape opens a fresh websocket session to TrueNAS and
+# logs in, and pool capacity doesn't move fast enough to justify more.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: truenas-exporter
+  namespace: truenas-exporter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: truenas-exporter
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 60s
+      scrapeTimeout: 15s
