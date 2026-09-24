@@ -17,6 +17,27 @@ Homebrew needs), and that's expected to keep being true for old-but-still-useful
 Homebrew does work, use it — it's less to maintain. Where it doesn't, Telegraf's own tar.gz release has no
 package-manager dependency at all.
 
+## Where the data goes
+
+Two copies of the same metrics, for two different jobs:
+
+- **SigNoz, for graphs.** Telegraf's `outputs.opentelemetry` pushes to `otel.jakerobb.org` → `signoz-otel-collector` →
+  ClickHouse. Browse it in SigNoz's Metrics Explorer by `host.name`.
+- **Prometheus, for alerts** (added 2026-09-24). Telegraf's `outputs.prometheus_client` serves `/metrics` on port
+  `9273`, and kube-prometheus-stack's Prometheus scrapes it as the `mac-hosts` job (a static target in
+  [`argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml)). The
+  `MacHostDiskSpaceLow` rule in that file fires through Alertmanager → ntfy like every other alert: warning below 40GiB
+  free, critical below 15GiB. SigNoz has no alerting wired up (see `todo/FUTURE.md`), which is why this second path
+  exists. A failed scrape (Mac off, Telegraf stopped, firewall) shows up as the chart's default `TargetDown` alert.
+
+Why the disk alert matters: the UTM VM's disk file only takes up space on the Mac as the VM writes to it. If the Mac
+fills up, QEMU pauses the VM ("No space left on device") and its Talos node goes NotReady. Kubelet's own image
+cleanup can't prevent it, because it only sees the VM's virtual disk size. This happened on 2026-09-24. The SigNoz copy
+had shown the Mac at 99.8% used for hours beforehand, but nothing was alerting on it.
+
+**Each Mac needs a DHCP reservation** so the scrape target stays put (the MacBook Pro's is `192.168.102.9`). Adding a
+Mac means a new reservation plus a new entry under the `mac-hosts` job's `targets`.
+
 ## Why Telegraf, not Vector
 
 Vector already ships rpi5-1's logs to SigNoz over OTLP/HTTP (see `docker-compose/vector/vector.yaml`), but its
@@ -182,7 +203,35 @@ All steps below run on the physical Mac itself.
 
 7. **Verify in SigNoz** (signoz.jakerobb.org) — check the Metrics Explorer for `host.name = <the NODE_HOST_NAME you set in step 2>` and confirm `thermal`, `power`, `smc_temperature`, `smc_fan`, `disk`, and `system` series are all arriving.
 
+8. **Verify the Prometheus endpoint.** From rpi5-1 (not from the Mac itself, which would bypass the firewall):
+   ```bash
+   curl -s http://<mac-ip>:9273/metrics | grep '^disk_free'
+   ```
+   Give it a minute after a (re)start first: the endpoint has nothing to serve until Telegraf's first 60s flush.
+   `bootstrap.sh` already handles the macOS Application Firewall (see the Gotcha below): it ad-hoc signs the binary
+   and allows it through. If this still fails with `Empty reply from server` while the same `curl` against
+   `localhost` on the Mac works, the firewall is blocking it. Check `codesign -v <prefix>/bin/telegraf` (it must be
+   signed) and `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getappblocked <prefix>/bin/telegraf`. Then add
+   the Mac's reserved IP to the `mac-hosts` scrape job (see "Where the data goes" above) and check that Prometheus
+   shows the target as up.
+
 ## Gotchas found
+
+- **The macOS firewall silently blocks an unsigned Telegraf, even when it's listed as allowed.** Found live
+  2026-09-24: with the Application Firewall on, `socketfilterfw --listapps` showed `/usr/local/bin/telegraf` as
+  "Allow incoming connections" and `--getappblocked` said "permitted", yet every connection to `:9273` from another
+  host got `Empty reply from server` (TCP connects, then closes). `localhost` worked, because the firewall doesn't
+  filter loopback. Turning the firewall off made it work, which pinned it down. Cause: InfluxData's macOS build
+  has no code signature at all (`codesign -dv` → "code object is not signed at all"), and the firewall matches apps
+  by signature. Fix: an ad-hoc signature (`codesign --force --sign -`), then remove and re-add the firewall entry
+  and restart Telegraf so its listening socket is opened under the new rule. `bootstrap.sh` does all of this on
+  every run, since each run re-copies the binary and so discards the signature.
+- **Telegraf 1.40 exits on an unknown config option instead of ignoring it.** The first version of the
+  `prometheus_client` block used `expiration` (the option is `expiration_interval`). Telegraf logged "configuration
+  specified the fields ["expiration"], but they were not used" to `telegraf-launchd.log`, not `telegraf.log`, and
+  exited; launchd's `KeepAlive` then restarted it every ~10s (`runs = 46`, `last exit code = 1` in
+  `launchctl print`). Nothing reached SigNoz either while this was happening. Validate config changes before
+  deploying: `telegraf --config <rendered.conf> --input-filter disk --test` with the same Telegraf version catches it.
 
 - **`collect-smc.sh`'s temperature values can carry trailing annotation text.** Found live on the 2018 MacBook Pro:
   `powermetrics --samplers smc`'s `CPU die temperature` line reads `93.60 C (fan)`, not just `93.60 C` —
@@ -209,7 +258,9 @@ All steps below run on the physical Mac itself.
   directory (a plausible but unconfirmed cause — it stopped happening after pre-creating the log file with the
   daemon user's ownership; that's moot now that the daemon runs as root). `bootstrap.sh` still runs `plutil -lint`
   on the rendered plist before installing it, to rule out a bad template substitution as another possible cause of
-  the same unhelpful error.
+  the same unhelpful error. **Confirmed cause (2026-09-24):** re-running `bootstrap.sh` while Telegraf was already
+  running hit it every time, because `launchctl bootout` returns before launchd has finished removing the service.
+  The script now waits until `launchctl print` stops finding the service before it bootstraps.
 - **`brew --prefix` succeeding does not mean `brew install <formula>` will work.** `bootstrap.sh`'s first version used
   `command -v brew && brew --prefix` as a "does Homebrew work here" probe, on the theory that Homebrew refuses to run
   at all on an unsupported macOS. Found live on the 2018 MacBook Pro: `brew --prefix` succeeds fine (it's a read-only
