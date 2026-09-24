@@ -23,4 +23,4 @@ creation_rules:
     key_groups:
       - age:
           - age1nqvgqc45f5j9y9ch0lyccdefeazs26xkp732rujp23nqeqmdjefshruqs8
-          # - <runner age public key>  (uncomment once generated)
+          - age18r384kx7fu9zur2c0err7ujxze76sr7dzyuz5hc4netncx8m4ezq0rn45a
