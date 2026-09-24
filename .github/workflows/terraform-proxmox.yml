@@ -59,7 +59,7 @@ jobs:
       - name: Plan
         run: |
           set -o pipefail
-          ./terraform/proxmox/tf.sh plan -no-color | tee "$RUNNER_TEMP/plan.txt"
+          ./terraform/proxmox/tf.sh plan -no-color 2>&1 | tee "$RUNNER_TEMP/plan.txt"
 
       - name: Plan summary
         if: always()
@@ -68,7 +68,7 @@ jobs:
           {
             echo '### terraform/proxmox plan'
             echo
-            grep -E '^(Plan:|No changes\.)' "$RUNNER_TEMP/plan.txt" || true
+            grep -E '^(Plan:|No changes\.|Error:)' "$RUNNER_TEMP/plan.txt" || true
             echo
             echo '<details><summary>Full plan</summary>'
             echo
@@ -103,4 +103,23 @@ jobs:
           fi
 
       - name: Apply
-        run: ./terraform/proxmox/tf.sh apply -auto-approve -no-color
+        run: |
+          set -o pipefail
+          ./terraform/proxmox/tf.sh apply -auto-approve -no-color 2>&1 | tee "$RUNNER_TEMP/apply.txt"
+
+      - name: Apply summary
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/apply.txt" ] || exit 0
+          {
+            echo '### terraform/proxmox apply'
+            echo
+            grep -E '^(Apply complete!|No changes\.|Error:)' "$RUNNER_TEMP/apply.txt" || true
+            echo
+            echo '<details><summary>Full output</summary>'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/apply.txt"
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
