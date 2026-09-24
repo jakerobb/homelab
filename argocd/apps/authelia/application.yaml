@@ -43,9 +43,9 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 128Mi
+              memory: 224Mi
             limits:
-              memory: 256Mi
+              memory: 384Mi
 
         ingress:
           enabled: true

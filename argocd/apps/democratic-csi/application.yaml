@@ -71,11 +71,43 @@ spec:
         # `latest` was then master HEAD: v1.9.5 plus README-only commits.
         # The controller and node run the same image, so keep both tags in
         # step. Renovate PRs both, via the regex manager in renovate.json.
+        # Requests throughout from 7-day peaks (2026-09-24); the chart sets
+        # none. Kept deliberately above peak: this is the storage path for
+        # every PVC in the cluster.
         controller:
           driver:
             image:
               # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
               tag: 'v1.9.5'
+            resources:
+              requests:
+                cpu: 10m
+                memory: 192Mi
+          externalAttacher:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+          externalProvisioner:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+          externalResizer:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+          externalSnapshotter:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+        csiProxy:
+          resources:
+            requests:
+              cpu: 5m
+              memory: 32Mi
         node:
           # Replaced by node-driver-registrar.yaml (a standalone DaemonSet).
           # The chart's registrar mounts all of /var/lib/kubelet without
@@ -90,6 +122,10 @@ spec:
             image:
               # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
               tag: 'v1.9.5'
+            resources:
+              requests:
+                cpu: 20m
+                memory: 224Mi
             # Without this, libmount drops the StorageClass's context= mount
             # option. See selinux-config.yaml.
             extraVolumeMounts:

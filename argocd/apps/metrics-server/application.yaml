@@ -25,6 +25,12 @@ spec:
         revisionHistoryLimit: 2
         args:
           - --kubelet-insecure-tls
+        # Chart default memory request is 200Mi; 7-day peak was 90Mi
+        # (2026-09-24). CPU left at the chart's 100m default.
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: metrics-server

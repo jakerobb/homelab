@@ -163,6 +163,24 @@ spec:
           # Deployment, so this chart doesn't expose an equivalent knob for
           # it — same "not worth chasing" call as local-path-provisioner's.
           revisionHistoryLimit: 2
+          # Requests here and below from 7-day peaks (2026-09-24); the chart
+          # sets none for any of these.
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+          # Covers the config-reloader sidecar in both Prometheus and
+          # Alertmanager.
+          prometheusConfigReloader:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+        kube-state-metrics:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
         prometheus:
           # Headlamp's bundled Prometheus plugin (manifests/headlamp/deployment.yaml)
           # auto-detects a Prometheus Service by this exact label — added
@@ -190,6 +208,13 @@ spec:
             # local retention/storage modest — this is a bridge, not the
             # long-term store.
             retention: 10d
+            # Steady at ~1.7Gi (7-day peak 1.68Gi).
+            resources:
+              requests:
+                cpu: 100m
+                memory: 2Gi
+              limits:
+                memory: 3Gi
             storageSpec:
               volumeClaimTemplate:
                 spec:
@@ -206,6 +231,10 @@ spec:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
               effect: NoSchedule
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
         # kubelet.serviceMonitor.tlsConfig.insecureSkipVerify is already the
         # chart default (Talos's self-signed-per-node kubelet certs are
         # exactly the case it's defaulted on for) — same call already made

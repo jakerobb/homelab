@@ -11,8 +11,9 @@
 #   fine at 3:30am, not mid-day.
 # - LowNodeUtilization only (+ RemoveDuplicates), on *actual* usage from
 #   metrics-server. LNU's default is request-based, the same math the
-#   scheduler itself uses — and requests here badly understate real usage
-#   (see todo/READY.md "Audit app memory requests against real usage").
+#   scheduler itself uses — and requests here badly understated real usage
+#   (corrected 2026-09-24, see todo/DONE.md "Audit app memory requests
+#   against real usage"). Real usage is still the better signal.
 # - Worker nodes only; control planes are tainted and run only system pods.
 # - Hard caps: at most 2 evictions per node, 3 total, per run.
 # - No new PDBs for single-replica pods: `minAvailable: 1` on a singleton
