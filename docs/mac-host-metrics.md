@@ -17,6 +17,27 @@ Homebrew needs), and that's expected to keep being true for old-but-still-useful
 Homebrew does work, use it — it's less to maintain. Where it doesn't, Telegraf's own tar.gz release has no
 package-manager dependency at all.
 
+## Where the data goes
+
+Two copies of the same metrics, for two different jobs:
+
+- **SigNoz, for graphs.** Telegraf's `outputs.opentelemetry` pushes to `otel.jakerobb.org` → `signoz-otel-collector` →
+  ClickHouse. Browse it in SigNoz's Metrics Explorer by `host.name`.
+- **Prometheus, for alerts** (added 2026-09-24). Telegraf's `outputs.prometheus_client` serves `/metrics` on port
+  `9273`, and kube-prometheus-stack's Prometheus scrapes it as the `mac-hosts` job (a static target in
+  [`argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml)). The
+  `MacHostDiskSpaceLow` rule in that file fires through Alertmanager → ntfy like every other alert: warning below 40GiB
+  free, critical below 15GiB. SigNoz has no alerting wired up (see `todo/FUTURE.md`), which is why this second path
+  exists. A failed scrape (Mac off, Telegraf stopped, firewall) shows up as the chart's default `TargetDown` alert.
+
+Why the disk alert matters: the UTM VM's disk file only takes up space on the Mac as the VM writes to it. If the Mac
+fills up, QEMU pauses the VM ("No space left on device") and its Talos node goes NotReady. Kubelet's own image
+cleanup can't prevent it, because it only sees the VM's virtual disk size. This happened on 2026-09-24. The SigNoz copy
+had shown the Mac at 99.8% used for hours beforehand, but nothing was alerting on it.
+
+**Each Mac needs a DHCP reservation** so the scrape target stays put (the MacBook Pro's is `192.168.102.9`). Adding a
+Mac means a new reservation plus a new entry under the `mac-hosts` job's `targets`.
+
 ## Why Telegraf, not Vector
 
 Vector already ships rpi5-1's logs to SigNoz over OTLP/HTTP (see `docker-compose/vector/vector.yaml`), but its
@@ -181,6 +202,16 @@ All steps below run on the physical Mac itself.
    -k system/com.jakerobb.telegraf`.
 
 7. **Verify in SigNoz** (signoz.jakerobb.org) — check the Metrics Explorer for `host.name = <the NODE_HOST_NAME you set in step 2>` and confirm `thermal`, `power`, `smc_temperature`, `smc_fan`, `disk`, and `system` series are all arriving.
+
+8. **Verify the Prometheus endpoint.** From rpi5-1 (not from the Mac itself, which would bypass the firewall):
+   ```bash
+   curl -s http://<mac-ip>:9273/metrics | grep '^disk_free'
+   ```
+   If that times out, the macOS Application Firewall is probably blocking incoming connections to the `telegraf`
+   binary. Check with `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`. If it's on, allow
+   Telegraf with `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add <prefix>/bin/telegraf` and
+   `--unblockapp <prefix>/bin/telegraf`. Then add the Mac's reserved IP to the `mac-hosts` scrape job (see "Where the
+   data goes" above) and check that Prometheus shows the target as up.
 
 ## Gotchas found
 

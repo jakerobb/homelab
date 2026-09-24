@@ -155,6 +155,47 @@ spec:
         defaultRules:
           rules:
             kubeProxy: false
+        # Mac host disk space (added 2026-09-24). A UTM VM's disk file only
+        # grows on the Mac as the VM writes to it, so the Mac running out of
+        # space is what stops the VM: QEMU pauses it and its Talos node goes
+        # NotReady with no explanation from inside Kubernetes. Kubelet's own
+        # image cleanup can't prevent this, because it measures the VM's
+        # 66GB virtual disk, not the Mac's free space. It happened on
+        # 2026-09-24 (see todo/DONE.md "Mac host disk alert"): a burst of image
+        # pulls stalled talos-worker-mbp after the Mac had sat below 1GB free
+        # for hours. Thresholds are absolute: one busy rollout pulled ~8GB of
+        # images, so 40GiB gives days of warning and 15GiB is "act now". Both
+        # share an alertname so the critical one inhibits the warning (see
+        # inhibit_rules above).
+        additionalPrometheusRulesMap:
+          mac-hosts:
+            groups:
+              - name: mac-hosts
+                rules:
+                  - alert: MacHostDiskSpaceLow
+                    expr: disk_free{job="mac-hosts", path="/"} < 40 * 1024^3
+                    for: 15m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: Mac host {{ $labels.host }} is low on disk space.
+                      description: >-
+                        {{ $labels.host }} has {{ $value | humanize1024 }}B free.
+                        The Talos VM it hosts pauses if the Mac fills up. Free
+                        space on the Mac (Time Machine local snapshots are a
+                        common hidden cost: tmutil listlocalsnapshots /).
+                  - alert: MacHostDiskSpaceLow
+                    expr: disk_free{job="mac-hosts", path="/"} < 15 * 1024^3
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: Mac host {{ $labels.host }} is nearly out of disk space.
+                      description: >-
+                        {{ $labels.host }} has only {{ $value | humanize1024 }}B
+                        free. The Talos VM it hosts will pause (node NotReady)
+                        once the Mac fills up. Free space now; don't force-stop
+                        the VM if it has already paused.
         kubeProxy:
           enabled: false
         prometheusOperator:
@@ -208,6 +249,20 @@ spec:
             # local retention/storage modest — this is a bridge, not the
             # long-term store.
             retention: 10d
+            # Physical Macs underneath UTM-hosted Talos workers. Telegraf runs
+            # natively on each Mac (scripts/mac-host-metrics/, see
+            # docs/mac-host-metrics.md) and exposes /metrics on :9273 alongside
+            # its OTLP feed to SigNoz. Scraped here so the rules in
+            # additionalPrometheusRulesMap below can alert through Alertmanager.
+            # The IP is a DHCP reservation on the UCG (set 2026-09-24). The
+            # Telegraf `host` label carries the node-naming-convention name.
+            # If a scrape fails, the chart's default TargetDown rule fires.
+            additionalScrapeConfigs:
+              - job_name: mac-hosts
+                scrape_interval: 60s
+                static_configs:
+                  - targets:
+                      - 192.168.102.9:9273   # 2018 MacBook Pro, host of talos-worker-mbp
             # Steady at ~1.7Gi (7-day peak 1.68Gi).
             resources:
               requests:

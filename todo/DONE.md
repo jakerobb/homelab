@@ -324,3 +324,29 @@ Consequences worth knowing:
   the intended outcome, but it also means removing `talos-worker-mbp` before the Mac Studio arrives would leave pods
   Pending, where before it would have silently over-packed the small workers.
 - The descheduler's `nodeFit: true` checks requests, so its eviction decisions are more accurate now too.
+
+## Mac host disk alert
+
+**Done (2026-09-24). Goes live when merged, once Telegraf on the Mac is re-bootstrapped.** Prompted by
+`talos-worker-mbp` going NotReady mid-rollout the same day. The UTM VM's disk file only grows on the Mac as the VM
+writes to it. A burst of ~15 image pulls grew it until the MacBook Pro's disk filled, and QEMU paused the VM ("No
+space left on device"). Kubelet's image cleanup can't catch this, because it measures the VM's 66GB virtual disk, not
+the Mac's free space. Recovery added a second problem: the Talos install ISO had never been detached from the VM
+([`../docs/utm-talos-worker.md`](../docs/utm-talos-worker.md) step 7) and was still first in boot order, so deleting
+it to free space and then re-attaching it booted the VM into Talos's `haltIfInstalled` guard. Removing the CD drive
+fixed that.
+
+The Mac's Telegraf was already reporting the problem to SigNoz: 99.6-99.9% used, under 1GB free, from at least 10:30
+that morning. Nothing alerted on it, because SigNoz has no alerting wired up. The fix sends the same metrics to
+Prometheus as well:
+
+- Telegraf ([`../scripts/mac-host-metrics/telegraf.conf`](../scripts/mac-host-metrics/telegraf.conf)) gets an
+  `outputs.prometheus_client` on `:9273`, alongside its existing OTLP output.
+- kube-prometheus-stack scrapes it as the `mac-hosts` job, a static target at the Mac's new DHCP reservation
+  `192.168.102.9` (it had been on a `.203` lease).
+- `MacHostDiskSpaceLow` fires through Alertmanager → ntfy: warning below 40GiB free for 15 minutes, critical below
+  15GiB for 5. Both share an alertname, so the critical one inhibits the warning. A failed scrape shows up as the
+  chart's existing `TargetDown` alert.
+
+Runbook: [`../docs/mac-host-metrics.md`](../docs/mac-host-metrics.md) ("Where the data goes", plus a new verification
+step for the endpoint and the macOS firewall).
