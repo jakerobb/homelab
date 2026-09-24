@@ -83,7 +83,12 @@ if [ ! -f "${RUNNER_DIR}/.runner" ]; then
 
   read -rsp "Runner registration token: " token
   echo
+  token="${token//[[:space:]]/}"
   [ -n "$token" ] || die "no registration token given"
+  # Input is hidden, so echo just the shape of what was pasted (registration
+  # tokens are ~29 uppercase alphanumerics) to catch a bad paste early.
+  echo "Got a ${#token}-character token."
+  [[ "$token" =~ ^[A-Z0-9]+$ ]] || die "that doesn't look like a registration token (expected uppercase letters/digits only)"
   (cd "$RUNNER_DIR" && as_runner ./config.sh --unattended \
     --url "$REPO_URL" --token "$token" \
     --name "$RUNNER_NAME" --labels "$RUNNER_LABELS" \
