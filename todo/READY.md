@@ -4,37 +4,13 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## Descheduler
-
-**Not started.** Kubernetes never rebalances already-running pods — the scheduler only places new/pending pods, so
-whatever a cordon/drain scatters stays scattered even after the drained node comes back with room to spare. Surfaced
-concretely 2026-09-22: draining `talos-worker-mbp` for a Talos reinstall (see
-[`talos/README.md`](../talos/README.md#additional-worker-talos-worker-mbp-added-2026-09-22)) pushed SigNoz's ClickHouse
-and ZooKeeper onto the much smaller `talos-worker-1`/`talos-worker-2` (Proxmox, 4GB each), which then sat at 80-82%
-memory while `-mbp` sat at 7% — fixed by hand (`kubectl delete pod`, letting the scheduler re-place them). This will
-keep happening: node capacity here is heterogeneous already (tiny Pi5 control planes, small MS-A2 workers, a
-temporarily-huge MBP) and gets more so once the Mac Studio arrives, and maintenance-driven drains are routine.
-[`kubernetes-sigs/descheduler`](https://github.com/kubernetes-sigs/descheduler) is the standard fix — runs periodically
-(typically a `CronJob`) and evicts pods that violate configured balance strategies (e.g. `LowNodeUtilization`), letting
-the scheduler redo the placement. Needs a deliberately conservative policy, not defaults — aggressive eviction can
-thrash stateful pods (ClickHouse is exactly the kind of workload that shouldn't be evicted repeatedly), so this pairs
-with making sure the relevant `PodDisruptionBudget`s exist first.
-
-**Why this has to be utilization-based, not just request-based** (found the same day): `kubectl describe node` showed
-`talos-worker-1`/`talos-worker-2` had only 12%/38% of memory actually *requested* at the same moment `kubectl top nodes`
-showed them at 78-80% real usage — most of the existing apps already on those nodes (ArgoCD components, Cilium,
-cert-manager-webhook, etc.) request far less than they actually use. The scheduler only ever sees requests, so it happily
-placed ClickHouse's 2Gi request believing there was ~3GB of headroom that didn't really exist. Descheduler's
-`LowNodeUtilization` strategy is the right tool specifically because it looks at real utilization, not the same
-request-based math the scheduler itself already got fooled by — see "Audit app memory requests against real usage"
-below, a related but separate effort.
-
 ## Audit app memory requests against real usage
 
-**Not started.** Direct fallout from the `Descheduler` finding above — worker-1/worker-2 both had real memory usage far
+**Not started.** Direct fallout from the Descheduler work (see
+[`DONE.md`](DONE.md#descheduler)) — worker-1/worker-2 both had real memory usage far
 above what was actually requested cluster-wide (78-80% used vs. 12-38% requested), meaning most apps here are running on
 guessed-low or copy-pasted chart-default requests rather than anything measured. This isn't just cosmetic: undersized
-requests are exactly what let the scheduler over-pack a node past what it can really handle (see above), and it also
+requests are exactly what let the scheduler over-pack a node past what it can really handle (see the Descheduler entry), and it also
 means Kubernetes' OOM-kill prioritization (which weighs actual usage against requests) is working off bad data
 everywhere, not just for SigNoz. Go through each app under `argocd/apps/`/`manifests/`, compare `kubectl top pod`
 against its committed `resources.requests`, and correct the ones that are meaningfully off — most likely candidates are

@@ -1,0 +1,110 @@
+# Descheduler: evicts pods from over-utilized worker nodes so the scheduler
+# can re-place them. Kubernetes never rebalances running pods on its own, so
+# whatever a drain scatters stays scattered (see todo/DONE.md "Descheduler"
+# for the 2026-09-22 ClickHouse incident that motivated this).
+#
+# Deliberately conservative, not the chart's defaults:
+# - Nightly CronJob (03:30, before Renovate's 04:17 slot), not a Deployment
+#   looping every few minutes. Most pods worth moving here are single-replica
+#   and PVC-backed (ClickHouse, ZooKeeper, Prometheus, Authelia, ntfy), so an
+#   eviction is a brief outage while the iSCSI volume re-attaches elsewhere —
+#   fine at 3:30am, not mid-day.
+# - LowNodeUtilization only (+ RemoveDuplicates), on *actual* usage from
+#   metrics-server. LNU's default is request-based, the same math the
+#   scheduler itself uses — and requests here badly understate real usage
+#   (see todo/READY.md "Audit app memory requests against real usage").
+# - Worker nodes only; control planes are tainted and run only system pods.
+# - Hard caps: at most 2 evictions per node, 3 total, per run.
+# - No new PDBs for single-replica pods: `minAvailable: 1` on a singleton
+#   would block this *and* `kubectl drain`. The existing ClickHouse PDB
+#   (maxUnavailable: 1 on one replica) never blocks anything.
+#
+# No ServiceMonitor: the chart's metrics endpoint lives only for the few
+# seconds the Job runs, so Prometheus would never scrape it. Evictions show
+# up as Kubernetes Events (reason `Descheduled`) and in the last few Jobs'
+# pod logs (`kubectl -n descheduler logs job/<name>`).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: descheduler
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/descheduler/
+    chart: descheduler
+    targetRevision: 0.36.0
+    helm:
+      releaseName: descheduler
+      valuesObject:
+        kind: CronJob
+        schedule: "30 3 * * *"
+        timeZone: America/Detroit
+        # A run takes seconds; kill a stuck one well before the next night
+        # (the chart already hardcodes concurrencyPolicy: Forbid).
+        activeDeadlineSeconds: 600
+
+        # Chart default is 500m/256Mi guaranteed — oversized for a job that
+        # runs for seconds once a day on 4GB workers.
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+        deschedulerPolicy:
+          # labels.Parse syntax: every node without the control-plane label.
+          nodeSelector: "!node-role.kubernetes.io/control-plane"
+          maxNoOfPodsToEvictPerNode: 2
+          maxNoOfPodsToEvictTotal: 3
+          metricsProviders:
+            - source: KubernetesMetrics
+          # Replaces the chart's default profile entirely (Helm doesn't merge
+          # lists), which enables six strategies and protects PVC pods.
+          profiles:
+            - name: default
+              pluginConfig:
+                - name: DefaultEvictor
+                  args:
+                    # Only evict when some other (worker) node can actually
+                    # take the pod — otherwise it's churn for nothing.
+                    nodeFit: true
+                    podProtections:
+                      # emptyDir counts as "local storage", and ClickHouse,
+                      # signoz-0, Prometheus and most of ArgoCD mount one
+                      # (scratch only; real data is on iSCSI PVCs). Left
+                      # protected, the pods this exists for could never move.
+                      # System-critical and DaemonSet pods stay protected.
+                      defaultDisabled:
+                        - PodsWithLocalStorage
+                - name: RemoveDuplicates
+                - name: LowNodeUtilization
+                  args:
+                    # Under: below 35% on *every* resource. Over: above 70%
+                    # on *any* resource. Evicts from over- until they drop
+                    # below 70%, only while under-utilized nodes exist.
+                    # Today's steady state (~58% / ~58% / 25%) is a no-op;
+                    # the 2026-09-22 incident (80% / 82% / 7%) would trigger.
+                    thresholds:
+                      cpu: 35
+                      memory: 35
+                    targetThresholds:
+                      cpu: 70
+                      memory: 70
+                    metricsUtilization:
+                      source: KubernetesMetrics
+              plugins:
+                balance:
+                  enabled:
+                    - RemoveDuplicates
+                    - LowNodeUtilization
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: descheduler
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

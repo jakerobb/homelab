@@ -256,3 +256,36 @@ in a diff. The comment there explains what each rule does. The main difference f
 item: the critical→warning and warning→info rules match on `alertname` as well as `namespace`, so an unrelated critical
 alert doesn't hide a different warning. Info alerts only notify when a warning or critical alert is firing in the same
 namespace, which is how the `InfoInhibitor` rule is designed to work.
+
+## Descheduler
+
+**Done (2026-09-24). Goes live when merged.** [`kubernetes-sigs/descheduler`](https://github.com/kubernetes-sigs/descheduler)
+chart 0.36.0, in [`../argocd/apps/descheduler/application.yaml`](../argocd/apps/descheduler/application.yaml). It exists
+because Kubernetes never rebalances pods that are already running. On 2026-09-22, draining `talos-worker-mbp` for a Talos
+reinstall pushed SigNoz's ClickHouse and ZooKeeper onto `talos-worker-1` and `talos-worker-2`. Those two sat at 80-82%
+memory while `-mbp` sat at 7%, and the fix was deleting the pods by hand. The comment in the Application covers the full
+reasoning. The main decisions:
+
+- **Real usage, not requests.** `LowNodeUtilization` looks at requests unless you tell it otherwise. That is the same
+  math the scheduler uses, and it's what caused the problem: the workers were 12-38% *requested* but 78-80% *used*.
+  Here it reads real usage from metrics-server instead (`metricsUtilization.source: KubernetesMetrics`).
+- **Conservative settings.** It runs as a CronJob at 03:30 America/Detroit, only against worker nodes, with only
+  `LowNodeUtilization` and `RemoveDuplicates`. Each run evicts at most 2 pods per node and 3 in total. A node counts as
+  underused below 35% on both CPU and memory, and as overloaded above 70% on either one.
+- **Stateful pods can be evicted.** All PVCs are on `hexos-iscsi`, so a pod with a volume can move to another node. The
+  single-replica ones (ClickHouse, ZooKeeper, Prometheus, Authelia, ntfy) have a short outage while the volume
+  re-attaches, which is acceptable at 3:30am. The chart's default protection for local storage is turned off because
+  it treats emptyDir as local storage, and ClickHouse, `signoz-0`, Prometheus and most of ArgoCD mount one. Left on, it
+  would protect exactly the pods this exists to move. System-critical and DaemonSet pods are still protected.
+- **No new PDBs.** For a single replica, `minAvailable: 1` would block both descheduler and `kubectl drain`. The existing
+  ClickHouse PDB (`maxUnavailable: 1` on one replica) never blocks anything and was left as is.
+- **No ServiceMonitor.** The Job only runs for a few seconds, so Prometheus would never scrape it. To see what it did,
+  look for Events with reason `Descheduled`, or read the pod logs from the last few Jobs in the `descheduler` namespace.
+
+Checked before merge by building v0.36.0 and running it with `--dry-run` from rpi5-1 against the live cluster, using
+the exact policy. With today's usage (workers ~57%, `-mbp` ~25%) it correctly decided there was nothing to do. With
+the overload threshold lowered to 50% in a scratch copy, it picked evictions from both small workers and stopped at the
+per-node and per-run caps. One behaviour to know about: within a node, pods are evicted in order of lowest priority,
+then QoS class (BestEffort first), not largest first. After a big imbalance it can take a few nights to settle, and the
+largest pod isn't guaranteed to be the one that moves. The real fix for that is still "Audit app memory requests
+against real usage" in [`READY.md`](READY.md).
