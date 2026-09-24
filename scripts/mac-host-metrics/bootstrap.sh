@@ -153,6 +153,14 @@ else
   # bootout first (ignoring failure) so a re-run after fixing something
   # doesn't just fail on "service already bootstrapped".
   sudo launchctl bootout system/com.jakerobb.telegraf 2>/dev/null || true
+  # bootout returns before launchd has finished tearing the service down, and
+  # bootstrapping while it's still going fails with the unhelpful
+  # "Bootstrap failed: 5: Input/output error" (hit re-running this 2026-09-24
+  # with Telegraf already running). Wait until launchd no longer knows it.
+  for _ in $(seq 1 20); do
+    sudo launchctl print system/com.jakerobb.telegraf >/dev/null 2>&1 || break
+    sleep 0.5
+  done
   if ! sudo launchctl bootstrap system /Library/LaunchDaemons/com.jakerobb.telegraf.plist; then
     echo "launchctl bootstrap failed. Most likely cause: a leftover copy of this daemon still loaded" >&2
     echo "from an earlier attempt (check: sudo launchctl print system/com.jakerobb.telegraf)." >&2

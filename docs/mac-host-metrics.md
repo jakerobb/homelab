@@ -240,7 +240,9 @@ All steps below run on the physical Mac itself.
   directory (a plausible but unconfirmed cause — it stopped happening after pre-creating the log file with the
   daemon user's ownership; that's moot now that the daemon runs as root). `bootstrap.sh` still runs `plutil -lint`
   on the rendered plist before installing it, to rule out a bad template substitution as another possible cause of
-  the same unhelpful error.
+  the same unhelpful error. **Confirmed cause (2026-09-24):** re-running `bootstrap.sh` while Telegraf was already
+  running hit it every time, because `launchctl bootout` returns before launchd has finished removing the service.
+  The script now waits until `launchctl print` stops finding the service before it bootstraps.
 - **`brew --prefix` succeeding does not mean `brew install <formula>` will work.** `bootstrap.sh`'s first version used
   `command -v brew && brew --prefix` as a "does Homebrew work here" probe, on the theory that Homebrew refuses to run
   at all on an unsupported macOS. Found live on the 2018 MacBook Pro: `brew --prefix` succeeds fine (it's a read-only
