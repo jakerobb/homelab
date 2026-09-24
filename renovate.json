@@ -14,8 +14,11 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Authelia's own image tag is pinned in valuesObject, separately from the chart's targetRevision (which the argocd manager already tracks) — neither built-in manager sees a nested image.tag override, so this catches it via an explicit annotation comment.",
-      "managerFilePatterns": ["/^argocd/apps/authelia/application\\.yaml$/"],
+      "description": "Image tags pinned in an Application's valuesObject (Authelia, democratic-csi), separately from the chart's targetRevision (which the argocd manager already tracks) — neither built-in manager sees a nested image.tag override, so this catches it via an explicit annotation comment.",
+      "managerFilePatterns": [
+        "/^argocd/apps/authelia/application\\.yaml$/",
+        "/^argocd/apps/democratic-csi/application\\.yaml$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+tag: '(?<currentValue>.*?)'"
       ]

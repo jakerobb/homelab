@@ -31,7 +31,10 @@ impossible instead of just easy to avoid.
 
 **Symlinked (works reliably):** `docker-compose.yml`, `caddy/Caddyfile`,
 `resolv.conf`, `resolv-host.conf`, `telegraf/` (whole dir),
-`nut-influx-relay/` (whole dir), `vector/vector.yaml`.
+`nut-influx-relay/` (whole dir), `vector/vector.yaml`, plus (added
+2026-09-24, none of them bind-mounted by any running service)
+`ntfy/conf/server.yml`, `nut-conf-office/ups.conf`, and
+`zigbee2mqtt/configuration.sops.yaml`.
 
 **NOT symlinked — reverted to real (manually re-copied) files after a live
 test broke Home Assistant** (config unreadable inside the container within

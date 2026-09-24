@@ -66,6 +66,16 @@ spec:
               - context=system_u:object_r:ephemeral_t:s0
             secrets: {}
         volumeSnapshotClasses: []
+        # Driver image pinned (2026-09-24) instead of the chart's default
+        # `latest`, which any node-pod restart could silently re-pull.
+        # `latest` was then master HEAD: v1.9.5 plus README-only commits.
+        # The controller and node run the same image, so keep both tags in
+        # step. Renovate PRs both, via the regex manager in renovate.json.
+        controller:
+          driver:
+            image:
+              # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
+              tag: 'v1.9.5'
         node:
           # Replaced by node-driver-registrar.yaml (a standalone DaemonSet).
           # The chart's registrar mounts all of /var/lib/kubelet without
@@ -76,9 +86,12 @@ spec:
           # registrar removes its own registration socket on SIGTERM.
           driverRegistrar:
             enabled: false
-          # Without this, libmount drops the StorageClass's context= mount
-          # option. See selinux-config.yaml.
           driver:
+            image:
+              # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
+              tag: 'v1.9.5'
+            # Without this, libmount drops the StorageClass's context= mount
+            # option. See selinux-config.yaml.
             extraVolumeMounts:
               - name: selinux-config
                 mountPath: /etc/selinux/config
