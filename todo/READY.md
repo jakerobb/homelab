@@ -4,39 +4,6 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## CI: render and validate Kubernetes manifests
-
-**In progress (2026-09-24).** Implemented as the `Kubernetes manifests` job in `lint.yml` plus
-[`../scripts/ci/render-manifests.py`](../scripts/ci/render-manifests.py); move to DONE.md once it's green on a PR. Follow-on to the GHA work (see DONE.md). Add a job to the `lint` workflow
-([`../.github/workflows/lint.yml`](../.github/workflows/lint.yml)) that `helm template`s each Helm-based ArgoCD
-Application under `argocd/apps/` with its own chart/version/`valuesObject`, and runs the output plus the raw YAML under
-`manifests/` through `kubeconform` (Kubernetes schemas plus CRD schemas for Gateway API, cert-manager, Cilium, etc.).
-Main payoff: Renovate's chart-bump PRs currently only reveal a breaking change after merge, when ArgoCD goes unhealthy;
-this would catch it on the PR. Needs a small script to pull chart repo/name/version/values out of each
-`application.yaml`. GitHub-hosted runner, no secrets needed.
-
-## Alertmanager InfoInhibitor: full inhibit_rules cascade
-
-**Partially done.** `argocd/apps/kube-prometheus-stack/application.yaml` routes `InfoInhibitor` to the `null` receiver
-(2026-09-22, stops it from notifying ntfy — see the `Watchdog`-adjacent route), but that's only half of what the alert's
-own annotation says it's for: "should be routed to a null receiver **and configured to inhibit alerts with
-severity=info**." The actual inhibition (an info-level alert firing alongside something more severe in the same
-namespace shouldn't also notify separately) needs a real `inhibit_rules` block, which this repo doesn't have at all yet.
-Standard kube-prometheus-stack pairing for this is roughly:
-```yaml
-inhibit_rules:
-  - source_matchers: ['severity = critical']
-    target_matchers: ['severity =~ warning|info']
-    equal: ['namespace']
-  - source_matchers: ['severity = warning']
-    target_matchers: ['severity = info']
-    equal: ['namespace']
-  - source_matchers: ['alertname = InfoInhibitor']
-    target_matchers: ['severity = info']
-    equal: ['namespace']
-```
-Not added yet — worth confirming this doesn't unexpectedly swallow something currently useful before turning it on.
-
 ## Descheduler
 
 **Not started.** Kubernetes never rebalances already-running pods — the scheduler only places new/pending pods, so

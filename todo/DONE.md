@@ -232,3 +232,27 @@ The same effort added a `lint` workflow ([`../.github/workflows/lint.yml`](../.g
 GitHub-hosted, no secrets) with four checks: every `*.sops.*` file is really encrypted
 ([`../scripts/ci/check-sops-encrypted.py`](../scripts/ci/check-sops-encrypted.py)), the Renovate config is valid in
 strict mode, and `shellcheck` and `actionlint` pass.
+
+## CI: render and validate Kubernetes manifests
+
+**Done (2026-09-24).** The `Kubernetes manifests` job in [`../.github/workflows/lint.yml`](../.github/workflows/lint.yml)
+runs [`../scripts/ci/render-manifests.py`](../scripts/ci/render-manifests.py) to render everything ArgoCD would apply,
+then validates the output with `kubeconform` against Kubernetes and CRD schemas (Gateway API, cert-manager, Cilium, and
+so on). The script runs `helm template` on each Helm-based Application under `argocd/apps/` with its own
+chart/version/values, and includes the raw YAML under `manifests/` as well. The payoff is that a breaking Renovate chart
+bump now fails on its PR instead of showing up after merge as an unhealthy ArgoCD app. The job passed on the PR that
+added it ([#17](https://github.com/jakerobb/homelab/pull/17)) and on the merge to `main`. It runs on a GitHub-hosted
+runner and needs no secrets.
+
+## Alertmanager inhibit_rules cascade
+
+**Done (2026-09-24). It turned out to be live all along.** The todo item assumed the repo had no `inhibit_rules`, but
+the live Alertmanager config already had all four of the chart's default rules. `alertmanager.config` in
+`kube-prometheus-stack`'s values is a map that Helm deep-merges, and this repo's `config:` never set `inhibit_rules`,
+so the chart's defaults stayed in effect. The rules are now written out explicitly in
+[`../argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml),
+identical to the defaults (confirmed by rendering the chart), so a future chart bump can't change them without showing up
+in a diff. The comment there explains what each rule does. The main difference from the version sketched in the old todo
+item: the critical→warning and warning→info rules match on `alertname` as well as `namespace`, so an unrelated critical
+alert doesn't hide a different warning. Info alerts only notify when a warning or critical alert is firing in the same
+namespace, which is how the `InfoInhibitor` rule is designed to work.
