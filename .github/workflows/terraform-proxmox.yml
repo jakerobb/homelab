@@ -1,0 +1,106 @@
+# terraform/proxmox: plan on pull requests, apply on merge to main.
+#
+# Runs on the self-hosted runner on the jump box (label homelab-jumpbox) — the
+# only place that can reach the Proxmox API — via terraform/proxmox/tf.sh,
+# using the host's own terraform/sops binaries so CI and manual runs never
+# disagree on Terraform version (state written by a newer Terraform can't be
+# read by an older one). Setup: docs/gha-terraform.md.
+#
+# This repo is public, so fork PRs must never reach the self-hosted runner:
+# the plan job only runs for PRs whose head branch lives in this repo
+# (Renovate's included), and the repo's Actions settings additionally require
+# approval before any outside contributor's workflow runs. Never switch this
+# to pull_request_target.
+#
+# Workflow logs on a public repo are public. Sensitive variables are redacted
+# by Terraform, but don't add outputs or debug logging that print secrets.
+name: terraform-proxmox
+
+on:
+  pull_request:
+    paths:
+      - terraform/proxmox/**
+      - .github/workflows/terraform-proxmox.yml
+  push:
+    branches: [main]
+    paths:
+      - terraform/proxmox/**
+      - .github/workflows/terraform-proxmox.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  plan:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, homelab-jumpbox]
+    concurrency:
+      group: terraform-proxmox-plan-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Format check
+        run: terraform -chdir=terraform/proxmox fmt -check -diff
+
+      - name: Init
+        run: ./terraform/proxmox/tf.sh init
+
+      - name: Validate
+        run: ./terraform/proxmox/tf.sh validate -no-color
+
+      - name: Plan
+        run: |
+          set -o pipefail
+          ./terraform/proxmox/tf.sh plan -no-color | tee "$RUNNER_TEMP/plan.txt"
+
+      - name: Plan summary
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/plan.txt" ] || exit 0
+          {
+            echo '### terraform/proxmox plan'
+            echo
+            grep -E '^(Plan:|No changes\.)' "$RUNNER_TEMP/plan.txt" || true
+            echo
+            echo '<details><summary>Full plan</summary>'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/plan.txt"
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, homelab-jumpbox]
+    # Never cancel an in-flight apply. A newer queued apply replacing an older
+    # queued one is fine — it applies main as of the newer commit anyway.
+    concurrency:
+      group: terraform-proxmox-apply
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Init
+        run: ./terraform/proxmox/tf.sh init
+
+      # Empty state means a misconfigured/unmigrated backend, not a fresh
+      # environment — applying would try to create duplicates of every
+      # existing VM. A deliberate from-scratch build is a manual job anyway.
+      - name: Refuse to apply against empty state
+        run: |
+          if [ -z "$(./terraform/proxmox/tf.sh state list)" ]; then
+            echo "::error::Remote state is empty — refusing to apply. See docs/gha-terraform.md."
+            exit 1
+          fi
+
+      - name: Apply
+        run: ./terraform/proxmox/tf.sh apply -auto-approve -no-color

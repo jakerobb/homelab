@@ -25,9 +25,10 @@ to create one after install. Never put it in a `.tf`/`.tfvars` file.
 
 **Run via `./tf.sh` instead of `terraform` directly** (added 2026-09-21, so the token
 never needs pasting into a shell by hand): `./tf.sh plan`, `./tf.sh apply`, etc. — a thin
-wrapper that decrypts `secrets/proxmox-api-token.sops.yaml` (SOPS + age, same repo key as
-everywhere else — see `talos/README.md#secrets-sops--age`) and injects it as
-`TF_VAR_proxmox_api_token` for just that one command, same `sops exec-env` pattern as
+wrapper that decrypts `secrets/proxmox-api-token.sops.yaml` and
+`secrets/b2-state-backend.sops.yaml` (SOPS + age, same repo key as everywhere else plus
+the CI runner's own key — see `talos/README.md#secrets-sops--age`) and injects them as
+`TF_VAR_proxmox_api_token` and the B2 backend's `AWS_*` credentials for just that one command, same `sops exec-env` pattern as
 `scripts/etcd-snapshot-backup.sh`'s B2 credentials. One-time setup, see
 `secrets/proxmox-api-token.yaml.example`.
 
@@ -35,6 +36,7 @@ Plain manual export still works too, if you ever need it outside the wrapper:
 
 ```bash
 export TF_VAR_proxmox_api_token="terraform@pve!provider=<uuid>"
+export AWS_ACCESS_KEY_ID="<B2 keyID>" AWS_SECRET_ACCESS_KEY="<B2 applicationKey>"
 terraform plan   # not ./tf.sh, since the wrapper would override this with the sops value
 ```
 
@@ -57,7 +59,13 @@ terraform plan   # not ./tf.sh, since the wrapper would override this with the s
 
 ## Running this
 
-This repo is cloned read-only (HTTPS, no credentials needed — it's a public repo)
-on **rpi5-1** at `~/dev/homelab`, which is also where Terraform itself now lives
-(`/usr/local/bin/terraform`, v1.16.2) — same jump-box convention as `talosctl`.
-Run `terraform plan`/`apply` from there rather than from a Mac.
+**Normally via GitHub Actions** (2026-09-24): PRs touching `terraform/proxmox/**` get a
+`plan`, merges to `main` get an `apply`, both on a self-hosted runner on the jump box —
+see [`docs/gha-terraform.md`](../../docs/gha-terraform.md). State lives in B2
+(`backend.tf`), not on local disk.
+
+Manual runs still work, from the jump box only: this repo is cloned read-only (HTTPS,
+no credentials needed — it's a public repo) on **rpi5-1** at `~/dev/homelab`, which is
+also where Terraform itself lives (`/usr/local/bin/terraform`) — same jump-box
+convention as `talosctl`. Use `./tf.sh`, which also takes the host-level lock CI uses
+(B2 can't do Terraform's own state locking). Don't run it from a Mac.
