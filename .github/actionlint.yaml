@@ -1,0 +1,4 @@
+self-hosted-runner:
+  # Jump-box runner — see docs/gha-terraform.md.
+  labels:
+    - homelab-jumpbox

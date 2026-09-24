@@ -15,7 +15,12 @@ creation_rules:
     key_groups:
       - age:
           - age1nqvgqc45f5j9y9ch0lyccdefeazs26xkp732rujp23nqeqmdjefshruqs8
+  # Second recipient here only: the GitHub Actions runner's own age key on the
+  # jump box (scripts/gha-runner/setup-runner.sh prints it), so CI can decrypt
+  # Terraform's secrets and nothing else. After changing recipients, run
+  # `sops updatekeys` on each matching file — see docs/gha-terraform.md.
   - path_regex: terraform/.*/secrets/.*\.sops\.(yaml|json|env)$
     key_groups:
       - age:
           - age1nqvgqc45f5j9y9ch0lyccdefeazs26xkp732rujp23nqeqmdjefshruqs8
+          - age18r384kx7fu9zur2c0err7ujxze76sr7dzyuz5hc4netncx8m4ezq0rn45a

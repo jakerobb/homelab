@@ -6,7 +6,12 @@ observable cluster before we bring in critical workloads.
 
 ## GHA Terraform automation
 
-Pull requests should trigger a `terraform plan`; merges to `main` should trigger `terraform apply`. 
+Pull requests should trigger a `terraform plan`; merges to `main` should trigger `terraform apply`.
+
+**In progress (2026-09-24).** Workflow, runner setup script, B2 state backend and runbook are written
+([`../docs/gha-terraform.md`](../docs/gha-terraform.md)); the one-time setup steps there (B2 bucket, runner
+install, SOPS recipient, state migration, fork-approval setting) still need doing before merge. Move to DONE.md
+once the first real apply has run from CI.
 
 ## Alertmanager InfoInhibitor: full inhibit_rules cascade
 
