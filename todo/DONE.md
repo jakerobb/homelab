@@ -215,3 +215,20 @@ WebSocket API, because the REST API is removed in HexOS v26.04. Homepage added t
 v2.4.0, which is what's deployed, and [`../manifests/homepage/configmap.yaml`](../manifests/homepage/configmap.yaml)
 already sets `version: 2` on the `truenas` widget. Homepage's logs showed no TrueNAS errors over 24h, so the widget is
 already on the new API and a HexOS upgrade past 26.04 won't break it.
+
+## GHA Terraform automation
+
+**Done (2026-09-24).** `terraform/proxmox` is planned on every PR that touches it and applied on merge to `main`, by
+[`../.github/workflows/terraform-proxmox.yml`](../.github/workflows/terraform-proxmox.yml), with plan/apply output in
+the job summary. It runs on a self-hosted runner on the jump box, not in-cluster via ARC, because this Terraform
+manages the VMs the cluster's workers run on. The runner runs as an unprivileged `gha-runner` user with its own age key,
+which can decrypt only `terraform/**/secrets`. State moved from local disk on rpi5-1 to the B2 bucket
+`jakerobb-homelab-tfstate`. B2 can't do Terraform's native state locking, so `tf.sh` takes a host-level `flock`
+instead, and all runs happen on the jump box. The public repo is protected by running the plan job only for same-repo
+PRs and requiring approval for all outside contributors' workflow runs. The first CI applies were no-ops, as expected.
+Runbook: [`../docs/gha-terraform.md`](../docs/gha-terraform.md).
+
+The same effort added a `lint` workflow ([`../.github/workflows/lint.yml`](../.github/workflows/lint.yml),
+GitHub-hosted, no secrets) with four checks: every `*.sops.*` file is really encrypted
+([`../scripts/ci/check-sops-encrypted.py`](../scripts/ci/check-sops-encrypted.py)), the Renovate config is valid in
+strict mode, and `shellcheck` and `actionlint` pass.

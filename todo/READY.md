@@ -4,14 +4,16 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## GHA Terraform automation
+## CI: render and validate Kubernetes manifests
 
-Pull requests should trigger a `terraform plan`; merges to `main` should trigger `terraform apply`.
-
-**In progress (2026-09-24).** Workflow, runner setup script, B2 state backend and runbook are written
-([`../docs/gha-terraform.md`](../docs/gha-terraform.md)); the one-time setup steps there (B2 bucket, runner
-install, SOPS recipient, state migration, fork-approval setting) still need doing before merge. Move to DONE.md
-once the first real apply has run from CI.
+**In progress (2026-09-24).** Implemented as the `Kubernetes manifests` job in `lint.yml` plus
+[`../scripts/ci/render-manifests.py`](../scripts/ci/render-manifests.py); move to DONE.md once it's green on a PR. Follow-on to the GHA work (see DONE.md). Add a job to the `lint` workflow
+([`../.github/workflows/lint.yml`](../.github/workflows/lint.yml)) that `helm template`s each Helm-based ArgoCD
+Application under `argocd/apps/` with its own chart/version/`valuesObject`, and runs the output plus the raw YAML under
+`manifests/` through `kubeconform` (Kubernetes schemas plus CRD schemas for Gateway API, cert-manager, Cilium, etc.).
+Main payoff: Renovate's chart-bump PRs currently only reveal a breaking change after merge, when ArgoCD goes unhealthy;
+this would catch it on the PR. Needs a small script to pull chart repo/name/version/values out of each
+`application.yaml`. GitHub-hosted runner, no secrets needed.
 
 ## Alertmanager InfoInhibitor: full inhibit_rules cascade
 
