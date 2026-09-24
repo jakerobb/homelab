@@ -66,9 +66,18 @@ spec:
               - context=system_u:object_r:ephemeral_t:s0
             secrets: {}
         volumeSnapshotClasses: []
-        # Without this, libmount drops the StorageClass's context= mount
-        # option. See selinux-config.yaml.
         node:
+          # Replaced by node-driver-registrar.yaml (a standalone DaemonSet).
+          # The chart's registrar mounts all of /var/lib/kubelet without
+          # mount propagation, which pins old copies of iSCSI mounts and
+          # loses unflushed writes when a pod moves to another node. See
+          # that file's header comment. This also drops the chart's `cleanup`
+          # sidecar, which lives in the same template block. The standalone
+          # registrar removes its own registration socket on SIGTERM.
+          driverRegistrar:
+            enabled: false
+          # Without this, libmount drops the StorageClass's context= mount
+          # option. See selinux-config.yaml.
           driver:
             extraVolumeMounts:
               - name: selinux-config

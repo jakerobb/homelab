@@ -1027,6 +1027,71 @@ talosctl -n 192.168.102.34 logs auditd --tail 2000 | grep -c 'type=AVC'
 talosctl -n 192.168.102.34 dmesg | tail -5   # no more "rate limit exceeded"
 ```
 
+## democratic-csi registrar mount leak (found 2026-09-24)
+
+When a `hexos-iscsi` volume moved between nodes, **recent writes to it
+were silently lost**. Nothing crashed, every Application stayed
+Synced/Healthy, and the pod came up fine on the new node. The only sign
+was kernel messages in `talosctl dmesg` on the node the volume left:
+
+```
+EXT4-fs (sdb): shut down requested (2)
+Buffer I/O error on dev sdb, logical block 90113, lost sync page write
+JBD2: I/O error when updating journal superblock for sdb-8.
+```
+
+On the node it moved to, the next mount then logged `EXT4-fs (sdX): recovery
+complete`. That journal replay means the filesystem was never cleanly
+unmounted. Seen on authelia's PV (worker-2 → mbp, 2026-09-23 23:58Z,
+3 seconds *after* democratic-csi's `NodeUnstageVolume` had returned
+success) and on ClickHouse's PV on mbp (`lost async page write`, 17:09Z,
+during the SELinux remount above).
+
+**Cause:** the democratic-csi chart's `driver-registrar` sidecar mounts all
+of `/var/lib/kubelet` as a hostPath with no `mountPropagation`, which is
+hardcoded in the chart template. That container's mount namespace gets a
+private copy of every iSCSI volume already mounted under `/var/lib/kubelet`
+when it starts, and host unmounts never propagate into it. Later, when
+NodeUnstage unmounts one of those volumes on the host, the registrar's copy
+keeps the ext4 superblock alive. ext4 only flushes when the last reference
+is unmounted, so dirty data is still in the page cache when democratic-csi
+logs out of the iSCSI session. The kernel then drops the dead device and
+shuts the filesystem down, and anything that wasn't fsync'd is gone.
+Confirmed by comparing mount tables: the registrar's
+`/proc/<pid>/mountinfo` listed ZooKeeper's and ntfy's volumes on mbp, and
+Prometheus's and signoz-db's on worker-2. Those were exactly the volumes
+already mounted when the node DaemonSet last rolled (2026-09-23 ~17:09Z).
+Any of those pods moving would have lost data the same way.
+
+The mount only exists for the registrar's `--mode=kubelet-registration-probe`
+liveness check, which has been a no-op since node-driver-registrar v2.9.0.
+
+**Fix:** `node.driverRegistrar.enabled: false` in the chart values, plus a
+standalone registrar DaemonSet that mounts only the driver's socket
+directory and `plugins_registry`
+([`argocd/apps/democratic-csi/node-driver-registrar.yaml`](../argocd/apps/democratic-csi/node-driver-registrar.yaml)).
+The chart has no way to add containers to, or override mounts on, the node
+DaemonSet, so this couldn't be done through values alone. The same leak is
+worth checking for on any other CSI driver added later: look for a
+sidecar that mounts the kubelet dir with `mountPropagation` unset.
+
+Rolling this out restarts the `democratic-csi-node` pods. That's safe: the
+old registrar containers exiting just drops their extra references, while the
+host mounts stay put and in use. Verify after the rollout:
+
+```bash
+kubectl get csinode -o custom-columns=NODE:.metadata.name,DRIVERS:.spec.drivers[*].name
+# every worker still lists org.democratic-csi.iscsi
+kubectl -n democratic-csi get pods -o wide
+# on each worker, the registrar's mount table has no iSCSI devices:
+PID=$(talosctl -n 192.168.102.34 processes | awk '/csi-node-driver-registrar/{print $2}')
+talosctl -n 192.168.102.34 read /proc/$PID/mountinfo | grep -c ' - ext4 '   # expect 0 (its own hostPaths are xfs)
+```
+
+Then move a PVC-backed pod (e.g. `kubectl -n ntfy delete pod -l app.kubernetes.io/name=ntfy`
+after cordoning its node) and check the old node's `talosctl dmesg` for
+the *absence* of `shut down requested` / `lost ... page write`.
+
 ## Additional worker: talos-worker-mbp (added 2026-09-22)
 
 A third worker, built from an idle 2018 15" MacBook Pro (32GB RAM, on the

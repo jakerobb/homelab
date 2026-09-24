@@ -1,0 +1,115 @@
+# Standalone CSI node-driver-registrar for democratic-csi, replacing the
+# chart's own registrar sidecar (disabled via node.driverRegistrar.enabled:
+# false in application.yaml). Applied by the root app, like namespace.yaml.
+#
+# Why (found 2026-09-24): the chart's registrar container hardcodes a
+# hostPath mount of all of /var/lib/kubelet with no mountPropagation. When
+# the container starts, it gets a private copy of every iSCSI volume mounted
+# under /var/lib/kubelet at that moment. Later, when the pod using one of
+# those volumes moves, NodeUnstage unmounts it on the host, but the
+# registrar's copy keeps the ext4 filesystem alive. ext4 doesn't flush on an
+# unmount that isn't the last reference, so dirty pages are still in memory
+# when democratic-csi logs out of the iSCSI session. Those writes are lost
+# ("Buffer I/O error ... lost async page write", "EXT4-fs (sdX): shut down
+# requested (2)" in `talosctl dmesg`), and the next mount has to replay the
+# journal ("recovery complete"). Seen on authelia's PV moving worker-2 -> mbp
+# (2026-09-23 23:58Z) and ClickHouse's PV on mbp (17:09Z). See
+# talos/README.md "democratic-csi registrar mount leak".
+#
+# The chart only mounts /var/lib/kubelet for its
+# `--mode=kubelet-registration-probe` liveness check, and that mode has
+# been a no-op since registrar v2.9.0, the version the chart itself pins
+# (kubernetes-csi/node-driver-registrar#316). This DaemonSet mounts only the
+# two leaf directories the registrar needs. Neither can contain a volume
+# mount, so there's nothing to leak. The chart has no node.extraContainers
+# or volumeMount override for the registrar, which is why this runs as its
+# own DaemonSet instead of a values change. The registrar only needs
+# hostPath access to the driver's socket; it doesn't have to share a pod
+# with the driver.
+#
+# Liveness uses the registrar's own /healthz, which fails if the kubelet
+# registration socket goes missing. That also covers the one-time rollout
+# race: the old chart pod's `cleanup` preStop hook deletes
+# /registration/org.democratic-csi.iscsi-reg.sock. If this DaemonSet's pod
+# started first and created that socket, the hook deletes it, and the probe
+# restarts the container, which recreates it.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: democratic-csi-node-driver-registrar
+  namespace: democratic-csi
+  labels:
+    app.kubernetes.io/name: democratic-csi-node-driver-registrar
+    app.kubernetes.io/part-of: democratic-csi
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: democratic-csi-node-driver-registrar
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: democratic-csi-node-driver-registrar
+        app.kubernetes.io/part-of: democratic-csi
+    spec:
+      # Same placement as the chart's node DaemonSet (no tolerations, so
+      # workers only).
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-node-critical
+      automountServiceAccountToken: false
+      containers:
+        - name: node-driver-registrar
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0
+          args:
+            - --v=2
+            - --csi-address=/csi-data/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/org.democratic-csi.iscsi/csi.sock
+            - --http-endpoint=:9809
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: healthz
+              containerPort: 9809
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Runs as root (the image default) to create its socket in the
+          # root-owned host directories, but needs nothing else.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi-data
+            - name: registration-dir
+              mountPath: /registration
+      volumes:
+        # Same host paths the chart uses. The driver's csi-proxy container
+        # serves csi.sock here.
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/org.democratic-csi.iscsi
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory

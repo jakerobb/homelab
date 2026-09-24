@@ -1,0 +1,89 @@
+# Our own exporter (github.com/jakerobb/truenas-exporter), built because
+# TrueNAS 25.10's Graphite reporting export has no pool-space metrics (its
+# generated netdata.conf sets `diskspace = no`) — see argocd/README.md's
+# truenas-exporter section. Queries TrueNAS's JSON-RPC websocket API on each
+# Prometheus scrape; no state, no background polling.
+#
+# Image tags are YYYYMMDD dates from the repo's GHA publish workflow;
+# Renovate's kubernetes manager picks up newer ones like any other image.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: truenas-exporter
+  namespace: truenas-exporter
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: truenas-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: truenas-exporter
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: truenas-exporter
+          image: docker.io/jakerobb/truenas-exporter:20260924
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            # wss:// only — TrueNAS 25.04+ revokes an API key used over plain
+            # ws://, and the exporter refuses ws:// by default for that reason.
+            - name: TRUENAS_URL
+              value: wss://truenas.lan/api/current
+            # Read from the mounted Secret rather than an env var, so the key
+            # never shows up in `kubectl describe pod`.
+            - name: TRUENAS_API_KEY_FILE
+              value: /run/secrets/truenas/api-key
+            # SHA-256 of TrueNAS's factory self-signed certificate (CN=localhost,
+            # so normal hostname validation can't pass). Pinned instead of
+            # skip-verify so the API key is never sent to an impostor.
+            # Captured 2026-09-24 via:
+            #   echo | openssl s_client -connect truenas.lan:443 2>/dev/null | openssl x509 -noout -fingerprint -sha256
+            # If TrueNAS ever regenerates its cert, truenas_up drops to 0 and
+            # the pod logs "certificate fingerprint mismatch" with the new
+            # value — update it here.
+            - name: TRUENAS_TLS_FINGERPRINT
+              value: "B0:BF:CB:BC:1B:17:A0:74:52:AD:08:9B:5D:DB:28:22:A6:BF:8C:84:62:73:6C:3A:B1:24:3B:EC:FB:6D:C5:2B"
+          ports:
+            - name: http
+              containerPort: 8080
+          # /health only reports that the process is serving — TrueNAS being
+          # down shows up as truenas_up 0, not as pod restarts.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /run/secrets/truenas
+              name: truenas-credentials
+              readOnly: true
+      volumes:
+        # Applied out-of-band via `sops -d ... | kubectl apply -f -` (not
+        # ArgoCD-managed — no KSOPS yet), so it must exist before this pod
+        # will start. See argocd/secrets/truenas-api-key.truenas-exporter.sops.yaml.
+        - name: truenas-credentials
+          secret:
+            secretName: truenas-exporter-api-key
