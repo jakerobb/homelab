@@ -1,0 +1,50 @@
+# Repo-wide static checks. GitHub-hosted runners only — none of this needs
+# the homelab network or any secrets, so it's safe on any PR (outside
+# contributors' runs still need approval, per the repo setting).
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sops-encrypted:
+    name: SOPS files encrypted
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 scripts/ci/check-sops-encrypted.py
+
+  renovate-config:
+    name: Renovate config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: suzuki-shunsuke/github-action-renovate-config-validator@v2.2.0
+        with:
+          strict: "true"
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # shellcheck is preinstalled on ubuntu-latest.
+      - run: git ls-files -z '*.sh' | xargs -0 shellcheck
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Picks up .github/actionlint.yaml (self-hosted runner labels), and
+      # shellchecks workflow run: blocks too.
+      - uses: raven-actions/actionlint@v2
