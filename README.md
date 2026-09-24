@@ -43,7 +43,8 @@ Passwords and other secrets are in 1Password in the Tech vault, which is shared 
     - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions; the two Talos worker VMs are provisioned from
       here, applied from rpi5-1.
     - [`docker-compose/`](docker-compose/) — the `rpi5-1` Compose stack's config (secrets SOPS-encrypted); see its
-      README for what's captured vs. excluded.
+      README for what's captured vs. excluded. Auto-deployed on merge by a pull-based cron job on rpi5-1
+      ([`docs/compose-deploy.md`](docs/compose-deploy.md)).
     - Anything that can't reasonably be IaC'd (BIOS/IOMMU toggles, HexOS's GUI-only pool setup) gets a step-by-step
       runbook here instead of being skipped.
 
