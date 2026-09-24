@@ -40,6 +40,51 @@ jobs:
       # shellcheck is preinstalled on ubuntu-latest.
       - run: git ls-files -z '*.sh' | xargs -0 shellcheck
 
+  kubeconform:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    env:
+      # renovate: datasource=github-releases depName=helm/helm
+      HELM_VERSION: v4.3.0
+      # renovate: datasource=github-releases depName=yannh/kubeconform
+      KUBECONFORM_VERSION: v0.8.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - run: pip install pyyaml
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install kubeconform
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+          curl -fsSLO "${base}/kubeconform-linux-amd64.tar.gz"
+          curl -fsSL "${base}/CHECKSUMS" | grep ' kubeconform-linux-amd64.tar.gz$' | sha256sum -c -
+          tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      # Helm-templates every Application's chart with its own values, plus the
+      # raw/kustomized manifests — see the script's docstring. A chart that
+      # fails to render (bad version, values that break a template) fails here.
+      - name: Render
+        run: python3 scripts/ci/render-manifests.py "$RUNNER_TEMP/rendered"
+
+      # Kubernetes schemas plus the community CRD catalog (Gateway API,
+      # cert-manager, prometheus-operator, ArgoCD, Cilium...). -strict rejects
+      # unknown fields, i.e. typos. CustomResourceDefinitions themselves are
+      # skipped: there's no upstream schema for that kind, and they're
+      # chart-vendored anyway.
+      - name: Validate
+        run: |
+          kubeconform -strict -summary -output text \
+            -skip CustomResourceDefinition \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            "$RUNNER_TEMP/rendered"
+
   actionlint:
     name: actionlint
     runs-on: ubuntu-latest

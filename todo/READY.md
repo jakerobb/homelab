@@ -6,7 +6,8 @@ observable cluster before we bring in critical workloads.
 
 ## CI: render and validate Kubernetes manifests
 
-**Not started.** Follow-on to the GHA work (see DONE.md). Add a job to the `lint` workflow
+**In progress (2026-09-24).** Implemented as the `Kubernetes manifests` job in `lint.yml` plus
+[`../scripts/ci/render-manifests.py`](../scripts/ci/render-manifests.py); move to DONE.md once it's green on a PR. Follow-on to the GHA work (see DONE.md). Add a job to the `lint` workflow
 ([`../.github/workflows/lint.yml`](../.github/workflows/lint.yml)) that `helm template`s each Helm-based ArgoCD
 Application under `argocd/apps/` with its own chart/version/`valuesObject`, and runs the output plus the raw YAML under
 `manifests/` through `kubeconform` (Kubernetes schemas plus CRD schemas for Gateway API, cert-manager, Cilium, etc.).

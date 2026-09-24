@@ -14,6 +14,14 @@
   "customManagers": [
     {
       "customType": "regex",
+      "description": "Tool versions pinned as env vars in GitHub Actions workflows (helm, kubeconform in lint.yml) via an explicit annotation comment on the line above.",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+[A-Z_]+: (?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
       "description": "Image tags pinned in an Application's valuesObject (Authelia, democratic-csi), separately from the chart's targetRevision (which the argocd manager already tracks) — neither built-in manager sees a nested image.tag override, so this catches it via an explicit annotation comment.",
       "managerFilePatterns": [
         "/^argocd/apps/authelia/application\\.yaml$/",
