@@ -207,13 +207,31 @@ All steps below run on the physical Mac itself.
    ```bash
    curl -s http://<mac-ip>:9273/metrics | grep '^disk_free'
    ```
-   If that times out, the macOS Application Firewall is probably blocking incoming connections to the `telegraf`
-   binary. Check with `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`. If it's on, allow
-   Telegraf with `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add <prefix>/bin/telegraf` and
-   `--unblockapp <prefix>/bin/telegraf`. Then add the Mac's reserved IP to the `mac-hosts` scrape job (see "Where the
-   data goes" above) and check that Prometheus shows the target as up.
+   Give it a minute after a (re)start first: the endpoint has nothing to serve until Telegraf's first 60s flush.
+   `bootstrap.sh` already handles the macOS Application Firewall (see the Gotcha below): it ad-hoc signs the binary
+   and allows it through. If this still fails with `Empty reply from server` while the same `curl` against
+   `localhost` on the Mac works, the firewall is blocking it. Check `codesign -v <prefix>/bin/telegraf` (it must be
+   signed) and `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getappblocked <prefix>/bin/telegraf`. Then add
+   the Mac's reserved IP to the `mac-hosts` scrape job (see "Where the data goes" above) and check that Prometheus
+   shows the target as up.
 
 ## Gotchas found
+
+- **The macOS firewall silently blocks an unsigned Telegraf, even when it's listed as allowed.** Found live
+  2026-09-24: with the Application Firewall on, `socketfilterfw --listapps` showed `/usr/local/bin/telegraf` as
+  "Allow incoming connections" and `--getappblocked` said "permitted", yet every connection to `:9273` from another
+  host got `Empty reply from server` (TCP connects, then closes). `localhost` worked, because the firewall doesn't
+  filter loopback. Turning the firewall off made it work, which pinned it down. Cause: InfluxData's macOS build
+  has no code signature at all (`codesign -dv` → "code object is not signed at all"), and the firewall matches apps
+  by signature. Fix: an ad-hoc signature (`codesign --force --sign -`), then remove and re-add the firewall entry
+  and restart Telegraf so its listening socket is opened under the new rule. `bootstrap.sh` does all of this on
+  every run, since each run re-copies the binary and so discards the signature.
+- **Telegraf 1.40 exits on an unknown config option instead of ignoring it.** The first version of the
+  `prometheus_client` block used `expiration` (the option is `expiration_interval`). Telegraf logged "configuration
+  specified the fields ["expiration"], but they were not used" to `telegraf-launchd.log`, not `telegraf.log`, and
+  exited; launchd's `KeepAlive` then restarted it every ~10s (`runs = 46`, `last exit code = 1` in
+  `launchctl print`). Nothing reached SigNoz either while this was happening. Validate config changes before
+  deploying: `telegraf --config <rendered.conf> --input-filter disk --test` with the same Telegraf version catches it.
 
 - **`collect-smc.sh`'s temperature values can carry trailing annotation text.** Found live on the 2018 MacBook Pro:
   `powermetrics --samplers smc`'s `CPU die temperature` line reads `93.60 C (fan)`, not just `93.60 C` —

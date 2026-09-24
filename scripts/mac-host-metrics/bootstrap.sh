@@ -105,6 +105,36 @@ else
   sudo chmod 755 "${TELEGRAF_PREFIX}/bin/telegraf"
 fi
 
+# Homebrew's bin/telegraf is a symlink into the Cellar. Signing and firewall
+# rules have to target the real file.
+TELEGRAF_BIN="$(realpath "${TELEGRAF_PREFIX}/bin/telegraf")"
+
+# InfluxData's macOS build ships with no code signature at all. The macOS
+# Application Firewall identifies apps by their signature, so an unsigned
+# Telegraf can be listed as "Allow incoming connections" and still have
+# every non-local connection to its Prometheus endpoint (:9273) dropped:
+# curl from another host gets "Empty reply from server" while localhost
+# works (found live 2026-09-24). An ad-hoc signature (`-`, no Apple
+# developer identity needed) is enough for the firewall to match it. This
+# runs on every bootstrap, because each run re-copies the binary above,
+# which discards the previous signature.
+if ! codesign -v "$TELEGRAF_BIN" 2>/dev/null; then
+  echo "==> Ad-hoc signing ${TELEGRAF_BIN} (it ships unsigned; the firewall needs a signature to match)"
+  sudo codesign --force --sign - "$TELEGRAF_BIN"
+fi
+
+# Let Prometheus reach :9273 through the Application Firewall, if it's on.
+# Remove-then-add so a stale entry recorded against an earlier (unsigned or
+# differently-signed) binary can't linger. Has to happen before Telegraf
+# starts: the firewall judges a listening socket when it's opened.
+SOCKETFILTERFW=/usr/libexec/ApplicationFirewall/socketfilterfw
+if sudo "$SOCKETFILTERFW" --getglobalstate | grep -q "enabled"; then
+  echo "==> Allowing incoming connections to Telegraf through the macOS firewall"
+  sudo "$SOCKETFILTERFW" --remove "$TELEGRAF_BIN" >/dev/null 2>&1 || true
+  sudo "$SOCKETFILTERFW" --add "$TELEGRAF_BIN"
+  sudo "$SOCKETFILTERFW" --unblockapp "$TELEGRAF_BIN"
+fi
+
 echo "==> Installing collector scripts and per-host telegraf.conf (host.name=${NODE_HOST_NAME}, prefix=${TELEGRAF_PREFIX})"
 sudo mkdir -p "${TELEGRAF_PREFIX}/etc/telegraf/scripts"
 sudo cp "${SCRIPT_DIR}"/collect-*.sh "${TELEGRAF_PREFIX}/etc/telegraf/scripts/"
@@ -170,6 +200,8 @@ fi
 
 echo
 echo "==> Done. Check SigNoz (signoz.jakerobb.org) Metrics Explorer for host.name = ${NODE_HOST_NAME}."
+echo "    Prometheus endpoint: from another host (not this Mac), after about a minute:"
+echo "      curl -s http://<this-mac-ip>:9273/metrics | grep '^disk_free'"
 if [ "$INSTALL_METHOD" = "manual" ]; then
   echo "    Logs:   ${TELEGRAF_PREFIX}/var/log/telegraf.log (rotates at 10MB, 5 archives)"
   echo "            ${TELEGRAF_PREFIX}/var/log/telegraf-launchd.log (crashes/startup output only)"
