@@ -8,14 +8,16 @@ resolver, and metrics/logging stack.
 Many of these workloads are not hardware dependent, and movement to
 Kubernetes will happen as time permits.
 
-Deployed from `~/docker` on `rpi5-1`, running `docker compose up -d` from
-there — not yet wired into any CI/CD. Not a copy of this directory anymore
-(see "Split-brain elimination" below): most config-time files under
-`~/docker/` are symlinks into `~/dev/homelab/docker-compose/` (a plain `git
-clone` of this repo, kept up to date with `git pull`), so editing here and
-pulling on the host *is* the deploy step for those files. A handful of files
-still can't be symlinked (Docker limitation, see below) and remain real
-copies needing a manual re-copy after editing here.
+Deployed from `~/docker` on `rpi5-1`. **Merging to `main` is the deploy
+step:** a cron job on rpi5-1 pulls, syncs, runs `docker compose up -d`, and
+restarts services whose config changed, within about 5 minutes. See
+[`docs/compose-deploy.md`](../docs/compose-deploy.md). `~/docker` is not a
+copy of this directory anymore (see "Split-brain elimination" below): most
+config-time files under `~/docker/` are symlinks into
+`~/dev/homelab/docker-compose/`, which is a plain `git clone` of this repo.
+The files that can't be symlinked (Docker limitation, see below) and the
+decrypted secrets are real copies, which the auto-deploy script keeps in
+sync. It alerts, and doesn't overwrite, if they're changed on the host.
 
 ## Split-brain elimination (2026-09-20)
 
@@ -69,8 +71,9 @@ directory mount (e.g. `./homeassistant/configuration.yaml:/config/configuration.
 *in addition to* `./homeassistant:/config`) — which is a real edit to
 `docker-compose.yml`'s volumes, not just a host-side symlink, and wasn't
 made without discussing it first given the Home Assistant near-miss above.
-These files stay split-brain (manual re-copy after editing) until that's
-decided.
+Until that's decided, these files stay as copies. They're no longer copied
+by hand: [auto-deploy](../docs/compose-deploy.md) syncs them on merge and
+alerts when one is changed on the host.
 
 **One general gotcha, hit repeatedly during this migration:** a container
 that was already running when its bind-mount source changed on the host
