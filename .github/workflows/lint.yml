@@ -32,6 +32,17 @@ jobs:
         with:
           strict: "true"
 
+  renovate-parse:
+    name: Renovate can parse Applications
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - run: pip install pyyaml
+      - run: python3 scripts/ci/check-renovate-parse.py
+
   shellcheck:
     name: shellcheck
     runs-on: ubuntu-latest

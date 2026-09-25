@@ -192,8 +192,12 @@ spec:
                       severity: warning
                     annotations:
                       summary: Mac host {{ $labels.host }} is low on disk space.
+                      # Don't start a line with a {{ template }}: Renovate strips
+                      # templates before parsing, which breaks a folded block's
+                      # indentation and silently drops this whole file from
+                      # Renovate (scripts/ci/check-renovate-parse.py catches it).
                       description: >-
-                        {{ $labels.host }} has {{ $value | humanize1024 }}B free.
+                        Mac host {{ $labels.host }} has {{ $value | humanize1024 }}B free.
                         The Talos VM it hosts pauses if the Mac fills up. Free
                         space on the Mac (Time Machine local snapshots are a
                         common hidden cost: tmutil listlocalsnapshots /).
@@ -205,7 +209,7 @@ spec:
                     annotations:
                       summary: Mac host {{ $labels.host }} is nearly out of disk space.
                       description: >-
-                        {{ $labels.host }} has only {{ $value | humanize1024 }}B
+                        Mac host {{ $labels.host }} has only {{ $value | humanize1024 }}B
                         free. The Talos VM it hosts will pause (node NotReady)
                         once the Mac fills up. Free space now; don't force-stop
                         the VM if it has already paused.
