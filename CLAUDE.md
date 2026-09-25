@@ -9,6 +9,12 @@ connecting. This is also where `terraform plan`/`apply` and similar
 cluster-admin actions get run from. Cilium's ongoing lifecycle is managed
 via ArgoCD, not manual `helm upgrade` — see [`talos/README.md`](talos/README.md).
 
+The 2018 MacBook Pro hosting the `talos-worker-mbp` UTM VM is reachable as
+`jakerobb@192.168.102.9` (key auth set up; no need to ask before connecting).
+Use it for host-level checks — disk space, UTM state, Telegraf — see
+[`docs/utm-talos-worker.md`](docs/utm-talos-worker.md) and
+[`docs/mac-host-metrics.md`](docs/mac-host-metrics.md).
+
 ## Making changes
 
 Before making any change:

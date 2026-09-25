@@ -14,6 +14,13 @@ remotely the way Terraform drives Proxmox. Steps 1-6 below are manual, done
 on the Mac itself; everything after that is remote (SSH to rpi5-1), same as
 any other new node.
 
+**Remote access to the Mac host:** once set up, the Mac can be reached over
+SSH (Remote Login enabled, key auth) — for `talos-worker-mbp`'s host, that's
+`ssh jakerobb@192.168.102.9`. Handy for checking host disk space and UTM state
+without VNC. Don't route the Mac's own SSH client through the 1Password SSH
+agent: it needs an interactive unlock, so `git pull` and friends hang when run
+over an SSH session.
+
 ## 1. Install UTM
 
 Download from [mac.getutm.app](https://mac.getutm.app/) and install normally.
