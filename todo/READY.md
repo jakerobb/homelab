@@ -4,16 +4,6 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## rpi5-1 mail-alert reliability (msmtpq)
-
-**Not started**, merged in from README.md's original hardware-migration checklist (2026-09-18). The
-`etcd-snapshot-backup.sh` cron job on rpi5-1 emails failures via `msmtp` (see [
-`../docs/email-alerts.md`](../docs/email-alerts.md)), but `msmtp` sends synchronously with no retry/queue — an ISP
-outage exactly when the 3:15 AM cron fires would silently drop the alert. Fix: install `msmtpq` (bundled with `msmtp`, a
-lightweight file-based queue wrapper reusing the same config). Low priority given how narrow the overlap window is.
-Deliberately **out of scope for in-cluster alerting** — this path exists specifically to survive a cluster outage, so it
-stays on rpi5-1 independent of cluster health.
-
 ## HexOS storage
 
 **Not started.** An NFS-backed `StorageClass` for genuinely ReadWriteMany workloads (media libraries, etc.) — the

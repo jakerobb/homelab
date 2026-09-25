@@ -15,7 +15,16 @@ an unresolved UCG Fiber routing bug (see
 the T500 ending up as a dedicated ZFS log device rather than striped capacity) with NFS/SMB shares (runbook:
 [`../docs/hexos-install.md`](../docs/hexos-install.md)). Two loose ends from that checklist were tracked separately
 rather than as part of this entry:
-restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queue gap found along the way (still open).
+restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queue gap found along the way (done, 2026-09-25; see below).
+
+## rpi5-1 mail-alert reliability (msmtpq)
+
+**Done (2026-09-25).** rpi5-1's `sendmail` is now a thin wrapper around Debian's bundled `msmtpq`
+([`../scripts/msmtpq/`](../scripts/msmtpq/)), installed with `dpkg-divert` so `msmtp-mta` upgrades can't undo it. When
+the relay is unreachable, cron `MAILTO` alerts (such as the etcd-backup failure alert) are queued instead of dropped,
+and a `*/15` cron job flushes the queue. Kept deliberately on rpi5-1, independent of the cluster. Verified by queueing
+a send through a stub that always fails, then flushing it, and by sending end-to-end through cron's real `MAILTO` path.
+Details: [`../docs/email-alerts.md`](../docs/email-alerts.md#queuing-when-the-relay-is-unreachable-msmtpq).
 
 ## Ingress (Gateway API)
 
