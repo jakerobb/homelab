@@ -135,8 +135,7 @@ and database files are **not** committed — they're excluded the same way
 ## Secrets
 
 This repo is public, so anything with a real credential in it is encrypted
-with SOPS + age (same key/mechanism as `talos/secrets.sops.yaml` and
-`argocd/secrets/*.sops.yaml` — see the repo root `.sops.yaml`). Decrypt with
+with SOPS + age (same key/mechanism as `talos/secrets.sops.yaml` — see the repo root `.sops.yaml`). Decrypt with
 the age key from 1Password (`~/.config/sops/age/keys.txt` on `rpi5-1` and
 the Talos jump box already have it):
 

@@ -4,31 +4,6 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## Cluster secrets via 1Password + External Secrets Operator
-
-**In progress (branch `external-secrets-1password`, 2026-09-24).** Replaces the old KSOPS item. Every SOPS file under
-`argocd/secrets/` had to be applied by hand (`sops -d ... | kubectl apply -f -`) because ArgoCD couldn't decrypt it.
-We chose External Secrets Operator reading a dedicated `homelab-k8s` 1Password vault over KSOPS. KSOPS would have
-needed the age private key in-cluster and Kustomize. See
-[`../argocd/README.md`](../argocd/README.md#external-secrets-operator-decided-and-deployed-2026-09-24) for the design.
-
-Done on the branch: ESO Application (chart 2.11.0) plus `ClusterSecretStore`, 15 `ExternalSecret`s and an
-`ExternalSecretNotSynced` alert in `manifests/external-secrets-config/`. ArgoCD's OIDC secret moved to a
-`$secret:key` reference. democratic-csi's driver config is now a template. Docs are updated, and
-`scripts/migrate-to-1password.py` is ready to run.
-
-Remaining:
-1. Run `scripts/migrate-to-1password.py`. It creates the vault, items and service account, and writes the
-   encrypted token file.
-2. Install ESO's CRDs and apply the token Secret (argocd/README.md, "ESO bootstrap").
-3. Merge. Confirm every `ExternalSecret` is `SecretSynced` and adopted its existing Secret.
-4. `helm upgrade` ArgoCD with plain `-f argocd/install/values.yaml` (drops the old SOPS values fragment). Then check
-   SSO login.
-5. Strip the stale `kubectl.kubernetes.io/last-applied-configuration` annotation from the adopted Secrets. `kubectl
-   apply` stored every plaintext value there, and ESO doesn't remove it, so rotated values would linger in it.
-6. `git rm` the 16 migrated `argocd/secrets/*.sops.yaml` files, keeping only `onepassword-service-account.sops.yaml`.
-   Then move this item to DONE.md.
-
 ## rpi5-1 mail-alert reliability (msmtpq)
 
 **Not started**, merged in from README.md's original hardware-migration checklist (2026-09-18). The

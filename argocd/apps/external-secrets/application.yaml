@@ -1,6 +1,6 @@
 # External Secrets Operator (ESO): syncs values from 1Password into plain
 # Kubernetes Secrets, replacing the old "sops -d ... | kubectl apply" step
-# for everything under argocd/secrets/. The ClusterSecretStore and every
+# for the SOPS files that used to live under argocd/secrets/. The ClusterSecretStore and every
 # ExternalSecret live in a separate Application (apps/external-secrets-config,
 # wave 0) — same chart-then-config split as cert-manager/cert-manager-config.
 # See argocd/README.md's "External Secrets Operator" section.
