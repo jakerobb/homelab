@@ -104,8 +104,8 @@ MAILTO=jakerobb@gmail.com
 
 Unlike `etcd-snapshot-backup.sh` (silent on success, mails on failure via
 cron's own `MAILTO` + stderr), the daily job sends its own email every day
-via `msmtp` directly (account `brevo`, see
-[`email-alerts.md`](email-alerts.md)) regardless of outcome -- that's the
+via `/usr/sbin/sendmail` (the queueing `msmtpq` wrapper, account `brevo`,
+see [`email-alerts.md`](email-alerts.md)) regardless of outcome -- that's the
 point, it's a routine digest, not a failure alert. The hourly job runs every
 hour but only emails when `--min-full-gc-per-hour` is exceeded (`main()`
 prints "Skipped: ..." and returns without sending otherwise) -- that output

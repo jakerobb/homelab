@@ -38,6 +38,9 @@ GATEWAY = "root@47Net.lan"
 MAIL_FROM = "noreply@jakerobb.org"
 MAIL_TO = "jakerobb@gmail.com"
 MSMTP_ACCOUNT = "brevo"
+# msmtpq wrapper (scripts/msmtpq/), not msmtp directly, so a report sent
+# while the relay is unreachable is queued and retried instead of lost.
+SENDMAIL = "/usr/sbin/sendmail"
 
 GC_LINE_RE = re.compile(
     r"^\[(\d+(?:\.\d+)?)s\]\s+GC\(\d+\)\s+Pause\s+(Full|Incremental)\s+GC"
@@ -196,13 +199,13 @@ def send_mail(subject: str, body: str) -> None:
     msg["To"] = MAIL_TO
 
     result = subprocess.run(
-        ["msmtp", "-a", MSMTP_ACCOUNT, "-t"],
+        [SENDMAIL, "-a", MSMTP_ACCOUNT, "-t"],
         input=msg.as_string(),
         text=True,
         capture_output=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"msmtp failed (rc={result.returncode}): {result.stderr.strip()}")
+        raise RuntimeError(f"sendmail failed (rc={result.returncode}): {result.stderr.strip()}")
 
 
 def parse_args():
