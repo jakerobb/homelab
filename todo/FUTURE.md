@@ -90,12 +90,11 @@ investigate, but my plan is to eliminate most of it anyway. Every time I check t
 
 **Waiting on:** the stable NetworkOptimizer **2.9.0** release
 ([Ozark-Connect/NetworkOptimizer releases](https://github.com/Ozark-Connect/NetworkOptimizer/releases)). On 2026-09-24
-the `optimizer` service was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` to try out a new feature
-the developer asked us to test. Watchtower won't move a pinned tag, so the pin stays until someone changes it. Once
-2.9.0 (or later) ships, change the image back to `:latest` in **both** `docker-compose/docker-compose.yml` here **and**
-`~/docker/docker-compose.yml` on rpi5-1 (a real file, not a symlink; see
-[`../docker-compose/README.md`](../docker-compose/README.md)), then `docker compose pull optimizer && docker compose up
--d optimizer` there.
+the `optimizer` service was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview3`
+on 2026-09-25) to try out a new feature the developer asked us to test. Watchtower won't move a pinned tag, so the pin
+stays until someone changes it. Once 2.9.0 (or later) ships, change the image back to `:latest` in
+`docker-compose/docker-compose.yml`. Merging deploys it to rpi5-1 automatically (see
+[`../docs/compose-deploy.md`](../docs/compose-deploy.md)).
 
 ## Re-enable `KubeMemoryOvercommit` alert notifications
 

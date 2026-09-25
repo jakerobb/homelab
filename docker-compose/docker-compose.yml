@@ -155,7 +155,7 @@ services:
   optimizer:
     <<: *dns
     # Pinned to a preview build the developer asked us to try; revert to :latest afterward
-    image: ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2
+    image: ghcr.io/ozark-connect/network-optimizer:2.9.0-preview3
 #    image: network-optimizer-test
 #    build:
 #      context: ../NetworkOptimizer   # path to your clone, not just docker/
