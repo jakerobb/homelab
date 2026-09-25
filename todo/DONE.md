@@ -292,7 +292,10 @@ memory requests against real usage" below.
 
 ## Audit app memory requests against real usage
 
-**Done (2026-09-24). Goes live when merged, plus the manual steps below.** Requests were compared against 7 days of
+**Done and live (2026-09-24).** Merged in [#21](https://github.com/jakerobb/homelab/pull/21); the manual steps
+(Cilium sync, ArgoCD `helm upgrade`, Talos patch on all three control planes) were applied the same day. The rollout
+was interrupted when `talos-worker-mbp` froze partway through (see "Mac host disk alert" below) and finished after it
+recovered. Requests were compared against 7 days of
 Prometheus history per workload (`container_memory_working_set_bytes` and CPU usage against
 `kube_pod_container_resource_requests`), not a single `kubectl top` reading. Before: about 40 containers had no requests
 at all, and the cluster requested 7.4Gi total while using far more. The rule used: memory request just above the 7-day
@@ -324,10 +327,19 @@ Consequences worth knowing:
   the intended outcome, but it also means removing `talos-worker-mbp` before the Mac Studio arrives would leave pods
   Pending, where before it would have silently over-packed the small workers.
 - The descheduler's `nodeFit: true` checks requests, so its eviction decisions are more accurate now too.
+- `KubeMemoryOvercommit` started firing (and did daily): total requests (21.9GiB) exceed what's left if the largest
+  node is lost (39.4 - 23.0 = 16.4GiB). That's true, not a bad rule: mbp holds ~58% of cluster memory, and even
+  perfectly sized requests (~13.8GiB real usage) would sit just under the line. Routed to Alertmanager's `null`
+  receiver on 2026-09-25 until the Mac Studio joins (see `FUTURE.md`).
+- In hindsight, sizing requests at the 7-day *peak* overshot. p95 is the usual basis, with limits or headroom
+  covering spikes. The biggest overshoots are per-node DaemonSets sized for mbp (otel-agent 384Mi and cilium-envoy
+  128Mi on every node) and the apiserver at 1536Mi. Trimming them is deferred (see `FUTURE.md`).
 
 ## Mac host disk alert
 
-**Done (2026-09-24). Goes live when merged, once Telegraf on the Mac is re-bootstrapped.** Prompted by
+**Done and live (2026-09-24).** Merged in [#22](https://github.com/jakerobb/homelab/pull/22) (plus
+[#24](https://github.com/jakerobb/homelab/pull/24) for a Telegraf warning), and the MacBook re-bootstrapped;
+Prometheus shows the `mac-hosts` target up and both rules loaded. Prompted by
 `talos-worker-mbp` going NotReady mid-rollout the same day. The UTM VM's disk file only grows on the Mac as the VM
 writes to it. A burst of ~15 image pulls grew it until the MacBook Pro's disk filled, and QEMU paused the VM ("No
 space left on device"). Kubelet's image cleanup can't catch this, because it measures the VM's 66GB virtual disk, not

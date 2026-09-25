@@ -113,6 +113,19 @@ spec:
                 - receiver: "null"
                   matchers:
                     - alertname = "InfoInhibitor"
+                # TEMPORARY (2026-09-25): KubeMemoryOvercommit is correct but
+                # not actionable yet. It fires when total memory requests
+                # exceed what the cluster could hand out after losing its
+                # largest node. talos-worker-mbp holds ~58% of the cluster's
+                # memory, so no realistic set of requests passes that test
+                # (see todo/DONE.md "Audit app memory requests against real
+                # usage"). It fired daily once requests became accurate. Routed
+                # to null rather than disabled, so it's still visible in the
+                # Prometheus/Alertmanager UIs. Remove this route once the Mac
+                # Studio joins as a worker (todo/FUTURE.md).
+                - receiver: "null"
+                  matchers:
+                    - alertname = "KubeMemoryOvercommit"
             receivers:
               - name: ntfy
                 webhook_configs:
