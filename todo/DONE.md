@@ -362,3 +362,26 @@ Prometheus as well:
 
 Runbook: [`../docs/mac-host-metrics.md`](../docs/mac-host-metrics.md) ("Where the data goes", plus a new verification
 step for the endpoint and the macOS firewall).
+
+## Cluster secrets via 1Password + External Secrets Operator
+
+**Done and live (2026-09-25).** Merged in [#27](https://github.com/jakerobb/homelab/pull/27). Replaced the old KSOPS
+item. Every SOPS file under `argocd/secrets/` used to be applied by hand (`sops -d ... | kubectl apply -f -`) because
+ArgoCD couldn't decrypt it. External Secrets Operator now syncs every cluster Secret from a dedicated `homelab-k8s`
+1Password vault, using a read-only service account. We chose that over KSOPS, which would have needed the age
+private key in-cluster plus Kustomize. Design and runbooks: [`../argocd/README.md`](../argocd/README.md#external-secrets-operator-decided-and-deployed-2026-09-24).
+
+- A one-shot script copied the 16 SOPS files into 13 1Password items, straight from `sops -d` into `op item create`,
+  then read every field back to confirm it matched. The two Cloudflare copies were the same token, so they became one
+  item. `truenas-api-key.sops.yaml` was never applied and was dead, because democratic-csi embeds the key in its
+  driver config. That config is now an ESO template in git, with only the key coming from 1Password. The SigNoz admin
+  login went to Jake's Private vault, since nothing in the cluster reads it.
+- At cutover, all 14 ExternalSecrets adopted their existing Secrets in place. Every value was checked against its
+  SOPS source, and all matched. The `kubectl.kubernetes.io/last-applied-configuration` annotations, which held
+  plaintext copies from `kubectl apply`, were stripped afterwards.
+- First-sync gotcha: the ExternalSecrets reconciled a few seconds before the `ClusterSecretStore` turned Valid, so
+  they all failed and went into retry backoff. A `force-sync` annotation on each fixed it at once.
+- ArgoCD's OIDC client secret is now a `$argocd-oidc-authelia:clientSecret` reference, so ArgoCD `helm upgrade`s no
+  longer need the SOPS values fragment.
+- `argocd/secrets/` now holds only `onepassword-service-account.sops.yaml`, the ESO token that has to be bootstrapped
+  by hand.

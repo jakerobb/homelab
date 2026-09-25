@@ -621,8 +621,9 @@ Two things ESO can't do for itself. First, its CRDs, installed out-of-band
 like every other chart's (see "External Secrets Operator CRDs" below).
 Second, the service-account token, which lives SOPS-encrypted at
 [`secrets/onepassword-service-account.sops.yaml`](secrets/onepassword-service-account.sops.yaml)
-and is the only file left in `argocd/secrets/`. It was created by
-[`scripts/migrate-to-1password.py`](../scripts/migrate-to-1password.py).
+and is the only file left in `argocd/secrets/`. It was created by a one-shot
+migration script (`scripts/migrate-to-1password.py`, removed after cutover
+along with the old SOPS files it read; see git history).
 To apply it (on the Mac, which has the age key):
 
 ```bash
