@@ -126,45 +126,20 @@ on every device, no manually-added DNS entries per app:
   zone only (Cloudflare's built-in "Edit zone DNS" token template, restricted
   to that one zone). Needed by both cert-manager (DNS-01 solver) and
   external-dns, in their respective namespaces. **Not committed in plaintext
-  anywhere** — see "Cloudflare token setup" below. ArgoCD has no SOPS/KSOPS
-  decryption wired up, so these two secrets are applied directly to the
-  cluster out of band rather than through GitOps sync; the encrypted files
-  are still committed to `argocd/secrets/` (excluded from the root app's
-  `argocd/apps` recursion) purely for durability/versioning.
+  anywhere** — it lives in 1Password (`homelab-k8s` vault, item
+  `cloudflare-api-token`), and External Secrets Operator syncs the same item
+  into both namespaces. See "Cloudflare token setup" below and "External
+  Secrets Operator".
 
 ### Cloudflare token setup (one-time, manual)
 
 1. Cloudflare dashboard → My Profile → API Tokens → Create Token → **Edit
    zone DNS** template → Zone Resources: restrict to the specific
    `jakerobb.org` zone → Create → copy the token (shown once).
-2. Locally, from the repo root (this keeps the plaintext token out of any
-   chat/session transcript — only the encrypted result is ever shared):
-
-   ```bash
-   read -rsp "Cloudflare API token: " CF_TOKEN; echo
-   for ns in cert-manager external-dns; do
-     cat > argocd/secrets/cloudflare-api-token.${ns}.sops.yaml <<EOF
-   apiVersion: v1
-   kind: Secret
-   metadata:
-     name: cloudflare-api-token
-     namespace: ${ns}
-   stringData:
-     api-token: ${CF_TOKEN}
-   EOF
-     sops -e -i argocd/secrets/cloudflare-api-token.${ns}.sops.yaml
-   done
-   unset CF_TOKEN
-   ```
-3. Apply both directly to the cluster (bypasses git/ArgoCD entirely, same as
-   any other SOPS-encrypted file in this repo):
-
-   ```bash
-   export KUBECONFIG=~/.kube/config
-   sops -d argocd/secrets/cloudflare-api-token.cert-manager.sops.yaml | kubectl apply -f -
-   sops -d argocd/secrets/cloudflare-api-token.external-dns.sops.yaml | kubectl apply -f -
-   ```
-4. `git add argocd/secrets/` and commit — safe, they're encrypted.
+2. Paste it into the `api-token` field of the `cloudflare-api-token` item in
+   the `homelab-k8s` 1Password vault. ESO updates both namespaces' Secrets
+   within the hour; see "Adding or rotating a secret" under "External
+   Secrets Operator" to sync sooner.
 
 ## Authelia SSO (decided 2026-09-13)
 
@@ -205,49 +180,27 @@ time; those get added to Authelia's `access_control` as they land, not now.
 - **Bootstrap ordering:** `local-path-provisioner` is sync-wave `0`
   (alongside `cert-manager` — independent, both need to be healthy before
   anything that depends on either); `authelia` is wave `1`.
-- **Secrets:** same out-of-band pattern as the Cloudflare token above — no
-  SOPS/KSOPS wired into ArgoCD sync yet, so these are applied directly with
-  `kubectl` rather than through GitOps. Three secrets already
-  generated and committed encrypted:
-  - `argocd/secrets/authelia.sops.yaml` → Secret `authelia-secrets` in the
-    `authelia` namespace (session/storage encryption keys, OIDC HMAC secret,
+- **Secrets:** all from 1Password via External Secrets Operator
+  ([`manifests/external-secrets-config/authelia.yaml`](../manifests/external-secrets-config/authelia.yaml)),
+  items in the `homelab-k8s` vault:
+  - `authelia-secrets` → Secret `authelia-secrets` in the `authelia`
+    namespace (session/storage encryption keys, OIDC HMAC secret,
     password-reset JWT secret — all randomly generated, not
     human-memorable).
-  - `argocd/secrets/authelia-users-database.sops.yaml` → Secret
-    `users-database` in `authelia` (the `users_database.yml` file itself,
-    one `jake` account, argon2id-hashed password).
-  - `argocd/secrets/authelia-oidc-jwk.sops.yaml` → Secret `oidc-jwk` in
-    `authelia` (RSA-4096 private key Authelia uses to sign OIDC tokens).
-  - `argocd/secrets/argocd-oidc-client-secret.sops.yaml` — **not** a k8s
-    Secret manifest, a Helm *values fragment* (`configs.secret.extra`)
-    layered onto ArgoCD's own install at `helm upgrade` time, same as
-    `install/values.yaml` itself. Holds the plaintext OIDC client secret
-    ArgoCD needs; Authelia's own config only ever holds a one-way
-    pbkdf2-sha512 hash of it (inline in
+  - `authelia-users-database` → Secret `users-database` (the
+    `users_database.yml` file itself, in the item's notes: one `jake`
+    account, argon2id-hashed password).
+  - `authelia-oidc-jwk` → Secret `oidc-jwk` (RSA-4096 private key Authelia
+    uses to sign OIDC tokens, in the item's notes).
+  - `argocd-oidc-client-secret` → Secret `argocd-oidc-authelia` in the
+    `argocd` namespace: the plaintext OIDC client secret ArgoCD needs,
+    referenced from `oidc.config` in [`install/values.yaml`](install/values.yaml)
+    as `$argocd-oidc-authelia:clientSecret`. Authelia's own config only
+    ever holds a one-way pbkdf2-sha512 hash of it (inline in
     [`apps/authelia/application.yaml`](apps/authelia/application.yaml),
-    safe to commit since it's not reversible).
-
-  Apply the three real Secrets once Authelia's namespace exists (after
-  `root-app.yaml` has synced at least once):
-
-  ```bash
-  export KUBECONFIG=~/.kube/config
-  for f in authelia authelia-users-database authelia-oidc-jwk; do
-    sops -d argocd/secrets/${f}.sops.yaml | kubectl apply -f -
-  done
-  ```
-
-  Then layer the OIDC client secret onto ArgoCD's own Helm install (this is
-  why it's a separate `-f`, not baked into `install/values.yaml` — see
-  "Upgrading ArgoCD itself" below):
-
-  ```bash
-  helm upgrade argocd argo/argo-cd --version <currently-deployed chart version> -n argocd \
-    -f argocd/install/values.yaml \
-    -f <(sops -d argocd/secrets/argocd-oidc-client-secret.sops.yaml)
-  ```
-  (Check `helm list -n argocd` for the version actually running rather than assuming — don't hardcode a version here
-  that can silently drift from the "Bootstrap" section below.)
+    safe to commit since it's not reversible). Until 2026-09-24 this was a
+    SOPS-encrypted Helm values fragment layered onto every ArgoCD
+    `helm upgrade`; plain `-f argocd/install/values.yaml` is all it takes now.
 - **First login:** browse to `https://argocd.jakerobb.org`, click the SSO
   login option, authenticate as `jake` against Authelia. Since ArgoCD's
   `access_control` policy is `two_factor` and this is a brand-new Authelia
@@ -301,34 +254,9 @@ Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
   tokens, scoped to just `jakerobb/homelab`, with **Contents: Read and
   write** and **Pull requests: Read and write** repository permissions (add
   **Workflows: Read and write** too if `.github/workflows/` ever shows up).
-  Then, same out-of-band pattern as the Cloudflare/Authelia secrets above (no
-  SOPS/KSOPS wired into ArgoCD sync yet):
-
-  ```bash
-  read -rsp "Renovate GitHub token: " RENOVATE_TOKEN; echo
-  cat > argocd/secrets/renovate-github-token.sops.yaml <<EOF
-  apiVersion: v1
-  kind: Secret
-  metadata:
-    name: renovate-github-token
-    namespace: renovate
-  stringData:
-    token: ${RENOVATE_TOKEN}
-  EOF
-  sops -e -i argocd/secrets/renovate-github-token.sops.yaml
-  unset RENOVATE_TOKEN
-  ```
-
-  Apply once the `renovate` namespace exists (after `root-app.yaml` has
-  synced at least once):
-
-  ```bash
-  export KUBECONFIG=~/.kube/config
-  sops -d argocd/secrets/renovate-github-token.sops.yaml | kubectl apply -f -
-  ```
-
-  `git add argocd/secrets/renovate-github-token.sops.yaml` and commit —
-  safe, it's encrypted.
+  Save it as the `token` field of the `renovate-github-token` item in the
+  `homelab-k8s` 1Password vault; ESO syncs it (see "External Secrets
+  Operator").
 - **First run:** trigger it on demand instead of waiting for 4:17am —
   `kubectl create job --from=cronjob/renovate -n renovate renovate-manual-1`
   — then `kubectl logs -n renovate job/renovate-manual-1 -f`. Check the logs
@@ -602,8 +530,8 @@ at [`manifests/headlamp/`](../manifests/headlamp/).
   ([`manifests/headlamp/httproute.yaml`](../manifests/headlamp/httproute.yaml)),
   hostname `headlamp.jakerobb.org`, discovered by Homepage via
   `gethomepage.dev/*` annotations into the Infrastructure tab.
-- **Secrets:** same out-of-band pattern as Cloudflare/Authelia/Renovate above
-  (no SOPS/KSOPS wired into ArgoCD sync yet). Two things need generating
+- **Secrets:** from 1Password via External Secrets Operator, like the rest.
+  Two things need generating
   together — the plaintext client secret (goes in the k8s Secret Headlamp
   reads) and its pbkdf2-sha512 hash (goes in Authelia's client config, safe
   to commit since it's one-way, same as ArgoCD's own client above):
@@ -615,37 +543,113 @@ at [`manifests/headlamp/`](../manifests/headlamp/).
   This prints a `Random Password:` and a `Digest:` line. Paste the `Digest`
   value over the `CHANGEME-see-argocd/README.md#headlamp` placeholder in
   [`apps/authelia/application.yaml`](apps/authelia/application.yaml)'s
-  `headlamp` client — safe to commit, it's a one-way hash. Keep the
-  `Random Password` value for the next step only; it's the real secret and
-  shouldn't be pasted anywhere else:
+  `headlamp` client — safe to commit, it's a one-way hash. Put the
+  `Random Password` in the `client-secret` field of the
+  `headlamp-oidc-client-secret` item in the `homelab-k8s` 1Password vault,
+  and nowhere else. Until both are done, Headlamp's pod runs fine but its
+  OIDC login will fail (`invalid_client` from Authelia).
 
-  ```bash
-  read -rsp "Headlamp OIDC client secret (the Random Password from above): " SECRET; echo
-  cat > argocd/secrets/headlamp-oidc-client-secret.sops.yaml <<EOF
-  apiVersion: v1
-  kind: Secret
-  metadata:
-    name: headlamp-oidc-client-secret
-    namespace: headlamp
-  stringData:
-    client-secret: ${SECRET}
-  EOF
-  sops -e -i argocd/secrets/headlamp-oidc-client-secret.sops.yaml
-  unset SECRET
-  ```
+## External Secrets Operator (decided and deployed 2026-09-24)
 
-  Apply once the `headlamp` namespace exists (after `root-app.yaml` has
-  synced at least once):
+Every Secret a cluster workload needs comes from 1Password through
+[External Secrets Operator](https://external-secrets.io/) (ESO). This
+replaced hand-applying SOPS files (`sops -d argocd/secrets/... | kubectl
+apply -f -`), which ArgoCD had no way to do itself.
 
-  ```bash
-  export KUBECONFIG=~/.kube/config
-  sops -d argocd/secrets/headlamp-oidc-client-secret.sops.yaml | kubectl apply -f -
-  ```
+- **Why ESO + 1Password:** considered KSOPS (SOPS decryption inside
+  ArgoCD's repo-server), sops-secrets-operator, Sealed Secrets, and running
+  Vault/OpenBao. The SOPS-based options all need the age private key inside
+  the cluster, and KSOPS also needs Kustomize. Vault is a stateful HA service
+  with unsealing and its own bootstrap problem, which is too much for one
+  user. 1Password already holds the age key, so it adds no new system to
+  trust. The cluster gets a revocable, read-only token for one vault, and
+  rotating a value is an edit in 1Password with no re-encrypting or
+  committing.
+- **Vault:** `homelab-k8s`, holding only what the cluster reads. A
+  1Password service account (`homelab-external-secrets`) has `read_items` on
+  that vault and nothing else, so a leaked token exposes nothing the cluster
+  doesn't already have. Service accounts can't be granted Personal/Private
+  vaults at all.
+- **Item convention:** one Secure Note per Kubernetes Secret, titled after
+  the Secret (the Cloudflare token is one item that feeds two namespaces).
+  Each Secret key is a concealed field with the same label. Multi-line
+  values (Authelia's users database and JWK) go in the note's own notes
+  field instead, referenced as `<item>/notesPlain`.
+- **Manifests:** the operator is [`apps/external-secrets/`](apps/external-secrets/application.yaml)
+  (sync-wave -1). The `ClusterSecretStore` and every `ExternalSecret` are in
+  [`manifests/external-secrets-config/`](../manifests/external-secrets-config/),
+  one file per consuming app, synced by
+  [`apps/external-secrets-config/`](apps/external-secrets-config/application.yaml)
+  (wave 0). They're centralized because most consumers are Helm-only
+  Applications with no `manifests/` directory of their own.
+- **Refresh:** `refreshInterval: 1h` on every `ExternalSecret`. That's about
+  20 field reads an hour, far below 1Password's service-account rate limits.
+- **1Password outages:** ESO copies values into ordinary Secrets in etcd, and
+  pods read those, never 1Password. During an outage, running pods, restarts,
+  reschedules and node reboots all keep working. Only new or changed values
+  wait. A failed refresh leaves the existing Secret untouched, and
+  `ExternalSecretNotSynced` fires after 30 minutes
+  ([`prometheusrule.yaml`](../manifests/external-secrets-config/prometheusrule.yaml)).
+- **Deleting an `ExternalSecret` deletes its Secret** (the default
+  `creationPolicy: Owner`). Removing an entry from git, or a careless prune,
+  takes the Secret with it. Putting it back recreates the Secret from
+  1Password on the next sync.
+- **Changes don't restart pods.** Anything reading a Secret through an env
+  var (most of these) keeps the old value until the pod restarts. Restart
+  the Deployment after rotating a value. Files mounted from a Secret update
+  in place, but only apps that re-read them notice.
+- **democratic-csi's driver config** is an ESO template: the whole file is in
+  [`democratic-csi.yaml`](../manifests/external-secrets-config/democratic-csi.yaml),
+  and only the TrueNAS API key comes from 1Password. Edit it there.
 
-  `git add argocd/secrets/headlamp-oidc-client-secret.sops.yaml` and
-  commit — safe, it's encrypted. Until both this and the `Digest` edit
-  above are done, Headlamp's pod runs fine but its OIDC login will fail
-  (`invalid_client` from Authelia).
+### Adding or rotating a secret
+
+To rotate a value, edit the field in the `homelab-k8s` vault. To add one,
+create a Secure Note there (one concealed field per Secret key) and add an
+`ExternalSecret` to `manifests/external-secrets-config/<app>.yaml`. Either
+way, sync now instead of waiting up to an hour (on rpi5-1):
+
+```bash
+kubectl -n <namespace> annotate externalsecret <name> force-sync=$(date +%s) --overwrite
+```
+
+Then restart whatever reads it, if it reads it through an env var.
+
+### ESO bootstrap (one-time, manual)
+
+Two things ESO can't do for itself. First, its CRDs, installed out-of-band
+like every other chart's (see "External Secrets Operator CRDs" below).
+Second, the service-account token, which lives SOPS-encrypted at
+[`secrets/onepassword-service-account.sops.yaml`](secrets/onepassword-service-account.sops.yaml)
+and is the only file left in `argocd/secrets/`. It was created by
+[`scripts/migrate-to-1password.py`](../scripts/migrate-to-1password.py).
+To apply it (on the Mac, which has the age key):
+
+```bash
+sops -d argocd/secrets/onepassword-service-account.sops.yaml | ssh jakerobb@rpi5-1.lan kubectl apply -f -
+```
+
+To replace the token (lost, leaked, or expired), create a new service account
+with the same vault access. Then save its token to that file with
+`sops argocd/secrets/onepassword-service-account.sops.yaml`, re-apply, and
+delete the old service account in 1Password.
+
+### External Secrets Operator CRDs (one-time, manual, and again on every chart upgrade)
+
+`installCRDs: false`, same blanket rule as the other charts: CRDs stay out
+of ArgoCD's hands. Here it's also forced. `ClusterSecretStore` and
+`SecretStore` are ~724KB each as rendered, because every provider's schema is
+inlined, and that's far past the 256KiB annotation limit. ESO changes its
+CRDs in most minor releases, so **re-apply on every `targetRevision` bump**
+(on rpi5-1, with `<version>` from
+[`apps/external-secrets/application.yaml`](apps/external-secrets/application.yaml)):
+
+```bash
+kubectl apply --server-side -f https://raw.githubusercontent.com/external-secrets/external-secrets/v<version>/deploy/crds/bundle.yaml
+```
+
+Server-side apply sidesteps the annotation limit, and unlike `kubectl
+create`, it works for both the first install and upgrades.
 
 ## Bootstrap (one-time, manual)
 
@@ -756,12 +760,10 @@ account/org) is completed through its web UI. Until that happens, the
 collector's extensions/healthcheck report `ready` — looking healthy — while
 literally zero receivers/exporters/pipelines are actually running, silently
 dropping everything. Completed via `kubectl port-forward svc/signoz
-8080:8080` and the signup form at `/`; the admin credential is stored
-encrypted at
-[`argocd/secrets/signoz-admin-credentials.sops.yaml`](secrets/signoz-admin-credentials.sops.yaml)
-(not a Kubernetes `Secret` consumed by any pod — SigNoz keeps its own users
-in ClickHouse — this file exists purely as a durable encrypted record, same
-SOPS+age convention as everything else here). A `ConfigMap` change also
+8080:8080` and the signup form at `/`; the admin credential is stored in
+Jake's own 1Password vault as "SigNoz admin (homelab)" (not the cluster's
+`homelab-k8s` vault: no pod consumes it, since SigNoz keeps its own users
+in ClickHouse). A `ConfigMap` change also
 doesn't hot-reload into the collector Deployment — `kubectl rollout
 restart` is needed after any `otelCollector.config` edit for it to actually
 take effect.
@@ -1116,8 +1118,5 @@ deployed as [`apps/truenas-exporter/`](apps/truenas-exporter/application.yaml) �
   `truenas_pool_healthy`, `truenas_pool_status`, `truenas_up`. See the
   exporter's README for the full list.
 - **Secret:** a dedicated API key (not Homepage's, so retiring Homepage
-  doesn't break this), out-of-band as usual:
-
-  ```bash
-  sops -d argocd/secrets/truenas-api-key.truenas-exporter.sops.yaml | kubectl apply -f -
-  ```
+  doesn't break this): the `truenas-exporter-api-key` item in the
+  `homelab-k8s` 1Password vault, synced by External Secrets Operator.

@@ -1,0 +1,17 @@
+# SearXNG's own server.secret_key (manifests/searxng/deployment.yaml, via SEARXNG_SECRET).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: searxng-secret-key
+  namespace: searxng
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: searxng-secret-key
+  data:
+    - secretKey: secret-key
+      remoteRef:
+        key: searxng-secret-key/secret-key

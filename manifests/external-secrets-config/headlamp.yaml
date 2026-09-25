@@ -1,0 +1,17 @@
+# Headlamp's OIDC client secret for Authelia (argocd/apps/headlamp/).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: headlamp-oidc-client-secret
+  namespace: headlamp
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: headlamp-oidc-client-secret
+  data:
+    - secretKey: client-secret
+      remoteRef:
+        key: headlamp-oidc-client-secret/client-secret

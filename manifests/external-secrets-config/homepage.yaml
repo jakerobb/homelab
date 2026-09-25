@@ -1,0 +1,57 @@
+# Homepage widget credentials, mounted by manifests/homepage/deployment.yaml.
+# All read-only: Proxmox `readonly@pve!diagnostics` (PVEAuditor), a
+# read-only TrueNAS key separate from democratic-csi's, and a UniFi
+# Network API key.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: homepage-proxmox-credentials
+  namespace: homepage
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: homepage-proxmox-credentials
+  data:
+    - secretKey: token-id
+      remoteRef:
+        key: homepage-proxmox-credentials/token-id
+    - secretKey: token-secret
+      remoteRef:
+        key: homepage-proxmox-credentials/token-secret
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: homepage-truenas-credentials
+  namespace: homepage
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: homepage-truenas-credentials
+  data:
+    - secretKey: api-key
+      remoteRef:
+        key: homepage-truenas-credentials/api-key
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: homepage-unifi-credentials
+  namespace: homepage
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: homepage-unifi-credentials
+  data:
+    - secretKey: api-key
+      remoteRef:
+        key: homepage-unifi-credentials/api-key

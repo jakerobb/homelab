@@ -1,0 +1,63 @@
+# Authelia's three Secrets, all consumed by the chart in
+# argocd/apps/authelia/application.yaml. The users database and JWK are
+# whole multi-line files, so they're stored in their 1Password items' notes
+# (`notesPlain`) rather than a concealed field, which is single-line.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: authelia-secrets
+  namespace: authelia
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: authelia-secrets
+  data:
+    - secretKey: session.encryption.key
+      remoteRef:
+        key: authelia-secrets/session.encryption.key
+    - secretKey: storage.encryption.key
+      remoteRef:
+        key: authelia-secrets/storage.encryption.key
+    - secretKey: identity_providers.oidc.hmac.key
+      remoteRef:
+        key: authelia-secrets/identity_providers.oidc.hmac.key
+    - secretKey: identity_validation.reset_password.jwt.hmac.key
+      remoteRef:
+        key: authelia-secrets/identity_validation.reset_password.jwt.hmac.key
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: users-database
+  namespace: authelia
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: users-database
+  data:
+    - secretKey: users_database.yml
+      remoteRef:
+        key: authelia-users-database/notesPlain
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: oidc-jwk
+  namespace: authelia
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: oidc-jwk
+  data:
+    - secretKey: oidc.jwk.RS256.pem
+      remoteRef:
+        key: authelia-oidc-jwk/notesPlain

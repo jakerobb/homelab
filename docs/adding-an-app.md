@@ -9,7 +9,7 @@ worked example throughout is Headlamp
 ([`argocd/apps/headlamp/`](../argocd/apps/headlamp/application.yaml),
 [`manifests/headlamp/`](../manifests/headlamp/)) — added 2026-09-21, and
 about as representative a case as exists (bare manifests, native OIDC,
-custom RBAC, Homepage discovery, a SOPS secret).
+custom RBAC, Homepage discovery, a secret).
 
 For the deeper "why" behind any of this, see
 [`argocd/README.md`](../argocd/README.md) — that file is the per-app
@@ -179,54 +179,31 @@ Either way, don't do both — stacking forward-auth in front of an app that
 also wants its own OIDC login means authenticating against the same
 Authelia twice.
 
-## 5. Secrets: SOPS + age, always out-of-band
+## 5. Secrets: 1Password + External Secrets Operator
 
-**No sealed-secrets, no external-secrets-operator, no plaintext-committed
-secrets, and — important — no SOPS/KSOPS decryption wired into ArgoCD's
-own sync yet.** Every secret an app needs is a plain Kubernetes `Secret`
-manifest, SOPS-encrypted, committed under `argocd/secrets/`, and applied
-by hand once the app's namespace exists (**never synced by ArgoCD
-itself**). The recipe (copy this, substituting names):
+Every secret an app needs lives in the `homelab-k8s` 1Password vault and
+reaches the cluster through an `ExternalSecret`. No plaintext in git, and
+no SOPS files applied by hand. Full background is in
+[`argocd/README.md`](../argocd/README.md#external-secrets-operator-decided-and-deployed-2026-09-24).
 
-```bash
-read -rsp "<Thing> secret: " SECRET; echo
-cat > argocd/secrets/<name>-secret.sops.yaml <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: <name>-secret
-  namespace: <namespace>
-stringData:
-  <key>: ${SECRET}
-EOF
-sops -e -i argocd/secrets/<name>-secret.sops.yaml
-unset SECRET
-```
+1. In 1Password, create a **Secure Note** in `homelab-k8s`, titled the same
+   as the Kubernetes Secret. Add one concealed field per Secret key,
+   labeled exactly like the key. A multi-line value (a whole config file,
+   a PEM key) goes in the note's own notes field instead.
+2. Add an `ExternalSecret` to
+   `manifests/external-secrets-config/<name>.yaml`, copying an existing
+   one. Point each `remoteRef.key` at `<item>/<field>`, or
+   `<item>/notesPlain` for the notes. If only part of a config file is
+   secret, template the rest into the `ExternalSecret` (see
+   `democratic-csi.yaml`) so the non-secret part stays reviewable in git.
+3. Reference the Secret from the app's manifests by name as usual. ESO
+   creates it on its next sync after merge, or retries until the target
+   namespace exists.
 
-Then, once the namespace exists (after `root-app.yaml` has synced at
-least once):
-
-```bash
-export KUBECONFIG=~/.kube/config
-sops -d argocd/secrets/<name>-secret.sops.yaml | kubectl apply -f -
-```
-
-`git add argocd/secrets/<name>-secret.sops.yaml` and commit — safe,
-it's encrypted. The one exception to "plain Secret manifest": an app
-installed via Helm outside ArgoCD's own management (there's exactly one
-so far — ArgoCD's own install) can instead take a secret as a Helm
-*values fragment* layered on with an extra `-f <(sops -d ...)` at
-`helm upgrade` time, since there's no Secret object to apply on its own.
-That doesn't apply to anything deployed the normal way (bare manifests or
-an ArgoCD-managed Helm chart) — those always get a real Secret object.
-
-`.sops.yaml` at the repo root already scopes `argocd/secrets/*.sops.yaml`
-to the shared age recipient — no per-app SOPS config needed.
-
-**Never paste a raw secret value into a chat session** — generate and
-encrypt it in a real terminal (the commands above), and only ever share
-the *encrypted* file or a one-way hash (like the pbkdf2 OIDC client
-secret hash above) if asking for help.
+Generate secret values in a real terminal or in 1Password's own generator.
+**Never paste a raw secret value into a chat session.** Only a one-way hash
+is safe to share, like the pbkdf2 OIDC client-secret hash that goes into
+Authelia's config.
 
 ## 6. Homepage discovery
 
@@ -285,9 +262,9 @@ Vendor the CRD manifests under `manifests/<name>/` if there's no chart to
 5. Decide OIDC vs. forward-auth; wire up
    `argocd/apps/authelia/application.yaml` (`access_control` rule, plus
    an OIDC client if applicable) and any needed `ReferenceGrant`.
-6. Any secret the app needs: SOPS-encrypt under `argocd/secrets/`,
-   document the one-time `kubectl apply` in `argocd/README.md`, apply it
-   by hand once the namespace exists.
+6. Any secret the app needs: a Secure Note in the `homelab-k8s`
+   1Password vault plus an `ExternalSecret` in
+   `manifests/external-secrets-config/<name>.yaml` (section 5).
 7. Add a dated section to `argocd/README.md` documenting what was
    decided and why (chart vs. bare manifests, auth choice, RBAC scope,
    anything non-obvious) — that file is the durable record; this doc is

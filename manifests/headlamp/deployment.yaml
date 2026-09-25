@@ -2,9 +2,10 @@
 # `config.oidc.secret.existingSecret` wiring has multiple open upstream bugs
 # as of chart/app v0.45.0 (kubernetes-sigs/headlamp#2022, #2485, #4080: wrong
 # env var names, existing-secret values not actually reaching the container),
-# and ArgoCD has no SOPS/KSOPS decryption anyway (see argocd/README.md), so
-# there's no way to hand the chart a secret via `helm.valuesObject` without
-# committing the plaintext client secret to git. Setting the documented
+# and at the time ArgoCD had no way to decrypt secrets (External Secrets
+# Operator came later, 2026-09-24), so there was no way to hand the chart a
+# secret via `helm.valuesObject` without committing the plaintext client
+# secret to git. Setting the documented
 # HEADLAMP_CONFIG_OIDC_* env vars directly (https://headlamp.dev/docs/latest/installation/in-cluster/oidc/)
 # sidesteps the chart entirely and matches this repo's existing "bare
 # Deployment for a simple app" precedent (searxng, ntfy, homepage).

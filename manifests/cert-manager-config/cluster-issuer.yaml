@@ -1,8 +1,8 @@
 # DNS-01 against Cloudflare: no public HTTP-01 exposure needed, and it's the
 # only challenge type that supports the wildcard cert below. Requires
-# `cloudflare-api-token` to exist in the cert-manager namespace — applied
-# manually (SOPS-encrypted here, decrypted+applied out of band; ArgoCD has no
-# SOPS/KSOPS decryption wired up). See argocd/README.md.
+# `cloudflare-api-token` to exist in the cert-manager namespace, synced from
+# 1Password by External Secrets Operator
+# (manifests/external-secrets-config/cloudflare.yaml).
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
