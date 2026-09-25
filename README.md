@@ -34,7 +34,8 @@ Passwords and other secrets are in 1Password in the Tech vault, which is shared 
             - two Talos worker VMs — `talos-worker-1` (`.31`) and `talos-worker-2` (`.32`)
             - TrueNAS / HexOS (`.33`)
         - MacBook Pro (see "On top of the rack" below), running a third Talos
-          worker VM — `talos-worker-mbp` (`.34`) — under UTM
+          worker VM — `talos-worker-mbp` (`.34`) — under UTM. The Mac host itself is `.9`; SSH in as
+          `jakerobb@192.168.102.9` (key auth).
 - **Kubernetes cluster:** Talos + Kubernetes (see [`talos/README.md`](talos/README.md#current-state) for current
   versions), Cilium CNI with `kubeProxyReplacement`, full eBPF host routing, and L2 announcements for LoadBalancer IPs
   (`192.168.102.128/26`). Details and gotchas live in [`talos/README.md`](talos/README.md).
