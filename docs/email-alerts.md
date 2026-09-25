@@ -76,24 +76,63 @@ with a deliberately-broken copy of the script (bad node IP) — the resulting
 stderr was mailed through cron's real mechanism and arrived from
 `noreply@jakerobb.org` via Brevo.
 
-## Known gap: no queuing if the relay is unreachable
+## Queuing when the relay is unreachable (msmtpq)
 
-`msmtp` sends synchronously — if the ISP or Brevo is down at 3:15 AM when
-the cron job runs, the alert email itself is silently lost (no retry), which
-defeats the point if a failure and an outage coincide. Not fixed yet;
-options considered:
+`msmtp` on its own sends synchronously: if the ISP or Brevo were down at
+3:15 AM, a failure alert would be lost with no retry. As of 2026-09-25,
+rpi5-1's `sendmail` is [`scripts/msmtpq/msmtpq-sendmail`](../scripts/msmtpq/msmtpq-sendmail),
+a thin wrapper around Debian's bundled `msmtpq`
+(`/usr/libexec/msmtp/msmtpq/msmtpq`) using the same `~/.msmtprc`. A failed
+send stays in `~/.msmtp.queue/` instead of being dropped, and a cron job
+retries it every 15 minutes. Postfix as a local smarthost was considered and
+rejected, since it would add a whole daemon to what is otherwise a jump box.
 
-- **`msmtpq`** (bundled with `msmtp`, see
-  `/usr/share/doc/msmtp/examples/msmtpqueue/`) — lightweight file-based
-  queue wrapper around the same `msmtp` config already in place. Swap the
-  `/usr/sbin/sendmail` symlink to point at it instead, add a periodic
-  (systemd timer or cron) call to flush the queue. Low effort, no new
-  daemon.
-- **Postfix as a local smarthost** (`relayhost` pointed at Brevo, SASL auth)
-  — real MTA queue with proper retry/backoff, but a whole extra service to
-  maintain on a host that's otherwise just a jump box.
+Install or reinstall (idempotent) on rpi5-1:
 
-`msmtpq` is the better fit here given the low stakes and desire to avoid
-adding daemons to rpi5-1 — deferred rather than done, since an ISP outage
-overlapping exactly with a backup failure is a narrow edge case for a
-homelab. Revisit if this ever matters in practice.
+```bash
+~/dev/homelab/scripts/msmtpq/install.sh
+```
+
+What it does:
+
+- installs the wrapper to `/usr/local/bin/msmtpq-sendmail`
+- `dpkg-divert`s `msmtp-mta`'s `/usr/sbin/sendmail` and `/usr/lib/sendmail`
+  symlinks (to `*.msmtp-mta`) and points them at the wrapper, so an
+  `msmtp-mta` upgrade can't silently put non-queueing `msmtp` back
+- adds the flush job to the crontab:
+  `*/15 * * * * /usr/local/bin/msmtpq-sendmail --q-mgmt -r > /dev/null 2>&1`.
+  All output is discarded on purpose: with `MAILTO` set, any output would
+  be mailed through the same queue it is failing to flush.
+
+Wrapper details:
+
+- **`HOME` fallback.** cron runs its mailer with `HOME` unset, and `msmtpq`
+  expands `~` from it. Without the fallback, the first cron test tried to
+  create `/.msmtp.queue` and the mail was lost.
+- **No connectivity pre-check** (`EMAIL_CONN_TEST=x`). `msmtpq`'s default
+  pings debian.org before sending, which adds an ICMP failure mode
+  unrelated to SMTP. A failed `msmtp` send is queued anyway.
+
+Queue log: `~/.msmtp.queue.log`. Successful sends are still logged in
+`~/.msmtp.log`. To inspect or manage the queue:
+
+```bash
+msmtpq-sendmail --q-mgmt -d
+```
+
+```bash
+msmtpq-sendmail --q-mgmt -r
+```
+
+(`-d` lists the queue, `-r` flushes it now; `-h` shows the other options.)
+
+**Verified (2026-09-25):**
+
+- A send through `sendmail` with `MSMTP` pointed at a stub that always
+  fails was queued (exit 0). `--q-mgmt -r` then delivered it via Brevo.
+- A temporary `* * * * *` crontab entry writing to stderr was delivered
+  through cron's real `MAILTO` → `/usr/sbin/sendmail` path.
+
+**Not covered:** `scripts/unifi-gc-report.py` calls `msmtp -a brevo -t`
+directly rather than `sendmail`, so its reports bypass the queue. It raises
+on failure, so the failure appears in its own log.

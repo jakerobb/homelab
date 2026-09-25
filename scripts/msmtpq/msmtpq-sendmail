@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Queueing sendmail replacement for rpi5-1. Installed at /usr/local/bin and
+# symlinked over /usr/sbin/sendmail (via dpkg-divert, see install.sh), so
+# cron's MAILTO mail goes through msmtpq instead of straight to msmtp.
+# If the relay is unreachable the mail stays in the queue and the
+# */15 flush cron job retries it, instead of being dropped.
+#
+# See docs/email-alerts.md.
+#
+# Queue management: msmtpq-sendmail --q-mgmt -d   (list)
+#                   msmtpq-sendmail --q-mgmt -r   (flush)
+
+# cron invokes sendmail with HOME unset; msmtpq expands ~ from it.
+export HOME="${HOME:-$(getent passwd "$(id -u)" | cut -d: -f6)}"
+
+# msmtpq's own defaults: ping debian.org before every send (ICMP adds a
+# failure mode unrelated to SMTP; a failed msmtp send re-queues anyway) and
+# log to ~/log/. MSMTP is overridable so a failed send can be simulated.
+export MSMTP="${MSMTP:-/usr/bin/msmtp}"
+export MSMTPQ_Q="$HOME/.msmtp.queue"
+export MSMTPQ_LOG="$HOME/.msmtp.queue.log"
+export EMAIL_CONN_TEST=x
+export EMAIL_QUEUE_QUIET=t
+
+exec /usr/libexec/msmtp/msmtpq/msmtpq "$@"
