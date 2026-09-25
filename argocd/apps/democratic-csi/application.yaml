@@ -8,11 +8,10 @@
 # mirror) — same trust reasoning as local-path-provisioner: this runs
 # privileged, cluster-wide, and provisions real storage.
 #
-# driver.existingConfigSecret points at a hand-maintained SOPS-encrypted
-# Secret (argocd/secrets/democratic-csi-truenas-iscsi-config.sops.yaml) —
-# not applied through ArgoCD sync (no SOPS/KSOPS wired up yet, same gap
-# argocd/README.md already flags), so it must be applied out-of-band before
-# this Application will go healthy. It contains the TrueNAS API key.
+# driver.existingConfigSecret points at a Secret rendered by External
+# Secrets Operator from a template holding the whole driver config, with
+# only the TrueNAS API key pulled from 1Password. Edit the config in
+# manifests/external-secrets-config/democratic-csi.yaml, not here.
 #
 # reclaimPolicy: Retain, not the chart's Delete default — same reasoning as
 # local-path-provisioner: this is a real PVC-backed StorageClass under

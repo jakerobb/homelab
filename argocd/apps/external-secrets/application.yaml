@@ -1,0 +1,66 @@
+# External Secrets Operator (ESO): syncs values from 1Password into plain
+# Kubernetes Secrets, replacing the old "sops -d ... | kubectl apply" step
+# for everything under argocd/secrets/. The ClusterSecretStore and every
+# ExternalSecret live in a separate Application (apps/external-secrets-config,
+# wave 0) — same chart-then-config split as cert-manager/cert-manager-config.
+# See argocd/README.md's "External Secrets Operator" section.
+#
+# Wave -1 so it's ahead of everything whose Secrets it provides.
+#
+# installCRDs: false — CRDs are installed manually, out-of-band, same
+# blanket rule as kube-prometheus-stack/SigNoz (see argocd/README.md's
+# "External Secrets Operator CRDs" section). ClusterSecretStore/SecretStore
+# are ~724KB each as rendered (every provider's schema inlined), far past
+# the 256KiB last-applied annotation limit. Consequence: bumping
+# targetRevision needs a manual CRD re-apply — ESO changes its CRDs in most
+# minor releases, so assume yes unless the release notes say otherwise.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: 2.11.0
+    helm:
+      releaseName: external-secrets
+      valuesObject:
+        installCRDs: false
+        # See revisionHistoryLimit policy in argocd/README.md. Set per
+        # Deployment; the chart has no global knob.
+        revisionHistoryLimit: 2
+        # Chart sets no requests. Placeholders from ESO's typical footprint
+        # at this scale (~15 ExternalSecrets); resize from real usage once
+        # there's history — see todo/FUTURE.md's memory-request items.
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        webhook:
+          revisionHistoryLimit: 2
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+        certController:
+          revisionHistoryLimit: 2
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+        serviceMonitor:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

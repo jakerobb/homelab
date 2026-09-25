@@ -1,0 +1,57 @@
+# democratic-csi's driver config (existingConfigSecret in
+# argocd/apps/democratic-csi/application.yaml). Only the TrueNAS API key is
+# secret, so the rest of the file lives here as a template instead of
+# inside an encrypted blob. Edit it here; ESO re-renders the Secret, and
+# the controller/node pods need a restart to pick up changes.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: democratic-csi-truenas-iscsi-config
+  namespace: democratic-csi
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: democratic-csi-truenas-iscsi-config
+    template:
+      engineVersion: v2
+      data:
+        driver-config-file.yaml: |
+          driver: freenas-api-iscsi
+          instance_id:
+          httpConnection:
+            protocol: https
+            host: 192.168.102.33
+            port: 443
+            apiKey: "{{ .apiKey }}"
+            allowInsecure: true
+          zfs:
+            datasetParentName: data/k8s-iscsi
+            detachedSnapshotsDatasetParentName: data/k8s-iscsi-snapshots
+            zvolCompression:
+            zvolDedup:
+            zvolEnableReservation: false
+            zvolBlocksize:
+          iscsi:
+            targetPortal: "192.168.102.33:3260"
+            targetPortals: []
+            interface:
+            namePrefix: csi-
+            nameSuffix: "-hexos"
+            targetGroups:
+              - targetGroupPortalGroup: 1
+                targetGroupInitiatorGroup: 1
+                targetGroupAuthType: None
+                targetGroupAuthGroup:
+            extentInsecureTpc: true
+            extentXenCompat: false
+            extentDisablePhysicalBlocksize: true
+            extentBlocksize: 512
+            extentRpm: "SSD"
+            extentAvailThreshold: 0
+  data:
+    - secretKey: apiKey
+      remoteRef:
+        key: truenas-api-key-democratic-csi/api-key

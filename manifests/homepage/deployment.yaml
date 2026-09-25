@@ -59,8 +59,7 @@ spec:
             # appears in services.yaml/widgets.yaml — keeps the actual
             # secret values out of `kubectl describe pod`'s env dump, unlike
             # HOMEPAGE_VAR_XXX (see gethomepage.dev's env-substitution docs).
-            # Sourced from the three Secrets mounted below (argocd/secrets/
-            # {proxmox-api-token,truenas-api-key,unifi-credentials}.homepage.sops.yaml).
+            # Sourced from the three Secrets mounted below.
             - name: HOMEPAGE_FILE_PROXMOX_TOKEN_ID
               value: /run/secrets/proxmox/token-id
             - name: HOMEPAGE_FILE_PROXMOX_TOKEN_SECRET
@@ -125,10 +124,8 @@ spec:
         - name: homepage-icons
           configMap:
             name: homepage-icons
-        # Applied out-of-band via `sops -d ... | kubectl apply -f -` — see
-        # each secret's own comment header. Not ArgoCD-managed (no KSOPS
-        # yet, see todo/READY.md), so these Secrets must already exist in the
-        # `homepage` namespace before this Deployment will come up healthy.
+        # Synced from 1Password by External Secrets Operator
+        # (manifests/external-secrets-config/homepage.yaml).
         - name: proxmox-credentials
           secret:
             secretName: homepage-proxmox-credentials

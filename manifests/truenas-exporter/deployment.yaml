@@ -81,9 +81,8 @@ spec:
               name: truenas-credentials
               readOnly: true
       volumes:
-        # Applied out-of-band via `sops -d ... | kubectl apply -f -` (not
-        # ArgoCD-managed — no KSOPS yet), so it must exist before this pod
-        # will start. See argocd/secrets/truenas-api-key.truenas-exporter.sops.yaml.
+        # Synced from 1Password by External Secrets Operator
+        # (manifests/external-secrets-config/truenas-exporter.yaml).
         - name: truenas-credentials
           secret:
             secretName: truenas-exporter-api-key

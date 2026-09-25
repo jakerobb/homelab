@@ -1,0 +1,25 @@
+# ArgoCD's OIDC client secret for Authelia. ArgoCD resolves
+# `$argocd-oidc-authelia:clientSecret` in argocd-cm's oidc.config against
+# any Secret in its namespace carrying the part-of label below — see
+# argocd/install/values.yaml. This replaced the old `-f <(sops -d ...)`
+# values fragment layered onto every `helm upgrade` of ArgoCD itself.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: argocd-oidc-authelia
+  namespace: argocd
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: argocd-oidc-authelia
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: argocd
+  data:
+    - secretKey: clientSecret
+      remoteRef:
+        key: argocd-oidc-client-secret/client-secret

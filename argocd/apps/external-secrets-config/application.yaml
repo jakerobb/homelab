@@ -1,0 +1,35 @@
+# The ClusterSecretStore plus every ExternalSecret in the cluster, in one
+# place: manifests/external-secrets-config/, one file per consuming app.
+# Centralized rather than next to each app because half the consumers
+# (authelia, cert-manager, external-dns, democratic-csi, ArgoCD itself)
+# are Helm-only Applications with no manifests/ directory to put them in.
+#
+# Wave 0, after the operator (wave -1). The retry covers a cold bootstrap,
+# where a target namespace may not exist yet because its own Application
+# (which creates it) is syncing in the same wave; a later attempt succeeds.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/external-secrets-config
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

@@ -1,0 +1,26 @@
+# A failed sync leaves the last good Secret in place, so nothing breaks
+# right away. That's exactly why it needs an alert: a rotated value in
+# 1Password that never lands, or a revoked/expired service-account token,
+# would otherwise go unnoticed until something restarts and gets a stale
+# credential rejected. 30m tolerates a transient 1Password blip; with the
+# 1h refreshInterval, one failed refresh stays Ready=False until the next.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: external-secrets
+  namespace: external-secrets
+spec:
+  groups:
+    - name: external-secrets
+      rules:
+        - alert: ExternalSecretNotSynced
+          expr: externalsecret_status_condition{condition="Ready", status="False"} == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} is not syncing from 1Password"
+            description: >-
+              The Secret still holds its last synced value. Check
+              `kubectl -n {{ $labels.namespace }} describe externalsecret {{ $labels.name }}`
+              for the provider error (missing item/field, bad token, rate limit).

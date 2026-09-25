@@ -1,0 +1,17 @@
+# Renovate's GitHub token (manifests/renovate/).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: renovate-github-token
+  namespace: renovate
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: renovate-github-token
+  data:
+    - secretKey: token
+      remoteRef:
+        key: renovate-github-token/token

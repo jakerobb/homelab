@@ -10,11 +10,9 @@
 # ExternalAuth HTTPRoute filter (which isn't available yet at the cluster's
 # current Cilium version anyway — see todo/DONE.md).
 #
-# Secrets: authelia-secrets / users-database / oidc-jwk (SOPS-encrypted
-# under argocd/secrets/, applied out-of-band — same caveat as the
-# Cloudflare token secrets: no SOPS/KSOPS decryption wired into ArgoCD sync
-# yet) must exist in the `authelia` namespace before this Application will
-# come up healthy.
+# Secrets: authelia-secrets / users-database / oidc-jwk come from 1Password
+# via External Secrets Operator (manifests/external-secrets-config/
+# authelia.yaml) and must exist before this Application comes up healthy.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -174,9 +172,9 @@ spec:
                 - client_id: 'argocd'
                   client_name: 'ArgoCD'
                   # pbkdf2-sha512 hash of the client secret ArgoCD itself
-                  # holds in plaintext (argocd/secrets/argocd-oidc-client-secret.sops.yaml,
-                  # applied via argocd/install/values.yaml at Helm-upgrade
-                  # time — see argocd/README.md).
+                  # holds in plaintext (Secret argocd-oidc-authelia, synced
+                  # from 1Password item argocd-oidc-client-secret — see
+                  # argocd/README.md).
                   client_secret: '$pbkdf2-sha512$310000$zU.R9zGKBboxkc1zlxfNpQ$weqxt6tHx8YcX83ZhuBaLElD6n/3YN60LLmbO.dbtSjCERquTToS67ixm8YhCgFW0jNJDYWsoAydYMjR05xo1w'
                   public: false
                   redirect_uris:
@@ -208,9 +206,8 @@ spec:
                   client_name: 'Headlamp'
                   # pbkdf2-sha512 hash of the plaintext secret Headlamp
                   # itself holds via the headlamp-oidc-client-secret Secret
-                  # (argocd/secrets/headlamp-oidc-client-secret.sops.yaml,
-                  # applied out-of-band — see argocd/README.md's Headlamp
-                  # section). Computed 2026-09-21 by feeding the
+                  # (synced from 1Password by External Secrets Operator —
+                  # see argocd/README.md's Headlamp section). Computed 2026-09-21 by feeding the
                   # already-applied Secret's value into the running
                   # Authelia pod's own `authelia crypto hash generate
                   # pbkdf2` — matches the Secret exactly, never printed

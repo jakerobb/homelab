@@ -1,0 +1,17 @@
+# truenas-exporter's dedicated TrueNAS API key (manifests/truenas-exporter/).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: truenas-exporter-api-key
+  namespace: truenas-exporter
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: truenas-exporter-api-key
+  data:
+    - secretKey: api-key
+      remoteRef:
+        key: truenas-exporter-api-key/api-key

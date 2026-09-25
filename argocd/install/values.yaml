@@ -64,17 +64,17 @@ configs:
     # Authelia SSO (decided 2026-09-13) — see argocd/README.md. ArgoCD talks
     # to Authelia over real OIDC (Authelia has native OIDC-provider support,
     # and ArgoCD has native OIDC-client support), no Gateway-level
-    # forward-auth needed. `clientSecret` here is a reference by name, not
-    # the value — the actual secret is supplied at `helm upgrade` time via
-    # a separate SOPS-encrypted values file
-    # (argocd/secrets/argocd-oidc-client-secret.sops.yaml), same pattern as
-    # the Cloudflare API token. Do not put the plaintext secret in this
-    # committed file.
+    # forward-auth needed. `clientSecret` here is a reference, not the
+    # value: `$<secret>:<key>` makes ArgoCD read key `clientSecret` from
+    # Secret `argocd-oidc-authelia`, which External Secrets Operator syncs
+    # from 1Password (manifests/external-secrets-config/argocd.yaml) with
+    # the `app.kubernetes.io/part-of: argocd` label ArgoCD requires. Do not
+    # put the plaintext secret in this committed file.
     oidc.config: |
       name: Authelia
       issuer: https://auth.jakerobb.org
       clientID: argocd
-      clientSecret: $oidc.authelia.clientSecret
+      clientSecret: $argocd-oidc-authelia:clientSecret
       requestedScopes:
         - openid
         - profile
