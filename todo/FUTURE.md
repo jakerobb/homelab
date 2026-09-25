@@ -96,3 +96,36 @@ the developer asked us to test. Watchtower won't move a pinned tag, so the pin s
 `~/docker/docker-compose.yml` on rpi5-1 (a real file, not a symlink; see
 [`../docker-compose/README.md`](../docker-compose/README.md)), then `docker compose pull optimizer && docker compose up
 -d optimizer` there.
+
+## Re-enable `KubeMemoryOvercommit` alert notifications
+
+**Waiting on:** the Mac Studio being onboarded as a Talos worker. On 2026-09-25 this alert was routed to Alertmanager's
+`null` receiver in
+[`../argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml) (search
+for `KubeMemoryOvercommit`). It fires when total memory requests exceed what the cluster could still hand out after
+losing its largest node. That's accurate, not a false positive: `talos-worker-mbp` holds ~58% of cluster memory, so no
+realistic set of requests passes (see [`DONE.md`](DONE.md#audit-app-memory-requests-against-real-usage)). It fired
+daily, with nothing to act on until a second large node exists. Once the Studio is a worker, delete that route and
+check the alert in the Prometheus UI: it should be inactive. If it's still firing, revisit requests (see the next item)
+before re-enabling notifications.
+
+## Trim over-sized memory requests
+
+**Waiting on:** a clean month of usage history. **Revisit on or after 2026-10-25.** The 2026-09-24 audit set memory
+requests just above each workload's 7-day *peak*; p95 is the usual basis. Biggest overshoots, summed across
+replicas/nodes: cilium-agent (~1.8GiB over p95), otel-agent (~1.5GiB; 384Mi on every node, sized for mbp, while the
+Pis use ~65Mi), kube-apiserver (~0.9GiB; 1536Mi each on three control planes), cilium-envoy (~0.6GiB). Together
+about 2-3GiB of requested memory. Waiting because Cilium and every pod on mbp restarted on 2026-09-24, so the recent
+history understates their steady state. Re-run the same Prometheus comparison (per-container 7d/30d p95 and max vs
+`kube_pod_container_resource_requests`) and size to about p95. The apiserver lives in
+[`../talos/patches/control-plane/control-plane-resources.yaml`](../talos/patches/control-plane/control-plane-resources.yaml)
+(needs a `talosctl patch` per control plane); the rest are Helm values in `argocd/apps/` and `talos/cilium/values.yaml`
+(Cilium needs a manual ArgoCD sync).
+
+## Memory requests for SigNoz's ClickHouse operator
+
+**Waiting on:** the upstream `signoz` Helm chart exposing resources for its bundled clickhouse-operator. As of chart
+0.143.0 there's no values key for the `operator` and `metrics-exporter` containers of `signoz-clickhouse-operator`, so
+they're the only long-running containers in the cluster without memory requests (~100Mi together). Not worth a
+post-render patch for that little. When Renovate bumps the chart, check `helm show values signoz/signoz` under
+`clickhouse.clickhouseOperator` for a `resources` key, and set requests from real usage if it's there.
