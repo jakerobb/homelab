@@ -1,6 +1,7 @@
-# Wave 1 — waits for the cert-manager Application (wave 0) to be Healthy
-# before applying, since the ClusterIssuer/Certificate kinds don't exist
-# until cert-manager's CRDs are installed. See argocd/README.md.
+# Wave 1, created after the cert-manager Application (wave 0). The
+# ClusterIssuer/Certificate kinds don't exist until cert-manager's CRDs are
+# installed. Root doesn't wait for that, so on a cold bootstrap the first
+# syncs can fail, and the retry policy covers it. See argocd/README.md.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -21,3 +22,9 @@ spec:
     automated:
       selfHeal: true
       prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

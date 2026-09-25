@@ -4,9 +4,10 @@
 # (authelia, cert-manager, external-dns, democratic-csi, ArgoCD itself)
 # are Helm-only Applications with no manifests/ directory to put them in.
 #
-# Wave 0, after the operator (wave -1). The retry covers a cold bootstrap,
-# where a target namespace may not exist yet because its own Application
-# (which creates it) is syncing in the same wave; a later attempt succeeds.
+# Wave 0, after the operator (wave -1). Its retry policy, the same one every
+# Application has, covers a cold bootstrap: ESO's webhook not answering yet
+# (seen on the first deploy, 2026-09-25), or a target namespace whose own
+# Application hasn't created it yet.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
