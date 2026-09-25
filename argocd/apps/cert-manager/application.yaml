@@ -1,7 +1,8 @@
 # Wave 0: chart + CRDs + controllers only. The ClusterIssuer/Certificate
-# (argocd/apps/cert-manager-config) are a separate Application at wave 1 so
-# root waits for this one to report Healthy before creating them — otherwise
-# the ClusterIssuer's `kind` wouldn't exist yet (CRD race).
+# are a separate Application (argocd/apps/cert-manager-config, wave 1)
+# because their kinds don't exist until this chart's CRDs do. Waves only
+# order creation, not health; that app's retry policy rides out the CRD race
+# on a cold bootstrap. See argocd/README.md.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -55,5 +56,11 @@ spec:
     automated:
       selfHeal: true
       prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
     syncOptions:
       - CreateNamespace=true

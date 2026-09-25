@@ -60,12 +60,22 @@ decision log; this doc is the distilled, repeatable process.
       automated:
         selfHeal: true
         prune: true
+      retry:
+        limit: 10
+        backoff:
+          duration: 30s
+          factor: 2
+          maxDuration: 10m
   ```
 
   `selfHeal`/`prune` are on for everything today because nothing
   stateful is under ArgoCD's management yet — **revisit once a
   PVC-backed app is added** (prune deleting a PVC can delete real data,
-  depending on the StorageClass's reclaim policy).
+  depending on the StorageClass's reclaim policy). Keep the `retry` block
+  too. Auto-sync never re-attempts a failed sync of the same commit, and
+  sync waves don't wait for a dependency to be healthy, so a sync that
+  fails for an ordering reason would otherwise stay failed. See
+  argocd/README.md's "Sync waves only order creation".
 
 ## 2. Bare manifests vs. an external Helm chart
 

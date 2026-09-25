@@ -60,6 +60,23 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   depending on the storage class's reclaim policy. Also worth remembering
   day-to-day: self-heal reverts manual `kubectl edit`/`kubectl scale` fixes on
   the next sync (~3 min) unless you pause auto-sync first.
+- **Sync waves only order creation; retries do the rest (2026-09-25).**
+  Root applies child `Application`s in `sync-wave` order, but it doesn't wait
+  for one wave to be Healthy before the next. That needs a Lua health check
+  for `argoproj.io/Application` in `argocd-cm`, which Argo CD dropped from its
+  defaults in 1.8, and we deliberately don't add it. With it, one app stuck
+  Degraded (democratic-csi whenever TrueNAS is down, say) would stall root's
+  sync, so changes to later-wave Application manifests, like Renovate's chart
+  bumps, would pile up behind it. So a dependent can come up before its
+  dependency on a cold bootstrap: a webhook not answering yet, a namespace or
+  Secret not there yet, cert-manager's CRDs (it installs its own) not
+  registered yet. Auto-sync never re-attempts a failed sync of the same
+  commit by itself (`selfHeal` only reacts to drift after a successful sync),
+  so every automated Application carries the same `retry` block: 10 attempts,
+  backing off from 30s up to 10m, about an hour in total. The waves still set
+  a sensible order, which means fewer retries. The exceptions: `cilium`
+  (manual sync only), and root itself, which only creates `Application`
+  objects.
 - **Exposure:** `HTTPRoute` on the existing `homelab-gateway`
   ([`apps/argocd-ingress/httproute.yaml`](apps/argocd-ingress/httproute.yaml)),
   hostname `argocd.jakerobb.org`. `server.insecure: true` in the Helm values
@@ -120,8 +137,10 @@ on every device, no manually-added DNS entries per app:
   objects are needed going forward.
 - **Bootstrap ordering:** the `cert-manager` Application (chart + CRDs) is
   sync-wave `0`; `cert-manager-config` (the `ClusterIssuer` + `Certificate`,
-  which need cert-manager's CRDs to already exist) is wave `1`. Root waits
-  for wave 0 to be Healthy before applying wave 1.
+  which need cert-manager's CRDs to already exist) is wave `1`. Waves only
+  order creation (see "Sync waves only order creation" above). On a cold
+  bootstrap, `cert-manager-config` can fail until the CRDs register, and its
+  retry policy covers that.
 - **Cloudflare API token:** scoped to `Zone:DNS:Edit` on the `jakerobb.org`
   zone only (Cloudflare's built-in "Edit zone DNS" token template, restricted
   to that one zone). Needed by both cert-manager (DNS-01 solver) and
@@ -178,8 +197,9 @@ time; those get added to Authelia's `access_control` as they land, not now.
   Authelia chart's `ingress.gatewayAPI` option), hostname
   `auth.jakerobb.org`.
 - **Bootstrap ordering:** `local-path-provisioner` is sync-wave `0`
-  (alongside `cert-manager` — independent, both need to be healthy before
-  anything that depends on either); `authelia` is wave `1`.
+  (alongside `cert-manager`); `authelia` is wave `1`, so it's created after
+  both. It doesn't wait for them to be healthy; retries cover that (see
+  "Sync waves only order creation" above).
 - **Secrets:** all from 1Password via External Secrets Operator
   ([`manifests/external-secrets-config/authelia.yaml`](../manifests/external-secrets-config/authelia.yaml)),
   items in the `homelab-k8s` vault:
