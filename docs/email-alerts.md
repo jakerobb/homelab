@@ -133,6 +133,6 @@ msmtpq-sendmail --q-mgmt -r
 - A temporary `* * * * *` crontab entry writing to stderr was delivered
   through cron's real `MAILTO` → `/usr/sbin/sendmail` path.
 
-**Not covered:** `scripts/unifi-gc-report.py` calls `msmtp -a brevo -t`
-directly rather than `sendmail`, so its reports bypass the queue. It raises
-on failure, so the failure appears in its own log.
+`scripts/unifi-gc-report.py` sends its reports through `/usr/sbin/sendmail`
+too (as of 2026-09-25; it used to call `msmtp` directly), so they are
+queued the same way.
