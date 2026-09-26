@@ -1,0 +1,24 @@
+// rpi5-1 overrides for unattended-upgrades. Installed to
+// /etc/apt/apt.conf.d/ by install.sh; see docs/rpi5-1-os-updates.md.
+
+// Debian security only. Point releases, the Raspberry Pi archive (kernel,
+// firmware, bootloader), and Docker stay manual so they can be timed.
+Unattended-Upgrade::Origins-Pattern {
+        "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+};
+
+// Belt and braces in case docker.com ever lands in the pattern above: a
+// dockerd upgrade restarts every Compose container at once.
+Unattended-Upgrade::Package-Blacklist {
+        "docker-ce";
+        "docker-ce-cli";
+        "containerd.io";
+        "docker-compose-plugin";
+        "docker-buildx-plugin";
+};
+
+// Never reboot on its own; /var/run/reboot-required is checked by hand.
+Unattended-Upgrade::Automatic-Reboot "false";
+
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
