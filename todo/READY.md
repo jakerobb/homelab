@@ -6,17 +6,24 @@ observable cluster before we bring in critical workloads.
 
 ## Migrate domain names Hover -> CloudFlare
 
-**In progress (2026-09-25).** Zones are Terraform-managed in `terraform/cloudflare/` (runbook in its README).
-Hover inventory: no URL forwards or mailboxes anywhere; everything except `jakerobb.dev` was parked, dead, or
-pointing at a retired server, so they all become empty "parked" zones.
+**In progress.** Zones are Terraform-managed in `terraform/cloudflare/` (runbook in its README). On 2026-09-26 the 15
+domains below were moved to Cloudflare DNS as empty "parked" zones and their registrar transfers started; nothing on
+them was live (no URL forwards or mailboxes, and everything was parked, dead, or pointing at a retired server).
+`soleman.ski` and `commaspacebitch.com` had auto-renew turned off at Hover and will lapse. `jakerobb.dev` is next, once
+the transfers have all landed; see [`FUTURE.md`](FUTURE.md#migrate-jakerobbdev-from-hover-to-cloudflare).
 
-* **Move, parked:** jakerobb.me, robb.online, robb.software, indigoapps.dev, fastodon.dev, fastodon.me,
-  yourwebsiteisterrible.com (future blog on terrible web UX; maybe also grab yourappisterrible.com), camaroev.net,
-  camaro-ev.com, camaroev.org, camaroquestions.com, firebirdquestions.com, transamquestions.com, fbodyquestions.com,
-  modyourcamaro.com
-* **Move last:** jakerobb.dev (personal website; real records to carry over, SendGrid leftovers to drop)
-* **Drop** (turn off auto-renew at Hover and let lapse): soleman.ski (also not supported by Cloudflare Registrar),
-  commaspacebitch.com
+What each domain is (or was) for:
+* jakerobb.dev -- my personal website. Moving last.
+* soleman.ski -- Squarespace site for my father-in-law's business. Never finished; dropped.
+* commaspacebitch.com -- a joke domain I registered twenty years ago, never used; dropped.
+* jakerobb.me, robb.online, robb.software -- just grabbed these because I could; unused.
+* yourwebsiteisterrible.com -- future blog about terrible web UX and how it could be better. Maybe also grab
+  yourappisterrible.com for mobile apps.
+
+Reserved business opportunities:
+* indigoapps.dev -- Indigo because it's the color Apple left out of its original rainbow logo; the idea was that I'd build apps Apple neglected. No specific ideas.
+* fastodon.dev, fastodon.me - I was into Mastodon for a while and thought I wanted to build and host an ActivityPub server in Go rather than Ruby; it would be super performant, hence the name. 
+* camaroev.net, camaro-ev.com, camaroev.org, camaroquestions.com, firebirdquestions.com, transamquestions.com, fbodyquestions.com, modyourcamaro.com -- I love Camaros and wanted to build something here. 
 
 ## Make a Documentation app/site -- docs.jakerobb.org
 

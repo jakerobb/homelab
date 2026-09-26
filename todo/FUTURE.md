@@ -128,3 +128,36 @@ history understates their steady state. Re-run the same Prometheus comparison (p
 they're the only long-running containers in the cluster without memory requests (~100Mi together). Not worth a
 post-render patch for that little. When Renovate bumps the chart, check `helm show values signoz/signoz` under
 `clickhouse.clickhouseOperator` for a `resources` key, and set requests from real usage if it's there.
+
+## Migrate `jakerobb.dev` from Hover to Cloudflare
+
+**Waiting on:** the 15 domains transferred on 2026-09-26 all landing at Cloudflare Registrar without issue. `jakerobb.dev`
+was held back on purpose because it's the one that matters. Same process as the others (runbook in
+[`../terraform/cloudflare/README.md`](../terraform/cloudflare/README.md#moving-a-domain-from-hover)), plus:
+
+- **Real records to carry over** into their own file in `terraform/cloudflare/` (not `parked.tf`): the Linode hosts
+  (`@`, `beta`, `*`, `ci`, `job`, `db`, A and AAAA) and the `_acme-challenge.postgres` CNAME to `jakerobb.org`.
+  Re-check Hover's DNS tab first, since the site runs on Linode and records may have changed (see "Linode workload
+  migration" above). Drop the leftover SendGrid records (`23632814`, `em4126`, `em7338`, `s1`/`s2._domainkey`,
+  `url3118`, `url7304`) and the broken `null _domainkey` entry.
+- **Email forwarding:** Hover forwards `jake@jakerobb.dev` to Gmail, and that stops working when the nameservers move.
+  Replace it with Cloudflare Email Routing (Terraform: `cloudflare_email_routing_settings`, `_address`, `_rule`, plus
+  the MX/SPF records routing asks for). The token needs two more permissions for this: Zone · Email Routing Rules ·
+  Edit and Account · Email Routing Addresses · Edit. The destination address needs a one-time verification click in
+  Gmail. Set it up before switching nameservers so mail doesn't bounce in between. Fix the SPF record at the same time;
+  it's currently malformed (`v=spf1\010v=spf1 include:_spf.google.com ~all.`), probably meant to allow sending as this
+  address through Gmail.
+- **Order at Hover:** change the nameservers first, then unlock it. Changing nameservers re-locked the other domains.
+- **Afterwards:** turn off auto-renew on the Hover email forward (it renews separately, next on 2029-03-03), then close
+  the Hover account once nothing's left in it.
+
+## Revisit the parked domains
+
+**Waiting on:** the next renewal cycle. The 15 domains moved to Cloudflare on 2026-09-26 are parked (no web records,
+"sends no mail" records, [`../terraform/cloudflare/parked.tf`](../terraform/cloudflare/parked.tf)) and will auto-renew
+at Cloudflare. **Revisit on or after 2027-11-01**, before the earliest renewal (`modyourcamaro.com`, around 2027-12-05
+now that the transfer added a year). For each one, decide: keep holding it, actually build the thing, or let it lapse
+(turn off auto-renew in the Cloudflare dashboard and remove it from `parked.tf`). What each one was for is in the
+Hover-to-Cloudflare migration entry ([`READY.md`](READY.md) until it's done, [`DONE.md`](DONE.md) after).
+`yourwebsiteisterrible.com` is the one with a live idea: a blog about terrible web UX and how to fix it, maybe with a
+sister site `yourappisterrible.com` (not registered yet) for mobile apps.
