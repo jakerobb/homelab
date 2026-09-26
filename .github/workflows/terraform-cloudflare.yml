@@ -1,0 +1,128 @@
+# terraform/cloudflare: plan on pull requests, apply on merge to main.
+#
+# Same shape as terraform-proxmox.yml. Cloudflare's API is public, but this
+# still runs on the jump box's self-hosted runner (label homelab-jumpbox): that's
+# where the SOPS key and tf.sh's lock live, via terraform/cloudflare/tf.sh,
+# using the host's own terraform/sops binaries so CI and manual runs never
+# disagree on Terraform version (state written by a newer Terraform can't be
+# read by an older one). Setup: docs/gha-terraform.md.
+#
+# This repo is public, so fork PRs must never reach the self-hosted runner:
+# the plan job only runs for PRs whose head branch lives in this repo
+# (Renovate's included), and the repo's Actions settings additionally require
+# approval before any outside contributor's workflow runs. Never switch this
+# to pull_request_target.
+#
+# Workflow logs on a public repo are public. Sensitive variables are redacted
+# by Terraform, but don't add outputs or debug logging that print secrets.
+name: terraform-cloudflare
+
+on:
+  pull_request:
+    paths:
+      - terraform/cloudflare/**
+      - terraform/proxmox/secrets/b2-state-backend.sops.yaml
+      - .github/workflows/terraform-cloudflare.yml
+  push:
+    branches: [main]
+    paths:
+      - terraform/cloudflare/**
+      - terraform/proxmox/secrets/b2-state-backend.sops.yaml
+      - .github/workflows/terraform-cloudflare.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  plan:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, homelab-jumpbox]
+    concurrency:
+      group: terraform-cloudflare-plan-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Format check
+        run: terraform -chdir=terraform/cloudflare fmt -check -diff
+
+      - name: Init
+        run: ./terraform/cloudflare/tf.sh init
+
+      - name: Validate
+        run: ./terraform/cloudflare/tf.sh validate -no-color
+
+      - name: Plan
+        run: |
+          set -o pipefail
+          ./terraform/cloudflare/tf.sh plan -no-color 2>&1 | tee "$RUNNER_TEMP/plan.txt"
+
+      - name: Plan summary
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/plan.txt" ] || exit 0
+          {
+            echo '### terraform/cloudflare plan'
+            echo
+            grep -E '^(Plan:|No changes\.|Error:)' "$RUNNER_TEMP/plan.txt" || true
+            echo
+            echo '<details><summary>Full plan</summary>'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/plan.txt"
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, homelab-jumpbox]
+    # Never cancel an in-flight apply. A newer queued apply replacing an older
+    # queued one is fine — it applies main as of the newer commit anyway.
+    concurrency:
+      group: terraform-cloudflare-apply
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Init
+        run: ./terraform/cloudflare/tf.sh init
+
+      # Empty state means a misconfigured/unmigrated backend, not a fresh
+      # environment — applying would try to create duplicates of every
+      # existing zone. The first apply is a manual tf.sh run (README.md).
+      - name: Refuse to apply against empty state
+        run: |
+          if [ -z "$(./terraform/cloudflare/tf.sh state list)" ]; then
+            echo "::error::Remote state is empty — refusing to apply. See docs/gha-terraform.md."
+            exit 1
+          fi
+
+      - name: Apply
+        run: |
+          set -o pipefail
+          ./terraform/cloudflare/tf.sh apply -auto-approve -no-color 2>&1 | tee "$RUNNER_TEMP/apply.txt"
+
+      - name: Apply summary
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/apply.txt" ] || exit 0
+          {
+            echo '### terraform/cloudflare apply'
+            echo
+            grep -E '^(Apply complete!|No changes\.|Error:)' "$RUNNER_TEMP/apply.txt" || true
+            echo
+            echo '<details><summary>Full output</summary>'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/apply.txt"
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
