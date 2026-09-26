@@ -138,6 +138,17 @@ down onto it (~14h50m for 1.33TiB/318821 files — mostly small Photos Library f
 more than raw bandwidth). `rclone
 check` afterward: 0 differences, 318821 matching files.
 
+**NFS / ReadWriteMany path completed (2026-09-25).** `hexos-nfs` `StorageClass` from a second democratic-csi release
+([`../argocd/apps/democratic-csi-nfs/`](../argocd/apps/democratic-csi-nfs/application.yaml), `freenas-api-nfs` driver):
+one dataset + export per PVC under `data/k8s-nfs`, `maproot=root` + `0777`, Server-VLAN-only exports, `Retain`, NFSv4.2,
+same SELinux `context=` label and standalone registrar as the iSCSI release. Existing data (`data/shared`) is reached via
+a static PV through the same driver instead. Usage, caveats, and the verification procedure are in
+[`../docs/nfs-storage.md`](../docs/nfs-storage.md). Verified end-to-end on deploy: two pods on different workers (one
+non-root with `fsGroup`, one root) reading each other's files, root `chown` working, refquota enforced at the PVC size
+(`Disk quota exceeded` with incompressible data — zeros compress away and don't hit it), dataset/share comments set to
+`<namespace>/<pvc>`, a read-only static PV on `data/shared` from the third worker with `supplementalGroups: [3003]`, no
+AVC denials on any worker, and the driver's `DeleteVolume` removing its dataset and export cleanly.
+
 The earlier idea of moving InfluxDB's datastore onto `hexos-iscsi` is now moot — the Compose observability stack
 (InfluxDB included) isn't being lifted into the cluster as-is; it's superseded by the in-cluster metrics stack instead.
 
