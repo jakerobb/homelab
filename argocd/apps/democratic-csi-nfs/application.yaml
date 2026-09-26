@@ -1,0 +1,148 @@
+# NFS-backed StorageClass against HexOS/TrueNAS, for genuinely
+# ReadWriteMany workloads (media libraries, anything several pods read and
+# write at once). hexos-iscsi (argocd/apps/democratic-csi/) stays the
+# cluster default; iSCSI is block storage and can't do RWX.
+#
+# A second release of the same chart, not an addition to the iSCSI one:
+# democratic-csi runs one driver per release. The release name contains
+# "democratic-csi", so the chart's fullname is just "democratic-csi-nfs" and
+# nothing collides with the iSCSI release sharing the namespace. The
+# namespace itself (privileged PodSecurity) and the selinux-config
+# ConfigMap both come from argocd/apps/democratic-csi/.
+#
+# Each PVC gets its own dataset under data/k8s-nfs and its own NFS share,
+# created through the TrueNAS API (the driver creates the parent dataset
+# too). For mounting existing data such as data/shared, use a static PV
+# with this same driver instead; see docs/nfs-storage.md.
+#
+# driver.existingConfigSecret points at a Secret rendered by External
+# Secrets Operator. Edit the driver config in
+# manifests/external-secrets-config/democratic-csi-nfs.yaml, not here.
+#
+# reclaimPolicy: Retain, same reasoning as hexos-iscsi: under ArgoCD's
+# `prune: true`, an accidental prune orphans the dataset on HexOS instead
+# of deleting real data.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: democratic-csi-nfs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/democratic-csi/charts.git
+    targetRevision: democratic-csi-0.15.1
+    path: stable/democratic-csi
+    helm:
+      releaseName: democratic-csi-nfs
+      valuesObject:
+        csiDriver:
+          name: "org.democratic-csi.nfs"
+          # Lets kubelet apply a pod's fsGroup to RWX volumes too. The
+          # chart's default (ReadWriteOnceWithFSType) skips them, and NFS
+          # volumes have no fsType of their own.
+          fsGroupPolicy: File
+        storageClasses:
+          - name: hexos-nfs
+            defaultClass: false
+            reclaimPolicy: Retain
+            volumeBindingMode: Immediate
+            allowVolumeExpansion: true
+            parameters:
+              fsType: nfs
+            mountOptions:
+              # Linux clients only, so v4.2 is safe. The NFSv4 failures in
+              # docs/hexos-install.md are specific to the macOS client.
+              - nfsvers=4.2
+              - noatime
+              # Same SELinux label as hexos-iscsi, for the same reason: without
+              # it every pod write lands as an AVC denial (nfs_t) in the audit
+              # log. See talos/README.md "SELinux labels on iSCSI volumes".
+              - context=system_u:object_r:ephemeral_t:s0
+            secrets: {}
+        volumeSnapshotClasses: []
+        # Images and requests match the iSCSI release. Keep the driver tags
+        # in step with argocd/apps/democratic-csi/application.yaml; Renovate
+        # PRs both, via the regex manager in renovate.json.
+        controller:
+          driver:
+            image:
+              # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
+              tag: 'v1.9.5'
+            resources:
+              requests:
+                cpu: 10m
+                memory: 192Mi
+          externalAttacher:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+          externalProvisioner:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+          externalResizer:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+          externalSnapshotter:
+            resources:
+              requests:
+                cpu: 5m
+                memory: 64Mi
+        csiProxy:
+          resources:
+            requests:
+              cpu: 5m
+              memory: 32Mi
+        node:
+          # Replaced by node-driver-registrar.yaml in this directory, same as
+          # the iSCSI release. The chart's registrar pins a private copy of
+          # every volume mounted under /var/lib/kubelet; see the header of
+          # argocd/apps/democratic-csi/node-driver-registrar.yaml.
+          driverRegistrar:
+            enabled: false
+          driver:
+            image:
+              # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
+              tag: 'v1.9.5'
+            resources:
+              requests:
+                cpu: 20m
+                memory: 224Mi
+            # Without this, libmount drops the context= mount option. See
+            # argocd/apps/democratic-csi/selinux-config.yaml.
+            extraVolumeMounts:
+              - name: selinux-config
+                mountPath: /etc/selinux/config
+                subPath: config
+                readOnly: true
+          extraVolumes:
+            - name: selinux-config
+              configMap:
+                name: selinux-config
+        driver:
+          # Read at render time by the chart's node template (it only wires up
+          # iSCSI host mounts when this contains "iscsi"). The real config,
+          # with the same value, comes from existingConfigSecret.
+          config:
+            driver: freenas-api-nfs
+          existingConfigSecret: democratic-csi-truenas-nfs-config
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: democratic-csi
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

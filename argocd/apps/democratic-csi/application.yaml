@@ -1,8 +1,8 @@
 # iSCSI-backed StorageClass against HexOS/TrueNAS, chosen as the cluster's
 # default block-storage path (see terraform/proxmox and talos/README.md for
-# the iscsi-tools Talos extension this depends on). NFS stays available as a
-# separate, later addition for genuinely ReadWriteMany workloads — this app
-# only covers iSCSI.
+# the iscsi-tools Talos extension this depends on). This app only covers
+# iSCSI. ReadWriteMany NFS volumes come from a second release of the same
+# chart, argocd/apps/democratic-csi-nfs/.
 #
 # Sourced directly from the maintainer's own chart repo (not an ArtifactHub
 # mirror) — same trust reasoning as local-path-provisioner: this runs
