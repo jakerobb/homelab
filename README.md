@@ -27,7 +27,8 @@ Passwords and other secrets are in 1Password in the Tech vault, which is shared 
           the CGFiber.
     - **Servers**
         - `rpi5-1` - .2 on the Server VLAN. Docker Compose host and Jump box for Talos, Terraform, and Kubectl. Also has
-          a USB connection to the CyberPower UPS.
+          a USB connection to the CyberPower UPS. Security updates apply automatically; see
+          [`docs/rpi5-1-os-updates.md`](docs/rpi5-1-os-updates.md).
         - 3-node Talos control plane (`.11`-`.13`, Raspberry Pi 5 4GB with PoE+NVMe HATs and 256G NVMe storage)
             - `.10` is the cluster virtual IP
         - MS-A2 (`.21`) running Proxmox VE, hosting:
