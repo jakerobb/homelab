@@ -1,0 +1,62 @@
+# democratic-csi NFS driver config (existingConfigSecret in
+# argocd/apps/democratic-csi-nfs/application.yaml). Same layout as
+# democratic-csi.yaml next to this file: only the TrueNAS API key is secret,
+# and it's the same 1Password item the iSCSI driver uses. Edit the config
+# here; ESO re-renders the Secret, and the controller/node pods need a
+# restart to pick up changes.
+#
+# Share settings (decided 2026-09-25): maproot root plus 0777 dataset
+# permissions, so pods running as any UID can write and fsGroup/chown work.
+# Exports are limited to the Server VLAN, where every Talos node lives, same
+# as the existing data/shared export.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: democratic-csi-truenas-nfs-config
+  namespace: democratic-csi
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: democratic-csi-truenas-nfs-config
+    template:
+      engineVersion: v2
+      data:
+        driver-config-file.yaml: |
+          driver: freenas-api-nfs
+          instance_id:
+          httpConnection:
+            protocol: https
+            host: 192.168.102.33
+            port: 443
+            apiKey: "{{ .apiKey }}"
+            allowInsecure: true
+          zfs:
+            # Siblings of data/k8s-iscsi; neither may be nested in the other.
+            datasetParentName: data/k8s-nfs
+            detachedSnapshotsDatasetParentName: data/k8s-nfs-snapshots
+            # PVC size becomes the dataset's refquota.
+            datasetEnableQuotas: true
+            datasetEnableReservation: false
+            datasetPermissionsMode: "0777"
+            datasetPermissionsUser: 0
+            datasetPermissionsGroup: 0
+            datasetProperties:
+              "org.freenas:description": "{{`{{ parameters.[csi.storage.k8s.io/pvc/namespace] }}/{{ parameters.[csi.storage.k8s.io/pvc/name] }}`}}"
+          nfs:
+            shareCommentTemplate: "{{`{{ parameters.[csi.storage.k8s.io/pvc/namespace] }}/{{ parameters.[csi.storage.k8s.io/pvc/name] }}`}}"
+            shareHost: 192.168.102.33
+            shareAlldirs: false
+            shareAllowedHosts: []
+            shareAllowedNetworks:
+              - 192.168.102.0/24
+            shareMaprootUser: root
+            shareMaprootGroup: root
+            shareMapallUser: ""
+            shareMapallGroup: ""
+  data:
+    - secretKey: apiKey
+      remoteRef:
+        key: truenas-api-key-democratic-csi/api-key
