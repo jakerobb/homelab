@@ -4,15 +4,6 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## HexOS storage
-
-**In progress (2026-09-25) — manifests in `argocd/apps/democratic-csi-nfs/`, pending merge and end-to-end verification.**
-An NFS-backed `StorageClass` (`hexos-nfs`) for genuinely ReadWriteMany workloads (media libraries, etc.) — the
-`hexos-iscsi` `StorageClass` already in place is iSCSI/block storage, which can't do RWX. Second democratic-csi release
-(`freenas-api-nfs`), one dataset + export per PVC under `data/k8s-nfs`, plus a documented static-PV pattern for
-mounting the existing `data/shared` export. See [`../docs/nfs-storage.md`](../docs/nfs-storage.md). Remaining: once
-merged and synced, run the end-to-end check in that doc, then move this entry to DONE.md.
-
 ## Migrate domain names Hover -> CloudFlare
 
 I have several domain names registered at Hover:

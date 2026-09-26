@@ -153,5 +153,14 @@ For an end-to-end check:
 3. Confirm that `data/k8s-nfs/pvc-…` and its export exist on HexOS.
 4. Mount a read-only static PV against `data/shared` and list its top-level
    folders.
-5. Delete the test resources, then the leftover PV and dataset (they stay
-   behind because of `Retain`).
+5. Clean up. Before deleting the test PVC, patch its PV to
+   `persistentVolumeReclaimPolicy: Delete`; the driver then removes the
+   dataset and export itself, and the delete path gets tested too. Delete
+   the static PV normally (with `Retain` and no StorageClass, nothing
+   touches `data/shared`).
+
+To test the quota, write incompressible data (`/dev/urandom`). Zeros
+compress away on ZFS and never hit the refquota.
+
+Last run 2026-09-25, all passing. The results are in
+[`../todo/DONE.md`](../todo/DONE.md#hexos-storage).
