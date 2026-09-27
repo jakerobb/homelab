@@ -17,7 +17,6 @@ locals {
     "db-a"      = { name = "db.jakerobb.dev", type = "A", content = "172.233.211.22" }
     "db-aaaa"   = { name = "db.jakerobb.dev", type = "AAAA", content = "2600:3c06::f03c:92ff:fe98:7e2" }
     "acme-pg"   = { name = "_acme-challenge.postgres.jakerobb.dev", type = "CNAME", content = "_acme-challenge.postgres.jakerobb.org" }
-    "spf"       = { name = "jakerobb.dev", type = "TXT", content = "\"v=spf1 include:_spf.google.com ~all\"" }
   }
 }
 
@@ -36,17 +35,4 @@ resource "cloudflare_dns_record" "jakerobb_dev" {
   content = each.value.content
   proxied = false
   ttl     = 1 # automatic
-}
-
-# Interim: Hover's mail servers still hold the jake@ forward (to Gmail) and
-# keep honoring it regardless of who serves DNS, so pointing MX back at them
-# keeps mail flowing. Replace with Cloudflare Email Routing, then turn off
-# the Hover forward.
-resource "cloudflare_dns_record" "jakerobb_dev_mx_hover" {
-  zone_id  = cloudflare_zone.jakerobb_dev.id
-  name     = "jakerobb.dev"
-  type     = "MX"
-  content  = "mx.hover.com.cust.hostedemail.com"
-  priority = 10
-  ttl      = 1
 }
