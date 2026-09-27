@@ -26,29 +26,29 @@ resource "cloudflare_email_routing_rule" "jakerobb_dev_jake" {
   }]
 }
 
-# The records Email Routing needs, as its API specifies them for this zone
-# (GET /zones/:id/email/routing/dns; the MX priorities are per-zone). Managed
-# here rather than letting Cloudflare add them on enable, so the SPF record
-# can also keep Google (for sending as jake@ from Gmail).
-locals {
-  jakerobb_dev_mx = {
-    route1 = 45
-    route2 = 16
-    route3 = 64
+# Email Routing's MX and DKIM records (route1-3.mx.cloudflare.net, and
+# cf2024-1._domainkey) were first created here, but enabling routing locks
+# them: the API rejects any change, even a no-op, with "This record is managed
+# by Email Routing" (code 1046). So they're Cloudflare's now, and these blocks
+# drop them from state without deleting them. On a rebuild, enabling routing
+# adds them itself.
+removed {
+  from = cloudflare_dns_record.jakerobb_dev_mx
+  lifecycle {
+    destroy = false
   }
 }
 
-resource "cloudflare_dns_record" "jakerobb_dev_mx" {
-  for_each = local.jakerobb_dev_mx
-
-  zone_id  = cloudflare_zone.jakerobb_dev.id
-  name     = "jakerobb.dev"
-  type     = "MX"
-  content  = "${each.key}.mx.cloudflare.net"
-  priority = each.value
-  ttl      = 1
+removed {
+  from = cloudflare_dns_record.jakerobb_dev_routing_dkim
+  lifecycle {
+    destroy = false
+  }
 }
 
+# SPF isn't locked, so it stays here, to keep Google in it (for sending as
+# jake@ from Gmail). Enabling routing accepts it because it already includes
+# Cloudflare's.
 resource "cloudflare_dns_record" "jakerobb_dev_spf" {
   zone_id = cloudflare_zone.jakerobb_dev.id
   name    = "jakerobb.dev"
@@ -57,26 +57,14 @@ resource "cloudflare_dns_record" "jakerobb_dev_spf" {
   ttl     = 1
 }
 
-# Signs mail Cloudflare forwards, so Gmail doesn't flag it. Split into two
-# strings where Cloudflare splits it (a TXT string maxes out at 255 chars),
-# or every plan shows a diff.
-resource "cloudflare_dns_record" "jakerobb_dev_routing_dkim" {
-  zone_id = cloudflare_zone.jakerobb_dev.id
-  name    = "cf2024-1._domainkey.jakerobb.dev"
-  type    = "TXT"
-  content = "\"v=DKIM1; h=sha256; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiweykoi+o48IOGuP7GR3X0MOExCUDY/BCRHoWBnh3rChl7WhdyCxW3jgq1daEjPPqoi7sJvdg5hEQVsgVRQP4DcnQDVjGMbASQtrY4WmB1VebF+RPJB2ECPsEDTpeiI5ZyUAwJaVX7r6bznU67g7LvFq35yIo4sdlmtZGV+i0H4cpYH9+3JJ78k\" \"m4KXwaf9xUJCWF6nxeD+qG6Fyruw1Qlbds2r85U9dkNDVAS3gioCvELryh1TxKGiVTkg4wqHTyHfWsp7KD3WQHYJn0RyfJJu6YEmL77zonn7p2SRMvTMP3ZEXibnC9gz3nnhR6wcYL8Q7zXypKTMD58bTixDSJwIDAQAB\""
-  ttl     = 1
-}
-
-# Turns Email Routing on. After the records, so enabling finds them in place
-# instead of adding its own copies.
+# Turns Email Routing on. Routing was already enabled once directly through
+# the API (provider 5.25.0 crashed creating this; 5.26.0 fixed it), and
+# enabling again is a no-op.
 resource "cloudflare_email_routing_settings" "jakerobb_dev" {
   zone_id = cloudflare_zone.jakerobb_dev.id
 
   depends_on = [
-    cloudflare_dns_record.jakerobb_dev_mx,
     cloudflare_dns_record.jakerobb_dev_spf,
-    cloudflare_dns_record.jakerobb_dev_routing_dkim,
     cloudflare_email_routing_rule.jakerobb_dev_jake,
   ]
 }
