@@ -50,9 +50,10 @@ moving to the cluster get ArgoCD's reconciliation instead.
    recreate.** `up -d` only looks at the compose file, not at the contents
    of bind-mounted files. Services are matched to changed files through
    their actual bind mounts (from `docker compose config`), so there's no
-   table to maintain. A restart, not just a reload, is what picks up a
-   changed single-file bind mount like `caddy/Caddyfile` (see the inode
-   gotcha in the compose README).
+   table to maintain. Only mounts under `~/docker` count: host mounts like
+   telegraf's `/:/hostfs` would otherwise match every change. A restart,
+   not just a reload, is what picks up a changed single-file bind mount like
+   `caddy/Caddyfile` (see the inode gotcha in the compose README).
    - Caddy (`caddy validate`) and Home Assistant (`check_config`) are
      validated first. If validation fails, the service is **not** restarted:
      it keeps running its old config, and you get an alert. Note the broken

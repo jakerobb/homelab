@@ -304,7 +304,10 @@ class Deploy:
             self.problem("compose-config", "docker-compose.yml doesn't validate on rpi5-1 "
                                            "(`docker compose config`); nothing deployed.")
             return
-        mounts = {svc: [Path(v["source"]) for v in spec.get("volumes", []) if v["type"] == "bind"]
+        # Only mounts under ~/docker can hold deployed config. Host mounts like
+        # telegraf's `/:/hostfs` contain every path, so they'd match every change.
+        mounts = {svc: [Path(v["source"]) for v in spec.get("volumes", [])
+                        if v["type"] == "bind" and DEPLOY in Path(v["source"]).parents]
                   for svc, spec in json.loads(p.stdout)["services"].items()}
 
         writes = self.plan_files()

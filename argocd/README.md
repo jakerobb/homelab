@@ -1041,8 +1041,8 @@ The metric_log fix was verified live first with `ALTER TABLE
 system.metric_log MODIFY SETTING ...` (same two settings) before being put
 in config. When ClickHouse sees a system log table whose definition doesn't
 match config, it renames the old one to `metric_log_0` and creates a new
-one; if that happens on the next restart, `metric_log_0` keeps the ALTERed
-settings (so its merges are fine too) and can be dropped whenever.
+one. That happened on 2026-09-23; `metric_log_0` held only 09-22 to 09-23
+data and was dropped by hand on 2026-09-27.
 The old `system.trace_log` and `system.zookeeper_log` (~4 GiB together)
 were dropped by hand, since removing a system log from config doesn't drop
 its existing table.
