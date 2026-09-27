@@ -4,6 +4,16 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
+## Slow DNS in rpi5-1's Compose containers
+
+Found 2026-09-27. External DNS lookups from inside the Compose containers take about 4 seconds each; the same lookup
+on the host is instant. In the `telegraf` container, `curl -w "dns=%{time_namelookup}"` to `otel.jakerobb.org` shows
+4.0s every time, and `getent ahostsv4` is just as slow. The `resolv.conf` mounted into it
+(`docker-compose/resolv.conf`) lists `127.0.0.11`, then `172.18.0.1`, and nothing answers at `172.18.0.1`. Most
+services also set `dns: [192.168.102.2]` through the `x-dns` anchor. Nothing is broken yet, since clients reuse their
+connections, but anything with a short timeout could fail on a fresh lookup. Find the cause and fix it in the Compose
+config.
+
 ## Make a Documentation app/site -- docs.jakerobb.org
 
 Serves a hyperlinked view of all the docs. What everything is, how it works, how it's connected, how to fix common 

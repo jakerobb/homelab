@@ -156,3 +156,14 @@ confirm the setup is reproducible from this repo), or keep bookworm until closer
 `soleman.ski` on 2027-09-23. Everything else has moved to Cloudflare (see [`DONE.md`](DONE.md#domains-hover---cloudflare)).
 **Close it on or after 2027-09-24**, or sooner if leftover domains don't matter. The `jake@jakerobb.dev` forward still
 listed there is unused (mail goes through Cloudflare now) and can just be deleted.
+
+## Mac Studio on the Temperatures dashboard
+
+**Waiting on:** the Mac Studio arriving (expected November). Setting it up with
+[`../docs/mac-host-metrics.md`](../docs/mac-host-metrics.md) gets it onto SigNoz's Temperatures dashboard
+([`../terraform/signoz/dashboard-temperatures.tf`](../terraform/signoz/dashboard-temperatures.tf)) with no dashboard
+changes: the Mac panels group by `host.name`. The likely snag is temperatures. `collect-smc.sh` reads them from
+`powermetrics --samplers smc`, which was only verified on the Intel MacBook Pro, and Apple Silicon may not report die
+temperatures that way (step 5 of the runbook already warns about this). If it prints nothing there, pick another source
+for Apple Silicon's temperature sensors, and keep the metric name `smc_temperature_value` with `sensor=cpu_die` /
+`gpu_die` so the dashboard picks it up.
