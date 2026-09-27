@@ -1,0 +1,14 @@
+# Lets kubelet pull up to 5 images at once instead of one at a time
+# (Kubernetes' default). Added 2026-09-27 after the talos-worker-mbp
+# EPHEMERAL wipe: 40 images (3.58 GB compressed) took ~2.5 minutes to re-pull
+# serially, averaging well under 0.5 Gbps on a 2 Gbps link. Capped at 5 so a
+# burst of pulls can't swamp a node's disk or memory. See talos/README.md.
+#
+# Strategic merge (not a JSON patch like kubelet-log-limits.yaml): an
+# `op: add` on /machine/kubelet/extraConfig would replace that whole map and
+# drop the log limits.
+machine:
+  kubelet:
+    extraConfig:
+      serializeImagePulls: false
+      maxParallelImagePulls: 5
