@@ -9,8 +9,24 @@ observable cluster before we bring in critical workloads.
 **In progress.** Zones are Terraform-managed in `terraform/cloudflare/` (runbook in its README). On 2026-09-26 the 15
 domains below were moved to Cloudflare DNS as empty "parked" zones and their registrar transfers started; nothing on
 them was live (no URL forwards or mailboxes, and everything was parked, dead, or pointing at a retired server).
-`soleman.ski` and `commaspacebitch.com` had auto-renew turned off at Hover and will lapse. `jakerobb.dev` is next, once
-the transfers have all landed; see [`FUTURE.md`](FUTURE.md#migrate-jakerobbdev-from-hover-to-cloudflare).
+All 15 transfers landed at Cloudflare Registrar the same day. `soleman.ski` and `commaspacebitch.com` had auto-renew
+turned off at Hover and will lapse.
+
+### `jakerobb.dev` (in progress, 2026-09-26)
+
+- **Done:** zone and records in [`../terraform/cloudflare/jakerobb-dev.tf`](../terraform/cloudflare/jakerobb-dev.tf):
+  the Linode hosts, the `_acme-challenge.postgres` CNAME, and a fixed SPF record (Hover's was malformed:
+  `v=spf1\010v=spf1 include:_spf.google.com ~all.`). Dropped the dead SendGrid records and Hover's webmail CNAME.
+  Nameservers at Hover switched to Cloudflare and the domain unlocked. (The nameservers moved before the zone
+  existed, which took the site down for a few minutes; the first apply was run by hand to restore it.)
+- **Registrar transfer:** start it in the Cloudflare dashboard with the Hover auth code once the zone shows Active.
+- **Email:** Hover forwards `jake@jakerobb.dev` to Gmail. For now MX still points at Hover's mail servers, which keep
+  honoring the forward no matter who serves DNS. Replace it with Cloudflare Email Routing
+  (`cloudflare_email_routing_settings`, `_address`, `_rule`, plus the MX/SPF records routing needs). The
+  `homelab-terraform` token needs two more permissions first: Zone · Email Routing Rules · Edit and Account · Email
+  Routing Addresses · Edit. The Gmail destination needs a one-time verification click.
+- **Afterwards:** turn off auto-renew on the Hover email forward (it renews separately, next on 2029-03-03), then close
+  the Hover account once nothing's left in it.
 
 What each domain is (or was) for:
 * jakerobb.dev -- my personal website. Moving last.
