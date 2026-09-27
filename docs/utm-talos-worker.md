@@ -197,6 +197,9 @@ kubectl get pv -o custom-columns=PV:.metadata.name,SC:.spec.storageClassName,NOD
 The reset drains the node first. Anything too big for the other workers
 (Prometheus, ClickHouse) stays Pending until mbp is back. On 2026-09-27 the
 whole process took about 5 minutes: the node was Ready again after 2 minutes,
-all pods were Running after 4 (11.6 GB of images re-pulled), and ClickHouse
-and SigNoz were Ready after 5. Afterwards, confirm with `uptime` (or
+all pods were Running after 4 (40 images, 3.58 GB compressed, re-pulled one
+at a time), and ClickHouse and SigNoz were Ready after 5. Image pulls have
+been parallel since then
+([`../talos/README.md`](../talos/README.md#parallel-image-pulls-added-2026-09-27)),
+so this should be quicker next time. Afterwards, confirm with `uptime` (or
 `talosctl read /proc/uptime`) that the node really rebooted.

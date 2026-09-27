@@ -147,9 +147,10 @@ build artifact again.
    guess at them from scratch.
 2. Apply every committed patch (all of `talos/patches/control-plane/*.yaml`
    except the per-node hostname patches `cp1.yaml`/`cp2.yaml`/`cp3.yaml`,
-   plus `talos/patches/discovery-registry-fix.yaml` and
-   `talos/patches/kubelet-log-limits.yaml`, for `controlplane.yaml`; just
-   `kubelet-log-limits.yaml` for `worker.yaml` — the per-worker hostname
+   plus `talos/patches/discovery-registry-fix.yaml`,
+   `talos/patches/kubelet-log-limits.yaml` and
+   `talos/patches/kubelet-parallel-image-pulls.yaml`, for `controlplane.yaml`;
+   just the two `kubelet-*.yaml` patches for `worker.yaml` — the per-worker hostname
    *and* iSCSI kernel-module/extraMounts patches
    (`talos/patches/workers/worker-{1,2}.yaml`) are deliberately per-node,
    same as the control-plane hostname patches, and not folded into the
@@ -762,6 +763,31 @@ pinned one-per-node and unable to pile up further even if a node went
 down. RAM (4GB/worker) is the actual binding constraint on how many
 containers these boxes can run, not disk.
 
+
+### Parallel image pulls (added 2026-09-27)
+
+Kubelet pulls images one at a time by default. After the talos-worker-mbp
+EPHEMERAL wipe on 2026-09-27 (see
+[`../docs/utm-talos-worker.md`](../docs/utm-talos-worker.md)), re-pulling 40
+images (3.58 GB compressed) took about 2.5 minutes, averaging well under
+0.5 Gbps on a 2 Gbps link. [`patches/kubelet-parallel-image-pulls.yaml`](patches/kubelet-parallel-image-pulls.yaml)
+sets `serializeImagePulls: false` and `maxParallelImagePulls: 5`. It's a
+strategic-merge patch rather than a JSON patch like the log limits: an
+`op: add` on `/machine/kubelet/extraConfig` replaces that whole map, which
+would silently drop the log limits.
+
+```bash
+talosctl patch machineconfig -n <node-ip> -p @kubelet-parallel-image-pulls.yaml --mode=no-reboot
+```
+
+Applied live to all 6 nodes the same day. Only kubelet restarts; there's no
+reboot and pods keep running. Also applied to the `controlplane.yaml` and
+`worker.yaml` templates on rpi5-1. To check a node:
+
+```bash
+kubectl get --raw /api/v1/nodes/talos-worker-mbp/proxy/configz | jq '.kubeletconfig | {serializeImagePulls, maxParallelImagePulls, containerLogMaxSize}'
+```
+
 ## Control-plane VIP (added 2026-09-18)
 
 kubectl/OpenLens previously pointed at a single control-plane IP
@@ -874,9 +900,9 @@ recurrence since. Worth capturing here if/when that's dug up.
 - `patches/workers/` — per-node patches for the two MS-A2 worker VMs
   (hostname plus the iSCSI kernel-module/extraMounts settings — see
   "iscsi-tools extension" below).
-- `discovery-registry-fix.yaml`, `kubelet-log-limits.yaml` — shared
-  Talos machine-config patches applied to all 5 nodes (control planes and
-  workers alike).
+- `discovery-registry-fix.yaml`, `kubelet-log-limits.yaml`,
+  `kubelet-parallel-image-pulls.yaml` — shared Talos machine-config patches
+  applied to every node (control planes and workers alike).
 
 ## MS-A2 workers: decided values (2026-09-11)
 
