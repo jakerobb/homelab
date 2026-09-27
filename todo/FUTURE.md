@@ -90,8 +90,8 @@ investigate, but my plan is to eliminate most of it anyway. Every time I check t
 
 **Waiting on:** the stable NetworkOptimizer **2.9.0** release
 ([Ozark-Connect/NetworkOptimizer releases](https://github.com/Ozark-Connect/NetworkOptimizer/releases)). On 2026-09-24
-the `optimizer` service was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview3`
-on 2026-09-25) to try out a new feature the developer asked us to test. Watchtower won't move a pinned tag, so the pin
+the `optimizer` service was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview5`
+on 2026-09-27) to try out a new feature the developer asked us to test. Watchtower won't move a pinned tag, so the pin
 stays until someone changes it. Once 2.9.0 (or later) ships, change the image back to `:latest` in
 `docker-compose/docker-compose.yml`. Merging deploys it to rpi5-1 automatically (see
 [`../docs/compose-deploy.md`](../docs/compose-deploy.md)).
