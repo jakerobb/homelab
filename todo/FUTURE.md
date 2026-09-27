@@ -135,8 +135,8 @@ post-render patch for that little. When Renovate bumps the chart, check `helm sh
 "sends no mail" records, [`../terraform/cloudflare/parked.tf`](../terraform/cloudflare/parked.tf)) and will auto-renew
 at Cloudflare. **Revisit on or after 2027-11-01**, before the earliest renewal (`modyourcamaro.com`, around 2027-12-05
 now that the transfer added a year). For each one, decide: keep holding it, actually build the thing, or let it lapse
-(turn off auto-renew in the Cloudflare dashboard and remove it from `parked.tf`). What each one was for is in the
-Hover-to-Cloudflare migration entry ([`READY.md`](READY.md) until it's done, [`DONE.md`](DONE.md) after).
+(turn off auto-renew in the Cloudflare dashboard and remove it from `parked.tf`). What each one was for is in
+[`DONE.md`](DONE.md#domains-hover---cloudflare).
 `yourwebsiteisterrible.com` is the one with a live idea: a blog about terrible web UX and how to fix it, maybe with a
 sister site `yourappisterrible.com` (not registered yet) for mobile apps.
 
@@ -149,3 +149,10 @@ rpi5-1 itself is being converted to a Talos worker once the Compose workloads ar
 isn't worth the effort. The current plan is to move rpi5-1's SSD into the new Pi, which would carry bookworm over, so
 decide then: a fresh trixie image plus restoring the jump-box tooling (Raspberry Pi's supported path, and a chance to
 confirm the setup is reproducible from this repo), or keep bookworm until closer to LTS end. No target date.
+
+## Close the Hover account
+
+**Waiting on:** the two dropped domains lapsing at Hover (auto-renew is off): `commaspacebitch.com` on 2026-12-18 and
+`soleman.ski` on 2027-09-23. Everything else has moved to Cloudflare (see [`DONE.md`](DONE.md#domains-hover---cloudflare)).
+**Close it on or after 2027-09-24**, or sooner if leftover domains don't matter. The `jake@jakerobb.dev` forward still
+listed there is unused (mail goes through Cloudflare now) and can just be deleted.
