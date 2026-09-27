@@ -139,3 +139,13 @@ now that the transfer added a year). For each one, decide: keep holding it, actu
 Hover-to-Cloudflare migration entry ([`READY.md`](READY.md) until it's done, [`DONE.md`](DONE.md) after).
 `yourwebsiteisterrible.com` is the one with a live idea: a blog about terrible web UX and how to fix it, maybe with a
 sister site `yourappisterrible.com` (not registered yet) for mobile apps.
+
+## Jump box OS: Debian 12 (bookworm) -> 13 (trixie)
+
+**Waiting on:** the new 4GB Raspberry Pi 5 jump box ([`HARDWARE.md`](HARDWARE.md)). rpi5-1 runs Raspberry Pi OS on
+bookworm, which is now `oldstable`. That's fine for now: unattended-upgrades applies Debian security fixes, and
+bookworm LTS keeps publishing them until mid-2028 (see [`../docs/rpi5-1-os-updates.md`](../docs/rpi5-1-os-updates.md)).
+rpi5-1 itself is being converted to a Talos worker once the Compose workloads are off it, so upgrading it in place
+isn't worth the effort. The current plan is to move rpi5-1's SSD into the new Pi, which would carry bookworm over, so
+decide then: a fresh trixie image plus restoring the jump-box tooling (Raspberry Pi's supported path, and a chance to
+confirm the setup is reproducible from this repo), or keep bookworm until closer to LTS end. No target date.
