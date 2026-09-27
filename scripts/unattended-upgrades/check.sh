@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Daily check that unattended-upgrades on rpi5-1 is actually doing its job.
-# Prints problems to stderr, so cron (MAILTO + stdout to /dev/null) mails
-# them; prints nothing when all is well. See docs/rpi5-1-os-updates.md.
+# Daily check that unattended-upgrades is actually doing its job. Prints
+# problems to stderr, so cron (MAILTO + stdout to /dev/null) mails them;
+# prints nothing when all is well. Runs on rpi5-1 directly, and on the
+# Proxmox host piped over SSH from rpi5-1's crontab (it has no mail setup of
+# its own). See docs/rpi5-1-os-updates.md and docs/proxmox-os-updates.md.
 #
 # Catches the failure that went unnoticed for a year: unattended-upgrades not
 # installed (or not running) while Debian security fixes pile up.
@@ -42,7 +44,7 @@ fi
 
 if [ ${#problems[@]} -gt 0 ]; then
   {
-    echo "rpi5-1 OS update check found problems:"
+    echo "$(hostname) OS update check found problems:"
     printf -- '- %s\n' "${problems[@]}"
   } >&2
   exit 1

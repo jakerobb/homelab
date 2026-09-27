@@ -45,6 +45,13 @@ The script ends with a dry run. Its "Allowed origins" line should list only
 `Debian-Security`, and its "Packages that will be upgraded" list should
 contain only security packages, with no `docker-*`.
 
+The first install (2026-09-27) didn't pass that check: "Allowed origins"
+also listed `codename=bookworm,label=Debian`, from Debian's stock
+`50unattended-upgrades`, because apt merges list options across files. The
+`#clear` line in `52unattended-upgrades-local` fixes it. It was reinstalled
+the same day, and the same fix went to the Proxmox host
+([`proxmox-os-updates.md`](proxmox-os-updates.md)).
+
 ## One-time catch-up (on rpi5-1)
 
 Unattended-upgrades only applies security updates going forward. The rest of

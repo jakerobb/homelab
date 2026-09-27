@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Installs and configures unattended-upgrades (Debian security only) on
-# rpi5-1. Idempotent. Run on rpi5-1 from this directory.
-# See docs/rpi5-1-os-updates.md.
+# rpi5-1 or the Proxmox host. Idempotent. Run on the target host from this
+# directory. See docs/rpi5-1-os-updates.md and docs/proxmox-os-updates.md.
 set -euo pipefail
 
 cd "$(dirname "$0")"
+
+# The Proxmox host has no sudo; everything there runs as root.
+sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else command sudo "$@"; fi; }
 
 sudo apt-get update
 sudo apt-get install -y unattended-upgrades

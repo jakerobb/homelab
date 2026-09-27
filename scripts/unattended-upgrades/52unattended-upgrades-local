@@ -1,8 +1,16 @@
-// rpi5-1 overrides for unattended-upgrades. Installed to
-// /etc/apt/apt.conf.d/ by install.sh; see docs/rpi5-1-os-updates.md.
+// unattended-upgrades overrides for rpi5-1 and the Proxmox host. Installed to
+// /etc/apt/apt.conf.d/ by install.sh; see docs/rpi5-1-os-updates.md and
+// docs/proxmox-os-updates.md.
 
-// Debian security only. Point releases, the Raspberry Pi archive (kernel,
-// firmware, bootloader), and Docker stay manual so they can be timed.
+// Debian security only (${distro_codename} is bookworm on rpi5-1, trixie on
+// Proxmox). Point releases, the Raspberry Pi archive (kernel, firmware,
+// bootloader), Proxmox's own repo (PVE, QEMU, kernel), and Docker stay
+// manual so they can be timed.
+//
+// apt merges list options across files, so without the #clear this would
+// only add to Debian's stock 50unattended-upgrades list, which also allows
+// `codename=${distro_codename},label=Debian` (point releases).
+#clear Unattended-Upgrade::Origins-Pattern;
 Unattended-Upgrade::Origins-Pattern {
         "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
 };
@@ -20,5 +28,7 @@ Unattended-Upgrade::Package-Blacklist {
 // Never reboot on its own; /var/run/reboot-required is checked by hand.
 Unattended-Upgrade::Automatic-Reboot "false";
 
-Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+// Kernels are upgraded by hand on both hosts, and Proxmox's are managed by
+// proxmox-kernel-helper, so leave old kernels alone.
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";
 Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
