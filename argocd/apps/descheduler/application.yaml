@@ -82,17 +82,28 @@ spec:
                 - name: RemoveDuplicates
                 - name: LowNodeUtilization
                   args:
-                    # Under: below 35% on *every* resource. Over: above 70%
-                    # on *any* resource. Evicts from over- until they drop
-                    # below 70%, only while under-utilized nodes exist.
-                    # Today's steady state (~58% / ~58% / 25%) is a no-op;
-                    # the 2026-09-22 incident (80% / 82% / 7%) would trigger.
+                    # Relative to the cluster average, not fixed percentages
+                    # (since 2026-09-27). Under: more than 5 points below the
+                    # worker average on *every* listed resource. Over: more
+                    # than 5 points above it on *any*. Evicts from over-
+                    # nodes toward under- ones until each is within the band.
+                    # Fixed 35/70 never fired once the workers went to 8 GiB:
+                    # 46% / 23% / 25% memory (23 / 6 / 26 pods) had nothing
+                    # above 70%, so worker-2 stayed empty. A --dry-run then
+                    # showed ±10 still moved nothing, and ±5 moved 3 small
+                    # pods onto worker-2.
+                    #
+                    # CPU is deliberately left out: mbp's ~20% (vs ~2% on the
+                    # workers) is mostly ClickHouse, and a CPU band would
+                    # keep flagging mbp and moving pods off it every night.
+                    # maxNoOfPodsToEvict* above keeps any night's churn to 3.
+                    useDeviationThresholds: true
                     thresholds:
-                      cpu: 35
-                      memory: 35
+                      memory: 5
+                      pods: 5
                     targetThresholds:
-                      cpu: 70
-                      memory: 70
+                      memory: 5
+                      pods: 5
                     metricsUtilization:
                       source: KubernetesMetrics
               plugins:
