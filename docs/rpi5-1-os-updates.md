@@ -101,5 +101,6 @@ Raspberry Pi OS moved to trixie in late 2025, so bookworm is now
 `oldstable`. Upgrading in place is possible but not officially supported by
 Raspberry Pi. The supported path is a fresh image and a restore of the
 Compose stack and jump-box tooling. Not urgent while bookworm LTS still gets
-security fixes. It may be moot anyway, since the READY backlog's Compose
-workload migration is emptying this box out.
+security fixes. Deferred to the replacement 4GB jump box rather than done
+here, since rpi5-1 becomes a Talos worker once the Compose migration empties
+it out. Tracked in [`../todo/FUTURE.md`](../todo/FUTURE.md).
