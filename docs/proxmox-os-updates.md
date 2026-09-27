@@ -120,3 +120,44 @@ cluster-wide either way. Scaling the PVC-backed workloads down before the
 reboot would avoid it, but ArgoCD self-heal (and the Prometheus and
 ClickHouse operators) would scale them straight back up. Deleting the pods
 afterwards is simpler.
+
+## Resizing the Talos worker VMs
+
+Memory and CPU for talos-worker-1 and talos-worker-2 are set in
+[`../terraform/proxmox/talos-worker.tf`](../terraform/proxmox/talos-worker.tf),
+which has `reboot_after_update = false`. Without that, the provider reboots
+both workers at once, undrained, when an apply changes something like
+memory. With it, a merge only stages the change, and it takes effect at the
+next full stop/start. A reboot from inside Talos isn't enough.
+
+Either merge first, or set the value live with `qm set` so the merge is a
+no-op for it. Then roll the workers one at a time. On rpi5-1, for
+talos-worker-1 (VM 101; talos-worker-2 is VM 100 at 192.168.102.32):
+
+```bash
+kubectl drain talos-worker-1 --ignore-daemonsets --delete-emptydir-data --timeout=300s
+```
+
+```bash
+ssh proxmox "qm set 101 --memory 8192 && qm shutdown 101 --timeout 180 && qm start 101"
+```
+
+Wait for the node to be `Ready`, confirm it cold-started with
+`talosctl -n 192.168.102.31 read /proc/uptime` and has the new capacity with
+`kubectl get node talos-worker-1 -o jsonpath='{.status.capacity.memory}'`,
+then uncordon it and wait for all pods and apps to be healthy before doing
+the other one:
+
+```bash
+kubectl uncordon talos-worker-1
+```
+
+Drains are graceful, so iSCSI volumes detach cleanly and don't go read-only
+the way they do when HexOS goes down.
+
+On 2026-09-27 both workers went from 4 to 8 GiB this way, in about a minute
+each, with no downtime. That puts the VMs at 24 GiB of the host's 29.1 GiB
+usable (2 GiB of the 32 is reserved for the iGPU; see
+[`../todo/HARDWARE.md`](../todo/HARDWARE.md)). Ballooning is off, so the
+VMs will eventually hold their full allocation, and `free -m` on the host
+should settle at around 26 GiB used.

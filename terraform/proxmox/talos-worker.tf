@@ -17,6 +17,13 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
   node_name = var.proxmox_node_name
   name      = each.key
 
+  # Never let an apply power-cycle a worker (added 2026-09-27, same reasoning
+  # as hexos.tf). The provider's default would reboot both workers at once,
+  # undrained, to apply a change like a memory bump. Instead, apply, then
+  # drain and stop/start one worker at a time — see
+  # docs/proxmox-os-updates.md#resizing-the-talos-worker-vms.
+  reboot_after_update = false
+
   machine = "q35"
   bios    = "ovmf"
 
@@ -31,7 +38,10 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
   }
 
   memory {
-    dedicated = 4096
+    # 8 GiB since 2026-09-27 (was 4). With HexOS's 8 GiB that's 24 GiB of the
+    # host's 29 GiB usable, leaving ~5 GiB for Proxmox itself; ballooning is
+    # off on every VM, so it can't be clawed back later.
+    dedicated = 8192
     # No `floating` set — ballooning disabled, per root README step 4.
   }
 
