@@ -1,12 +1,14 @@
 # Repo-wide static checks. GitHub-hosted runners only — none of this needs
 # the homelab network or any secrets, so it's safe on any PR (outside
 # contributors' runs still need approval, per the repo setting).
+#
+# One job, not one per check: every check takes seconds, and Actions bills
+# each job rounded up to a whole minute, so six jobs cost ~6 min a run vs ~2.
+# PRs only — a merge to main re-runs checks the PR already passed.
 name: lint
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -16,43 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  sops-encrypted:
-    name: SOPS files encrypted
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - run: python3 scripts/ci/check-sops-encrypted.py
-
-  renovate-config:
-    name: Renovate config
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: suzuki-shunsuke/github-action-renovate-config-validator@v2.2.0
-        with:
-          strict: "true"
-
-  renovate-parse:
-    name: Renovate can parse Applications
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.x"
-      - run: pip install pyyaml
-      - run: python3 scripts/ci/check-renovate-parse.py
-
-  shellcheck:
-    name: shellcheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      # shellcheck is preinstalled on ubuntu-latest.
-      - run: git ls-files -z '*.sh' | xargs -0 shellcheck
-
-  kubeconform:
-    name: Kubernetes manifests
+  lint:
+    name: lint
     runs-on: ubuntu-latest
     env:
       # renovate: datasource=github-releases depName=helm/helm
@@ -60,6 +27,8 @@ jobs:
       # renovate: datasource=github-releases depName=yannh/kubeconform
       KUBECONFORM_VERSION: v0.8.0
     steps:
+      # --- Setup: everything the checks need, before any check runs, so a
+      # failing check can't skip setup for the ones after it.
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
@@ -77,10 +46,33 @@ jobs:
           tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
+      # --- Checks: each runs even if an earlier one failed (!cancelled()),
+      # so one run reports every problem, same as separate jobs did.
+      - name: SOPS files encrypted
+        if: ${{ !cancelled() }}
+        run: python3 scripts/ci/check-sops-encrypted.py
+
+      - name: Renovate config
+        if: ${{ !cancelled() }}
+        uses: suzuki-shunsuke/github-action-renovate-config-validator@v2.2.0
+        with:
+          strict: "true"
+
+      - name: Renovate can parse Applications
+        if: ${{ !cancelled() }}
+        run: python3 scripts/ci/check-renovate-parse.py
+
+      # shellcheck is preinstalled on ubuntu-latest.
+      - name: shellcheck
+        if: ${{ !cancelled() }}
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck
+
       # Helm-templates every Application's chart with its own values, plus the
       # raw/kustomized manifests — see the script's docstring. A chart that
       # fails to render (bad version, values that break a template) fails here.
-      - name: Render
+      - name: Render Kubernetes manifests
+        id: render
+        if: ${{ !cancelled() }}
         run: python3 scripts/ci/render-manifests.py "$RUNNER_TEMP/rendered"
 
       # Kubernetes schemas plus the community CRD catalog (Gateway API,
@@ -88,7 +80,8 @@ jobs:
       # unknown fields, i.e. typos. CustomResourceDefinitions themselves are
       # skipped: there's no upstream schema for that kind, and they're
       # chart-vendored anyway.
-      - name: Validate
+      - name: Validate Kubernetes manifests
+        if: ${{ !cancelled() && steps.render.outcome == 'success' }}
         run: |
           kubeconform -strict -summary -output text \
             -skip CustomResourceDefinition \
@@ -96,11 +89,8 @@ jobs:
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             "$RUNNER_TEMP/rendered"
 
-  actionlint:
-    name: actionlint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
       # Picks up .github/actionlint.yaml (self-hosted runner labels), and
       # shellchecks workflow run: blocks too.
-      - uses: raven-actions/actionlint@v2
+      - name: actionlint
+        if: ${{ !cancelled() }}
+        uses: raven-actions/actionlint@v2
