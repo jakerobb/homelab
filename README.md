@@ -44,6 +44,8 @@ Passwords and other secrets are in 1Password in the Tech vault, which is shared 
     - [`talos/`](talos/) — non-secret Cilium config and per-node Talos patches applied to the existing cluster.
     - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions; the two Talos worker VMs are provisioned from
       here, applied from rpi5-1.
+    - [`terraform/cloudflare/`](terraform/cloudflare/) and [`terraform/signoz/`](terraform/signoz/) — Cloudflare
+      zones for the parked domains, and SigNoz dashboards. Planned on PRs and applied on merge, like `terraform/proxmox`.
     - [`docker-compose/`](docker-compose/) — the `rpi5-1` Compose stack's config (secrets SOPS-encrypted); see its
       README for what's captured vs. excluded. Auto-deployed on merge by a pull-based cron job on rpi5-1
       ([`docs/compose-deploy.md`](docs/compose-deploy.md)).
@@ -298,6 +300,9 @@ Proxmox runs on the MS-A2. It manages the following VMs:
 * HexOS/TrueNAS
 * talos-worker-1
 * talos-worker-2
+
+The host itself runs node-exporter for metrics and temperatures, scraped by the cluster's Prometheus — see
+[`docs/proxmox-host-metrics.md`](docs/proxmox-host-metrics.md).
 
 ### Kubernetes cluster
 

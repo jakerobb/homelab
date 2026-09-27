@@ -951,6 +951,13 @@ own docs/changelog before assuming otherwise). Needs the matching
 `access_control` rule (`apps/authelia/application.yaml`) and
 `ReferenceGrant` entry (`apps/authelia/referencegrant.yaml`) — both added.
 
+One exception (2026-09-27): `/api/v2/dashboards` skips Authelia, so
+[`terraform/signoz`](../terraform/signoz/README.md) can manage dashboards
+with a service-account API key. SigNoz checks the key or session itself on
+every route under that path. Only that path is open, since opening all of
+`/api/` would put SigNoz's own password login in front of the LAN without
+Authelia's 2FA.
+
 ### ClickHouse CPU tuning (2026-09-23)
 
 **Symptom:** ClickHouse (`chi-signoz-clickhouse-cluster-0-0-0`) sat at a

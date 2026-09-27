@@ -280,6 +280,18 @@ spec:
                 static_configs:
                   - targets:
                       - 192.168.102.9:9273   # 2018 MacBook Pro, host of talos-worker-mbp
+              # Physical hosts outside the cluster running Debian's
+              # prometheus-node-exporter package (docs/proxmox-host-metrics.md).
+              # Named `node-exporter` on purpose: that puts them under the
+              # same node-exporter alert rules as the cluster's nodes, and in
+              # SigNoz's federation match (argocd/apps/signoz/application.yaml).
+              # `node` matches the label the in-cluster node-exporter gets.
+              - job_name: node-exporter
+                static_configs:
+                  - targets:
+                      - 192.168.102.21:9100  # MS-A2, the Proxmox host
+                    labels:
+                      node: ms-a2
             # Steady at ~1.7Gi (7-day peak 1.68Gi).
             resources:
               requests:
@@ -307,6 +319,19 @@ spec:
             requests:
               cpu: 10m
               memory: 48Mi
+          # Adds a `node` label (talos-cp-1, ...) to every node-exporter
+          # series. Without it, the only host identifier is `instance`
+          # (192.168.102.11:9100), which is what SigNoz legends would show.
+          # Not `nodename`, the chart's example: node_uname_info already has
+          # a `nodename` label, which would get renamed to exported_nodename.
+          # Recording rules that join `group_left(node)` from kube_pod_info
+          # overwrite it with the same value, so they're unaffected.
+          prometheus:
+            monitor:
+              relabelings:
+                - sourceLabels: [__meta_kubernetes_pod_node_name]
+                  targetLabel: node
+                  action: replace
         # kubelet.serviceMonitor.tlsConfig.insecureSkipVerify is already the
         # chart default (Talos's self-signed-per-node kubelet certs are
         # exactly the case it's defaulted on for) — same call already made
