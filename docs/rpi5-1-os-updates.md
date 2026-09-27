@@ -34,7 +34,7 @@ These stay manual, on purpose, so they can be timed:
 ## Install (on rpi5-1)
 
 ```bash
-cd ~/homelab && git pull
+cd ~/dev/homelab && git pull
 ```
 
 ```bash
@@ -66,6 +66,27 @@ After a reboot, confirm it actually happened with `uptime`, then check the
 Compose stack with `docker ps`.
 
 ## Checking that it's working
+
+[`scripts/unattended-upgrades/check.sh`](../scripts/unattended-upgrades/check.sh)
+runs daily from cron and mails (via cron's `MAILTO`, see
+[`email-alerts.md`](email-alerts.md)) if any of these is true:
+
+- `unattended-upgrades` isn't installed, or either apt config file is missing
+- its log hasn't been written in over 3 days
+- a `-security` package was pending at the previous day's check and still is
+
+It prints nothing when everything is fine. Added 2026-09-27, after the
+2026-09-27 health check found the install step above had never been run:
+the config was merged but `unattended-upgrades` still wasn't installed.
+
+Install the cron entry on rpi5-1 (`MAILTO` is already set in the crontab).
+09:00 is after the `apt-daily-upgrade` timer's 06:00–07:00 window:
+
+```bash
+crontab -l | { cat; echo "0 9 * * * \$HOME/dev/homelab/scripts/unattended-upgrades/check.sh > /dev/null"; } | crontab -
+```
+
+To check by hand:
 
 ```bash
 apt list --upgradable 2>/dev/null | grep -c security
