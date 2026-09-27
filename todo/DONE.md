@@ -447,3 +447,14 @@ Reserved business opportunities:
 * indigoapps.dev -- Indigo because it's the color Apple left out of its original rainbow logo; the idea was that I'd build apps Apple neglected. No specific ideas.
 * fastodon.dev, fastodon.me - I was into Mastodon for a while and thought I wanted to build and host an ActivityPub server in Go rather than Ruby; it would be super performant, hence the name. 
 * camaroev.net, camaro-ev.com, camaroev.org, camaroquestions.com, firebirdquestions.com, transamquestions.com, fbodyquestions.com, modyourcamaro.com -- I love Camaros and wanted to build something here.
+
+## Clean up orphaned PVs
+
+**Done (2026-09-27). Goes live when merged.** A daily CronJob,
+[`../manifests/pv-janitor/`](../manifests/pv-janitor/README.md), deletes PersistentVolumes that have been Released
+(their PVC deleted) for 30 days, after a 7-day warning through ntfy. Every StorageClass uses `reclaimPolicy: Retain` so
+an accidental prune can't destroy data, which meant deliberately deleted PVCs left their PVs and backing storage behind
+forever. The job never deletes a PV itself: it switches the PV to `reclaimPolicy: Delete`, and the provisioner that
+created it removes the zvol on HexOS or the directory on the node, then the PV. That was tested on both provisioners,
+and the job was tested end to end on a throwaway volume. Opt out per PV with the annotation
+`homelab.jakerobb.org/pv-janitor-keep=true`; the README also covers recovering data from a Released PV.

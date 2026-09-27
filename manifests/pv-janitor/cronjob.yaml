@@ -1,0 +1,65 @@
+# Daily cleanup of PVs left Released too long; see README.md. 04:45, after
+# the 03:00-03:15 backups, descheduler (03:30) and Renovate (04:17). A failed
+# run surfaces through kube-prometheus-stack's KubeJobFailed alert.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pv-janitor
+  namespace: pv-janitor
+spec:
+  schedule: "45 4 * * *"
+  timeZone: America/Detroit
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 300
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: pv-janitor
+          containers:
+            - name: pv-janitor
+              image: docker.io/library/python:3.14.7-alpine3.24
+              command: [python3, /app/pv-janitor.py]
+              env:
+                - name: GRACE_DAYS
+                  value: "30"
+                - name: WARN_DAYS
+                  value: "7"
+                # "true" logs what it would do without patching or notifying.
+                - name: DRY_RUN
+                  value: "false"
+                # In-cluster Service, not the public hostname, same as
+                # ntfy-alertmanager: keeps notices off the Gateway/DNS/TLS
+                # chain. Same topic as alerts.
+                - name: NTFY_URL
+                  value: http://ntfy.ntfy.svc.cluster.local:8080/homelab-alerts
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+              volumeMounts:
+                - name: script
+                  mountPath: /app
+                  readOnly: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 65534
+                runAsGroup: 65534
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 96Mi
+          volumes:
+            - name: script
+              configMap:
+                name: pv-janitor-script

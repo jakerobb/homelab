@@ -1,0 +1,30 @@
+# Cluster-scoped because PersistentVolumes are. Only get/list/patch: the job
+# never deletes a PV itself, it switches reclaimPolicy to Delete and lets the
+# provisioner that created it delete the storage and the PV.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pv-janitor
+  namespace: pv-janitor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pv-janitor
+rules:
+  - apiGroups: [""]
+    resources: [persistentvolumes]
+    verbs: [get, list, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pv-janitor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pv-janitor
+subjects:
+  - kind: ServiceAccount
+    name: pv-janitor
+    namespace: pv-janitor

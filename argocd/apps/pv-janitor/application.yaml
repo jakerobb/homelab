@@ -1,0 +1,27 @@
+# Own Application, same reasoning as truenas-exporter's. The manifests are
+# Kustomize (for the script's configMapGenerator); see
+# manifests/pv-janitor/README.md for what the job does.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pv-janitor
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/pv-janitor
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pv-janitor
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
