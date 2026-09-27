@@ -450,7 +450,7 @@ Reserved business opportunities:
 
 ## Clean up orphaned PVs
 
-**Done (2026-09-27). Goes live when merged.** A daily CronJob,
+**Done (2026-09-27).** A daily CronJob,
 [`../manifests/pv-janitor/`](../manifests/pv-janitor/README.md), deletes PersistentVolumes that have been Released
 (their PVC deleted) for 30 days, after a 7-day warning through ntfy. Every StorageClass uses `reclaimPolicy: Retain` so
 an accidental prune can't destroy data, which meant deliberately deleted PVCs left their PVs and backing storage behind
@@ -458,3 +458,34 @@ forever. The job never deletes a PV itself: it switches the PV to `reclaimPolicy
 created it removes the zvol on HexOS or the directory on the node, then the PV. That was tested on both provisioners,
 and the job was tested end to end on a throwaway volume. Opt out per PV with the annotation
 `homelab.jakerobb.org/pv-janitor-keep=true`; the README also covers recovering data from a Released PV.
+
+## Compose deploy: stop restarting Telegraf on every deploy
+
+**Done (2026-09-27).** The deploy script restarts services whose bind-mounted config changed, and Telegraf's `/:/hostfs`
+mount contains every path, so any deploy that touched `docker-compose/` restarted it. The script now only considers
+bind mounts under `~/docker` ([`../scripts/compose-deploy/compose-deploy.py`](../scripts/compose-deploy/compose-deploy.py)).
+Tested against the live Compose config: Telegraf now matches only its own `telegraf.conf`.
+
+## SigNoz dashboards as code, and a Temperatures dashboard
+
+**Done (2026-09-27).** SigNoz dashboards are managed by Terraform in
+[`../terraform/signoz/`](../terraform/signoz/README.md), planned on PRs and applied on merge like the other stacks. It
+authenticates with an API key for the `terraform` service account (Editor role). `/api/v2/dashboards` skips Authelia so
+that key can get through; SigNoz checks the key itself, and the rest of SigNoz stays behind Authelia.
+
+The first dashboard, **Temperatures**, has one panel per kind of sensor and one line per physical host: CPU, NVMe, GPU,
+memory and other components, plus fan speed and Mac throttling. To get every host onto it:
+
+- **MS-A2:** installed Debian's `prometheus-node-exporter` on the Proxmox host, scraped by Prometheus as job
+  `node-exporter`, so the usual node alerts cover it too ([`../docs/proxmox-host-metrics.md`](../docs/proxmox-host-metrics.md)).
+- **rpi5-1:** its Compose Telegraf also sends its temperatures and fan speed to SigNoz over OTLP.
+- **Pi control planes:** node-exporter series now carry a `node` label with the node name.
+- **MacBook Pro:** was already reporting.
+
+Lessons:
+- **Service-account roles:** a new SigNoz service account can end up with no role, even when one was picked during
+  creation. `GET /api/v1/service_accounts/me` shows `serviceAccountRoles: null` when that happens, and every call is 403.
+- **Panel queries:** SigNoz allows one query per panel. Several data sources on one panel go inside a single
+  `signoz/CompositeQuery`.
+- **First apply:** a new stack's first apply is manual, because the workflow refuses to apply against empty state.
+
