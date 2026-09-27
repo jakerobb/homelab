@@ -26,6 +26,17 @@ and a `*/15` cron job flushes the queue. Kept deliberately on rpi5-1, independen
 a send through a stub that always fails, then flushing it, and by sending end-to-end through cron's real `MAILTO` path.
 Details: [`../docs/email-alerts.md`](../docs/email-alerts.md#queuing-when-the-relay-is-unreachable-msmtpq).
 
+## rpi5-1 desktop cleanup (jump box prep)
+
+**Done (2026-09-27).** First host-cleanup step toward rpi5-1's future as a jump box-only 4GB Pi (see
+[`HARDWARE.md`](HARDWARE.md)). Purged the desktop extras: CUPS/hplip/sane and the printer drivers, wayvnc, RealVNC and
+rpi-connect (GUI access is through the hardware KVM now), gvfs, pipewire/wireplumber/pulseaudio, xdg-desktop-portal,
+rtkit, ModemManager and squeekboard, then ran `apt autoremove --purge`. That also removed the old 6.12.87 kernel; the Pi
+runs 6.12.109, with 6.12.93 kept as a fallback. The minimal desktop stays (labwc, pcmanfm, wf-panel-pi, lightdm).
+Bluetooth and avahi also stay while Home Assistant and matter-server are still on Compose. The default target is now
+`multi-user.target`, which frees roughly 550MB. For the GUI, run `sudo systemctl start lightdm`. tty1 autologins as
+`jakerobb` (`getty@tty1.service.d/autologin.conf`), so the KVM console goes straight to a shell with passwordless sudo.
+
 ## Ingress (Gateway API)
 
 **Done** — decided and deployed 2026-09-13, using Gateway API (Cilium's built-in implementation) instead of a separate
