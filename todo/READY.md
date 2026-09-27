@@ -20,11 +20,10 @@ turned off at Hover and will lapse.
   Nameservers at Hover switched to Cloudflare and the domain unlocked. (The nameservers moved before the zone
   existed, which took the site down for a few minutes; the first apply was run by hand to restore it.)
 - **Registrar transfer:** start it in the Cloudflare dashboard with the Hover auth code once the zone shows Active.
-- **Email:** Hover forwards `jake@jakerobb.dev` to Gmail. For now MX still points at Hover's mail servers, which keep
-  honoring the forward no matter who serves DNS. Replace it with Cloudflare Email Routing
-  (`cloudflare_email_routing_settings`, `_address`, `_rule`, plus the MX/SPF records routing needs). The
-  `homelab-terraform` token needs two more permissions first: Zone · Email Routing Rules · Edit and Account · Email
-  Routing Addresses · Edit. The Gmail destination needs a one-time verification click.
+- **Email:** done 2026-09-27. Cloudflare Email Routing forwards `jake@jakerobb.dev` to Gmail
+  ([`../terraform/cloudflare/jakerobb-dev-email.tf`](../terraform/cloudflare/jakerobb-dev-email.tf)). Provider 5.25.0
+  couldn't create `cloudflare_email_routing_settings` ([cloudflare/terraform-provider-cloudflare#7304](https://github.com/cloudflare/terraform-provider-cloudflare/issues/7304)),
+  so routing was first enabled directly through the API; 5.26.0 fixes the crash.
 - **Afterwards:** turn off auto-renew on the Hover email forward (it renews separately, next on 2029-03-03), then close
   the Hover account once nothing's left in it.
 
