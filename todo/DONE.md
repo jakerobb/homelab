@@ -290,8 +290,10 @@ reasoning. The main decisions:
   math the scheduler uses, and it's what caused the problem: the workers were 12-38% *requested* but 78-80% *used*.
   Here it reads real usage from metrics-server instead (`metricsUtilization.source: KubernetesMetrics`).
 - **Conservative settings.** It runs as a CronJob at 03:30 America/Detroit, only against worker nodes, with only
-  `LowNodeUtilization` and `RemoveDuplicates`. Each run evicts at most 2 pods per node and 3 in total. A node counts as
-  underused below 35% on both CPU and memory, and as overloaded above 70% on either one.
+  `LowNodeUtilization` and `RemoveDuplicates`. Each run evicts at most 2 pods per node and 3 in total. A node originally
+  counted as underused below 35% on both CPU and memory, and as overloaded above 70% on either one. On 2026-09-27 that
+  changed to deviation from the worker average (`useDeviationThresholds`, ±5 points on memory and pod count, no CPU),
+  because once the workers went to 8 GiB no node ever passed 70%, and a nearly empty worker-2 never got pods.
 - **Stateful pods can be evicted.** All PVCs are on `hexos-iscsi`, so a pod with a volume can move to another node. The
   single-replica ones (ClickHouse, ZooKeeper, Prometheus, Authelia, ntfy) have a short outage while the volume
   re-attaches, which is acceptable at 3:30am. The chart's default protection for local storage is turned off because
