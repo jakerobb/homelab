@@ -264,49 +264,59 @@ resource "signoz_dashboard" "temperatures" {
               }
             }
           }
+          # SigNoz allows one query per panel, so several data sources on
+          # one panel go in a single composite query, one builder query each.
           queries = [
-            for i, q in p.queries : {
+            {
               kind = "time_series"
               spec = {
-                name = substr("ABCDEFGH", i, 1)
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name   = substr("ABCDEFGH", i, 1)
-                        signal = "metrics"
-                        # Prometheus federation and Telegraf's OTLP output
-                        # both send about once a minute or faster.
-                        step_interval = "60"
-                        aggregations = [
-                          {
-                            metric_name       = q.metric
-                            time_aggregation  = "avg"
-                            space_aggregation = "max"
-                            reduce_to         = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = q.filter
-                        }
-                        group_by = [
-                          for g in q.group_by : {
-                            name            = g
-                            field_context   = "attribute"
-                            field_data_type = "string"
+                      queries = [
+                        for i, q in p.queries : {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name   = substr("ABCDEFGH", i, 1)
+                                signal = "metrics"
+                                # Prometheus federation and Telegraf's OTLP
+                                # output both send about once a minute or faster.
+                                step_interval = "60"
+                                aggregations = [
+                                  {
+                                    metric_name       = q.metric
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "max"
+                                    reduce_to         = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = q.filter
+                                }
+                                group_by = [
+                                  for g in q.group_by : {
+                                    name            = g
+                                    field_context   = "attribute"
+                                    field_data_type = "string"
+                                  }
+                                ]
+                                having = {
+                                  expression = ""
+                                }
+                                legend = q.legend
+                              }
+                            }
                           }
-                        ]
-                        having = {
-                          expression = ""
                         }
-                        legend = q.legend
-                      }
+                      ]
                     }
                   }
                 }
               }
-            }
+            },
           ]
         }
       }
