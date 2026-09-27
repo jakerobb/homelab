@@ -63,6 +63,12 @@ resource "cloudflare_dns_record" "jakerobb_dev_spf" {
 resource "cloudflare_email_routing_settings" "jakerobb_dev" {
   zone_id = cloudflare_zone.jakerobb_dev.id
 
+  # Set to the API's current value only so plans come up empty; otherwise every
+  # plan shows false -> null. The provider never actually sends this field
+  # (cloudflare/terraform-provider-cloudflare#7386), so changing it here does
+  # nothing.
+  support_subaddress = false
+
   depends_on = [
     cloudflare_dns_record.jakerobb_dev_spf,
     cloudflare_email_routing_rule.jakerobb_dev_jake,

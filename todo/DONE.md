@@ -405,3 +405,43 @@ private key in-cluster plus Kustomize. Design and runbooks: [`../argocd/README.m
   longer need the SOPS values fragment.
 - `argocd/secrets/` now holds only `onepassword-service-account.sops.yaml`, the ESO token that has to be bootstrapped
   by hand.
+
+## Domains: Hover -> Cloudflare
+
+**Done (2026-09-27).** All 16 kept domains now use Cloudflare Registrar and Cloudflare DNS, Terraform-managed in
+[`../terraform/cloudflare/`](../terraform/cloudflare/) (runbook in its README; plan/apply via GitHub Actions like
+`terraform/proxmox`, token `homelab-terraform`).
+
+- **15 parked domains** (moved 2026-09-26): nothing on them was live, so each is an empty zone with "sends no mail"
+  records ([`parked.tf`](../terraform/cloudflare/parked.tf)). `jakerobb.me` and `commaspacebitch.com` had been
+  delegated to GoDaddy nameservers that no longer answered, so they didn't resolve at all beforehand. When to decide
+  whether to keep each one: [`FUTURE.md`](FUTURE.md#revisit-the-parked-domains).
+- **`jakerobb.dev`** (moved 2026-09-26/27): real records carried over from Hover
+  ([`jakerobb-dev.tf`](../terraform/cloudflare/jakerobb-dev.tf)); dead SendGrid records dropped; SPF fixed (Hover's was
+  malformed). Hover's `jake@` → Gmail forward replaced by Cloudflare Email Routing
+  ([`jakerobb-dev-email.tf`](../terraform/cloudflare/jakerobb-dev-email.tf)). Expiry now 2030-03-03.
+- **Dropped:** `soleman.ski` (Cloudflare doesn't support `.ski` anyway) and `commaspacebitch.com`, auto-renew off at
+  Hover; they lapse 2027-09-23 and 2026-12-18.
+
+Gotchas, for next time:
+- **At Hover, changing nameservers re-locks the domain.** Change nameservers first, then unlock.
+- **Create the Cloudflare zone before switching nameservers.** `jakerobb.dev`'s nameservers moved first and the site
+  was down for a few minutes until the zone existed.
+- **Email Routing:** the destination address must be verified before a rule can reference it. Provider 5.25.0 crashed
+  creating `cloudflare_email_routing_settings` (routing was enabled through the API instead; fixed in 5.26.0). Once
+  enabled, routing locks its MX and DKIM records, so any Terraform change to them fails ("managed by Email Routing");
+  they're left to Cloudflare via `removed` blocks.
+- **Transfer emails** may name Cloudflare by its registrar ID, **1910**, instead of by name.
+
+What each domain is (or was) for:
+* jakerobb.dev -- my personal website.
+* soleman.ski -- Squarespace site for my father-in-law's business. Never finished; dropped.
+* commaspacebitch.com -- a joke domain I registered twenty years ago, never used; dropped.
+* jakerobb.me, robb.online, robb.software -- just grabbed these because I could; unused.
+* yourwebsiteisterrible.com -- future blog about terrible web UX and how it could be better. Maybe also grab
+  yourappisterrible.com for mobile apps.
+
+Reserved business opportunities:
+* indigoapps.dev -- Indigo because it's the color Apple left out of its original rainbow logo; the idea was that I'd build apps Apple neglected. No specific ideas.
+* fastodon.dev, fastodon.me - I was into Mastodon for a while and thought I wanted to build and host an ActivityPub server in Go rather than Ruby; it would be super performant, hence the name. 
+* camaroev.net, camaro-ev.com, camaroev.org, camaroquestions.com, firebirdquestions.com, transamquestions.com, fbodyquestions.com, modyourcamaro.com -- I love Camaros and wanted to build something here.

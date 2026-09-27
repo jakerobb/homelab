@@ -4,42 +4,6 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## Migrate domain names Hover -> CloudFlare
-
-**In progress.** Zones are Terraform-managed in `terraform/cloudflare/` (runbook in its README). On 2026-09-26 the 15
-domains below were moved to Cloudflare DNS as empty "parked" zones and their registrar transfers started; nothing on
-them was live (no URL forwards or mailboxes, and everything was parked, dead, or pointing at a retired server).
-All 15 transfers landed at Cloudflare Registrar the same day. `soleman.ski` and `commaspacebitch.com` had auto-renew
-turned off at Hover and will lapse.
-
-### `jakerobb.dev` (in progress, 2026-09-26)
-
-- **Done:** zone and records in [`../terraform/cloudflare/jakerobb-dev.tf`](../terraform/cloudflare/jakerobb-dev.tf):
-  the Linode hosts, the `_acme-challenge.postgres` CNAME, and a fixed SPF record (Hover's was malformed:
-  `v=spf1\010v=spf1 include:_spf.google.com ~all.`). Dropped the dead SendGrid records and Hover's webmail CNAME.
-  Nameservers at Hover switched to Cloudflare and the domain unlocked. (The nameservers moved before the zone
-  existed, which took the site down for a few minutes; the first apply was run by hand to restore it.)
-- **Registrar transfer:** start it in the Cloudflare dashboard with the Hover auth code once the zone shows Active.
-- **Email:** done 2026-09-27. Cloudflare Email Routing forwards `jake@jakerobb.dev` to Gmail
-  ([`../terraform/cloudflare/jakerobb-dev-email.tf`](../terraform/cloudflare/jakerobb-dev-email.tf)). Provider 5.25.0
-  couldn't create `cloudflare_email_routing_settings` ([cloudflare/terraform-provider-cloudflare#7304](https://github.com/cloudflare/terraform-provider-cloudflare/issues/7304)),
-  so routing was first enabled directly through the API; 5.26.0 fixes the crash.
-- **Afterwards:** turn off auto-renew on the Hover email forward (it renews separately, next on 2029-03-03), then close
-  the Hover account once nothing's left in it.
-
-What each domain is (or was) for:
-* jakerobb.dev -- my personal website. Moving last.
-* soleman.ski -- Squarespace site for my father-in-law's business. Never finished; dropped.
-* commaspacebitch.com -- a joke domain I registered twenty years ago, never used; dropped.
-* jakerobb.me, robb.online, robb.software -- just grabbed these because I could; unused.
-* yourwebsiteisterrible.com -- future blog about terrible web UX and how it could be better. Maybe also grab
-  yourappisterrible.com for mobile apps.
-
-Reserved business opportunities:
-* indigoapps.dev -- Indigo because it's the color Apple left out of its original rainbow logo; the idea was that I'd build apps Apple neglected. No specific ideas.
-* fastodon.dev, fastodon.me - I was into Mastodon for a while and thought I wanted to build and host an ActivityPub server in Go rather than Ruby; it would be super performant, hence the name. 
-* camaroev.net, camaro-ev.com, camaroev.org, camaroquestions.com, firebirdquestions.com, transamquestions.com, fbodyquestions.com, modyourcamaro.com -- I love Camaros and wanted to build something here. 
-
 ## Make a Documentation app/site -- docs.jakerobb.org
 
 Serves a hyperlinked view of all the docs. What everything is, how it works, how it's connected, how to fix common 
