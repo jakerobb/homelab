@@ -170,3 +170,33 @@ dashboard, `CONNECTIVITY OK`, the expected IP) before moving on.
    silent drift here before on the existing workers).
 7. Detach/eject the `metal-amd64.iso` from the VM's Drives once install is
    confirmed working — not needed again unless reinstalling from scratch.
+
+## Recovering from a corrupted image store
+
+If the Mac's disk fills up, QEMU pauses the VM mid-write, and containerd's
+unpacked images can be left damaged. After the 2026-09-24 disk-full freeze,
+`rancher/local-path-provisioner` failed on mbp only, with
+`exec format error`: its binary was a 0-byte file. Removing the image with
+`talosctl image remove` and pulling it again doesn't help, because
+containerd reuses its damaged unpacked copy.
+
+The fix is to wipe the node's EPHEMERAL partition (containerd, kubelet
+state, logs), which leaves its Talos config intact. On rpi5-1:
+
+```bash
+talosctl -n 192.168.102.34 reset --graceful=true --reboot --system-labels-to-wipe EPHEMERAL --wait=false
+```
+
+Check first that no `local-path` PVs are pinned to mbp, since they live on
+that partition:
+
+```bash
+kubectl get pv -o custom-columns=PV:.metadata.name,SC:.spec.storageClassName,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]
+```
+
+The reset drains the node first. Anything too big for the other workers
+(Prometheus, ClickHouse) stays Pending until mbp is back. On 2026-09-27 the
+whole process took about 5 minutes: the node was Ready again after 2 minutes,
+all pods were Running after 4 (11.6 GB of images re-pulled), and ClickHouse
+and SigNoz were Ready after 5. Afterwards, confirm with `uptime` (or
+`talosctl read /proc/uptime`) that the node really rebooted.

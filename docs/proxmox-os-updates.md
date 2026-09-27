@@ -82,3 +82,41 @@ If a new `proxmox-kernel-*` was installed, it needs a reboot, which takes
 down talos-worker-1, talos-worker-2, and HexOS. Afterwards, confirm the host
 actually rebooted with `uptime`, and that both workers are `Ready` in
 `kubectl get nodes`.
+
+### After a reboot: read-only iSCSI volumes
+
+HexOS is `truenas.lan`, the democratic-csi `hexos-iscsi` backend, so a
+Proxmox reboot also cuts storage to every PVC. Any volume that was mounted
+on a node that stayed up (talos-worker-mbp, in practice) and got written to
+during the outage aborts its ext4 journal and turns read-only. It doesn't
+recover when HexOS comes back. Some pods crash-loop on it (Prometheus:
+`read-only file system`), but others keep running and just fail every write
+(on 2026-09-27, ClickHouse and signoz-0 were `Running` and read-only). So
+"all pods Running" is not enough. Check, on rpi5-1:
+
+```bash
+talosctl -n 192.168.102.34 dmesg | grep -E "EXT4-fs.*(aborted journal|read-only)"
+```
+
+The fix is to delete each affected pod. Once no pod on the node uses the
+volume, the kubelet unmounts it, and the next mount replays the journal
+(`EXT4-fs (sdX): recovery complete` in dmesg). Do one pod at a time and
+check that it's writable again. For example:
+
+```bash
+kubectl -n signoz delete pod signoz-0
+```
+
+Pods on the rebooted workers themselves come back clean, since their mounts
+are fresh. Old pods from those workers may linger as `Error` after their
+replacements are running; clear them with:
+
+```bash
+kubectl delete pods -A --field-selector=status.phase=Failed
+```
+
+Draining the workers first doesn't help: iSCSI storage goes down
+cluster-wide either way. Scaling the PVC-backed workloads down before the
+reboot would avoid it, but ArgoCD self-heal (and the Prometheus and
+ClickHouse operators) would scale them straight back up. Deleting the pods
+afterwards is simpler.
