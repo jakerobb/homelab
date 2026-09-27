@@ -1,0 +1,15 @@
+# Kustomize for configMapGenerator, same as glance: pv-janitor.py lives here
+# as a real file (not a block scalar in a ConfigMap), and the generated
+# ConfigMap's hash suffix means an edit to it is picked up on sync. Old
+# hash-suffixed ConfigMaps are pruned by the Application.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: pv-janitor
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - cronjob.yaml
+configMapGenerator:
+  - name: pv-janitor-script
+    files:
+      - pv-janitor.py
