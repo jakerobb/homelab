@@ -195,9 +195,14 @@ spec:
                     - 'profile'
                     - 'email'
                     - 'groups'
+                  # authorization_code only: 'refresh_token' is only valid
+                  # alongside the 'offline_access' scope, which neither
+                  # ArgoCD nor Headlamp requests, so Authelia never issued
+                  # refresh tokens to them anyway. Authelia 4.39 warns about
+                  # the mismatch and says it becomes a startup error in a
+                  # future version (i.e. an SSO lockout on a routine bump).
                   grant_types:
                     - 'authorization_code'
-                    - 'refresh_token'
                   response_types:
                     - 'code'
                   token_endpoint_auth_method: 'client_secret_basic'
@@ -223,7 +228,6 @@ spec:
                     - 'email'
                   grant_types:
                     - 'authorization_code'
-                    - 'refresh_token'
                   response_types:
                     - 'code'
                   token_endpoint_auth_method: 'client_secret_basic'
