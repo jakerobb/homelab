@@ -86,14 +86,15 @@ That $85/month saved will go a long way toward paying for the Mac Studio!
 Also, this setup is constantly emailing me about high CPU usage and container restarts. I have not had time to 
 investigate, but my plan is to eliminate most of it anyway. Every time I check the website itself, it seems fine. 
 
-## NetworkOptimizer preview pin → back to `:latest`
+## NetworkOptimizer preview pin → stable release
 
 **Waiting on:** the stable NetworkOptimizer **2.9.0** release
 ([Ozark-Connect/NetworkOptimizer releases](https://github.com/Ozark-Connect/NetworkOptimizer/releases)). On 2026-09-24
-the `optimizer` service was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview5`
-on 2026-09-27) to try out a new feature the developer asked us to test. Watchtower won't move a pinned tag, so the pin
-stays until someone changes it. Once 2.9.0 (or later) ships, change the image back to `:latest` in
-`docker-compose/docker-compose.yml`. Merging deploys it to rpi5-1 automatically (see
+the `optimizer` service was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview7`
+on 2026-09-28) to try out a new feature the developer asked us to test. Renovate won't move it either: it treats
+`-previewN` as a variant suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, change the image to
+that version in `docker-compose/docker-compose.yml` (a pinned version, not `:latest`; Renovate tracks it from there).
+Also check `network-optimizer-speedtest`, which is pinned to stable `2.8.6` and should move to the same release. Merging deploys it to rpi5-1 automatically (see
 [`../docs/compose-deploy.md`](../docs/compose-deploy.md)).
 
 ## Re-enable `KubeMemoryOvercommit` alert notifications

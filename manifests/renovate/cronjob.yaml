@@ -1,6 +1,5 @@
-# Kubernetes/GitOps equivalent of docker-compose's Watchtower
-# (docker-compose/docker-compose.yml): instead of patching running
-# containers directly, Renovate opens PRs against this repo (container image
+# Replaced docker-compose's Watchtower (removed 2026-09-28): instead of
+# patching running containers directly, Renovate opens PRs against this repo (container image
 # tags, ArgoCD Helm chart versions under argocd/apps/**, docker-compose
 # image tags, Terraform provider versions) — merging one is what actually
 # changes anything, since ArgoCD's existing auto-sync then picks it up. See
@@ -14,8 +13,8 @@ metadata:
   name: renovate
   namespace: renovate
 spec:
-  # Same off-peak slot as Watchtower's old WATCHTOWER_SCHEDULE
-  # (docker-compose/docker-compose.yml: 4:00am America/Detroit).
+  # Same off-peak slot as the since-removed Watchtower's old schedule
+  # (4:00am America/Detroit).
   schedule: "17 4 * * *"
   timeZone: America/Detroit
   concurrencyPolicy: Forbid

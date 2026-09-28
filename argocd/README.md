@@ -244,8 +244,9 @@ time; those get added to Authelia's `access_control` as they land, not now.
 
 ## Renovate (dependency updates, decided and deployed 2026-09-16)
 
-Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
-(`docker-compose/docker-compose.yml`) — see the
+Replaced the Docker Compose stack's Watchtower (removed 2026-09-28; every
+image in `docker-compose/docker-compose.yml` is now pinned and bumped by
+Renovate PRs like everything else) — see the
 [`READY.md`](../todo/READY.md#compose-workload-migration) note this replaces.
 
 - **PR-based, not in-place patching.** Watchtower silently swaps running
@@ -263,8 +264,8 @@ Kubernetes/GitOps equivalent of the Docker Compose stack's Watchtower
 - **Self-hosted CLI image, not the GitHub App** — keeps this entirely
   in-cluster/GitOps'd like everything else here, at the cost of one manual
   bootstrap step (the GitHub token below).
-- **Schedule:** daily, 4:17am America/Detroit — same off-peak slot Watchtower
-  used to run in.
+- **Schedule:** daily, 4:17am America/Detroit — the same off-peak slot
+  Watchtower used to run in.
 - **Image tag is pinned, not `:latest`** — deliberately, so the `kubernetes`
   manager picks it up and Renovate ends up opening a PR against its own
   CronJob when a new version ships.
