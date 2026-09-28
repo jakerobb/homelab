@@ -1187,6 +1187,13 @@ The first service moved under the "Compose workload migration" plan in
 - **Hardened pod.** The image is `distroless/static`, which defaults to
   root; the pod runs as 65532 with a read-only root filesystem and all
   capabilities dropped.
+- **Dashboards** are in SigNoz, managed by Terraform
+  ([`../terraform/signoz/unifi-dashboards.tf`](../terraform/signoz/unifi-dashboards.tf)):
+  ports of unpoller's six stock Grafana dashboards, plus a UniFi Power
+  dashboard for PoE, the PDU and the UPS Tower. They replace the InfluxDB
+  versions in the Compose Grafana, which stopped getting data with this
+  migration. They're PromQL, because federation delivers every series as an
+  untyped gauge and SigNoz's query builder only offers `rate` on counters.
 
 ## Docs site (added 2026-09-28)
 

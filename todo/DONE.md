@@ -231,6 +231,11 @@ SigNoz federates `{job="unpoller"}` for long-term history. It's stateless and ha
 Authelia rule. The InfluxDB history was not migrated. Details:
 [`../argocd/README.md`](../argocd/README.md#unpoller-migrated-from-docker-compose-2026-09-28).
 
+Its Grafana dashboards moved to SigNoz as Terraform-managed PromQL dashboards
+([`../terraform/signoz/unifi-dashboards.tf`](../terraform/signoz/unifi-dashboards.tf)): unpoller's six stock ones and
+the PoE/PDU half of the old Power dashboard, plus the UPS Tower. That Power dashboard's NUT UPS rows stay in the Compose
+Grafana until NUT migrates.
+
 ## ntfy (Compose workload migration)
 
 **Done 2026-09-20.** Migrated off the RPi5 16GB's Docker Compose stack into the cluster — see

@@ -9,6 +9,13 @@ Manages SigNoz dashboards. SigNoz itself is deployed by ArgoCD (`argocd/apps/sig
   fan speed and throttling for every physical host: the Raspberry Pi control planes,
   rpi5-1, the MS-A2 and the Macs. Where each host's data comes from is in the file's
   header comment.
+- `unifi-dashboards.tf` plus one `dashboard-unifi-*.tf` per dashboard: seven UniFi
+  dashboards (Network, Gateway, Switches, Access Points, Clients, Client DPI, Power)
+  built from unpoller's metrics. They're ports of unpoller's stock Grafana dashboards,
+  plus the PoE/PDU half of the old Compose Grafana's Power dashboard. Each
+  `dashboard-unifi-*.tf` is plain data (sections, rows, panels, PromQL), and
+  `unifi-dashboards.tf` renders them all; its header comment explains the format, and
+  why these use PromQL instead of the query builder.
 
 ## Auth
 
