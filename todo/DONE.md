@@ -26,6 +26,18 @@ and a `*/15` cron job flushes the queue. Kept deliberately on rpi5-1, independen
 a send through a stub that always fails, then flushing it, and by sending end-to-end through cron's real `MAILTO` path.
 Details: [`../docs/email-alerts.md`](../docs/email-alerts.md#queuing-when-the-relay-is-unreachable-msmtpq).
 
+## Slow DNS in rpi5-1's Compose containers
+
+**Done (2026-09-28).** External lookups from Compose bridge containers took about 4s, and some containers
+(`zigbee2mqtt`, `nut-webui`) couldn't resolve external names at all. dockerd logged ~700 `failed to query external DNS`
+errors a day. Cause: Unbound listened on `interface: 0.0.0.0`, so the kernel chose the source address of its UDP
+replies from the route back to the client. A bridge container querying `192.168.102.2` got its answer from
+`172.18.0.1` and dropped it. TCP was unaffected. The mounted `docker-compose/resolv.conf` hid this by falling back to
+`172.18.0.1` after Docker's embedded DNS timed out. Fix: `interface-automatic: yes` in
+[`../docker-compose/unbound/custom.conf.d/local.conf`](../docker-compose/unbound/custom.conf.d/local.conf), and removed
+the `resolv.conf` workaround mounts so bridge containers use Docker's embedded DNS as intended. Host-network containers
+still mount `resolv-host.conf`.
+
 ## rpi5-1 desktop cleanup (jump box prep)
 
 **Done (2026-09-27).** First host-cleanup step toward rpi5-1's future as a jump box-only 4GB Pi (see

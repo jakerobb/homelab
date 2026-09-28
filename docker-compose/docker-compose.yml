@@ -247,7 +247,6 @@ services:
     volumes:
       - ./influxdb/data:/var/lib/influxdb2
       - ./influxdb/config:/etc/influxdb2
-      - ./resolv.conf:/etc/resolv.conf:ro
 
   grafana:
     <<: *dns
@@ -267,7 +266,6 @@ services:
       - GF_INSTALL_PLUGINS=grafana-clock-panel,victoriametrics-logs-datasource
     volumes:
       - ./grafana:/var/lib/grafana
-      - ./resolv.conf:/etc/resolv.conf:ro
       - ./grafana-provisioning:/etc/grafana/provisioning:ro
 
   telegraf:
@@ -292,7 +290,6 @@ services:
       - UNIFI_TOKEN=${UNIFI_TOKEN}
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-      - ./resolv.conf:/etc/resolv.conf:ro
       - /run/udev:/run/udev:ro
       - /dev:/dev:ro
       - /:/hostfs:ro
@@ -321,8 +318,6 @@ services:
       - UP_UNIFI_DEFAULT_VERIFY_SSL=false
       - UP_PROMETHEUS_DISABLE=true
       - UP_UNIFI_DEFAULT_SAVE_DPI=true
-    volumes:
-      - ./resolv.conf:/etc/resolv.conf:ro
 
   nut-influx-relay:
     <<: *dns
@@ -339,7 +334,6 @@ services:
       - NUT_PASSWORD=${NUT_PASSWORD}
     volumes:
       - ./nut-influx-relay/config.yaml:/etc/nut-influx-relay/config.yaml:ro
-      - ./resolv.conf:/etc/resolv.conf:ro
     ports:
       - "8085:8080"
 
