@@ -1,0 +1,4 @@
+/* Wider content column: the decision logs are long and table-heavy. */
+.md-grid {
+  max-width: 1440px;
+}

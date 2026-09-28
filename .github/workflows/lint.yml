@@ -67,6 +67,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: git ls-files -z '*.sh' | xargs -0 shellcheck
 
+      # The same build docs.jakerobb.org runs (manifests/docs/), but --strict:
+      # a broken link, a missing anchor, or a Markdown file left out of the
+      # nav fails the PR instead of quietly shipping.
+      - name: Docs site
+        if: ${{ !cancelled() }}
+        env:
+          DOCS_GIT_DATES: "false"
+          NO_MKDOCS_2_WARNING: "true"
+        run: |
+          pip install -r docs-site/requirements.txt
+          mkdocs build --strict -f docs-site/mkdocs.yml -d "$RUNNER_TEMP/site"
+
       # Helm-templates every Application's chart with its own values, plus the
       # raw/kustomized manifests — see the script's docstring. A chart that
       # fails to render (bad version, values that break a template) fails here.

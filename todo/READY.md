@@ -4,12 +4,6 @@ Cluster-readiness backlog — each of these is its own effort, meant to be tackl
 This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
 observable cluster before we bring in critical workloads.
 
-## Make a Documentation app/site -- docs.jakerobb.org
-
-Serves a hyperlinked view of all the docs. What everything is, how it works, how it's connected, how to fix common 
-issues, how to get access, etc. This should be behind Authelia, linked from Homepage, and deployed as an ArgoCD
-application just like everything else.
-
 ## Compose workload migration
 
 **Not started — deliberately held until the cluster itself is robust**

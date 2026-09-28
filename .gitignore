@@ -58,3 +58,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# MkDocs output and local venv (docs-site/README.md)
+/site/
+/.venv/

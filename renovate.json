@@ -17,6 +17,24 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["instantlinux/nut-upsd"],
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-r(?<build>\\d+)$"
+    },
+    {
+      "description": "docs.jakerobb.org builds with the mkdocs-material image in-cluster (manifests/docs/deployment.yaml) and with the PyPI package in CI (docs-site/requirements.txt). Bump both in one PR so CI checks the version the site will actually run.",
+      "matchPackageNames": [
+        "docker.io/squidfunk/mkdocs-material",
+        "squidfunk/mkdocs-material",
+        "mkdocs-material"
+      ],
+      "groupName": "mkdocs-material"
+    },
+    {
+      "description": "nginx's even minor versions are the stable line and odd ones are mainline. The docs site's nginx tracks stable only.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "docker.io/nginxinc/nginx-unprivileged",
+        "nginxinc/nginx-unprivileged"
+      ],
+      "allowedVersions": "/^\\d+\\.\\d*[02468]\\.\\d+-alpine$/"
     }
   ],
   "customManagers": [

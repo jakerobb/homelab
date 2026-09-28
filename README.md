@@ -7,6 +7,10 @@ This repo contains IaC and related stuff for my homelab and home network in gene
 
 Passwords and other secrets are in 1Password in the Tech vault, which is shared with the family.
 
+These docs are also published as a searchable site at [docs.jakerobb.org](https://docs.jakerobb.org) (home network
+only). New here? Start with [How it fits together](docs/overview.md), [Getting access](docs/access.md) and
+[Troubleshooting](docs/troubleshooting.md).
+
 ## Current architecture
 
 - **Network:**
@@ -332,6 +336,7 @@ Operations
 Applications
 * homepage
 * searxng
+* docs
 
 ## External Dependencies
 

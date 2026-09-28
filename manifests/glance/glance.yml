@@ -104,6 +104,9 @@ pages:
             groups:
               - title: Apps
                 links:
+                  - title: Docs
+                    url: https://docs.jakerobb.org
+                    icon: di:mkdocs
                   - title: Headlamp
                     url: https://headlamp.jakerobb.org
                     icon: di:headlamp

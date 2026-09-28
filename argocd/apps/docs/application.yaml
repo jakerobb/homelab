@@ -1,0 +1,26 @@
+# docs.jakerobb.org: the repo's Markdown rendered with MkDocs Material. See
+# argocd/README.md's "docs" section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: docs
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/docs
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: docs
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
