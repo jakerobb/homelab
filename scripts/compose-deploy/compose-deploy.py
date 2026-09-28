@@ -42,6 +42,9 @@ LOG_MAX_BYTES = 1_000_000
 # Unauthenticated topic — keep messages to paths/service names, never file
 # contents or command output (which could carry secrets).
 NTFY_URL = "https://ntfy.jakerobb.org/homelab-alerts"
+# Full path, because cron's PATH is just /usr/bin:/bin and sops lives in
+# /usr/local/bin (see docs/compose-deploy.md's prerequisites).
+SOPS = "/usr/local/bin/sops"
 
 # Deploy-relative destination -> (SRC-relative SOPS source, extra sops args).
 # Mirrors the decrypt commands in docker-compose/README.md.
@@ -219,7 +222,7 @@ class Deploy:
         return entries
 
     def decrypt(self, src, sops_args):
-        p = run(["sops", "--decrypt", *sops_args, str(src)], timeout=60)
+        p = run([SOPS, "--decrypt", *sops_args, str(src)], timeout=60)
         if p.returncode != 0:
             raise RuntimeError(f"sops couldn't decrypt {src.relative_to(REPO)}")
         return p.stdout
