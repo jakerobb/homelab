@@ -286,7 +286,6 @@ Docker Compose is where everything started. It runs on rpi5-1, and includes the 
 * influxdb
 * grafana
 * telegraf
-* unpoller
 * nut-influx-relay
 * mosquitto
 * zigbee2mqtt
@@ -329,6 +328,7 @@ Observability
 * kube-prometheus-stack
 * SigNoz
   * signoz-k8s-infra
+* unpoller
 
 Operations
 * renovate

@@ -6,7 +6,7 @@ observable cluster before we bring in critical workloads.
 
 ## Compose workload migration
 
-**Not started — deliberately held until the cluster itself is robust**
+**In progress (since 2026-09-28).** Migrated services move to [`DONE.md`](DONE.md) as they land.
 Move each service off the RPi5 16GB's Docker Compose stack into the cluster, one at a time, in separate sessions. For
 each, consider whether a more K8s-appropriate or K8s-native alternative exists. Each application should be a separate
 ArgoCD Application resource. Put each application behind Authelia -- using OIDC if possible; ExternalAuth filtering
@@ -22,7 +22,6 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 ### To be migrated
 
-- **Unpoller** (UniFi metrics aggregation) — probably switching from InfluxDB as a target to Prometheus
 - **NetworkOptimizer** (`optimizer` + `network-optimizer-speedtest`) — no hardware dependency, network-based app. Needs
   a persistent volume (SQLite, configs, license under `./data`)
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — no hardware dependency. Needs a

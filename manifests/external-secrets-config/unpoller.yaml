@@ -1,0 +1,21 @@
+# unpoller's read-only local UniFi account (manifests/unpoller/). Same
+# account the Compose deployment used.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: unpoller-unifi-credentials
+  namespace: unpoller
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: unpoller-unifi-credentials
+  data:
+    - secretKey: username
+      remoteRef:
+        key: unpoller-unifi-credentials/username
+    - secretKey: password
+      remoteRef:
+        key: unpoller-unifi-credentials/password

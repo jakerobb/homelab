@@ -183,6 +183,10 @@ spec:
                           - '{job="node-exporter"}'
                           - '{job="kube-scheduler"}'
                           - '{job="kube-controller-manager"}'
+                          # UniFi metrics (manifests/unpoller/). Prometheus
+                          # keeps only 10 days, and these used to live in
+                          # InfluxDB long-term, so SigNoz holds the history.
+                          - '{job="unpoller"}'
                           - 'up'
                       static_configs:
                         - targets:

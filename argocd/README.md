@@ -1150,6 +1150,44 @@ deployed as [`apps/truenas-exporter/`](apps/truenas-exporter/application.yaml) �
   doesn't break this): the `truenas-exporter-api-key` item in the
   `homelab-k8s` 1Password vault, synced by External Secrets Operator.
 
+## unpoller (migrated from Docker Compose, 2026-09-28)
+
+UniFi controller metrics (devices, clients, DPI, sites), polled from the
+Cloud Gateway Fiber by [unpoller](https://github.com/unpoller/unpoller).
+The first service moved under the "Compose workload migration" plan in
+[`../todo/READY.md`](../todo/READY.md) (ntfy went earlier, on its own). Deployed as
+[`apps/unpoller/`](apps/unpoller/application.yaml) →
+[`manifests/unpoller/`](../manifests/unpoller/).
+
+- **InfluxDB → Prometheus.** On Compose it wrote to InfluxDB's `unifi`
+  bucket. Here it serves `/metrics` (unpoller's native Prometheus output),
+  scraped by a `ServiceMonitor` every 30s, the same as truenas-exporter. The
+  UniFi controller only updates traffic stats about every 30s, so
+  `UP_PROMETHEUS_INTERVAL` (unpoller's cache refresh) matches that.
+- **Long-term history lives in SigNoz.** Prometheus keeps only 10 days, so
+  `{job="unpoller"}` was added to SigNoz's `/federate` selectors
+  ([`apps/signoz/application.yaml`](apps/signoz/application.yaml)). Measured
+  before enabling it: about 4.6k series and 1.1MB per scrape with DPI on
+  (49 clients, 10 devices), roughly a tenth of the rest of the federated set.
+  The InfluxDB `unifi` history was not migrated; unpoller's Influx and
+  Prometheus schemas differ enough that it's not worth converting.
+- **No PVC, no UI, no Authelia.** Unpoller is stateless and only exposes
+  `/metrics` inside the cluster (no `HTTPRoute`), so there's nothing to put
+  behind forward-auth.
+- **Credentials:** the same read-only local UniFi account Compose used,
+  from the `unpoller-unifi-credentials` item (`username`, `password`) in the
+  `homelab-k8s` 1Password vault, synced by External Secrets Operator
+  ([`../manifests/external-secrets-config/unpoller.yaml`](../manifests/external-secrets-config/unpoller.yaml)).
+  Kept over a UniFi API key because those carry the creating admin's full
+  permissions. The password is read with unpoller's `file://` prefix from
+  the mounted Secret, so it doesn't show in `kubectl describe pod`.
+- **Controller URL** is `https://gateway.lan` (same as Homepage's widget),
+  not the `47Net.lan` name Compose used, which also resolves to three IPv6
+  addresses.
+- **Hardened pod.** The image is `distroless/static`, which defaults to
+  root; the pod runs as 65532 with a read-only root filesystem and all
+  capabilities dropped.
+
 ## Docs site (added 2026-09-28)
 
 `docs.jakerobb.org` renders this repo's Markdown as a searchable site with
