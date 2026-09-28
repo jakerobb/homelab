@@ -32,7 +32,7 @@ into a `~/dev/homelab` git checkout on rpi5-1 — one copy of the content,
 impossible instead of just easy to avoid.
 
 **Symlinked (works reliably):** `docker-compose.yml`, `caddy/Caddyfile`,
-`resolv.conf`, `resolv-host.conf`, `telegraf/` (whole dir),
+`resolv-host.conf`, `telegraf/` (whole dir),
 `nut-influx-relay/` (whole dir), `vector/vector.yaml`, plus (added
 2026-09-24, none of them bind-mounted by any running service)
 `ntfy/conf/server.yml`, `nut-conf-office/ups.conf`, and
@@ -178,7 +178,10 @@ encrypted in their native YAML/JSON with SOPS's normal per-value encryption.
   secret — none of the captured config files have a literal credential in
   plaintext, only the files listed above (which are the *sources* those
   `${VAR}`s or bind-mounted files ultimately come from).
-- `resolv.conf` / `resolv-host.conf` are bind-mounted into several
-  containers to point them at Unbound (`192.168.102.2`) instead of Docker's
-  default embedded DNS — see the `x-dns` anchor and per-service
-  `/etc/resolv.conf` mounts in `docker-compose.yml`.
+- DNS: bridge-network containers use Docker's embedded DNS (`127.0.0.11`),
+  which forwards to Unbound (`192.168.102.2`) via the `x-dns` anchor.
+  Host-network containers don't get the embedded resolver, so they
+  bind-mount `resolv-host.conf` instead. This only works because Unbound
+  sets `interface-automatic: yes` (see `unbound/custom.conf.d/local.conf`):
+  without it, UDP replies to bridge containers come back from `172.18.0.1`
+  and get dropped, so every lookup times out.
