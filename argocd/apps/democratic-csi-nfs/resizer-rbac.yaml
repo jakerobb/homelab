@@ -1,0 +1,36 @@
+# Extra permission for the csi-resizer sidecar, which the chart's controller
+# ClusterRole doesn't grant. Applied by the root app, like namespace.yaml; the
+# chart has no hook for extra RBAC rules (identical to ../democratic-csi/resizer-rbac.yaml apart from names).
+#
+# csi-resizer v2.0+ turns its VolumeAttributesClass feature on automatically
+# when the cluster serves storage.k8s.io/v1 VolumeAttributesClass (Kubernetes
+# 1.34+), and then watches that resource. Without read access its informer
+# gets `forbidden` and never syncs. Rule copied from upstream's
+# deploy/kubernetes/rbac.yaml (external-resizer v2.x). Drop this file if the
+# chart's ClusterRole ever adds it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: democratic-csi-nfs-resizer-vac
+  labels:
+    app.kubernetes.io/part-of: democratic-csi-nfs
+rules:
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattributesclasses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: democratic-csi-nfs-resizer-vac
+  labels:
+    app.kubernetes.io/part-of: democratic-csi-nfs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: democratic-csi-nfs-resizer-vac
+subjects:
+  # The chart's controller ServiceAccount (<release>-controller-sa).
+  - kind: ServiceAccount
+    name: democratic-csi-nfs-controller-sa
+    namespace: democratic-csi
