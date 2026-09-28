@@ -82,22 +82,40 @@ spec:
               requests:
                 cpu: 10m
                 memory: 192Mi
+          # Sidecar images pinned here (2026-09-28): the chart's defaults are
+          # only bumped occasionally upstream (last in 2024-03/2025-03), so
+          # they'd otherwise sit years behind. Renovate PRs these via the
+          # regex manager in renovate.json. The resizer (v2.0+) also needs
+          # VolumeAttributesClass read access the chart's ClusterRole
+          # lacks; see resizer-rbac.yaml.
           externalAttacher:
+            image:
+              # renovate: datasource=docker depName=registry.k8s.io/sig-storage/csi-attacher
+              tag: 'v4.13.0'
             resources:
               requests:
                 cpu: 5m
                 memory: 64Mi
           externalProvisioner:
+            image:
+              # renovate: datasource=docker depName=registry.k8s.io/sig-storage/csi-provisioner
+              tag: 'v6.3.0'
             resources:
               requests:
                 cpu: 5m
                 memory: 64Mi
           externalResizer:
+            image:
+              # renovate: datasource=docker depName=registry.k8s.io/sig-storage/csi-resizer
+              tag: 'v2.2.1'
             resources:
               requests:
                 cpu: 5m
                 memory: 64Mi
           externalSnapshotter:
+            image:
+              # renovate: datasource=docker depName=registry.k8s.io/sig-storage/csi-snapshotter
+              tag: 'v8.6.0'
             resources:
               requests:
                 cpu: 5m

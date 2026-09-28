@@ -522,3 +522,23 @@ compose-deploy's `up -d --remove-orphans` applies a merged bump and removed the 
   (`exec: "docker": executable file not found`, since `job-local` runs inside the Ofelia container, which has no Docker
   CLI), so ~12.7GB of unused images had built up. That was Ofelia's only job, so Ofelia is removed too.
 
+## democratic-csi: pin the CSI sidecars
+
+**Done (2026-09-28).** The chart hardcodes its CSI sidecar images and only bumps them occasionally (last in March 2025,
+and then only the snapshotter), so both releases were running 2023-era attacher v4.4.0, provisioner v3.6.0 and resizer
+v1.9.0. Both [`../argocd/apps/democratic-csi/application.yaml`](../argocd/apps/democratic-csi/application.yaml) and its
+NFS twin now pin csi-attacher v4.13.0, csi-provisioner v6.3.0, csi-resizer v2.2.1 and csi-snapshotter v8.6.0, with
+`# renovate:` comments for the existing regex manager. csi-resizer v2.3.0 had a GitHub release but wasn't on
+registry.k8s.io yet; Renovate will PR it once it is.
+
+Checked before upgrading:
+- **Flags:** every flag the chart passes still exists in each new version (the resizer's `--timeout` now overrides
+  its new `--resize-timeout`/`--modify-timeout`).
+- **RBAC:** diffed the chart's controller ClusterRole against each sidecar's upstream `rbac.yaml`. Only the resizer
+  needed more: v2.0+ watches VolumeAttributesClass once the cluster serves the v1 API (Kubernetes 1.34+), so each
+  release gets a small `resizer-rbac.yaml` beside its Application. The snapshotter's missing group-snapshot rules
+  only matter with its `CSIVolumeGroupSnapshot` feature gate, which is off by default.
+- **Provisioner upgrade notes:** v5 turns topology on by default, but only for drivers that report
+  `VOLUME_ACCESSIBILITY_CONSTRAINTS`, and democratic-csi's iSCSI/NFS drivers don't, so nothing changes; v4's
+  volume-mode-conversion check only affects restores from snapshots, which aren't in use.
+
