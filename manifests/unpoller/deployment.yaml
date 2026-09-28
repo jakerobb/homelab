@@ -1,0 +1,110 @@
+# UniFi metrics exporter (github.com/unpoller/unpoller). On Compose it wrote
+# to InfluxDB; here it serves /metrics for Prometheus instead, and SigNoz
+# gets the data by federation (argocd/apps/signoz/application.yaml).
+# Stateless: no PVC.
+#
+# Configured entirely through UP_* env vars; the image's built-in
+# /etc/unpoller/up.conf supplies everything else.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unpoller
+  namespace: unpoller
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: unpoller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: unpoller
+    spec:
+      automountServiceAccountToken: false
+      # distroless/static defaults to root; nothing in the image needs it.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: unpoller
+          image: ghcr.io/unpoller/unpoller:v5.2.10
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: TZ
+              value: America/Detroit
+            - name: UP_INFLUXDB_DISABLE
+              value: "true"
+            - name: UP_PROMETHEUS_DISABLE
+              value: "false"
+            - name: UP_PROMETHEUS_HTTP_LISTEN
+              value: "0.0.0.0:9130"
+            # How often the background poller refreshes the cache that
+            # /metrics serves. The controller only updates traffic stats
+            # about every 30s, so polling faster just repeats values.
+            - name: UP_PROMETHEUS_INTERVAL
+              value: 30s
+            # Startup and error logs only, not a line for every poll.
+            - name: UP_POLLER_QUIET
+              value: "true"
+            - name: UP_UNIFI_DEFAULT_URL
+              value: https://gateway.lan
+            # The gateway has UniFi OS's factory self-signed cert.
+            - name: UP_UNIFI_DEFAULT_VERIFY_SSL
+              value: "false"
+            # The same read-only local UniFi account Compose used. Chosen
+            # over an API key, because UniFi API keys carry their creating
+            # admin's full permissions.
+            - name: UP_UNIFI_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: unpoller-unifi-credentials
+                  key: username
+            # file:// makes unpoller read the password from the mounted
+            # Secret, so it never shows up in `kubectl describe pod`.
+            - name: UP_UNIFI_DEFAULT_PASS
+              value: file:///run/secrets/unifi/password
+            - name: UP_UNIFI_DEFAULT_SAVE_SITES
+              value: "true"
+            - name: UP_UNIFI_DEFAULT_SAVE_DPI
+              value: "true"
+          ports:
+            - name: metrics
+              containerPort: 9130
+          # /metrics serves the cached poll, so it answers even while the
+          # controller is unreachable. That shows up as missing unpoller_*
+          # series, not as pod restarts.
+          livenessProbe:
+            tcpSocket:
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - mountPath: /run/secrets/unifi
+              name: unifi-credentials
+              readOnly: true
+      volumes:
+        # Synced from 1Password by External Secrets Operator
+        # (manifests/external-secrets-config/unpoller.yaml).
+        - name: unifi-credentials
+          secret:
+            secretName: unpoller-unifi-credentials
+            items:
+              - key: password
+                path: password

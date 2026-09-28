@@ -223,6 +223,14 @@ topic — see
 mapped to ntfy priority/tags today ([
 `../manifests/ntfy-alertmanager/configmap.yaml`](../manifests/ntfy-alertmanager/configmap.yaml)).
 
+## Unpoller (Compose workload migration)
+
+**Done (2026-09-28).** The first service moved under the plan in [`READY.md`](READY.md) (ntfy went earlier, on its own).
+Unpoller now runs in the cluster and exports Prometheus metrics instead of writing to InfluxDB's `unifi` bucket.
+SigNoz federates `{job="unpoller"}` for long-term history. It's stateless and has no UI, so there's no PVC and no
+Authelia rule. The InfluxDB history was not migrated. Details:
+[`../argocd/README.md`](../argocd/README.md#unpoller-migrated-from-docker-compose-2026-09-28).
+
 ## ntfy (Compose workload migration)
 
 **Done 2026-09-20.** Migrated off the RPi5 16GB's Docker Compose stack into the cluster — see

@@ -1,0 +1,20 @@
+# Picked up by kube-prometheus-stack's Prometheus without label matching,
+# same as truenas-exporter's. The scrape job is named "unpoller" after the
+# Service, which is what SigNoz's federation selector matches on.
+#
+# 30s matches UP_PROMETHEUS_INTERVAL in deployment.yaml; scraping faster
+# would just re-read the same cached poll.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: unpoller
+  namespace: unpoller
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: unpoller
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 20s

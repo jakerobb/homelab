@@ -1,0 +1,15 @@
+# Cluster-internal only (no HTTPRoute): Prometheus is the only consumer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: unpoller
+  namespace: unpoller
+  labels:
+    app.kubernetes.io/name: unpoller
+spec:
+  selector:
+    app.kubernetes.io/name: unpoller
+  ports:
+    - name: metrics
+      port: 9130
+      targetPort: metrics

@@ -299,26 +299,6 @@ services:
       - /lib/aarch64-linux-gnu/libjq.so.1:/lib/aarch64-linux-gnu/libjq.so.1:ro
       - /lib/aarch64-linux-gnu/libonig.so.5:/lib/aarch64-linux-gnu/libonig.so.5:ro
 
-  unpoller:
-    <<: *dns
-    container_name: unpoller
-    image: ghcr.io/unpoller/unpoller:v5.2.8
-    restart: unless-stopped
-    depends_on:
-      - influxdb
-    environment:
-      - TZ=America/Detroit
-      - UP_INFLUXDB_URL=http://influxdb:8086
-      - UP_INFLUXDB_ORG=home
-      - UP_INFLUXDB_BUCKET=unifi
-      - UP_INFLUXDB_AUTH_TOKEN=${UNPOLLER_INFLUXDB_TOKEN}
-      - UP_UNIFI_DEFAULT_URL=https://47Net.lan
-      - UP_UNIFI_DEFAULT_USER=${UNPOLLER_UNIFI_USER}
-      - UP_UNIFI_DEFAULT_PASS=${UNPOLLER_UNIFI_PASS}
-      - UP_UNIFI_DEFAULT_VERIFY_SSL=false
-      - UP_PROMETHEUS_DISABLE=true
-      - UP_UNIFI_DEFAULT_SAVE_DPI=true
-
   nut-influx-relay:
     <<: *dns
     container_name: nut-influx-relay

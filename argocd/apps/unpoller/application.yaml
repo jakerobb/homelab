@@ -1,0 +1,27 @@
+# Own Application rather than raw manifests under root, same as
+# truenas-exporter's. Migrated from Docker Compose 2026-09-28; see
+# argocd/README.md's unpoller section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: unpoller
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/unpoller
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: unpoller
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
