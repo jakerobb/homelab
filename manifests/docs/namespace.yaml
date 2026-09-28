@@ -1,0 +1,8 @@
+# Explicit Namespace rather than CreateNamespace=true, same as every other
+# app (see docs/adding-an-app.md). Both containers run non-root with all
+# capabilities dropped, so the cluster's default `baseline` enforcement is
+# fine.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: docs

@@ -1,6 +1,6 @@
 # Pi 5 U-Boot firmware fix — custom installer tooling
 
-Full background: [`talos/README.md`](../README.md), "Talos v1.14.1 upgrade
+Full background: [`talos/README.md`](../../README.md), "Talos v1.14.1 upgrade
 blocked by Pi5 EFI-variable firmware bug". Short version: the 3 Pi5 control
 planes ship a U-Boot that doesn't support writable EFI variables, which
 blocks every normal `talosctl upgrade`. The fix is a community `hive`-branch

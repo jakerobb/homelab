@@ -1,0 +1,18 @@
+# Kustomize for configMapGenerator, same reason as manifests/glance/: the
+# build script and nginx config live here as real files, and the
+# hash-suffixed ConfigMap names roll the pod whenever either one changes.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: docs
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+configMapGenerator:
+  - name: docs-builder
+    files:
+      - build-loop.sh
+  - name: docs-nginx
+    files:
+      - nginx.conf

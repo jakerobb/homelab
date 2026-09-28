@@ -49,6 +49,16 @@ Bluetooth and avahi also stay while Home Assistant and matter-server are still o
 `multi-user.target`, which frees roughly 550MB. For the GUI, run `sudo systemctl start lightdm`. tty1 autologins as
 `jakerobb` (`getty@tty1.service.d/autologin.conf`), so the KVM console goes straight to a shell with passwordless sudo.
 
+## Documentation site (docs.jakerobb.org)
+
+**Done (2026-09-28). Goes live when merged.** The repo's Markdown, rendered with MkDocs Material, behind Authelia
+forward-auth, with a tile on Homepage. Every `*.md` file in the repo is a page, read from where it already lives, and
+the pod rebuilds itself within 5 minutes of each merge to `main`. CI builds the site with `--strict` on every PR, so
+broken links and anchors fail the PR. Building it found and fixed four broken links in the existing docs. Also added
+three new pages as the site's entry points: [How it fits together](../docs/overview.md),
+[Getting access](../docs/access.md) and [Troubleshooting](../docs/troubleshooting.md). Design and trade-offs:
+[`../argocd/README.md`](../argocd/README.md#docs-site-added-2026-09-28).
+
 ## Ingress (Gateway API)
 
 **Done** — decided and deployed 2026-09-13, using Gateway API (Cilium's built-in implementation) instead of a separate

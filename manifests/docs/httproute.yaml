@@ -1,0 +1,54 @@
+# Gated by Authelia forward-auth, same pattern as searxng/httproute.yaml.
+# MkDocs output is static HTML with no login of its own, so OIDC isn't an
+# option. The content is also public on GitHub, but the rendered site
+# stays behind Authelia like every other *.jakerobb.org app.
+#
+# Needs this namespace in the ReferenceGrant in
+# argocd/apps/authelia/referencegrant.yaml and an `access_control` rule for
+# docs.jakerobb.org in argocd/apps/authelia/application.yaml.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: docs
+  namespace: docs
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: Docs
+    gethomepage.dev/description: How the homelab works, and how to fix it
+    gethomepage.dev/icon: mkdocs.png
+    gethomepage.dev/group: Apps
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - docs.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: docs
+          port: 8080

@@ -21,3 +21,10 @@ Before making any change:
 1. Make sure the local repo is clean and up to date. 
    * Feel free to pull in latest. If there are uncommitted changes (staged or otherwise), check with me before you proceed.
 2. Create a suitably named branch
+
+## Docs
+
+Every Markdown file in the repo is published at docs.jakerobb.org (see
+[`docs-site/README.md`](docs-site/README.md)). When adding a new `.md` file,
+add it to `nav:` in `docs-site/mkdocs.yml`, or the PR's lint check fails.
+Write links as GitHub-style relative paths; they work on both.

@@ -1,0 +1,3 @@
+# What CI builds the docs site with. Keep in step with the builder image tag
+# in manifests/docs/deployment.yaml (renovate.json groups the two).
+mkdocs-material[git]==9.7.7

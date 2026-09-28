@@ -52,7 +52,7 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
 - **Sync policy: fully automated (`selfHeal: true`, `prune: true`)** on every
   app managed under `apps/`. Chosen deliberately over the safer
   automated-no-prune middle ground: nothing stateful (PVCs etc.) is under
-  ArgoCD's management yet — see [`../todo/READY.md`](../todo/READY.md#hexos-storage) — so
+  ArgoCD's management yet — see [`../todo/DONE.md`](../todo/DONE.md#hexos-storage) — so
   prune's main hazard (deleting real stateful data that's missing from a
   manifest) doesn't apply yet. **Revisit this once storage-backed workloads
   (e.g. an NFS-backed `StorageClass` from the HexOS TODO) go under ArgoCD's
@@ -181,7 +181,7 @@ time; those get added to Authelia's `access_control` as they land, not now.
   It's a deliberate bridge, not a long-term answer: PVs are backed by a
   directory on whichever single node the pod lands on, no redundancy. Fine
   for Authelia's small SQLite file; superseded once the
-  [HexOS storage TODO](../todo/READY.md#hexos-storage) provides a real NFS/SMB
+  [HexOS storage TODO](../todo/DONE.md#hexos-storage) provides a real NFS/SMB
   `StorageClass`. `reclaimPolicy: Retain` (not the chart's `Delete` default)
   since this is also the first PVC-backed workload under ArgoCD's
   fully-automated `prune: true` — see the "Sync policy" bullet above.
@@ -252,7 +252,7 @@ Renovate PRs like everything else) — see the
 - **PR-based, not in-place patching.** Watchtower silently swaps running
   containers; that model fights GitOps (git is supposed to be the source of
   truth for what's running). Instead, [Renovate](https://docs.renovatebot.com/)
-  runs as a `CronJob` ([`apps/renovate/`](apps/renovate/cronjob.yaml)) that
+  runs as a `CronJob` ([`manifests/renovate/`](../manifests/renovate/cronjob.yaml)) that
   scans this repo and opens PRs bumping container image tags, ArgoCD Helm
   chart versions (`argocd/apps/**/application.yaml`), docker-compose image
   tags, and Terraform provider versions. Merging a PR is what actually
@@ -383,7 +383,7 @@ chart `kube-prometheus-stack` from `prometheus-community`.
 - **Storage:** `hexos-iscsi` (already the cluster default StorageClass, with
   `reclaimPolicy: Retain` — see [`democratic-csi`](apps/democratic-csi/application.yaml)),
   10Gi, 10-day retention. Deliberately modest — no VictoriaMetrics
-  remote-write yet (see [`READY.md`](../todo/READY.md#log-and-metrics-aggregation)),
+  remote-write yet (see [`DONE.md`](../todo/DONE.md#log-and-metrics-aggregation-signoz)),
   so this is a bridge, not the long-term store.
 - **Kubelet scrape TLS:** `insecureSkipVerify` is already the chart default
   for the kubelet `ServiceMonitor` — same call already made for
@@ -1149,3 +1149,46 @@ deployed as [`apps/truenas-exporter/`](apps/truenas-exporter/application.yaml) �
 - **Secret:** a dedicated API key (not Homepage's, so retiring Homepage
   doesn't break this): the `truenas-exporter-api-key` item in the
   `homelab-k8s` 1Password vault, synced by External Secrets Operator.
+
+## Docs site (added 2026-09-28)
+
+`docs.jakerobb.org` renders this repo's Markdown as a searchable site with
+[MkDocs Material](https://squidfunk.github.io/mkdocs-material/). Deployed as
+[`apps/docs/`](apps/docs/application.yaml) →
+[`manifests/docs/`](../manifests/docs/). The site config is in
+[`docs-site/`](../docs-site/mkdocs.yml).
+
+- **Content comes from all over the repo.** Every `*.md` file is a page, where
+  it already lives (`README.md`, `argocd/README.md`, `docs/*.md`,
+  `todo/*.md`, ...). A small MkDocs hook
+  ([`docs-site/hooks/repo_docs.py`](../docs-site/hooks/repo_docs.py)) adds them
+  to the build, since MkDocs otherwise only reads a single `docs_dir`. The
+  same hook adapts GitHub-flavored Markdown for Python-Markdown: links to
+  YAML, scripts and directories become GitHub links, and 2-space nested lists
+  are re-indented. Nothing had to change in the existing docs for them to
+  render. Heading anchors use GitHub's rules, so `#section` links work on
+  both GitHub and the site.
+- **Built in the pod, not in CI.** One pod has two containers sharing an
+  `emptyDir`. The builder (the official `squidfunk/mkdocs-material` image)
+  clones the repo, builds, and polls `main` every 5 minutes. nginx
+  (`nginx-unprivileged`) serves the result. A new build is swapped in with an
+  atomic symlink rename, and a failed build leaves the previous one in place.
+  The alternative, an image built by GitHub Actions and pushed to a
+  registry, needs a registry, push credentials, and something to bump the
+  image tag in git after every docs change. Here, the only moving parts are
+  two pinned public images.
+- **CI checks every PR.** The `Docs site` step in
+  [`lint.yml`](../.github/workflows/lint.yml) runs the same build with
+  `--strict`, so a broken link, a bad `#anchor`, or a new Markdown file
+  missing from `nav:` in `mkdocs.yml` fails the PR. CI builds with the PyPI
+  package pinned in `docs-site/requirements.txt`. Renovate groups it with the
+  builder image so the two stay on the same version.
+- **Auth:** Authelia forward-auth (`ExternalAuth` filter), like SearXNG.
+  MkDocs output is static and has no login of its own. The content is public
+  on GitHub anyway, but the site follows the same rule as the other
+  browser-facing `*.jakerobb.org` apps.
+- **No persistent storage.** A new pod clones and builds from scratch in
+  about 10 seconds, and isn't Ready until `/index.html` exists.
+- **Adding a page:** write the Markdown file anywhere in the repo and add it
+  to `nav:` in `docs-site/mkdocs.yml`. To preview locally, see
+  [`docs-site/README.md`](../docs-site/README.md).

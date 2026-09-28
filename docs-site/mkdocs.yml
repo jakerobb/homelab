@@ -1,0 +1,141 @@
+# docs.jakerobb.org: the repo's Markdown, rendered with MkDocs Material.
+# Pages come from all over the repo (see hooks/repo_docs.py); `pages/` only
+# holds site-only assets. See docs-site/README.md for building it locally.
+site_name: homelab docs
+site_url: https://docs.jakerobb.org/
+repo_url: https://github.com/jakerobb/homelab
+repo_name: jakerobb/homelab
+# Page paths are repo-relative, so GitHub's edit URL works as-is.
+edit_uri: edit/main/
+
+docs_dir: pages
+site_dir: ../site
+
+hooks:
+  - hooks/repo_docs.py
+
+theme:
+  name: material
+  icon:
+    logo: material/server-network
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.action.edit
+    - content.action.view
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+extra_css:
+  - assets/extra.css
+
+plugins:
+  - search
+  # "Last updated" per page, from git history. Off in CI, whose checkout is
+  # shallow (the plugin warns about that, and --strict fails on warnings).
+  - git-revision-date-localized:
+      enabled: !ENV [DOCS_GIT_DATES, true]
+      type: date
+      timezone: America/Detroit
+      fallback_to_build_date: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-style heading anchors. The repo's links were written against
+      # GitHub's slugs (e.g. `#dns--tls-decided-2026-09-13`, double hyphen),
+      # and Python-Markdown's default slugify collapses those.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.betterem
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  # Mermaid diagrams in ```mermaid fences, which GitHub renders too.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: README.md
+  - Start here:
+      - How it fits together: docs/overview.md
+      - Getting access: docs/access.md
+      - Troubleshooting: docs/troubleshooting.md
+  - Kubernetes:
+      - Talos cluster: talos/README.md
+      - ArgoCD and apps: argocd/README.md
+      - Adding an app: docs/adding-an-app.md
+      - NFS storage: docs/nfs-storage.md
+      - etcd backups: docs/etcd-backup.md
+      - pv-janitor: manifests/pv-janitor/README.md
+      - Pi 5 U-Boot fix: talos/tools/uboot-fix/README.md
+  - Hosts:
+      - rpi5-1:
+          - Docker Compose stack: docker-compose/README.md
+          - Compose auto-deploy: docs/compose-deploy.md
+          - OS updates: docs/rpi5-1-os-updates.md
+          - Email alerts: docs/email-alerts.md
+          - UniFi GC report: docs/unifi-gc-report.md
+      - Proxmox (MS-A2):
+          - Installing Proxmox: docs/proxmox-install.md
+          - OS updates: docs/proxmox-os-updates.md
+          - Config backup: docs/proxmox-config-backup.md
+          - Host metrics: docs/proxmox-host-metrics.md
+      - HexOS: docs/hexos-install.md
+      - MacBook Pro worker:
+          - UTM Talos worker: docs/utm-talos-worker.md
+          - Host metrics: docs/mac-host-metrics.md
+  - Terraform:
+      - GitHub Actions: docs/gha-terraform.md
+      - Proxmox: terraform/proxmox/README.md
+      - Cloudflare: terraform/cloudflare/README.md
+      - SigNoz: terraform/signoz/README.md
+  - Plans:
+      - Ready: todo/READY.md
+      - Future: todo/FUTURE.md
+      - Hardware: todo/HARDWARE.md
+      - Done: todo/DONE.md

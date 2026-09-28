@@ -1,0 +1,143 @@
+# Bare Deployment, no chart: two containers sharing one emptyDir.
+#
+# - builder: the official MkDocs Material image, running build-loop.sh. It
+#   clones this repo (public, so no credentials), builds the site, and
+#   rebuilds within POLL_SECONDS of each new commit on main.
+# - nginx: serves the latest good build.
+#
+# Building in-cluster means no image registry, no CI job pushing images, and
+# no bot committing tag bumps back to the repo. The trade-off is that the
+# site trails main by up to one poll interval, and a fresh pod clones and
+# builds before it's Ready (~10s). CI runs the same build with --strict on
+# every PR (.github/workflows/lint.yml), so a broken build shouldn't reach
+# main in the first place.
+#
+# The two image tags are pinned for Renovate. Keep the builder's
+# mkdocs-material version in step with docs-site/requirements.txt (what CI
+# builds with); renovate.json groups them into one PR.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docs
+  namespace: docs
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: docs
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: docs
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: builder
+          image: docker.io/squidfunk/mkdocs-material:9.7.7
+          imagePullPolicy: IfNotPresent
+          # tini (the image's own init) so SIGTERM stops the loop promptly.
+          command: ["/sbin/tini", "--", "/bin/sh", "/scripts/build-loop.sh"]
+          securityContext:
+            # The image has no USER and defaults to root. Nothing here needs
+            # root: git and mkdocs only write under the emptyDirs below.
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: REPO_URL
+              value: https://github.com/jakerobb/homelab.git
+            - name: BRANCH
+              value: main
+            - name: POLL_SECONDS
+              value: "300"
+            - name: HOME
+              value: /tmp
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            # Silences Material's startup banner about MkDocs 2.0.
+            - name: NO_MKDOCS_2_WARNING
+              value: "true"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - mountPath: /scripts
+              name: builder-script
+              readOnly: true
+            - mountPath: /work
+              name: work
+            - mountPath: /site
+              name: site
+            - mountPath: /tmp
+              name: builder-tmp
+        - name: nginx
+          image: docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            # The image's own nginx user.
+            runAsUser: 101
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /index.html
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            # Whole-directory mount, not subPath (see
+            # manifests/homepage/deployment.yaml for why). This replaces the
+            # image's stock default.conf.
+            - mountPath: /etc/nginx/conf.d
+              name: nginx-config
+              readOnly: true
+            - mountPath: /site
+              name: site
+              readOnly: true
+            # nginx-unprivileged keeps its pid file and temp paths in /tmp.
+            - mountPath: /tmp
+              name: nginx-tmp
+      volumes:
+        - name: builder-script
+          configMap:
+            name: docs-builder
+        - name: nginx-config
+          configMap:
+            name: docs-nginx
+        - name: work
+          emptyDir: {}
+        - name: site
+          emptyDir: {}
+        - name: builder-tmp
+          emptyDir: {}
+        - name: nginx-tmp
+          emptyDir: {}
