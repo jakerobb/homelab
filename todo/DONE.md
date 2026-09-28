@@ -500,3 +500,25 @@ Lessons:
   `signoz/CompositeQuery`.
 - **First apply:** a new stack's first apply is manual, because the workflow refuses to apply against empty state.
 
+## Compose: Watchtower -> Renovate
+
+**Done (2026-09-28).** Every image in [`../docker-compose/docker-compose.yml`](../docker-compose/docker-compose.yml)
+is now pinned to the exact version that was running (found by matching each container's image digest against the
+registry's tags, since `:latest`, `:stable` and untagged images don't say what they are), and Watchtower is removed.
+Renovate's `docker-compose` manager (on by default in `config:recommended`) opens PRs for them like everything else;
+compose-deploy's `up -d --remove-orphans` applies a merged bump and removed the Watchtower container itself.
+
+- **Own images** (`modbus-eth-controller`, `nut-influx-relay`): their publish workflows push a `YYYYMMDD` tag on every
+  push to main, which Renovate compares as a version (same as `truenas-exporter`). A second build on the same day
+  overwrites that day's tag, so Renovate won't see it.
+- **`edgd1er/webnut`** only publishes `latest`, so it's pinned as `latest@sha256:...` and Renovate PRs digest changes.
+- **[`../renovate.json`](../renovate.json) rules:** `instantlinux/nut-upsd` gets regex versioning, because its
+  `-rN` Alpine-revision suffix would otherwise pin it to one revision forever. Verified with a local
+  `renovate --platform=local --dry-run=lookup`.
+- **Mixed-tag images** pin the variant that was running: `eclipse-mosquitto:2.1.2-alpine`, `timberio/vector:0.58.0-debian`,
+  `koush/scrypted:v0.147.0-noble-full`.
+- **Image cleanup** moved to rpi5-1's crontab: `docker image prune --all --force --filter until=168h` daily at 5am,
+  replacing Watchtower's `WATCHTOWER_CLEANUP`. Ofelia's own `docker-image-prune` job had been failing every day
+  (`exec: "docker": executable file not found`, since `job-local` runs inside the Ofelia container, which has no Docker
+  CLI), so ~12.7GB of unused images had built up. That was Ofelia's only job, so Ofelia is removed too.
+

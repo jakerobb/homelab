@@ -3,28 +3,9 @@ x-dns: &dns
     - 192.168.102.2
 
 services:
-  watchtower:
-    <<: *dns
-    image: containrrr/watchtower:latest
-    container_name: watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      # Run every day at 4:00am ET (cron format includes seconds)
-      - TZ=America/Detroit
-      - WATCHTOWER_SCHEDULE=0 0 4 * * *
-      # Remove old images after updating
-      - WATCHTOWER_CLEANUP=true
-      # Only update running containers
-      - WATCHTOWER_INCLUDE_STOPPED=false
-      # Rolling restart instead of stopping everything at once
-      - WATCHTOWER_ROLLING_RESTART=true
-      - DOCKER_API_VERSION=1.47
-
   caddy:
     <<: *dns
-    image: ghcr.io/caddybuilds/caddy-cloudflare:latest
+    image: ghcr.io/caddybuilds/caddy-cloudflare:2.11.4
     container_name: caddy
     restart: unless-stopped
     network_mode: host
@@ -38,7 +19,7 @@ services:
   homeassistant:
     <<: *dns
     container_name: homeassistant
-    image: ghcr.io/home-assistant/home-assistant:stable
+    image: ghcr.io/home-assistant/home-assistant:2026.9.4
     privileged: true
     restart: unless-stopped
     network_mode: host
@@ -61,7 +42,7 @@ services:
   scrypted:
     <<: *dns
     container_name: scrypted
-    image: koush/scrypted
+    image: koush/scrypted:v0.147.0-noble-full
     restart: unless-stopped
     network_mode: host
     environment:
@@ -72,7 +53,7 @@ services:
   modbus-controller:
     <<: *dns
     container_name: modbus-controller
-    image: jakerobb/modbus-eth-controller:latest
+    image: jakerobb/modbus-eth-controller:20251201
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -81,7 +62,7 @@ services:
 
   nut-upsd:
     <<: *dns
-    image: instantlinux/nut-upsd
+    image: instantlinux/nut-upsd:2.8.5-r1
     container_name: nut-upsd
     restart: unless-stopped
     privileged: true
@@ -101,7 +82,9 @@ services:
     restart: unless-stopped
     depends_on:
       - nut-upsd
-    image: edgd1er/webnut:latest
+    # Upstream only publishes `latest` (no version tags), so this is pinned by
+    # digest instead; Renovate opens a PR when `latest` moves.
+    image: edgd1er/webnut:latest@sha256:bb41f38d03c7129b720c4a2549dcc2ccd12918993bfca313a1551284d0a5b22b
     environment:
       - UPS_HOST=nut-upsd
       - UPS_PORT=3493
@@ -113,7 +96,7 @@ services:
   change-detection:
     <<: *dns
     network_mode: host
-    image: dgtlmoon/changedetection.io:latest
+    image: dgtlmoon/changedetection.io:0.60.7
     container_name: change-detection
     environment:
       - PLAYWRIGHT_DRIVER_URL=ws://192.168.102.2:3000/?stealth=1&--disable-web-security=true&blockAds=true
@@ -136,7 +119,7 @@ services:
     volumes:
       - ./resolv-host.conf:/etc/resolv.conf:ro
     network_mode: host
-    image: ghcr.io/browserless/chromium:latest
+    image: ghcr.io/browserless/chromium:v2.56.7
     container_name: browserless
     environment:
       - SCREEN_WIDTH=1920
@@ -155,7 +138,7 @@ services:
   optimizer:
     <<: *dns
     # Pinned to a preview build the developer asked us to try; revert to :latest afterward
-    image: ghcr.io/ozark-connect/network-optimizer:2.9.0-preview5
+    image: ghcr.io/ozark-connect/network-optimizer:2.9.0-preview7
 #    image: network-optimizer-test
 #    build:
 #      context: ../NetworkOptimizer   # path to your clone, not just docker/
@@ -206,7 +189,7 @@ services:
   # Requires HOST_IP or HOST_NAME to be set in .env for result reporting
   network-optimizer-speedtest:
     <<: *dns
-    image: ghcr.io/ozark-connect/speedtest:latest
+    image: ghcr.io/ozark-connect/speedtest:2.8.6
     container_name: network-optimizer-speedtest
     restart: unless-stopped
     ports:
@@ -238,7 +221,7 @@ services:
 
   unbound:
     <<: *dns
-    image: klutchell/unbound:latest
+    image: klutchell/unbound:1.26.1
     container_name: unbound
     network_mode: host
     restart: unless-stopped
@@ -248,7 +231,7 @@ services:
   influxdb:
     <<: *dns
     container_name: influxdb
-    image: influxdb:2.9
+    image: influxdb:2.9.1
     restart: unless-stopped
     ports:
       - "8086:8086"
@@ -269,7 +252,7 @@ services:
   grafana:
     <<: *dns
     container_name: grafana
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.2.2
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -290,7 +273,7 @@ services:
   telegraf:
     <<: *dns
     container_name: telegraf
-    image: telegraf:latest
+    image: telegraf:1.40.1
     restart: unless-stopped
     user: "telegraf:990"
     depends_on:
@@ -322,7 +305,7 @@ services:
   unpoller:
     <<: *dns
     container_name: unpoller
-    image: ghcr.io/unpoller/unpoller:latest
+    image: ghcr.io/unpoller/unpoller:v5.2.8
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -344,7 +327,7 @@ services:
   nut-influx-relay:
     <<: *dns
     container_name: nut-influx-relay
-    image: jakerobb/nut-influx-relay:latest
+    image: jakerobb/nut-influx-relay:20260421
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -360,23 +343,8 @@ services:
     ports:
       - "8085:8080"
 
-  ofelia:
-    <<: *dns
-    container_name: ofelia
-    image: mcuadros/ofelia:latest
-    restart: unless-stopped
-    command: daemon --docker
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./resolv.conf:/etc/resolv.conf:ro
-    labels:
-      ofelia.job-local.docker-image-prune.schedule: "0 0 5 * * *"
-      ofelia.job-local.docker-image-prune.command: docker image prune -a --force
-    environment:
-      - TZ=America/Detroit
-
   mosquitto:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.1.2-alpine
     container_name: mosquitto
     restart: unless-stopped
     <<: *dns
@@ -388,7 +356,7 @@ services:
       - "1883:1883"
 
   zigbee2mqtt:
-    image: koenkk/zigbee2mqtt
+    image: koenkk/zigbee2mqtt:2.14.1
     container_name: zigbee2mqtt
     restart: unless-stopped
     <<: *dns
@@ -402,7 +370,7 @@ services:
       - TZ=America/Detroit
 
   matter-server:
-    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    image: ghcr.io/home-assistant-libs/python-matter-server:8.1.0
     container_name: matter-server
     restart: unless-stopped
     network_mode: host
@@ -414,7 +382,7 @@ services:
 
   zwave-js-ui:
     container_name: zwave-js-ui
-    image: zwavejs/zwave-js-ui:latest
+    image: zwavejs/zwave-js-ui:11.24.1
     restart: unless-stopped
     ports:
       - "8091:8091"   # Web UI
@@ -425,7 +393,7 @@ services:
       - TZ=America/Detroit
 
   victorialogs:
-    image: victoriametrics/victoria-logs:latest   # pin: tags use a -victorialogs suffix, e.g. vX.Y.Z-victorialogs
+    image: victoriametrics/victoria-logs:v1.52.0
     container_name: victorialogs
     restart: unless-stopped
     command:
@@ -440,7 +408,7 @@ services:
       - victorialogs-data:/vlogs           # swap to a bind path if you want it in your backup set
 
   vector:
-    image: timberio/vector:latest-debian
+    image: timberio/vector:0.58.0-debian
     container_name: vector
     restart: unless-stopped
     depends_on:

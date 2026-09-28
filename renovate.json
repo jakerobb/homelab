@@ -11,6 +11,14 @@
   "argocd": {
     "managerFilePatterns": ["/^argocd/apps/.+/application\\.ya?ml$/"]
   },
+  "packageRules": [
+    {
+      "description": "instantlinux/nut-upsd tags are <nut version>-r<Alpine package revision> (e.g. 2.8.5-r1). Default docker versioning treats `-r1` as a fixed variant suffix and would never propose -r2 or 2.8.6-r0; regex versioning treats the revision as a build number instead.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["instantlinux/nut-upsd"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-r(?<build>\\d+)$"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",

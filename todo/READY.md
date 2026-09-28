@@ -34,8 +34,6 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   out of the "Log and Metrics aggregation" item instead of running two parallel timeseries stacks — see that section for
   the current direction. Where reasonably easy, migrate the existing InfluxDB history into the new stack for continuity
   (not required, per Jake).
-- **Watchtower** — obviated by Renovate
-- **Ofelia** — replaced by K8s CronJobs
 - **Caddy** — obviated by Cilium Gateway
 
 ### To be migrated

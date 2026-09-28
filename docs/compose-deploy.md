@@ -73,13 +73,18 @@ including the output of failed commands, goes to
 holds `state.json`: last-deployed commit, file hashes, pending restarts, and
 open alerts.
 
-### Expected noise: Watchtower recreates
+### Image updates
 
-Watchtower (4am) recreates containers on new images but copies the old
-container's labels, including a stale `com.docker.compose.image`. The next
-`up -d` sees that mismatch and recreates the container once more, on the
-same image. That's harmless (a few seconds of downtime, about 4:05am) and
-shows up as `recreated <service>` in a low-priority deploy message.
+Every image in `docker-compose.yml` is pinned to a specific version (or, for
+the one image with no version tags, a digest). Renovate opens a PR when a
+new version ships; merging it is what updates the container, via the normal
+`up -d` above. Watchtower used to do this in place and was removed on
+2026-09-28.
+
+Superseded images are cleaned up by a crontab entry on rpi5-1 (not this
+script): `docker image prune --all --force --filter until=168h` daily at 5am.
+That removes every image no container uses, except ones created in the last
+week.
 
 ## Setup (one-time, on rpi5-1)
 
@@ -109,8 +114,9 @@ python3 ~/dev/homelab/scripts/compose-deploy/compose-deploy.py --adopt .env home
 ```
 
 That first real run also does a normal deploy. Expect it to recreate
-`telegraf`, `unpoller`, and `network-optimizer-speedtest` (the Watchtower
-label issue above), and nothing else.
+`telegraf`, `unpoller`, and `network-optimizer-speedtest` (Watchtower,
+since removed, had left them with a stale `com.docker.compose.image` label),
+and nothing else.
 
 Then add the cron entry (`crontab -e`; `MAILTO` is already set there):
 

@@ -268,7 +268,6 @@ there. Flex mini, currently unused
 
 Docker Compose is where everything started. It runs on rpi5-1, and includes the following containers:
 
-* watchtower
 * caddy
 * homeassistant
 * scrypted
@@ -285,7 +284,6 @@ Docker Compose is where everything started. It runs on rpi5-1, and includes the 
 * telegraf
 * unpoller
 * nut-influx-relay
-* ofelia
 * mosquitto
 * zigbee2mqtt
 * matter-server
