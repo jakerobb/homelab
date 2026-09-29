@@ -130,6 +130,24 @@ they're the only long-running containers in the cluster without memory requests 
 post-render patch for that little. When Renovate bumps the chart, check `helm show values signoz/signoz` under
 `clickhouse.clickhouseOperator` for a `resources` key, and set requests from real usage if it's there.
 
+## democratic-csi on TrueNAS's JSON-RPC API (hold HexOS/TrueNAS below 26.x)
+
+**Waiting on:** a democratic-csi release that talks to TrueNAS over the JSON-RPC 2.0 WebSocket API
+([democratic-csi/democratic-csi#509](https://github.com/democratic-csi/democratic-csi/issues/509)). Both drivers
+(`freenas-api-iscsi` and `freenas-api-nfs`, v1.9.5) use the REST API, which TrueNAS 26.04 removes. Until then,
+**don't let HexOS move TrueNAS past 25.10**: every `hexos-iscsi` and NFS volume would stop provisioning, attaching and
+resizing. TrueNAS's "deprecated REST API was used" alert comes from democratic-csi. As of 2026-09-29, TrueNAS's
+audit log showed its API key as the only REST caller (`midclt call audit.query` as `jake`, filtering on
+`service_data.protocol == LEGACY_REST`). The IP in the alert is whichever worker runs the controller pods. The
+maintainer said on 2026-09-14 that work was starting, and plans to drop REST and require TrueNAS 26.x, so the
+driver upgrade and the TrueNAS upgrade will likely have to happen together. If it stalls, alternatives are
+[truenas/truenas-csi](https://github.com/truenas/truenas-csi) (official) and
+[fenio/tns-csi](https://github.com/fenio/tns-csi). While doing this, also replace the `democratic-csi` API key. It
+belongs to `truenas_admin`, so it has full admin rights; give it a dedicated user with only the roles the driver
+needs. The key goes into
+[`../manifests/external-secrets-config/democratic-csi.yaml`](../manifests/external-secrets-config/democratic-csi.yaml)
+and `democratic-csi-nfs.yaml` from 1Password.
+
 ## Revisit the parked domains
 
 **Waiting on:** the next renewal cycle. The 15 domains moved to Cloudflare on 2026-09-26 are parked (no web records,
