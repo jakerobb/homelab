@@ -96,7 +96,7 @@ services:
   change-detection:
     <<: *dns
     network_mode: host
-    image: dgtlmoon/changedetection.io:0.60.7
+    image: dgtlmoon/changedetection.io:0.60.8
     container_name: change-detection
     environment:
       - PLAYWRIGHT_DRIVER_URL=ws://192.168.102.2:3000/?stealth=1&--disable-web-security=true&blockAds=true
