@@ -4,7 +4,9 @@
 # no selector, a hand-written EndpointSlice with the backend's fixed IP, and
 # the HTTPRoute. Not ExternalName Services, which Cilium's Gateway doesn't
 # support as backends. The `managed-by` label keeps Kubernetes' EndpointSlice
-# controllers from touching the slices.
+# controllers from touching the slices. ArgoCD only applies the slices because
+# argocd/install/values.yaml removes EndpointSlice from its default
+# resource.exclusions.
 #
 # When a Compose app migrates into the cluster, delete its file here; its
 # own manifests take over the hostname.
