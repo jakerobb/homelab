@@ -47,7 +47,7 @@ changedetection.jakerobb.org {
 
 # optimizer.jakerobb.org migrated to the k8s cluster 2026-09-28 (Gateway API
 # HTTPRoute + external-dns, see manifests/network-optimizer/). The
-# optimizer.lan UniFi DNS entry this used can be deleted too.
+# optimizer.lan UniFi DNS entry this used has been deleted.
 
 # ntfy.jakerobb.org migrated to the k8s cluster 2026-09-20 (Gateway API
 # HTTPRoute + external-dns, see argocd/apps/ntfy/) — this block, and the

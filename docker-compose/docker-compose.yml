@@ -138,9 +138,9 @@ services:
   # optimizer + network-optimizer-speedtest migrated to the k8s cluster
   # 2026-09-28 (one pod, both containers) — see manifests/network-optimizer/
   # and argocd/README.md's NetworkOptimizer section. compose-deploy's
-  # --remove-orphans stops the old containers on merge; ./data, ./logs and
-  # ./ssh-keys on rpi5-1 were copied into the cluster's PVC first and can be
-  # deleted by hand once the migration is confirmed.
+  # --remove-orphans stopped the old containers on merge. Their ./data, ./logs
+  # and ./ssh-keys on rpi5-1 were copied into the cluster's PVC first, then
+  # deleted once the migration was confirmed.
 
   # Migrated to the k8s cluster 2026-09-20 — see argocd/apps/ntfy/ and
   # argocd/README.md's ntfy section. Not removed until the cluster-hosted

@@ -117,10 +117,7 @@ and database files are **not** committed — they're excluded the same way
   itself is captured, encrypted, below).
 - `influxdb/data/`, `mosquitto/data/`, `mosquitto/log/`, `ntfy/cache/`,
   `grafana/` (all of it — `grafana-provisioning/` is captured separately
-  and is the only hand-authored part), `data/`, `logs/`, `ssh-keys/` (the
-  former network-optimizer container's SQLite db, PDFs, and license — it
-  moved to the cluster on 2026-09-28, so these are leftovers to delete once
-  that's confirmed).
+  and is the only hand-authored part).
 - `nut-conf/` — genuinely empty (confirmed 2026-09-20, permissions had
   drifted to unreadable — fixed to `u+x`), and unreferenced by anything: the
   `nut-upsd` container generates its real `/etc/nut/ups.conf` itself
