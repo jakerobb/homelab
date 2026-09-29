@@ -182,7 +182,7 @@ services:
   grafana:
     <<: *dns
     container_name: grafana
-    image: grafana/grafana:13.2.2
+    image: grafana/grafana:13.2.3
     restart: unless-stopped
     depends_on:
       - influxdb
