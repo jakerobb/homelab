@@ -15,7 +15,7 @@
       message: '{{trigger[''notification''][''message'']}}'
   mode: single
 - id: '1771452044660'
-  alias: Turn on porch light
+  alias: Turn on porch light on webhook (doorbell camera activity)
   description: ''
   triggers:
   - trigger: webhook
