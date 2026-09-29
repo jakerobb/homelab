@@ -8,7 +8,8 @@
 # this way. homepage/httproute.yaml was the first, searxng/httproute.yaml
 # the second, argocd/apps/signoz/httproute.yaml the third,
 # manifests/glance/httproute.yaml the fourth, manifests/docs/httproute.yaml
-# the fifth, argocd/apps/kube-prometheus-stack/httproute.yaml the sixth. Add
+# the fifth, argocd/apps/kube-prometheus-stack/httproute.yaml (and its
+# httproute-alertmanager.yaml) the sixth. Add
 # another entry
 # here (not a second ReferenceGrant) as more apps adopt the ExternalAuth
 # pattern from todo/DONE.md's "Gateway API forward-auth" list.

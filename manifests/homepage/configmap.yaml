@@ -127,6 +127,13 @@ data:
         - NUT (UPS Monitoring):
             icon: nut.png
             href: https://nut.jakerobb.org
+        # Manual rather than discovered: the speed test is served straight
+        # from a LoadBalancer IP, not an HTTPRoute (see
+        # manifests/network-optimizer/service-lb.yaml). LAN only.
+        - Speed Test:
+            icon: openspeedtest.png
+            href: http://speedtest.jakerobb.org:3005
+            description: Network Optimizer's LAN speed test
     - Infrastructure:
         # href and widget.url deliberately point at different places
         # (confirmed 2026-09-16): the tile *links* to HexOS's own dashboard
