@@ -13,7 +13,7 @@ upses:
     host: nut-upsd
     port: 3493
     ups_name: ups
-    tls: false
+    tls_mode: plain
     username: ${NUT_USER}
     password: ${NUT_PASSWORD}
     extra_field_mappings:
@@ -28,5 +28,5 @@ upses:
     host: 192.168.0.9
     port: 3493
     ups_name: office-ups
-    tls: true
+    tls_mode: starttls
     tls_skip_verify: true
