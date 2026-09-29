@@ -1250,8 +1250,8 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   (`two_factor`, `client_secret_post`, PKCE S256). The provider itself is
   configured in the app and stored in its db, so it's a one-time GUI step:
   **Settings > Identity**, add an OIDC provider with
-  - scheme key `authelia` (the redirect URI is
-    `https://optimizer.jakerobb.org/signin-oidc/authelia`)
+  - the generic OIDC preset, whose fixed scheme `oidc` gives the redirect
+    URI `https://optimizer.jakerobb.org/signin-oidc/oidc`
   - issuer/authority `https://auth.jakerobb.org`
   - client ID `network-optimizer`
   - client secret from the 1Password item `network-optimizer-oidc-client-secret`
