@@ -49,7 +49,9 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | Headlamp | <https://headlamp.jakerobb.org> | Web UI for the Kubernetes cluster |
 | SigNoz | <https://signoz.jakerobb.org> | Logs, metrics and dashboards |
 | Prometheus | <https://prometheus.jakerobb.org> | Cluster metrics and alert rules |
+| Alertmanager | <https://alertmanager.jakerobb.org> | Active alerts and silences |
 | ntfy | <https://ntfy.jakerobb.org> | Push notifications and alerts. No login |
+| Speed test | <http://speedtest.jakerobb.org:3005> | LAN speed test (Network Optimizer). LAN only, no login |
 | SearXNG | <https://search.jakerobb.org> | Private web search |
 | Glance | <https://glance.jakerobb.org> | Dashboard (trial) |
 

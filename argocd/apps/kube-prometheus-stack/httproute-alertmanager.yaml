@@ -1,0 +1,53 @@
+# Alertmanager's web UI at alertmanager.jakerobb.org, for viewing active
+# alerts and creating silences. Same setup as httproute.yaml (Prometheus):
+# Alertmanager has no login of its own, so it's gated by Authelia
+# forward-auth, and needs the same ReferenceGrant entry (the `monitoring`
+# namespace is already there) plus its own access_control rule in
+# argocd/apps/authelia/application.yaml. ntfy-alertmanager and Prometheus
+# talk to the Service directly and aren't affected.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: Alertmanager
+    gethomepage.dev/description: Active alerts and silences
+    gethomepage.dev/icon: alertmanager.png
+    gethomepage.dev/group: Monitoring
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - alertmanager.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: kube-prometheus-stack-alertmanager
+          port: 9093

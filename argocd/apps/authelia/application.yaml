@@ -142,6 +142,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'prometheus.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'alertmanager.jakerobb.org'
+                policy: 'two_factor'
 
           identity_providers:
             oidc:

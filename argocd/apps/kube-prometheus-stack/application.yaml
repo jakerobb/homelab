@@ -54,6 +54,10 @@ spec:
         alertmanager:
           enabled: true
           alertmanagerSpec:
+            # Public URL from httproute-alertmanager.yaml, so the links in
+            # alert notifications (e.g. "silence this") open in a browser.
+            # The chart default is the in-cluster Service address.
+            externalUrl: https://alertmanager.jakerobb.org
             # Single replica, no HA gossip — matches this being a
             # best-effort home notification path, not a paged on-call
             # system. Trivial resource footprint either way.

@@ -147,6 +147,9 @@ pages:
                     icon: di:zigbee2mqtt
               - title: Monitoring
                 links:
+                  - title: Alertmanager
+                    url: https://alertmanager.jakerobb.org
+                    icon: di:alertmanager
                   - title: Grafana
                     url: https://grafana.jakerobb.org
                     icon: di:grafana
@@ -171,6 +174,11 @@ pages:
                   - title: SigNoz
                     url: https://signoz.jakerobb.org
                     icon: di:signoz
+                  # Plain HTTP on its own LB IP, not through the Gateway (see
+                  # manifests/network-optimizer/service-lb.yaml). LAN only.
+                  - title: Speed Test
+                    url: http://speedtest.jakerobb.org:3005
+                    icon: di:openspeedtest
               - title: Infrastructure
                 links:
                   - title: ArgoCD
