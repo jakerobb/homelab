@@ -1261,6 +1261,14 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   Keep the built-in `admin` account until an SSO login is confirmed to map
   to an Admin user. If SSO ever locks you out, set `NETOPT_RECOVERY=1` on the
   container for one boot (see upstream's `docker/DEPLOYMENT.md`).
+- **In-app InfluxDB target (gotcha found at cutover).** The app's
+  monitoring feature was configured in its own UI (stored in the db, not in
+  any env var) to write to InfluxDB at `http://localhost:8086`. That worked
+  under host networking on rpi5-1 and fails from the pod with `Connection
+  refused`. Fixed in the UI (Settings, InfluxDB URL) by pointing it at
+  `http://rpi5-1.lan:8086`, the Compose InfluxDB, which is published on the
+  host. Revisit when InfluxDB is retired (see
+  [`../todo/READY.md`](../todo/READY.md)'s "Do not migrate" list).
 - **Version:** still on `2.9.0-preview7` for both containers, the build the
   migrated db was last opened with. See
   [`../todo/FUTURE.md`](../todo/FUTURE.md#networkoptimizer-preview-pin--stable-release).

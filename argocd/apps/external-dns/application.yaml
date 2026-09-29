@@ -28,8 +28,10 @@ spec:
           # For LoadBalancer Services that bypass the Gateway (e.g.
           # NetworkOptimizer's speed test/iperf3 IP). Without --fqdn-template
           # this source only publishes Services annotated with
-          # external-dns.alpha.kubernetes.io/hostname, so the Gateway's own
-          # LB Service and everything else are ignored.
+          # external-dns.kubernetes.io/hostname, so the Gateway's own LB
+          # Service and everything else are ignored. Not the older
+          # external-dns.alpha.kubernetes.io/ prefix most examples online
+          # use: v0.22 changed the default prefix with no fallback.
           - service
         policy: sync
         registry: txt
