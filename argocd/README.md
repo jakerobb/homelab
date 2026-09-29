@@ -1217,9 +1217,10 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
     proxies, and HTTP/2 multiplexing in particular, distort speed test
     results, and iperf3 isn't HTTP anyway. Plain HTTP on :3005 is how it
     worked on Compose too.
-- **Networking trade-off (open question).** Compose used `network_mode:
-  host` on rpi5-1. Jake chose a LoadBalancer IP over `hostNetwork` pinned to
-  one node, to be evaluated in use:
+- **Networking trade-off (evaluated and kept, 2026-09-28).** Compose used
+  `network_mode: host` on rpi5-1. Jake chose a LoadBalancer IP over
+  `hostNetwork` pinned to one node, and after testing (see "Measured
+  throughput" below) it stays:
   - The pod *prefers* nodes with `homelab.jakerobb.org/nic-speed-mbps` above
     9999 (the MS-A2 workers; see
     [`../talos/README.md`](../talos/README.md#node-nic-speed-labels-added-2026-09-28)),
@@ -1246,6 +1247,14 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
     with no pinning. UniFi knows each worker's IP (the VM's own network
     adapter, on the MS-A2's switch port). Tests the app starts itself leave
     from that IP anyway, because pod egress is masqueraded to the node.
+  - **Known upstream bug: VMs behind a hypervisor.** UniFi reports the
+    MS-A2 VMs' uplink as the `proxmox` client (`192.168.102.21`) on port 25,
+    not as the USW Pro HD 24. The app logs `Server position: ... on unknown
+    port 25` and, for gateway tests, drops the switch hop and assumes 1 Gbps.
+    That makes the "max" and efficiency grades wrong (e.g. 453%). Browser
+    test paths from clients come out right (10 Gbps). Host networking
+    wouldn't change this, since UniFi would still see the VM behind the
+    Proxmox host. To be reported upstream (drafted 2026-09-28).
 - **Measured throughput (2026-09-28)**, iperf3 with 6 streams from a 10GbE
   Mac on another VLAN, so routed by the gateway:
   - to the pod via `.129`: about 9.0 Gbps up and 9.3 Gbps down, which is
@@ -1278,8 +1287,10 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   - PKCE on
   - scopes `openid profile email`
 
-  Keep the built-in `admin` account until an SSO login is confirmed to map
-  to an Admin user. If SSO ever locks you out, set `NETOPT_RECOVERY=1` on the
+  SSO is linked to Jake's account via Authelia's `sub` for user `jake`
+  (`authelia storage user identifiers export` in the Authelia pod shows it).
+  The built-in `admin` account stays enabled on purpose as an emergency
+  fallback. If SSO ever locks you out anyway, set `NETOPT_RECOVERY=1` on the
   container for one boot (see upstream's `docker/DEPLOYMENT.md`).
 - **In-app InfluxDB target (gotcha found at cutover).** The app's
   monitoring feature was configured in its own UI (stored in the db, not in
@@ -1301,8 +1312,8 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   HTTPRoute, replacing the manual `services.yaml` entry. No Cloudflare DNS
   cleanup is needed: `optimizer.jakerobb.org` only ever matched the
   `*.jakerobb.org → caddy.lan` wildcard CNAME, which the external-dns record
-  overrides. The `optimizer.lan` UniFi DNS entry is unused now and can be
-  deleted.
+  overrides. The `optimizer.lan` UniFi DNS entry has been deleted, and so has
+  the old Compose data on rpi5-1.
 
 ## Docs site (added 2026-09-28)
 
