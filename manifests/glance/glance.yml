@@ -165,6 +165,9 @@ pages:
                   - title: NUT (UPS Monitoring)
                     url: https://nut.jakerobb.org
                     icon: di:nut
+                  - title: Prometheus
+                    url: https://prometheus.jakerobb.org
+                    icon: di:prometheus
                   - title: SigNoz
                     url: https://signoz.jakerobb.org
                     icon: di:signoz
