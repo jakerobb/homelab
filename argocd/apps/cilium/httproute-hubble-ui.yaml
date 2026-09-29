@@ -1,0 +1,58 @@
+# Hubble UI at hubble.jakerobb.org: a live service map and flow log for the
+# cluster, including dropped packets and their reasons. The UI itself is
+# enabled in talos/cilium/values.yaml; this route sits beside Cilium's
+# Application for the same reason as argocd/apps/signoz/httproute.yaml
+# (chart-only app, picked up by root's recursive scan). It's synced by root
+# automatically, not by the manual-only cilium app, and until that app is
+# synced it just points at a Service that doesn't exist yet.
+#
+# Gated by Authelia forward-auth (ExternalAuth): Hubble UI has no login and
+# shows every flow in the cluster. Requires the matching ReferenceGrant entry
+# (argocd/apps/authelia/referencegrant.yaml) and access_control rule
+# (argocd/apps/authelia/application.yaml) for hubble.jakerobb.org.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: Hubble
+    gethomepage.dev/description: Cilium network flows and drops
+    gethomepage.dev/icon: cilium.png
+    gethomepage.dev/group: Monitoring
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - hubble.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: hubble-ui
+          port: 80

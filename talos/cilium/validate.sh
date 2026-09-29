@@ -25,7 +25,7 @@ ok()  { printf '  OK    %s\n' "$*"; }
 bad() { printf '  FAIL  %s\n' "$*"; FAILED=1; }
 
 echo "== Workload rollout status =="
-for res in daemonset/cilium daemonset/cilium-envoy deployment/cilium-operator; do
+for res in daemonset/cilium daemonset/cilium-envoy deployment/cilium-operator deployment/hubble-relay deployment/hubble-ui; do
   if kubectl -n "$NAMESPACE" rollout status "$res" --timeout="$ROLLOUT_TIMEOUT" >/dev/null 2>&1; then
     ok "$res rolled out and ready"
   else
@@ -60,6 +60,30 @@ for pod in $AGENT_PODS; do
     bad "$pod: host routing is NOT BPF — check bpf.masquerade (talos/README.md gotcha)"
   fi
 done
+
+echo "== Hubble =="
+# The relay reporting every node connected proves the mTLS certs from
+# cert-manager (manifests/cert-manager-config/hubble-ca.yaml) chain to the
+# same CA on both ends; a mismatch shows up here as fewer connected nodes.
+for cert in hubble-server-certs hubble-relay-client-certs; do
+  ready=$(kubectl -n "$NAMESPACE" get certificate "$cert" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+  if [[ "$ready" == "True" ]]; then
+    ok "Certificate $cert Ready"
+  else
+    bad "Certificate $cert not Ready (kubectl -n $NAMESPACE describe certificate $cert)"
+  fi
+done
+if command -v hubble >/dev/null 2>&1; then
+  nodes=$(kubectl get nodes --no-headers | wc -l | tr -d ' ')
+  connected=$(hubble status -P 2>&1 | sed -nE 's/^Connected Nodes: ([0-9]+)\/([0-9]+).*/\1/p')
+  if [[ "$connected" == "$nodes" ]]; then
+    ok "hubble-relay connected to all $nodes nodes"
+  else
+    bad "hubble-relay connected to ${connected:-?} of $nodes nodes (hubble status -P)"
+  fi
+else
+  echo "  SKIP  hubble CLI not installed; can't check relay connectivity"
+fi
 
 echo "== LoadBalancer Services: IP assignment + external reachability =="
 while IFS=$'\t' read -r ns name ip; do

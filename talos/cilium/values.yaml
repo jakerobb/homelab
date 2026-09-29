@@ -93,6 +93,46 @@ securityContext:
 gatewayAPI:
   enabled: true
 
+# Hubble flow visibility (added 2026-09-29). Hubble itself was already on in
+# every agent (the chart default); this adds hubble-relay, which merges
+# all nodes' flows behind one endpoint for the `hubble` CLI on rpi5-1
+# (`hubble observe -P`), and Hubble UI at hubble.jakerobb.org
+# (argocd/apps/cilium/httproute-hubble-ui.yaml). Mainly for seeing dropped
+# packets and why, the kind of failure this cluster has had silently before.
+#
+# tls.auto.method: certmanager instead of the chart's default `helm`: see
+# manifests/cert-manager-config/hubble-ca.yaml for why. The relay-to-UI hop
+# stays plain gRPC inside the cluster (relay.tls.server off, the default).
+#
+# Requests are first guesses for these small Go services and an nginx
+# frontend; check them against real usage after a week.
+hubble:
+  tls:
+    auto:
+      method: certmanager
+      certManagerIssuerRef:
+        group: cert-manager.io
+        kind: Issuer
+        name: hubble-ca
+  relay:
+    enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+  ui:
+    enabled: true
+    backend:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 48Mi
+    frontend:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+
 # Requests from 7 days of Prometheus data (2026-09-24, see todo/DONE.md
 # "Audit app memory requests against real usage"). The chart sets none, so
 # the scheduler was counting ~2.3GB of real usage across six nodes as zero.
