@@ -1371,6 +1371,13 @@ through `homelab-gateway` like everything else. Deployed as
   Gateway doesn't support `ExternalName` Services as backends, and all the
   IPs are DHCP reservations, so hard-coding them is fine. The Compose apps all
   use host networking on rpi5-1 (`192.168.102.2`).
+- **ArgoCD had to stop excluding EndpointSlices.** The chart's default
+  `resource.exclusions` skips `Endpoints` and `EndpointSlice`, so on the first
+  sync ArgoCD created the Services and HTTPRoutes, never applied the slices,
+  and still reported Synced/Healthy. Every route returned 503 ("no healthy
+  upstream"). [`install/values.yaml`](install/values.yaml) now sets the
+  default list minus `EndpointSlice`. It's a Helm value, so it took a manual
+  `helm upgrade` (see "Upgrading ArgoCD itself").
 - **Auth.** Home Assistant, Scrypted, the UniFi gateway and the KVM keep their
   own logins and skip forward-auth. Home Assistant has to, since its phone
   app can't do an Authelia login. Everything else gets the `ExternalAuth`

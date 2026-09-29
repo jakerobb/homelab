@@ -80,6 +80,59 @@ configs:
         - profile
         - email
         - groups
+    # The chart's default list, minus EndpointSlice. manifests/lan-routes/
+    # commits hand-written EndpointSlices (backends outside the cluster), and
+    # with the default exclusion ArgoCD silently never applied them: the app
+    # showed Synced/Healthy while every route returned 503. Setting this key
+    # replaces the default, so recheck it against the chart's on upgrades.
+    # Endpoints stays excluded; nothing in the repo uses it.
+    resource.exclusions: |
+      - apiGroups:
+        - ''
+        kinds:
+        - Endpoints
+      - apiGroups:
+        - coordination.k8s.io
+        kinds:
+        - Lease
+      - apiGroups:
+        - authentication.k8s.io
+        - authorization.k8s.io
+        kinds:
+        - SelfSubjectReview
+        - TokenReview
+        - LocalSubjectAccessReview
+        - SelfSubjectAccessReview
+        - SelfSubjectRulesReview
+        - SubjectAccessReview
+      - apiGroups:
+        - certificates.k8s.io
+        kinds:
+        - CertificateSigningRequest
+      - apiGroups:
+        - cert-manager.io
+        kinds:
+        - CertificateRequest
+      - apiGroups:
+        - cilium.io
+        kinds:
+        - CiliumIdentity
+        - CiliumEndpoint
+        - CiliumEndpointSlice
+      - apiGroups:
+        - kyverno.io
+        - reports.kyverno.io
+        - wgpolicyk8s.io
+        kinds:
+        - PolicyReport
+        - ClusterPolicyReport
+        - EphemeralReport
+        - ClusterEphemeralReport
+        - AdmissionReport
+        - ClusterAdmissionReport
+        - BackgroundScanReport
+        - ClusterBackgroundScanReport
+        - UpdateRequest
   rbac:
     # Without this, ArgoCD's RBAC subject defaults to the OIDC `sub` claim —
     # an opaque UUID Authelia assigns, not anything a policy.csv rule could
