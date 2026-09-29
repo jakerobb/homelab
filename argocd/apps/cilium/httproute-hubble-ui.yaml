@@ -3,8 +3,9 @@
 # enabled in talos/cilium/values.yaml; this route sits beside Cilium's
 # Application for the same reason as argocd/apps/signoz/httproute.yaml
 # (chart-only app, picked up by root's recursive scan). It's synced by root
-# automatically, not by the manual-only cilium app, and until that app is
-# synced it just points at a Service that doesn't exist yet.
+# automatically, not by the manual-only cilium app. If the hubble-ui Service
+# is missing (cilium not synced yet), ArgoCD marks this route, and so root,
+# Degraded with "Service hubble-ui not found" until it exists.
 #
 # Gated by Authelia forward-auth (ExternalAuth): Hubble UI has no login and
 # shows every flow in the cluster. Requires the matching ReferenceGrant entry

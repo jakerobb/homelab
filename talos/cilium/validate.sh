@@ -75,7 +75,14 @@ for cert in hubble-server-certs hubble-relay-client-certs; do
 done
 if command -v hubble >/dev/null 2>&1; then
   nodes=$(kubectl get nodes --no-headers | wc -l | tr -d ' ')
-  connected=$(hubble status -P 2>&1 | sed -nE 's/^Connected Nodes: ([0-9]+)\/([0-9]+).*/\1/p')
+  # Retries for up to a minute: right after the certs change, the kubelet
+  # can take that long to refresh the Secret in an agent's volume, and
+  # until then the relay can't connect to that node (seen 2026-09-29).
+  for _ in 1 2 3 4 5; do
+    connected=$(hubble status -P 2>&1 | sed -nE 's/^Connected Nodes: ([0-9]+)\/([0-9]+).*/\1/p')
+    [[ "$connected" == "$nodes" ]] && break
+    sleep 15
+  done
   if [[ "$connected" == "$nodes" ]]; then
     ok "hubble-relay connected to all $nodes nodes"
   else
@@ -86,7 +93,7 @@ else
 fi
 
 echo "== LoadBalancer Services: IP assignment + external reachability =="
-while IFS=$'\t' read -r ns name ip; do
+while IFS=$'\t' read -r ns name ip port; do
   [[ -z "$ns" ]] && continue
   if [[ -z "$ip" ]]; then
     bad "$ns/$name: no external IP assigned"
@@ -94,13 +101,16 @@ while IFS=$'\t' read -r ns name ip; do
   fi
   ok "$ns/$name: external IP $ip assigned"
 
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time "$CURL_TIMEOUT" "http://$ip/" 2>/dev/null)
+  # The Service's first port, not always 80: network-optimizer-lb only
+  # listens on 3005 and 5201, and Cilium drops a SYN to a port with no
+  # backend, which looked exactly like an L2 announcement failure.
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time "$CURL_TIMEOUT" "http://$ip:$port/" 2>/dev/null)
   if [[ "$code" != "000" ]]; then
-    ok "$ns/$name: http://$ip/ got a response (HTTP $code) — not a timeout/refusal"
+    ok "$ns/$name: http://$ip:$port/ got a response (HTTP $code) — not a timeout/refusal"
   else
-    bad "$ns/$name: http://$ip/ got NO response within ${CURL_TIMEOUT}s — check L2 announcements (talos/README.md)"
+    bad "$ns/$name: http://$ip:$port/ got NO response within ${CURL_TIMEOUT}s — check L2 announcements (talos/README.md)"
   fi
-done < <(kubectl get svc -A -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.loadBalancer.ingress[0].ip}{"\n"}{end}')
+done < <(kubectl get svc -A -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.loadBalancer.ingress[0].ip}{"\t"}{.spec.ports[0].port}{"\n"}{end}')
 
 echo "== Gateway API objects =="
 while IFS=$'\t' read -r name accepted; do
