@@ -65,7 +65,7 @@ data:
     gateway: true
 
   # Manually-entered apps, alphabetical by name. This is deliberately a
-  # snapshot of everything currently proxied by docker-compose/caddy/Caddyfile
+  # snapshot of everything Caddy proxied (now manifests/lan-routes/)
   # plus the two apps already live in the cluster (ArgoCD, Authelia) — as
   # each Compose app migrates into the cluster per todo/READY.md's "Compose workload
   # migration" plan, delete its entry here and annotate its new HTTPRoute

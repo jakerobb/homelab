@@ -142,7 +142,7 @@ Traefik/nginx, no `IngressRoute` CRDs.
   `HTTPRoute`s cluster-wide and creates/updates the `A` record itself —
   no manual DNS step for a genuinely new hostname.
   - **Gotcha:** if the hostname already existed as a Cloudflare record
-    from the old Caddy setup (`docker-compose/caddy/Caddyfile`),
+    from the old Caddy setup (a CNAME to `caddy.lan`),
     external-dns won't adopt/overwrite it (no TXT ownership marker) —
     delete that record by hand in the Cloudflare dashboard once the new
     `HTTPRoute` has synced. Check this on every Compose→cluster

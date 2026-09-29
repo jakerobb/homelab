@@ -58,7 +58,7 @@ Unattended-upgrades only applies security updates going forward. The rest of
 the backlog, including Docker 29.6.0 → 29.8.x and the Raspberry Pi kernel,
 needs one manual run. The Docker upgrade restarts every Compose container,
 so do this when a few minutes of downtime is fine. That includes `unbound`
-and `caddy` as well as Home Assistant, Zigbee, and NUT. Avoid 03:00–03:30,
+as well as Home Assistant, Zigbee, and NUT. Avoid 03:00–03:30,
 when the Proxmox and etcd backups land here.
 
 ```bash

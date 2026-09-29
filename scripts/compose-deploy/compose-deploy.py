@@ -13,7 +13,7 @@ merged change to this script deploys itself on the next run). Each run:
      was stopped or edited by hand).
   5. Restarts services whose bind-mounted config changed but that `up -d`
      didn't recreate (it only looks at the compose file, not mount contents),
-     validating Caddy/Home Assistant config first.
+     validating Home Assistant config first.
   6. Reports deploys and problems to ntfy; mails via cron (stderr) if ntfy
      itself is unreachable or the script crashes.
 
@@ -70,8 +70,6 @@ STOP_BEFORE_WRITE = {"change-detection", "zigbee2mqtt", "zwave-js-ui"}
 # container keeps its old config and we alert instead of restarting into a
 # broken one.
 VALIDATORS = {
-    "caddy": ["run", "--rm", "--no-deps", "-T", "--entrypoint", "caddy", "caddy",
-              "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
     "homeassistant": ["exec", "-T", "homeassistant", "python", "-m", "homeassistant",
                       "--script", "check_config", "--config", "/config"],
 }

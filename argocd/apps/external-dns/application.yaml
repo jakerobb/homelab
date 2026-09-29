@@ -35,11 +35,12 @@ spec:
           - service
         policy: sync
         registry: txt
-        # Distinguishes records this instance owns from Caddy's existing
-        # jakerobb.org records — flat/shared zone was a deliberate choice
-        # (migrating most Caddy-managed names into k8s over time), but the
-        # TXT registry still means external-dns will only ever touch/prune
-        # records carrying its own ownership marker, never Caddy's.
+        # jakerobb.org is shared with records external-dns doesn't manage:
+        # the apex and www (CNAMEs to jakerobb.dev), wireguard, and the
+        # Brevo mail records (added by Brevo's own Cloudflare integration).
+        # The TXT registry means external-dns only ever touches or prunes
+        # records carrying its own ownership marker, never those. (It also
+        # kept it off Caddy's records until Caddy was retired on 2026-09-29.)
         txtOwnerId: homelab-k8s
         domainFilters:
           - jakerobb.org

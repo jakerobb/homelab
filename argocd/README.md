@@ -1416,8 +1416,9 @@ through `homelab-gateway` like everything else. Deployed as
   `modbus`, `modbus-relay`, `nut` and `scrypted`. Names that only matched the
   wildcard moved to the Gateway as soon as external-dns created their `A`
   records. The explicit CNAMEs had to be deleted by hand first, because
-  external-dns won't touch records it doesn't own. The wildcard and
-  `caddy.jakerobb.org` go when Caddy is removed from Compose.
+  external-dns won't touch records it doesn't own. Caddy was removed from
+  Compose the same day, and the wildcard, `caddy.jakerobb.org` and the UniFi
+  `caddy.lan` entry were deleted by hand after that.
 - **When an app migrates** into the cluster, delete its file here in the same
   PR. Its own HTTPRoute takes over the hostname, and its `access_control`
   rule may move or change.

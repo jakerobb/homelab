@@ -52,11 +52,11 @@ moving to the cluster get ArgoCD's reconciliation instead.
    their actual bind mounts (from `docker compose config`), so there's no
    table to maintain. Only mounts under `~/docker` count: host mounts like
    telegraf's `/:/hostfs` would otherwise match every change. A restart,
-   not just a reload, is what picks up a changed single-file bind mount like
-   `caddy/Caddyfile` (see the inode gotcha in the compose README).
-   - Caddy (`caddy validate`) and Home Assistant (`check_config`) are
-     validated first. If validation fails, the service is **not** restarted:
-     it keeps running its old config, and you get an alert. Note the broken
+   not just a reload, is what picks up a changed single-file bind mount
+   (see the inode gotcha in the compose README).
+   - Home Assistant (`check_config`) is validated first. If validation
+     fails, the service is **not** restarted: it keeps running its old
+     config, and you get an alert. Note the broken
      file is already on disk, so fix it forward promptly. Failed restarts
      are retried after the next merge (or with `--retry`).
 6. **Notifies** via ntfy topic `homelab-alerts` (the same one Alertmanager
