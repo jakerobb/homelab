@@ -2,9 +2,12 @@
 # 11310): traffic by application and category, from the gateway's deep
 # packet inspection. Grafana's per-client repeated panels become top-N
 # client/application panels; there's no client variable, for the reason in
-# dashboard-unifi-clients.tf. Totals are over the last 24 hours, a fixed
-# window, since SigNoz's PromQL has no $__range. Rendered by
-# unifi-dashboards.tf.
+# dashboard-unifi-clients.tf. Rendered by unifi-dashboards.tf.
+#
+# UniFi's DPI byte and packet counts dip slightly between polls, so the charts
+# use clamp_min(delta(...), 0) instead of rate(): rate() takes every dip for a
+# counter reset and adds the whole count back. They also skip unpoller's
+# "TOTAL" series (see local.unifi_dpi_totals_sql, which the totals use).
 
 locals {
   unifi_client_dpi = {
@@ -13,18 +16,18 @@ locals {
     duration    = "24h"
     sections = [
       {
-        title = "Last 24 hours"
+        title = "Totals"
         rows = [
           {
             h = 8
             panels = [
               {
                 id      = "category-pie", w = 6, type = "pie", unit = "By", title = "Traffic by category"
-                queries = [{ q = "sum by (category) (increase(unpoller_client_dpi_receive_bytes[24h])) + sum by (category) (increase(unpoller_client_dpi_transmit_bytes[24h]))", legend = "{{category}}" }]
+                queries = [{ sql = "SELECT category, received + sent AS total FROM (${replace(local.unifi_dpi_totals_sql, "__LABEL__", "category")})", legend = "{{category}}" }]
               },
               {
                 id      = "application-pie", w = 6, type = "pie", unit = "By", title = "Traffic by application (top 15)"
-                queries = [{ q = "topk(15, sum by (application) (increase(unpoller_client_dpi_receive_bytes[24h])) + sum by (application) (increase(unpoller_client_dpi_transmit_bytes[24h])))", legend = "{{application}}" }]
+                queries = [{ sql = "SELECT application, received + sent AS total FROM (${replace(local.unifi_dpi_totals_sql, "__LABEL__", "application")}) LIMIT 15", legend = "{{application}}" }]
               },
             ]
           },
@@ -32,20 +35,14 @@ locals {
             h = 8
             panels = [
               {
-                id          = "category-table", w = 6, type = "table", unit = "By", title = "By category"
-                description = "Value columns: bytes received, bytes sent."
-                queries = [
-                  { q = "sum by (category) (increase(unpoller_client_dpi_receive_bytes[24h]))" },
-                  { q = "sum by (category) (increase(unpoller_client_dpi_transmit_bytes[24h]))" },
-                ]
+                id           = "category-table", w = 6, type = "table", unit = "By", title = "By category"
+                column_units = { received = "By", sent = "By" }
+                queries      = [{ sql = replace(local.unifi_dpi_totals_sql, "__LABEL__", "category") }]
               },
               {
-                id          = "client-table", w = 6, type = "table", unit = "By", title = "By client"
-                description = "Value columns: bytes received, bytes sent."
-                queries = [
-                  { q = "sum by (name) (increase(unpoller_client_dpi_receive_bytes[24h]))" },
-                  { q = "sum by (name) (increase(unpoller_client_dpi_transmit_bytes[24h]))" },
-                ]
+                id           = "client-table", w = 6, type = "table", unit = "By", title = "By client"
+                column_units = { received = "By", sent = "By" }
+                queries      = [{ sql = replace(local.unifi_dpi_totals_sql, "__LABEL__", "name") }]
               },
             ]
           },
@@ -59,11 +56,11 @@ locals {
             panels = [
               {
                 id      = "category-rx", w = 6, type = "ts", unit = "By/s", title = "Received by category"
-                queries = [{ q = "sum by (category) (rate(unpoller_client_dpi_receive_bytes[5m]))", legend = "{{category}}" }]
+                queries = [{ q = "sum by (category) (clamp_min(delta(unpoller_client_dpi_receive_bytes{name!=\"TOTAL\"}[5m]), 0) / 300)", legend = "{{category}}" }]
               },
               {
                 id      = "category-tx", w = 6, type = "ts", unit = "By/s", title = "Sent by category"
-                queries = [{ q = "sum by (category) (rate(unpoller_client_dpi_transmit_bytes[5m]))", legend = "{{category}}" }]
+                queries = [{ q = "sum by (category) (clamp_min(delta(unpoller_client_dpi_transmit_bytes{name!=\"TOTAL\"}[5m]), 0) / 300)", legend = "{{category}}" }]
               },
             ]
           },
@@ -73,13 +70,13 @@ locals {
               {
                 id = "category-packets", w = 6, type = "ts", unit = "pps", title = "Packets by category"
                 queries = [
-                  { q = "sum by (category) (rate(unpoller_client_dpi_receive_packets[5m]) + rate(unpoller_client_dpi_transmit_packets[5m]))", legend = "{{category}}" },
+                  { q = "sum by (category) (clamp_min(delta(unpoller_client_dpi_receive_packets{name!=\"TOTAL\"}[5m]), 0) / 300 + clamp_min(delta(unpoller_client_dpi_transmit_packets{name!=\"TOTAL\"}[5m]), 0) / 300)", legend = "{{category}}" },
                 ]
               },
               {
                 id = "top-clients", w = 6, type = "ts", unit = "By/s", title = "Top 10 clients"
                 queries = [
-                  { q = "topk(10, sum by (name) (rate(unpoller_client_dpi_receive_bytes[5m]) + rate(unpoller_client_dpi_transmit_bytes[5m])))", legend = "{{name}}" },
+                  { q = "topk(10, sum by (name) (clamp_min(delta(unpoller_client_dpi_receive_bytes{name!=\"TOTAL\"}[5m]), 0) / 300 + clamp_min(delta(unpoller_client_dpi_transmit_bytes{name!=\"TOTAL\"}[5m]), 0) / 300))", legend = "{{name}}" },
                 ]
               },
             ]
@@ -89,11 +86,11 @@ locals {
             panels = [
               {
                 id      = "client-app-rx", w = 6, type = "ts", unit = "By/s", title = "Top 15 client applications, received"
-                queries = [{ q = "topk(15, sum by (name, application) (rate(unpoller_client_dpi_receive_bytes[5m])))", legend = "{{name}}: {{application}}" }]
+                queries = [{ q = "topk(15, sum by (name, application) (clamp_min(delta(unpoller_client_dpi_receive_bytes{name!=\"TOTAL\"}[5m]), 0) / 300))", legend = "{{name}}: {{application}}" }]
               },
               {
                 id      = "client-app-tx", w = 6, type = "ts", unit = "By/s", title = "Top 15 client applications, sent"
-                queries = [{ q = "topk(15, sum by (name, application) (rate(unpoller_client_dpi_transmit_bytes[5m])))", legend = "{{name}}: {{application}}" }]
+                queries = [{ q = "topk(15, sum by (name, application) (clamp_min(delta(unpoller_client_dpi_transmit_bytes{name!=\"TOTAL\"}[5m]), 0) / 300))", legend = "{{name}}: {{application}}" }]
               },
             ]
           },

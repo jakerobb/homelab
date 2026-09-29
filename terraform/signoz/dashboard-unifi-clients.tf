@@ -37,23 +37,23 @@ locals {
             ]
           },
           {
-            h = 6
+            h = 8
             panels = [
               {
                 id      = "per-network", w = 3, type = "pie", unit = "1", title = "Clients per network"
-                queries = [{ q = "count by (network) (unpoller_client_uptime_seconds{ap_name=~\"$ap|\", sw_name=~\"$switch|\"})", legend = "{{network}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["network"], filter = "(wired = 'false' AND ap_name IN $ap) OR (wired = 'true' AND sw_name IN $switch)", legend = "{{network}}" }]
               },
               {
                 id      = "per-channel", w = 3, type = "pie", unit = "1", title = "Wireless clients per channel"
-                queries = [{ q = "count by (channel) (unpoller_client_uptime_seconds{wired=\"false\", ap_name=~\"$ap\"})", legend = "Channel {{channel}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["channel"], filter = "wired = 'false' AND ap_name IN $ap", legend = "Channel {{channel}}" }]
               },
               {
                 id      = "per-protocol", w = 3, type = "pie", unit = "1", title = "Wireless clients per Wi-Fi standard"
-                queries = [{ q = "count by (radio_proto) (unpoller_client_uptime_seconds{wired=\"false\", ap_name=~\"$ap\"})", legend = "{{radio_proto}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["radio_proto"], filter = "wired = 'false' AND ap_name IN $ap", legend = "{{radio_proto}}" }]
               },
               {
                 id      = "per-vendor", w = 3, type = "pie", unit = "1", title = "Clients per vendor"
-                queries = [{ q = "count by (oui) (unpoller_client_uptime_seconds{ap_name=~\"$ap|\", sw_name=~\"$switch|\"})", legend = "{{oui}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["oui"], filter = "(wired = 'false' AND ap_name IN $ap) OR (wired = 'true' AND sw_name IN $switch)", legend = "{{oui}}" }]
               },
             ]
           },
@@ -62,11 +62,11 @@ locals {
             panels = [
               {
                 id          = "wireless-table", w = 12, type = "table", unit = "s", title = "Wireless clients"
-                description = "Value columns: uptime, current receive and transmit rate. A client that just roamed shows its latest AP and channel."
+                description = "Channels and Wi-Fi standards are in the pie charts above."
                 queries = [
-                  { q = "topk by (mac) (1, max by (name, ip, mac, ap_name, essid, channel, radio_proto, network, oui) (unpoller_client_uptime_seconds{wired=\"false\", ap_name=~\"$ap\"}))" },
-                  { q = "topk by (mac) (1, max by (name, ip, mac, ap_name, essid, channel, radio_proto, network, oui) (unpoller_client_receive_rate_bytes{wired=\"false\", ap_name=~\"$ap\"} * on (mac) group_left (essid, channel, radio_proto) (topk by (mac) (1, max by (mac, essid, channel, radio_proto) (unpoller_client_uptime_seconds{wired=\"false\"})) * 0 + 1)))", unit = "By/s" },
-                  { q = "topk by (mac) (1, max by (name, ip, mac, ap_name, essid, channel, radio_proto, network, oui) (unpoller_client_transmit_rate_bytes{wired=\"false\", ap_name=~\"$ap\"} * on (mac) group_left (essid, channel, radio_proto) (topk by (mac) (1, max by (mac, essid, channel, radio_proto) (unpoller_client_uptime_seconds{wired=\"false\"})) * 0 + 1)))", unit = "By/s" },
+                  { metric = "unpoller_client_uptime_seconds", group_by = ["name", "ip", "mac", "ap_name", "network", "oui"], filter = "wired = 'false' AND ap_name IN $ap", legend = "Uptime" },
+                  { metric = "unpoller_client_receive_rate_bytes", group_by = ["name", "ip", "mac", "ap_name", "network", "oui"], filter = "wired = 'false' AND ap_name IN $ap", unit = "By/s", legend = "Receive" },
+                  { metric = "unpoller_client_transmit_rate_bytes", group_by = ["name", "ip", "mac", "ap_name", "network", "oui"], filter = "wired = 'false' AND ap_name IN $ap", unit = "By/s", legend = "Transmit" },
                 ]
               },
             ]
@@ -75,12 +75,11 @@ locals {
             h = 8
             panels = [
               {
-                id          = "wired-table", w = 12, type = "table", unit = "s", title = "Wired clients"
-                description = "Value columns: uptime, current receive and transmit rate."
+                id = "wired-table", w = 12, type = "table", unit = "s", title = "Wired clients"
                 queries = [
-                  { q = "max by (name, ip, mac, sw_name, sw_port, network, oui) (unpoller_client_uptime_seconds{wired=\"true\", sw_name=~\"$switch\"})" },
-                  { q = "max by (name, ip, mac, sw_name, sw_port, network, oui) (unpoller_client_receive_rate_bytes{wired=\"true\", sw_name=~\"$switch\"})", unit = "By/s" },
-                  { q = "max by (name, ip, mac, sw_name, sw_port, network, oui) (unpoller_client_transmit_rate_bytes{wired=\"true\", sw_name=~\"$switch\"})", unit = "By/s" },
+                  { metric = "unpoller_client_uptime_seconds", group_by = ["name", "ip", "mac", "sw_name", "sw_port", "network", "oui"], filter = "wired = 'true' AND sw_name IN $switch", legend = "Uptime" },
+                  { metric = "unpoller_client_receive_rate_bytes", group_by = ["name", "ip", "mac", "sw_name", "sw_port", "network", "oui"], filter = "wired = 'true' AND sw_name IN $switch", unit = "By/s", legend = "Receive" },
+                  { metric = "unpoller_client_transmit_rate_bytes", group_by = ["name", "ip", "mac", "sw_name", "sw_port", "network", "oui"], filter = "wired = 'true' AND sw_name IN $switch", unit = "By/s", legend = "Transmit" },
                 ]
               },
             ]

@@ -21,33 +21,33 @@ locals {
         title = "Access points"
         rows = [
           {
-            h = 6
+            h = 8
             panels = [
               {
                 id      = "clients-ap", w = 3, type = "pie", unit = "1", title = "Clients per AP"
-                queries = [{ q = "count by (ap_name) (unpoller_client_uptime_seconds{wired=\"false\", ap_name=~\"$ap\"})", legend = "{{ap_name}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["ap_name"], filter = "wired = 'false' AND ap_name IN $ap", legend = "{{ap_name}}" }]
               },
               {
                 id      = "clients-channel", w = 3, type = "pie", unit = "1", title = "Clients per channel"
-                queries = [{ q = "count by (channel) (unpoller_client_uptime_seconds{wired=\"false\", ap_name=~\"$ap\"})", legend = "Channel {{channel}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["channel"], filter = "wired = 'false' AND ap_name IN $ap", legend = "Channel {{channel}}" }]
               },
               {
                 id      = "clients-protocol", w = 3, type = "pie", unit = "1", title = "Clients per Wi-Fi standard"
-                queries = [{ q = "count by (radio_proto) (unpoller_client_uptime_seconds{wired=\"false\", ap_name=~\"$ap\"})", legend = "{{radio_proto}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["radio_proto"], filter = "wired = 'false' AND ap_name IN $ap", legend = "{{radio_proto}}" }]
               },
               {
                 id      = "clients-oui", w = 3, type = "pie", unit = "1", title = "Clients per vendor"
-                queries = [{ q = "count by (oui) (unpoller_client_uptime_seconds{wired=\"false\", ap_name=~\"$ap\"})", legend = "{{oui}}" }]
+                queries = [{ metric = "unpoller_client_uptime_seconds", space = "count", group_by = ["oui"], filter = "wired = 'false' AND ap_name IN $ap", legend = "{{oui}}" }]
               },
             ]
           },
           {
-            h = 4
+            h = 5
             panels = [
               {
-                id          = "details", w = 12, type = "table", unit = "s", title = "Details"
-                description = "The value column is uptime."
-                queries     = [{ q = "max by (name, model, version, ip, mac, serial) (unpoller_device_uptime_seconds{name=~\"$ap\"} * on (name) group_left (model, version, ip, mac, serial) max by (name, model, version, ip, mac, serial) (unpoller_device_info))" }]
+                id           = "details", w = 12, type = "table", unit = "s", title = "Details"
+                column_units = { uptime = "s" }
+                queries      = [{ sql = replace(local.unifi_device_details_sql, "__VAR__", "ap") }]
               },
             ]
           },
@@ -57,7 +57,7 @@ locals {
               {
                 id          = "networks", w = 12, type = "table", unit = "dBm", title = "Networks"
                 description = "Each SSID on each radio, with its clients' average signal."
-                queries     = [{ q = "max by (name, essid, radio, bssid) (unpoller_device_vap_average_client_signal{name=~\"$ap\"})" }]
+                queries     = [{ metric = "unpoller_device_vap_average_client_signal", group_by = ["name", "essid", "radio", "bssid"], filter = "name IN $ap", legend = "Average client signal" }]
               },
             ]
           },
