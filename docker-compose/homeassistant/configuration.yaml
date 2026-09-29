@@ -10,3 +10,13 @@ automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 
+
+# Reached through the cluster's Gateway (manifests/lan-routes/homeassistant.yaml).
+# Envoy's connections arrive from whichever node's IP they were masqueraded
+# to, so trust the whole Server VLAN rather than a node list that goes stale
+# when nodes change. Without this, HA answers 400 to any request carrying
+# X-Forwarded-For.
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.102.0/24

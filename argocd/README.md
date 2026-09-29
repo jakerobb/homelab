@@ -1377,7 +1377,13 @@ through `homelab-gateway` like everything else. Deployed as
   and still reported Synced/Healthy. Every route returned 503 ("no healthy
   upstream"). [`install/values.yaml`](install/values.yaml) now sets the
   default list minus `EndpointSlice`. It's a Helm value, so it took a manual
-  `helm upgrade` (see "Upgrading ArgoCD itself").
+  `helm upgrade` (see "Upgrading ArgoCD itself"). The slices also spell out
+  `protocol: TCP` and `conditions.ready: true`: the API server fills those
+  in, and ArgoCD compares list items whole, so leaving them out keeps the app
+  OutOfSync forever.
+- **Home Assistant needs `trusted_proxies`.** Envoy sends `X-Forwarded-For`
+  from a node IP, and HA answers 400 to that from an untrusted proxy.
+  `docker-compose/homeassistant/configuration.yaml` trusts the Server VLAN.
 - **Auth.** Home Assistant, Scrypted, the UniFi gateway and the KVM keep their
   own logins and skip forward-auth. Home Assistant has to, since its phone
   app can't do an Authelia login. Everything else gets the `ExternalAuth`
