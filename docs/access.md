@@ -48,6 +48,7 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | ArgoCD | <https://argocd.jakerobb.org> | Deploys the cluster's apps from this repo |
 | Headlamp | <https://headlamp.jakerobb.org> | Web UI for the Kubernetes cluster |
 | SigNoz | <https://signoz.jakerobb.org> | Logs, metrics and dashboards |
+| Prometheus | <https://prometheus.jakerobb.org> | Cluster metrics and alert rules |
 | ntfy | <https://ntfy.jakerobb.org> | Push notifications and alerts. No login |
 | SearXNG | <https://search.jakerobb.org> | Private web search |
 | Glance | <https://glance.jakerobb.org> | Dashboard (trial) |

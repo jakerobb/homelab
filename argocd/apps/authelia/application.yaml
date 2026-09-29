@@ -140,6 +140,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'docs.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'prometheus.jakerobb.org'
+                policy: 'two_factor'
 
           identity_providers:
             oidc:

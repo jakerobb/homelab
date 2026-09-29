@@ -213,6 +213,40 @@ spec:
                         free. The Talos VM it hosts will pause (node NotReady)
                         once the Mac fills up. Free space now; don't force-stop
                         the VM if it has already paused.
+          # iSCSI volumes (hexos-iscsi) show up on workers as sdb, sdc, ...;
+          # sda is each worker's own system disk, which legitimately queues
+          # deep during image pulls, so it's excluded. On 2026-09-29 around
+          # 00:00 EDT, writes to Prometheus's own PVC on talos-worker-mbp
+          # hung for 180s (the SCSI command timeout), twice, with no iSCSI
+          # connection error and HexOS otherwise healthy. The kernel failed
+          # the writes with EIO, ext4 logged "potential data loss", and an
+          # hour later Prometheus panicked on the deferred fsync error and
+          # lost head-chunk data. Nothing alerted: one restart isn't
+          # KubePodCrashLooping, and kernel logs aren't collected anywhere.
+          # Weighted I/O time is summed per request when it completes
+          # (including a timeout), so ~10 writes stuck 180s each push the
+          # 5m rate to ~6 (the incident peaked at 7.1). The worst normal
+          # value on any iSCSI disk over the prior week was 3.3.
+          iscsi-volumes:
+            groups:
+              - name: iscsi-volumes
+                rules:
+                  - alert: ISCSIVolumeIOStall
+                    expr: >-
+                      rate(node_disk_io_time_weighted_seconds_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[5m]) > 5
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: An iSCSI volume on {{ $labels.instance }} stalled.
+                      description: >-
+                        Disk {{ $labels.device }} on {{ $labels.instance }} had an
+                        average of {{ $value | humanize }} requests waiting over 5 minutes.
+                        Writes that time out fail with EIO and can lose data
+                        silently. Check the node's dmesg for "timing out
+                        command" or "I/O error, dev", find the pod that
+                        mounts the device, and restart it if it logged write
+                        errors. Then check HexOS for what stalled.
         kubeProxy:
           enabled: false
         prometheusOperator:
@@ -255,6 +289,10 @@ spec:
             labels:
               headlamp-prometheus: "true"
           prometheusSpec:
+            # Public URL from httproute.yaml, so alert "source" links point
+            # somewhere a browser can open instead of the pod's hostname.
+            # No path component, so the UI keeps serving from /.
+            externalUrl: https://prometheus.jakerobb.org
             # Cluster-wide discovery — without this, only the chart's own
             # bundled ServiceMonitors get scraped, and a future app's
             # ServiceMonitor would be silently ignored.
