@@ -1211,8 +1211,8 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
     `TRUSTED_PROXIES=10.244.0.0/16` (the pod CIDR Envoy connects from) makes
     the app honor `X-Forwarded-For`.
   - `http://speedtest.jakerobb.org:3005` and iperf3 on `:5201`: a dedicated
-    L2 LoadBalancer IP, `192.168.102.129`. It's pinned because the app's
-    `HOST_IP` must match it, and its DNS record comes from external-dns's new
+    L2 LoadBalancer IP, `192.168.102.129`. It's pinned so the address
+    stays stable, and its DNS record comes from external-dns's new
     `service` source. The Gateway is skipped on purpose: upstream warns that
     proxies, and HTTP/2 multiplexing in particular, distort speed test
     results, and iperf3 isn't HTTP anyway. Plain HTTP on :3005 is how it
@@ -1237,6 +1237,26 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
     with `kubectl -n kube-system get lease cilium-l2announce-network-optimizer-network-optimizer-lb`.
   - If this proves too lossy, the fallback is `hostNetwork` on one node,
     which needs a `privileged` PodSecurity label on the namespace.
+  - **Path analysis uses the node's IP (changed 2026-09-28).** The app
+    container's `HOST_IP` was `.129` at first, and every result failed with
+    "Could not determine server position in network". The app looks
+    `HOST_IP` up in UniFi's client list, and UniFi never sees a
+    LoadBalancer IP as a client. It now comes from the downward API
+    (`status.hostIP`), so it follows the pod to whichever worker it runs on,
+    with no pinning. UniFi knows each worker's IP (the VM's own network
+    adapter, on the MS-A2's switch port). Tests the app starts itself leave
+    from that IP anyway, because pod egress is masqueraded to the node.
+- **Measured throughput (2026-09-28)**, iperf3 with 6 streams from a 10GbE
+  Mac on another VLAN, so routed by the gateway:
+  - to the pod via `.129`: about 9.0 Gbps up and 9.3 Gbps down, which is
+    line rate
+  - worker-to-worker, pod networking vs host networking: the same within
+    noise (about 63–68 Gbps)
+
+  Tests that terminate *on* the gateway top out around 4.4 / 2.5 Gbps from
+  the Mac directly, too: that's the gateway's CPU, not the cluster. The
+  browser speed test's upload half (about 5.7 Gbps) is the browser's limit,
+  since iperf3 moves 9 Gbps the same way.
 - **Storage:** a 5Gi `hexos-iscsi` PVC at `/app/data` (SQLite + WAL,
   `.credential_key`, license, reports), seeded from rpi5-1's `~/docker/data`
   before the first sync. It's block storage because upstream documents SQLite

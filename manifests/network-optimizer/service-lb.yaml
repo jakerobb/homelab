@@ -5,8 +5,9 @@
 # numbers. iperf3 isn't HTTP at all. This also matches the Compose setup,
 # where the speed test was plain HTTP on rpi5-1:3005.
 #
-# The IP is pinned (not pool-assigned) because the app's HOST_IP env var
-# (deployment.yaml) has to match it.
+# The IP is pinned (not pool-assigned) so it stays stable for DNS and for
+# clients pointing iperf3 at it, and because the speedtest container's
+# fallback HOST_IP (deployment.yaml) matches it.
 #
 # The l2-announce label moves this Service onto the 10GbE-only L2 policy
 # (talos/cilium/l2-announcement-policy-10g.yaml), so the MBP's 2.5GbE link
