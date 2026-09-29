@@ -146,6 +146,21 @@ spec:
                 policy: 'two_factor'
               - domain: 'hubble.jakerobb.org'
                 policy: 'two_factor'
+              # manifests/lan-routes/ (Compose apps and LAN devices). The
+              # ones with their own login (homeassistant, scrypted, gateway,
+              # kvm) skip forward-auth and need no rule.
+              - domain:
+                  - 'zigbee.jakerobb.org'
+                  - 'zwave.jakerobb.org'
+                  - 'modbus.jakerobb.org'
+                  - 'nut.jakerobb.org'
+                  - 'changedetection.jakerobb.org'
+                  - 'grafana.jakerobb.org'
+                  - 'influxdb.jakerobb.org'
+                  - 'logs.jakerobb.org'
+                  - 'rack-led.jakerobb.org'
+                  - 'modbus-relay.jakerobb.org'
+                policy: 'two_factor'
 
           identity_providers:
             oidc:

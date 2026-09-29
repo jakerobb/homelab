@@ -1,0 +1,68 @@
+# VictoriaLogs (Compose on rpi5-1). Goes away with the observability stack.
+# Gated by Authelia forward-auth.
+apiVersion: v1
+kind: Service
+metadata:
+  name: victorialogs
+  namespace: lan-routes
+spec:
+  ports:
+    - name: http
+      port: 9428
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: victorialogs
+  namespace: lan-routes
+  labels:
+    kubernetes.io/service-name: victorialogs
+    endpointslice.kubernetes.io/managed-by: argocd
+addressType: IPv4
+ports:
+  - name: http
+    port: 9428
+endpoints:
+  - addresses:
+      - 192.168.102.2
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: victorialogs
+  namespace: lan-routes
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - logs.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: victorialogs
+          port: 9428
