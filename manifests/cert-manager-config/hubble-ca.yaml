@@ -1,0 +1,50 @@
+# Private CA for Hubble's internal mTLS: each Cilium agent's Hubble server
+# (hubble-server-certs) and hubble-relay's client cert
+# (hubble-relay-client-certs). Cilium's chart creates those two Certificates
+# itself (hubble.tls.auto.method: certmanager in talos/cilium/values.yaml);
+# this file only provides the Issuer they point at.
+#
+# Why cert-manager rather than the chart's default `helm` method: that method
+# generates a new random CA on every render, because the chart's `lookup` of
+# the existing CA Secret returns nothing under ArgoCD. It was harmless while
+# only the agents' server cert existed (argocd/apps/cilium/application.yaml
+# ignored the diff). Once hubble-relay's client cert joins, a render can
+# sign it with a CA the agents don't trust, and the relay silently can't
+# connect. Here the CA is created once and certs renew themselves.
+#
+# Chain: a self-signed Issuer mints the CA certificate, and a CA Issuer signs
+# with it. Namespaced to kube-system (where Cilium runs) rather than a
+# ClusterIssuer, so nothing else can get certs from this CA.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: hubble-selfsigned
+  namespace: kube-system
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: hubble-ca
+  namespace: kube-system
+spec:
+  isCA: true
+  commonName: Hubble CA
+  secretName: hubble-ca
+  duration: 87600h # 10 years; the leaf certs are what rotate
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: hubble-selfsigned
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: hubble-ca
+  namespace: kube-system
+spec:
+  ca:
+    secretName: hubble-ca

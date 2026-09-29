@@ -353,6 +353,40 @@ object stale/orphaned in `kube-system` — harmless to ignore, nothing reads
 it going forward, but worth knowing about if it's ever noticed and looks
 alarming.
 
+## Hubble relay, UI and CLI (added 2026-09-29)
+
+Hubble runs inside every Cilium agent (on by default). On top of that,
+[`cilium/values.yaml`](cilium/values.yaml) enables `hubble-relay`, which
+joins all nodes' flows into one stream, and Hubble UI at
+<https://hubble.jakerobb.org> (behind Authelia; route in
+[`../argocd/apps/cilium/httproute-hubble-ui.yaml`](../argocd/apps/cilium/httproute-hubble-ui.yaml)).
+The `hubble` CLI is on rpi5-1 in `/usr/local/bin`, installed by hand from
+[cilium/hubble releases](https://github.com/cilium/hubble/releases) with its
+`.sha256sum` checked. Useful commands:
+
+- `hubble observe -P --verdict DROPPED -f`: follow dropped packets and why.
+- `hubble observe -P -n <namespace> --last 50`: recent flows for one app.
+- `hubble status -P`: relay health. "Connected Nodes" should equal the node
+  count; [`cilium/validate.sh`](cilium/validate.sh) checks this.
+
+**Certificates come from cert-manager**, not the chart
+(`hubble.tls.auto.method: certmanager`). The chart's default `helm` method
+generates a fresh random CA on every render under ArgoCD, since its
+`lookup` of the existing CA Secret returns nothing there. The relay's client
+cert and the agents' server cert could then be signed by different CAs, and
+the relay would fail to connect with every pod still Running. The CA and
+Issuer live in
+[`../manifests/cert-manager-config/hubble-ca.yaml`](../manifests/cert-manager-config/hubble-ca.yaml).
+
+**First sync after this change: enable Prune.** The chart no longer renders
+the `cilium-ca` and `hubble-server-certs` Secrets, so ArgoCD lists them for
+pruning. Pruning `hubble-server-certs` is safe: cert-manager rewrites it from
+its new Certificate within seconds, the agents mount it as an optional volume
+and reload it without restarting, and it only affects Hubble, not the
+datapath. Nothing else in this cluster uses `cilium-ca` (no ClusterMesh).
+The agent DaemonSet and `cilium-config` render identically before and after
+this change, so the sync doesn't restart any agent.
+
 ## Talos control-plane upgrade: talos-rpi5 → yama6a fork (2026-09-17)
 
 Moving all 3 control planes from `ghcr.io/talos-rpi5/installer:v1.11.5` to

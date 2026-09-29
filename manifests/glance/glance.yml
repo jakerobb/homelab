@@ -153,6 +153,9 @@ pages:
                   - title: Grafana
                     url: https://grafana.jakerobb.org
                     icon: di:grafana
+                  - title: Hubble
+                    url: https://hubble.jakerobb.org
+                    icon: di:cilium
                   - title: InfluxDB
                     url: https://influxdb.jakerobb.org
                     icon: di:influxdb

@@ -50,6 +50,7 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | SigNoz | <https://signoz.jakerobb.org> | Logs, metrics and dashboards |
 | Prometheus | <https://prometheus.jakerobb.org> | Cluster metrics and alert rules |
 | Alertmanager | <https://alertmanager.jakerobb.org> | Active alerts and silences |
+| Hubble | <https://hubble.jakerobb.org> | Cilium network flows and dropped packets |
 | ntfy | <https://ntfy.jakerobb.org> | Push notifications and alerts. No login |
 | Speed test | <http://speedtest.jakerobb.org:3005> | LAN speed test (Network Optimizer). LAN only, no login |
 | SearXNG | <https://search.jakerobb.org> | Private web search |
@@ -67,6 +68,7 @@ are listed in `docker-compose/caddy/Caddyfile`.
 | rpi5-1 (jump box) | `ssh jakerobb@rpi5-1.lan` (`192.168.102.2`). Key-based login, passwordless `sudo` |
 | Kubernetes | From rpi5-1: `kubectl` works as-is (`~/.kube/config`). Or use Headlamp in a browser |
 | Talos nodes | From rpi5-1: `talosctl` with `~/talos/homelab/talosconfig`. Talos has no SSH |
+| Cilium flows | From rpi5-1: `hubble observe -P` (`-P` port-forwards to hubble-relay by itself). Or Hubble UI in a browser |
 | Proxmox (MS-A2) | <https://proxmox.lan:8006>, or `ssh proxmox` from rpi5-1 (logs in as root) |
 | HexOS / TrueNAS | <https://deck.hexos.com/dash>. The API and shares are at `truenas.lan` |
 | MacBook Pro worker host | `ssh jakerobb@192.168.102.9`. The Talos VM runs in UTM on that Mac |
