@@ -1,0 +1,26 @@
+# Routes to backends outside the cluster (Compose apps on rpi5-1, LAN
+# devices). See manifests/lan-routes/namespace.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lan-routes
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/lan-routes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lan-routes
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

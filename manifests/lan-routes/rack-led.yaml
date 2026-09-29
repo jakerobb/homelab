@@ -1,0 +1,68 @@
+# Rack LED strip, WLED (IoT VLAN).
+# Gated by Authelia forward-auth.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rack-led
+  namespace: lan-routes
+spec:
+  ports:
+    - name: http
+      port: 80
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: rack-led
+  namespace: lan-routes
+  labels:
+    kubernetes.io/service-name: rack-led
+    endpointslice.kubernetes.io/managed-by: argocd
+addressType: IPv4
+ports:
+  - name: http
+    port: 80
+endpoints:
+  - addresses:
+      - 192.168.62.6
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rack-led
+  namespace: lan-routes
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - rack-led.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: rack-led
+          port: 80

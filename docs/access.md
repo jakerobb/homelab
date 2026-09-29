@@ -57,8 +57,10 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | Glance | <https://glance.jakerobb.org> | Dashboard (trial) |
 
 The Compose apps on rpi5-1 (Home Assistant, Zigbee2MQTT, Z-Wave JS, NUT and
-others) are served through Caddy, and each has its own login. Their hostnames
-are listed in `docker-compose/caddy/Caddyfile`.
+others) and some LAN devices go through the same Gateway. Home Assistant,
+Scrypted, the UniFi gateway and the KVM use their own logins; the rest are
+behind Authelia. The hostnames are the files in `manifests/lan-routes/`; see
+[LAN routes](../argocd/README.md#lan-routes-replacing-caddy-added-2026-09-29).
 
 ## Infrastructure
 

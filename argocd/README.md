@@ -1357,3 +1357,38 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
 - **Adding a page:** write the Markdown file anywhere in the repo and add it
   to `nav:` in `docs-site/mkdocs.yml`. To preview locally, see
   [`docs-site/README.md`](../docs-site/README.md).
+
+## LAN routes: replacing Caddy (added 2026-09-29)
+
+Caddy on rpi5-1 used to serve every `*.jakerobb.org` name for things outside
+the cluster: the Compose apps and a few LAN devices. Those names now go
+through `homelab-gateway` like everything else. Deployed as
+[`apps/lan-routes/`](apps/lan-routes/application.yaml) →
+[`manifests/lan-routes/`](../manifests/lan-routes/), one file per hostname.
+
+- **Backends by IP.** Each file is a Service with no selector, a hand-written
+  EndpointSlice holding the backend's fixed IP, and the HTTPRoute. Cilium's
+  Gateway doesn't support `ExternalName` Services as backends, and all the
+  IPs are DHCP reservations, so hard-coding them is fine. The Compose apps all
+  use host networking on rpi5-1 (`192.168.102.2`).
+- **Auth.** Home Assistant, Scrypted, the UniFi gateway and the KVM keep their
+  own logins and skip forward-auth. Home Assistant has to, since its phone
+  app can't do an Authelia login. Everything else gets the `ExternalAuth`
+  filter. That includes Grafana and InfluxDB, which have their own logins
+  too, so they ask twice until the observability stack is retired.
+- **IoT VLAN firewall.** `kvm`, `rack-led` and `modbus-relay` are on the IoT
+  VLAN (`192.168.62.0/24`). UniFi's firewall allowed rpi5-1 in but not the
+  cluster nodes: a test pod on every node (2026-09-29) timed out on all three,
+  while rpi5-1 reached them. Envoy's upstream connections leave through the
+  node's IP (masquerade), so the UniFi rule has to allow the node IPs
+  (`.11`–`.13`, `.31`, `.32`, `.34`), not just rpi5-1.
+- **DNS cutover.** Cloudflare had a wildcard `*.jakerobb.org` → `caddy.lan`
+  CNAME, plus explicit `caddy.lan` CNAMEs for `gateway`, `homeassistant`,
+  `modbus`, `modbus-relay`, `nut` and `scrypted`. Names that only matched the
+  wildcard moved to the Gateway as soon as external-dns created their `A`
+  records. The explicit CNAMEs had to be deleted by hand first, because
+  external-dns won't touch records it doesn't own. The wildcard and
+  `caddy.jakerobb.org` go when Caddy is removed from Compose.
+- **When an app migrates** into the cluster, delete its file here in the same
+  PR. Its own HTTPRoute takes over the hostname, and its `access_control`
+  rule may move or change.

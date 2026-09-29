@@ -18,8 +18,7 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   out of the "Log and Metrics aggregation" item instead of running two parallel timeseries stacks — see that section for
   the current direction. Where reasonably easy, migrate the existing InfluxDB history into the new stack for continuity
   (not required, per Jake).
-- **Caddy** — obviated by Cilium Gateway. Before it can be retired, its routes to non-Compose devices need
-  HTTPRoutes of their own (see "Caddy's non-Compose routes" below).
+- **Caddy** — obviated by Cilium Gateway. Its routes now live in `manifests/lan-routes/`; see "Retire Caddy" below.
 
 ### To be migrated
 
@@ -37,19 +36,18 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 - **scrypted** — camera/NVR bridge
 - **modbus-controller** — custom app talking to a Modbus-over-Ethernet device
 
-### Caddy's non-Compose routes
+When a service migrates, delete its file from `manifests/lan-routes/` in the same PR.
 
-Caddy also reverse-proxies `*.jakerobb.org` names for devices on the LAN that aren't Compose services. Each needs an
-HTTPRoute on `homelab-gateway`, backed by a selector-less Service + EndpointSlice (or similar) pointing at the device,
-and behind Authelia. No state, so these can be done any time, independent of the migrations above.
+### Retire Caddy
 
-| Hostname                    | Caddy backend today |
-|-----------------------------|---------------------|
-| `gateway.jakerobb.org`      | `gateway.lan:80`    |
-| `rack-led.jakerobb.org`     | `rack-led.lan:80`   |
-| `kvm.jakerobb.org`          | `kvm.lan:80`        |
-| `modbus-relay.jakerobb.org` | `modbus.lan:80`     |
+**In progress (2026-09-29).** Every Caddy hostname, including the non-Compose LAN devices (`gateway`, `kvm`,
+`rack-led`, `modbus-relay`), now has an HTTPRoute in `manifests/lan-routes/`. See
+[`../argocd/README.md`](../argocd/README.md#lan-routes-replacing-caddy-added-2026-09-29). Remaining:
 
-Caddy's other names move with their apps and don't need separate work: `homeassistant`, `scrypted`, `modbus`
-(modbus-controller), `nut` (nut-webui), `changedetection`, `zigbee` and `zwave`. `influxdb`, `grafana` and `logs`
-(VictoriaLogs) go away with the observability stack.
+1. UniFi firewall: allow the cluster nodes into the IoT VLAN (`192.168.62.0/24`), as rpi5-1 already is.
+2. Delete the Cloudflare CNAMEs to `caddy.lan` for `gateway`, `homeassistant`, `modbus`, `modbus-relay`, `nut` and
+   `scrypted`, so external-dns can create their `A` records.
+3. Verify every hostname through the Gateway, including websockets (Home Assistant, Z-Wave JS UI, Zigbee2MQTT,
+   Scrypted, KVM).
+4. Remove Caddy from `docker-compose/`, then delete the wildcard `*.jakerobb.org` and `caddy.jakerobb.org` CNAMEs and
+   the `caddy.lan` DNS entry.

@@ -1,0 +1,43 @@
+# GL.iNet Comet X KVM (IoT VLAN).
+# Deliberately NOT gated by Authelia: the app has its own login.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kvm
+  namespace: lan-routes
+spec:
+  ports:
+    - name: http
+      port: 80
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: kvm
+  namespace: lan-routes
+  labels:
+    kubernetes.io/service-name: kvm
+    endpointslice.kubernetes.io/managed-by: argocd
+addressType: IPv4
+ports:
+  - name: http
+    port: 80
+endpoints:
+  - addresses:
+      - 192.168.62.8
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kvm
+  namespace: lan-routes
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - kvm.jakerobb.org
+  rules:
+    - backendRefs:
+        - name: kvm
+          port: 80

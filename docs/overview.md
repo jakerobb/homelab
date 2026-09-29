@@ -73,8 +73,9 @@ flowchart LR
    once with a password and a TOTP code.
 4. **The app.** The Gateway forwards the request to the app's Service.
 
-The Compose apps on rpi5-1 are still reached through Caddy there, using the
-same `*.jakerobb.org` names.
+The Compose apps on rpi5-1, and LAN devices with their own web UIs, use the
+same Gateway. Their routes point at addresses outside the cluster; see
+[LAN routes](../argocd/README.md#lan-routes-replacing-caddy-added-2026-09-29).
 
 ## How changes get deployed
 
