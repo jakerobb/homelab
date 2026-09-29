@@ -21,8 +21,6 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 ### To be migrated
 
-- **change-detection.io** (`change-detection` + its `browserless` dependency) — no hardware dependency. Needs a
-  persistent volume for the datastore.
 - **NUT UPS monitoring** (`nut-upsd`, `nut-webui`, `nut-influx-relay`) —
   `nut-upsd` needs direct USB access to the CyberPower UPS and almost certainly has to stay Pi-pinned; `nut-webui` and
   `nut-influx-relay` only talk to it over the network, though, so those two could plausibly migrate independently even
@@ -34,5 +32,8 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   rather than carrying them over.
 - **scrypted** — camera/NVR bridge
 - **modbus-controller** — custom app talking to a Modbus-over-Ethernet device
+- **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
+  as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it
+  waits until everything else has moved. No hardware dependency. Needs a persistent volume for the datastore.
 
 When a service migrates, delete its file from `manifests/lan-routes/` in the same PR.
