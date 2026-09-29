@@ -236,6 +236,18 @@ Its Grafana dashboards moved to SigNoz as Terraform-managed PromQL dashboards
 the PoE/PDU half of the old Power dashboard, plus the UPS Tower. That Power dashboard's NUT UPS rows stay in the Compose
 Grafana until NUT migrates.
 
+## NetworkOptimizer (Compose workload migration)
+
+**Done (2026-09-28).** The `optimizer` and `network-optimizer-speedtest` Compose services now run as one two-container
+pod ([`../manifests/network-optimizer/`](../manifests/network-optimizer/)). The SQLite data was copied into a
+`hexos-iscsi` PVC. The web UI is at `optimizer.jakerobb.org` through the Gateway, with login federated to Authelia over
+the app's own OIDC support rather than forward-auth. The speed test and iperf3 server bypass the Gateway on a dedicated
+L2 LoadBalancer IP (`192.168.102.129`, `speedtest.jakerobb.org`). Workers now carry a
+`homelab.jakerobb.org/nic-speed-mbps` label; the pod prefers 10GbE nodes, and a new 10GbE-only L2 policy keeps the MBP
+from announcing that IP. Open question: whether diagnostics suffer compared with host networking on rpi5-1 (path analysis,
+iperf3 client attribution when the L2 lease and the pod are on different nodes). Details:
+[`../argocd/README.md`](../argocd/README.md#networkoptimizer-migrated-from-docker-compose-2026-09-28).
+
 ## ntfy (Compose workload migration)
 
 **Done 2026-09-20.** Migrated off the RPi5 16GB's Docker Compose stack into the cluster — see

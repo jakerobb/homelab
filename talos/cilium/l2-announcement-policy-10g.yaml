@@ -1,0 +1,35 @@
+# Announces opted-in LoadBalancer IPs only from 10GbE workers (nodes labeled
+# via machine.nodeLabels in talos/patches/workers/). Services opt in with the
+# label `homelab.jakerobb.org/l2-announce: nic-10g`, which also excludes them
+# from the catch-all homelab-l2-announce policy.
+#
+# Added 2026-09-28 for NetworkOptimizer's speed test/iperf3 IP
+# (manifests/network-optimizer/service-lb.yaml). Whichever node holds the L2
+# lease receives all of that traffic, so letting the 2.5GbE MBP worker win it
+# would cap every test at 2.5Gbps no matter where the pod runs.
+#
+# Known limitation: L2 announcements ignore externalTrafficPolicy: Local
+# (Cilium docs), so the lease holder isn't guaranteed to be the pod's node.
+# When they differ, traffic takes one extra node hop and is SNATed, so the
+# pod sees that node's IP rather than the client's. See argocd/README.md's
+# NetworkOptimizer section.
+#
+# If no 10GbE worker is up, nothing announces these IPs, even if the pod is
+# running on the MBP.
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: homelab-l2-announce-10g
+spec:
+  serviceSelector:
+    matchLabels:
+      homelab.jakerobb.org/l2-announce: nic-10g
+  nodeSelector:
+    matchExpressions:
+      - key: node-role.kubernetes.io/control-plane
+        operator: DoesNotExist
+      - key: homelab.jakerobb.org/nic-speed-mbps
+        operator: In
+        values: ["10000"]
+  externalIPs: false
+  loadBalancerIPs: true

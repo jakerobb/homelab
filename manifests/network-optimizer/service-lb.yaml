@@ -1,0 +1,44 @@
+# Speed test (OpenSpeedTest, :3005) and iperf3 server (:5201) on their own
+# L2-announced IP, bypassing the Gateway. Upstream is explicit that
+# test traffic shouldn't go through a proxy: the extra hop costs throughput,
+# and Envoy negotiates HTTP/2, whose multiplexing skews OpenSpeedTest's
+# numbers. iperf3 isn't HTTP at all. This also matches the Compose setup,
+# where the speed test was plain HTTP on rpi5-1:3005.
+#
+# The IP is pinned (not pool-assigned) because the app's HOST_IP env var
+# (deployment.yaml) has to match it.
+#
+# The l2-announce label moves this Service onto the 10GbE-only L2 policy
+# (talos/cilium/l2-announcement-policy-10g.yaml), so the MBP's 2.5GbE link
+# never carries it. externalTrafficPolicy stays at the default (Cluster):
+# Cilium's L2 announcements don't support Local. If the lease holder isn't
+# the pod's node, the pod sees that node's IP as the source, which mostly
+# matters for iperf3 client attribution. Browser speed test results POST
+# through the Gateway, which keeps the real client IP in X-Forwarded-For.
+apiVersion: v1
+kind: Service
+metadata:
+  name: network-optimizer-lb
+  namespace: network-optimizer
+  labels:
+    homelab.jakerobb.org/l2-announce: nic-10g
+  annotations:
+    lbipam.cilium.io/ips: 192.168.102.129
+    external-dns.alpha.kubernetes.io/hostname: speedtest.jakerobb.org
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: network-optimizer
+  ports:
+    - name: speedtest
+      port: 3005
+      targetPort: speedtest
+      protocol: TCP
+    - name: iperf3
+      port: 5201
+      targetPort: iperf3
+      protocol: TCP
+    - name: iperf3-udp
+      port: 5201
+      targetPort: iperf3-udp
+      protocol: UDP

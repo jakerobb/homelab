@@ -1,0 +1,13 @@
+# Web UI/API, reached only through the Gateway (httproute.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: network-optimizer
+  namespace: network-optimizer
+spec:
+  selector:
+    app.kubernetes.io/name: network-optimizer
+  ports:
+    - name: http
+      port: 8042
+      targetPort: http

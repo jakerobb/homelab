@@ -234,6 +234,40 @@ spec:
                     - 'code'
                   token_endpoint_auth_method: 'client_secret_basic'
                   authorization_policy: 'two_factor'
+                - client_id: 'network-optimizer'
+                  client_name: 'Network Optimizer'
+                  # pbkdf2-sha512 hash of a secret generated 2026-09-28 on
+                  # rpi5-1 and hashed by the running Authelia pod's `authelia
+                  # crypto hash generate pbkdf2`, never printed as plaintext.
+                  # The plaintext lives in the app's own db (Settings >
+                  # Identity, where the provider is configured) and in the
+                  # 1Password item network-optimizer-oidc-client-secret.
+                  # Nothing in the cluster needs it, so there's no ESO sync.
+                  client_secret: '$pbkdf2-sha512$310000$d2kkHXsb4iSkH/4NNE.y0g$EbjEcJ5ORlEdPWWqv2iVVwsb.54ygz0D2JpB.4m71puT29/5yXDULqAA3ku8C7ZxXdxSu6.EVSTMofy46mYyHA'
+                  public: false
+                  # /signin-oidc/<scheme key>. The key is chosen when adding
+                  # the provider in the app and must be `authelia` to match.
+                  redirect_uris:
+                    - 'https://optimizer.jakerobb.org/signin-oidc/authelia'
+                  # ASP.NET's OIDC handler reads identity from the ID token
+                  # only (it doesn't call /userinfo by default), with
+                  # preferred_username as the name claim.
+                  claims_policy: 'email_identity'
+                  scopes:
+                    - 'openid'
+                    - 'profile'
+                    - 'email'
+                  grant_types:
+                    - 'authorization_code'
+                  response_types:
+                    - 'code'
+                  # ASP.NET Core's OIDC handler sends the client secret in the
+                  # token request body, not HTTP Basic.
+                  token_endpoint_auth_method: 'client_secret_post'
+                  # Turn on "Use PKCE" in the app's provider settings too.
+                  require_pkce: true
+                  pkce_challenge_method: 'S256'
+                  authorization_policy: 'two_factor'
   destination:
     server: https://kubernetes.default.svc
     namespace: authelia

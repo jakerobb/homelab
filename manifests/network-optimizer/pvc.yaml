@@ -1,0 +1,18 @@
+# /app/data: SQLite db (+ WAL), the credential encryption key (.credential_key),
+# license, floor plans, generated PDF reports, and the IEEE OUI cache. It was
+# 149MB at migration (2026-09-28), mostly the db.
+#
+# Block storage (iSCSI), not hexos-nfs. SQLite's WAL mode is unsafe on network
+# filesystems, and upstream falls back to DELETE journal mode there with "busy"
+# errors under load (docker/DEPLOYMENT.md, upstream issues #706/#727).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: network-optimizer-data
+  namespace: network-optimizer
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi

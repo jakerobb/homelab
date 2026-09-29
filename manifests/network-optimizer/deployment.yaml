@@ -1,0 +1,174 @@
+# Bare Deployment, no Helm chart (upstream ships none), same call as
+# homepage/ntfy.
+#
+# Migrated from the docker-compose `optimizer` + `network-optimizer-speedtest`
+# services on rpi5-1 (2026-09-28). See argocd/README.md's NetworkOptimizer
+# section for the design and cutover.
+#
+# Both containers share one pod (Compose ran them separately) so they always
+# land on the same node behind one LoadBalancer IP (service-lb.yaml). Two pods
+# would each get their own L2 lease, which could land on different nodes.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: network-optimizer
+  namespace: network-optimizer
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    # The data PVC is ReadWriteOnce, and SQLite must never have two writers.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: network-optimizer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: network-optimizer
+    spec:
+      affinity:
+        nodeAffinity:
+          # Soft preference for the fastest NIC (label set per worker in
+          # talos/patches/workers/): speed tests measure client <-> this pod,
+          # so a slow node caps every result. It stays schedulable anywhere
+          # so an outage on the 10GbE workers doesn't take the app down.
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.jakerobb.org/nic-speed-mbps
+                    operator: Gt
+                    values: ["9999"]
+            - weight: 10
+              preference:
+                matchExpressions:
+                  - key: homelab.jakerobb.org/nic-speed-mbps
+                    operator: Gt
+                    values: ["1999"]
+      securityContext:
+        # Upstream's docker-compose.prod.yml sets these for the speed test;
+        # they widen the TCP autotuning ceiling (32MB) so a single stream
+        # can fill multi-gigabit links. Pod-scoped, so iperf3 in the app
+        # container benefits too. Its third sysctl, tcp_mtu_probing, isn't
+        # on Kubernetes' safe list, so it's left out.
+        sysctls:
+          - name: net.ipv4.tcp_rmem
+            value: "4096 131072 33554432"
+          - name: net.ipv4.tcp_wmem
+            value: "4096 65536 33554432"
+      containers:
+        - name: network-optimizer
+          # Still on the 2.9.0 preview the developer asked us to try (see
+          # docker-compose.yml's history). The migrated db was last opened by
+          # this version, so don't drop back to 2.8.x stable. Move to 2.9.0
+          # once it's released.
+          image: ghcr.io/ozark-connect/network-optimizer:2.9.0-preview7
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TZ
+              value: America/Detroit
+            - name: BIND_LOCALHOST_ONLY
+              value: "false"
+            # The public name, served through the Gateway. Drives canonical
+            # redirects, CORS, the OIDC redirect_uri, and where the speed
+            # test page POSTs its results.
+            - name: REVERSE_PROXIED_HOST_NAME
+              value: optimizer.jakerobb.org
+            # The speed test/iperf3 LoadBalancer IP (service-lb.yaml), not
+            # the pod IP. Used for path analysis and the speed test URL.
+            - name: HOST_IP
+              value: 192.168.102.129
+            # Plain HTTP on :3005 at the LB IP, bypassing the Gateway (see
+            # service-lb.yaml for why). DNS comes from external-dns.
+            - name: OPENSPEEDTEST_HOST
+              value: speedtest.jakerobb.org
+            - name: OPENSPEEDTEST_PORT
+              value: "3005"
+            - name: OPENSPEEDTEST_HTTPS
+              value: "false"
+            # Envoy (Cilium Gateway) connects from the pod CIDR. Trusting
+            # its X-Forwarded-For gives the app real client IPs for rate
+            # limiting, the audit log, and speed test result attribution.
+            - name: TRUSTED_PROXIES
+              value: 10.244.0.0/16
+            - name: Iperf3Server__Enabled
+              value: "true"
+            - name: Logging__LogLevel__Default
+              value: Information
+            - name: Logging__LogLevel__NetworkOptimizer
+              value: Information
+          ports:
+            - name: http
+              containerPort: 8042
+            - name: iperf3
+              containerPort: 5201
+              protocol: TCP
+            - name: iperf3-udp
+              containerPort: 5201
+              protocol: UDP
+          startupProbe:
+            # Upstream allows 120s start_period (db migrations on upgrade).
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 30
+            # Same slack as ntfy's probe; see its deployment.yaml.
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            # ~505MiB steady state on rpi5-1 at migration.
+            requests:
+              cpu: 100m
+              memory: 640Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - mountPath: /app/data
+              name: data
+            # Only a mirror of stdout, so not persisted.
+            - mountPath: /app/logs
+              name: logs
+        - name: speedtest
+          # Released in lockstep with the app; keep the tags matched.
+          image: ghcr.io/ozark-connect/speedtest:2.9.0-preview7
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TZ
+              value: America/Detroit
+            - name: HOST_IP
+              value: 192.168.102.129
+            - name: OPENSPEEDTEST_HOST
+              value: speedtest.jakerobb.org
+            - name: OPENSPEEDTEST_PORT
+              value: "3005"
+            - name: OPENSPEEDTEST_HTTPS
+              value: "false"
+            # Results POST to https://<this>/api/public/speedtest/results.
+            - name: REVERSE_PROXIED_HOST_NAME
+              value: optimizer.jakerobb.org
+          ports:
+            - name: speedtest
+              containerPort: 3000
+          livenessProbe:
+            tcpSocket:
+              port: speedtest
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: network-optimizer-data
+        - name: logs
+          emptyDir: {}

@@ -1195,6 +1195,87 @@ The first service moved under the "Compose workload migration" plan in
   migration. They're PromQL, because federation delivers every series as an
   untyped gauge and SigNoz's query builder only offers `rate` on counters.
 
+## NetworkOptimizer (migrated from Docker Compose, 2026-09-28)
+
+[NetworkOptimizer](https://github.com/Ozark-Connect/NetworkOptimizer) (UniFi
+config auditing, LAN/WAN speed tests, path analysis). It replaces the
+Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
+[`apps/network-optimizer/`](apps/network-optimizer/application.yaml) →
+[`manifests/network-optimizer/`](../manifests/network-optimizer/).
+
+- **One pod, two containers.** The .NET app (`:8042` UI/API, `:5201` iperf3
+  server) and the OpenSpeedTest nginx (`:3000`) share a pod so they always
+  sit behind the same LoadBalancer IP on the same node.
+- **Two ways in.**
+  - `https://optimizer.jakerobb.org`: UI and API through the Gateway.
+    `TRUSTED_PROXIES=10.244.0.0/16` (the pod CIDR Envoy connects from) makes
+    the app honor `X-Forwarded-For`.
+  - `http://speedtest.jakerobb.org:3005` and iperf3 on `:5201`: a dedicated
+    L2 LoadBalancer IP, `192.168.102.129`. It's pinned because the app's
+    `HOST_IP` must match it, and its DNS record comes from external-dns's new
+    `service` source. The Gateway is skipped on purpose: upstream warns that
+    proxies, and HTTP/2 multiplexing in particular, distort speed test
+    results, and iperf3 isn't HTTP anyway. Plain HTTP on :3005 is how it
+    worked on Compose too.
+- **Networking trade-off (open question).** Compose used `network_mode:
+  host` on rpi5-1. Jake chose a LoadBalancer IP over `hostNetwork` pinned to
+  one node, to be evaluated in use:
+  - The pod *prefers* nodes with `homelab.jakerobb.org/nic-speed-mbps` above
+    9999 (the MS-A2 workers; see
+    [`../talos/README.md`](../talos/README.md#node-nic-speed-labels-added-2026-09-28)),
+    then above 1999. It can still fall back to any worker.
+  - Only 10GbE workers may announce the IP
+    ([`../talos/cilium/l2-announcement-policy-10g.yaml`](../talos/cilium/l2-announcement-policy-10g.yaml)),
+    so the MBP's 2.5GbE link never carries test traffic even when it isn't
+    running the pod.
+  - Cilium's L2 announcements don't support `externalTrafficPolicy: Local`,
+    so the lease holder may be the *other* MS-A2 worker. Traffic then takes
+    an extra hop and is SNATed, and the app sees that node's IP instead of
+    the client's. Browser speed test results aren't affected, since they're
+    POSTed through the Gateway with `X-Forwarded-For`. iperf3 client
+    attribution and path analysis may be. Check which node holds the lease
+    with `kubectl -n kube-system get lease cilium-l2announce-network-optimizer-network-optimizer-lb`.
+  - If this proves too lossy, the fallback is `hostNetwork` on one node,
+    which needs a `privileged` PodSecurity label on the namespace.
+- **Storage:** a 5Gi `hexos-iscsi` PVC at `/app/data` (SQLite + WAL,
+  `.credential_key`, license, reports), seeded from rpi5-1's `~/docker/data`
+  before the first sync. It's block storage because upstream documents SQLite
+  WAL problems on NFS. `/app/logs` is an `emptyDir`, since it only mirrors
+  stdout.
+- **Auth: in-app OIDC against Authelia**, not the `ExternalAuth` filter.
+  Forward-auth would block the speed test page's unauthenticated POST to
+  `/api/public/speedtest/results` from arbitrary LAN devices, and the app
+  has its own federated login anyway. The Authelia client is
+  `network-optimizer` in [`apps/authelia/application.yaml`](apps/authelia/application.yaml)
+  (`two_factor`, `client_secret_post`, PKCE S256). The provider itself is
+  configured in the app and stored in its db, so it's a one-time GUI step:
+  **Settings > Identity**, add an OIDC provider with
+  - scheme key `authelia` (the redirect URI is
+    `https://optimizer.jakerobb.org/signin-oidc/authelia`)
+  - issuer/authority `https://auth.jakerobb.org`
+  - client ID `network-optimizer`
+  - client secret from the 1Password item `network-optimizer-oidc-client-secret`
+  - PKCE on
+  - scopes `openid profile email`
+
+  Keep the built-in `admin` account until an SSO login is confirmed to map
+  to an Admin user. If SSO ever locks you out, set `NETOPT_RECOVERY=1` on the
+  container for one boot (see upstream's `docker/DEPLOYMENT.md`).
+- **Version:** still on `2.9.0-preview7` for both containers, the build the
+  migrated db was last opened with. See
+  [`../todo/FUTURE.md`](../todo/FUTURE.md#networkoptimizer-preview-pin--stable-release).
+- **Pod security:** `baseline`, not hardened like unpoller/ntfy. The image's
+  entrypoint starts as root to set the timezone and chown the data dir, then
+  drops to UID 1654 with `gosu`, and traceroute/ping rely on `NET_RAW`. The
+  two TCP buffer sysctls from upstream's compose file are on Kubernetes'
+  safe list; `tcp_mtu_probing` isn't, so it's omitted.
+- **Homepage:** discovered via `gethomepage.dev/*` annotations on the
+  HTTPRoute, replacing the manual `services.yaml` entry. No Cloudflare DNS
+  cleanup is needed: `optimizer.jakerobb.org` only ever matched the
+  `*.jakerobb.org → caddy.lan` wildcard CNAME, which the external-dns record
+  overrides. The `optimizer.lan` UniFi DNS entry is unused now and can be
+  deleted.
+
 ## Docs site (added 2026-09-28)
 
 `docs.jakerobb.org` renders this repo's Markdown as a searchable site with

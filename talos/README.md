@@ -41,7 +41,11 @@ _(as of 2026-09-24)_
   directly, so it looks like a normal host on the LAN to everything else. Only
   non-control-plane nodes announce (via `node-role.kubernetes.io/control-plane
   DoesNotExist`, not a manual label — new workers need no extra labeling to
-  participate).
+  participate). Exception: Services labeled `homelab.jakerobb.org/l2-announce: nic-10g`
+  are announced only by 10GbE workers, via
+  `cilium/l2-announcement-policy-10g.yaml` (see "Node NIC-speed labels"
+  below). Like the main policy, it's applied by hand with `kubectl apply`,
+  not by ArgoCD.
 
 ### Why L2 announcements instead of BGP
 
@@ -787,6 +791,37 @@ reboot and pods keep running. Also applied to the `controlplane.yaml` and
 ```bash
 kubectl get --raw /api/v1/nodes/talos-worker-mbp/proxy/configz | jq '.kubeletconfig | {serializeImagePulls, maxParallelImagePulls, containerLogMaxSize}'
 ```
+
+## Node NIC-speed labels (added 2026-09-28)
+
+Each worker's per-node patch in [`patches/workers/`](patches/workers/) sets
+`machine.nodeLabels` with `homelab.jakerobb.org/nic-speed-mbps`, the host's
+link speed in Mbps:
+
+| Node | Label | Link |
+|---|---|---|
+| `talos-worker-1`, `talos-worker-2` | `10000` | MS-A2, 10GbE |
+| `talos-worker-mbp` | `2500` | 2018 MBP, 2.5GbE adapter |
+
+The upcoming Pi worker should get `1000`, and the Mac Studio `10000`. Control
+planes aren't labeled since they don't run workloads.
+
+The value is an integer rather than `10GbE` so workloads can use
+nodeAffinity's `Gt`/`Lt` operators. NetworkOptimizer
+([`../manifests/network-optimizer/deployment.yaml`](../manifests/network-optimizer/deployment.yaml))
+prefers `Gt 9999`, and
+[`cilium/l2-announcement-policy-10g.yaml`](cilium/l2-announcement-policy-10g.yaml)
+only lets `10000` nodes announce its LoadBalancer IP.
+
+Talos applies `nodeLabels` live with no reboot. Set only the label with an
+inline patch rather than re-applying the whole per-worker file:
+
+```bash
+talosctl patch machineconfig -n 192.168.102.31 -p '{"machine":{"nodeLabels":{"homelab.jakerobb.org/nic-speed-mbps":"10000"}}}' --mode=no-reboot
+```
+
+Use `.32` for worker-2, and `.34` with `"2500"` for the MBP. Check with
+`kubectl get nodes -L homelab.jakerobb.org/nic-speed-mbps`.
 
 ## Control-plane VIP (added 2026-09-18)
 

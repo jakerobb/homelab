@@ -1,0 +1,12 @@
+# Explicit, labeled Namespace rather than relying on CreateNamespace=true, the
+# same reasoning as homepage/namespace.yaml.
+#
+# No PodSecurity override needed. The app's entrypoint starts as root to chown
+# /app/data and then drops to the image's `app` user (UID 1654) via gosu, and
+# traceroute/ping need NET_RAW. Both fit the cluster's default `baseline`
+# enforcement, and so do the two TCP buffer sysctls in deployment.yaml, which
+# are on Kubernetes' safe-sysctl list.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: network-optimizer

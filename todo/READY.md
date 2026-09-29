@@ -22,8 +22,6 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 ### To be migrated
 
-- **NetworkOptimizer** (`optimizer` + `network-optimizer-speedtest`) — no hardware dependency, network-based app. Needs
-  a persistent volume (SQLite, configs, license under `./data`)
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — no hardware dependency. Needs a
   persistent volume for the datastore.
 - **NUT UPS monitoring** (`nut-upsd`, `nut-webui`, `nut-influx-relay`) —

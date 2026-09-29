@@ -1,6 +1,13 @@
 machine:
   network:
     hostname: talos-worker-mbp
+  # Host NIC link speed in Mbps (UTM VM on the MBP, 2.5GbE adapter). An integer rather than
+  # "10GbE" so pods can use nodeAffinity's Gt/Lt operators: NetworkOptimizer
+  # prefers the fastest node, and talos/cilium/l2-announcement-policy-10g.yaml
+  # selects on it. Applied live, no reboot; see talos/README.md's
+  # "Node NIC-speed labels".
+  nodeLabels:
+    homelab.jakerobb.org/nic-speed-mbps: "2500"
   # UTM/QEMU under macOS on the 2018 MacBook Pro — a temporary stopgap worker
   # until the Mac Studio arrives (~Nov 2026), hence the hardware-identifying
   # name instead of the usual decoupled talos-worker-N convention (see

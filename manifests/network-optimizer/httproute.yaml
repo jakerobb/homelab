@@ -1,0 +1,36 @@
+# Deliberately NOT gated by Authelia's ExternalAuth filter, unlike
+# homepage/searxng. Authentication is the app's own login, federated to
+# Authelia over OIDC (client `network-optimizer` in
+# argocd/apps/authelia/application.yaml, configured in-app under Settings >
+# Identity; see argocd/README.md's NetworkOptimizer section). Forward-auth
+# would also block the speed test page's cross-origin, unauthenticated POST to
+# /api/public/speedtest/results from whatever LAN device ran the test.
+#
+# No DNS collision to clean up: optimizer.jakerobb.org previously resolved
+# only via the *.jakerobb.org -> caddy.lan wildcard CNAME in Cloudflare, and
+# the specific record external-dns creates for this route takes precedence
+# over it.
+#
+# gethomepage.dev/* annotations replace the manual services.yaml entry in
+# manifests/homepage/configmap.yaml, the same pattern as ntfy.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: network-optimizer
+  namespace: network-optimizer
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: Network Optimizer
+    gethomepage.dev/description: UniFi config audit and speed tests
+    gethomepage.dev/icon: /icons/network-optimizer.png
+    gethomepage.dev/group: Monitoring
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - optimizer.jakerobb.org
+  rules:
+    - backendRefs:
+        - name: network-optimizer
+          port: 8042

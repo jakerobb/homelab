@@ -124,9 +124,6 @@ data:
         - Logs:
             icon: victorialogs.png
             href: https://logs.jakerobb.org/select/vmui
-        - Network Optimizer:
-            icon: /icons/network-optimizer.png
-            href: https://optimizer.jakerobb.org
         - NUT (UPS Monitoring):
             icon: nut.png
             href: https://nut.jakerobb.org
