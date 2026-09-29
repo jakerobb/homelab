@@ -1,5 +1,13 @@
 # GL.iNet Comet X KVM (IoT VLAN).
 # Deliberately NOT gated by Authelia: the app has its own login.
+#
+# HTTPS to the backend, not plain HTTP: on port 80 the KVM redirects every
+# request to https://<Host>/ and ignores X-Forwarded-Proto, so proxying HTTP
+# loops forever (it did through Caddy too). Its factory certificate is
+# self-signed for `localhost` and expired in 1979, which BackendTLSPolicy
+# can't be told to accept, so the KVM now serves a certificate for
+# kvm.jakerobb.org signed by a private CA (kvm-backend-ca.yaml), uploaded
+# through its UI. Valid until 2036.
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,8 +15,8 @@ metadata:
   namespace: lan-routes
 spec:
   ports:
-    - name: http
-      port: 80
+    - name: https
+      port: 443
 ---
 apiVersion: discovery.k8s.io/v1
 kind: EndpointSlice
@@ -20,14 +28,31 @@ metadata:
     endpointslice.kubernetes.io/managed-by: argocd
 addressType: IPv4
 ports:
-  - name: http
-    port: 80
+  - name: https
+    port: 443
     protocol: TCP
 endpoints:
   - addresses:
       - 192.168.62.8
     conditions:
       ready: true
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: kvm
+  namespace: lan-routes
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: kvm
+  validation:
+    caCertificateRefs:
+      - group: ""
+        kind: ConfigMap
+        name: kvm-backend-ca
+    hostname: kvm.jakerobb.org
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -43,4 +68,4 @@ spec:
   rules:
     - backendRefs:
         - name: kvm
-          port: 80
+          port: 443

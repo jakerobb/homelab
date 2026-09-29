@@ -1,0 +1,32 @@
+# Public certificate of the private CA that signed the KVM's own HTTPS
+# certificate (kvm.yaml's BackendTLSPolicy verifies against it). Public, so
+# safe to commit. The CA's private key was deleted right after signing; to
+# replace the KVM's certificate, make a new CA and replace this. See
+# argocd/README.md's LAN routes section.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kvm-backend-ca
+  namespace: lan-routes
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDVzCCAj+gAwIBAgIUXrzQSUZ0j/PRssRaS6EL0jKXUTAwDQYJKoZIhvcNAQEL
+    BQAwMzEQMA4GA1UECgwHaG9tZWxhYjEfMB0GA1UEAwwWaG9tZWxhYiBLVk0gYmFj
+    a2VuZCBDQTAeFw0yNjA5MjkxODIxNDZaFw0zNjA5MjYxODIxNDZaMDMxEDAOBgNV
+    BAoMB2hvbWVsYWIxHzAdBgNVBAMMFmhvbWVsYWIgS1ZNIGJhY2tlbmQgQ0EwggEi
+    MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDThkqzJXAcroSfKLw2KCc83trM
+    1TCJ2muNM8ps7Sf5RGSJUzqcUlzDoQkj0BFdCOtE24AE5e1gLSdNtB7LX5yvaCjG
+    5htnzSrVxjWSRYGet2b78SzzChsSlCfPPNQWuv161PDHBZxcnMg6rjH2dERHaMXl
+    taCWWlgWAp8r2eZA7lmBB7s3loUs9+VnA4B5SoUTtj0Tthbft7Y01YHdXyiAk9F7
+    aeb+XCfUBCQXfjbWyGfpqzFfrxoxhi7AJ+CwhP4g5+YRbg8hJ7q+vTEorLxg8Ugq
+    Bk7DivvUGfUtWPj2u5bpibHt0Ht/XXxBxOM9NP018KCzwKkgMvkhw9YXo4ktAgMB
+    AAGjYzBhMB0GA1UdDgQWBBRj7Ys8gx5BlPSkvH85qTrmKQSt4TAfBgNVHSMEGDAW
+    gBRj7Ys8gx5BlPSkvH85qTrmKQSt4TAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB
+    /wQEAwIBBjANBgkqhkiG9w0BAQsFAAOCAQEADmEw8kS2hH3VLBYPdbi7nukmIuFn
+    udk9evEXcURkhDK20pxJMku78vDX5Njo2NczEv6z6E5vqm6EPxlEAlJEsGLIs93A
+    85/nQVF9T+/2+eoRGpuGw32+2vssGxMK222zTx6Wfzml1vxZUVGPHOwkwRVykQ4X
+    /HefWsEZeJMHRtGXDnOjbuDv3sloLXPUpc3CIdIo7Yd5A+NLOV3hlLEEMqNTvZJH
+    Jx63rA90ylUGGyvL1wg1TS+w4+oeOFKHc6j8ASmGdYrgfH/5g+1FLKc8wjfeev7o
+    cIXbOJ4FSOKB5rPempwUXfNjVPm9T7HAPoMUQw9/T81uMYHfGEA92AlwmQ==
+    -----END CERTIFICATE-----
