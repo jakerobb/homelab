@@ -1382,8 +1382,24 @@ through `homelab-gateway` like everything else. Deployed as
   in, and ArgoCD compares list items whole, so leaving them out keeps the app
   OutOfSync forever.
 - **Home Assistant needs `trusted_proxies`.** Envoy sends `X-Forwarded-For`
-  from a node IP, and HA answers 400 to that from an untrusted proxy.
-  `docker-compose/homeassistant/configuration.yaml` trusts the Server VLAN.
+  from a node IP, and HA answers 400 to that from an untrusted proxy. HA
+  (2026.9) no longer reads `http:` from `configuration.yaml`: it migrated
+  those settings into `.storage/http` (`yaml_migration_done: true`), which
+  isn't captured in this repo, and a YAML `http:` block is silently ignored.
+  Change it in HA's UI instead. The trusted proxies include
+  `192.168.102.0/24` (the Server VLAN), replacing the old
+  `192.168.102.2/32` that only covered Caddy.
+- **The KVM is reached over HTTPS.** On port 80 it redirects everything to
+  `https://<Host>/` and ignores `X-Forwarded-Proto`, so proxying plain HTTP
+  loops (it did through Caddy too). Its factory certificate is self-signed
+  for `localhost` and expired in 1979, and `BackendTLSPolicy` has no "skip
+  verification" option. So the KVM serves a certificate for
+  `kvm.jakerobb.org` (valid until 2036), uploaded through its UI and signed
+  by a private CA made just for it. The CA's public certificate is
+  [`kvm-backend-ca.yaml`](../manifests/lan-routes/kvm-backend-ca.yaml); its
+  private key was deleted after signing. The KVM's certificate and key are in
+  1Password. To replace the certificate, make a new CA, sign a new
+  certificate, upload it, and replace the ConfigMap.
 - **Auth.** Home Assistant, Scrypted, the UniFi gateway and the KVM keep their
   own logins and skip forward-auth. Home Assistant has to, since its phone
   app can't do an Authelia login. Everything else gets the `ExternalAuth`
