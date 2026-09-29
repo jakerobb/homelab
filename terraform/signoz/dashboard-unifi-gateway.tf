@@ -30,11 +30,12 @@ locals {
             ]
           },
           {
-            h = 3
+            h = 4
             panels = [
               {
-                id      = "details", w = 12, type = "table", unit = "1", title = "Details"
-                queries = [{ q = "max by (name, model, version, ip, mac, serial) (unpoller_device_info{name=~\"$gateway\"})" }]
+                id           = "details", w = 12, type = "table", unit = "s", title = "Details"
+                column_units = { uptime = "s" }
+                queries      = [{ sql = replace(local.unifi_device_details_sql, "__VAR__", "gateway") }]
               },
             ]
           },

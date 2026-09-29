@@ -22,12 +22,12 @@ locals {
         title = "Switches"
         rows = [
           {
-            h = 4
+            h = 7
             panels = [
               {
-                id          = "details", w = 12, type = "table", unit = "s", title = "Details"
-                description = "The value column is uptime."
-                queries     = [{ q = "max by (name, model, version, ip, mac, serial) (unpoller_device_uptime_seconds{name=~\"$switch\"} * on (name) group_left (model, version, ip, mac, serial) max by (name, model, version, ip, mac, serial) (unpoller_device_info))" }]
+                id           = "details", w = 12, type = "table", unit = "s", title = "Details"
+                column_units = { uptime = "s" }
+                queries      = [{ sql = replace(local.unifi_device_details_sql, "__VAR__", "switch") }]
               },
             ]
           },
@@ -110,11 +110,11 @@ locals {
             panels = [
               {
                 id          = "port-table", w = 12, type = "table", unit = "By/s", title = "Ports"
-                description = "Link speed and current traffic of every port with a link."
+                description = "Link speed and current traffic of every port. Unlinked ports show speed 0."
                 queries = [
-                  { q = "max by (name, port_num, port_name) (unpoller_device_port_port_speed_bps{name=~\"$switch\"} > 0)", unit = "bit/s" },
-                  { q = "sum by (name, port_num, port_name) (rate(unpoller_device_port_receive_bytes_total{name=~\"$switch\"}[5m]))" },
-                  { q = "sum by (name, port_num, port_name) (rate(unpoller_device_port_transmit_bytes_total{name=~\"$switch\"}[5m]))" },
+                  { metric = "unpoller_device_port_port_speed_bps", group_by = ["name", "port_num", "port_name"], filter = "name IN $switch", unit = "bit/s", legend = "Speed" },
+                  { metric = "unpoller_device_port_receive_rate_bytes", group_by = ["name", "port_num", "port_name"], filter = "name IN $switch", legend = "Receive" },
+                  { metric = "unpoller_device_port_transmit_rate_bytes", group_by = ["name", "port_num", "port_name"], filter = "name IN $switch", legend = "Transmit" },
                 ]
               },
             ]

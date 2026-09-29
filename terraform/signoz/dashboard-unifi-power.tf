@@ -44,7 +44,7 @@ locals {
             panels = [
               {
                 id      = "poe-now", w = 4, type = "table", unit = "watt", title = "PoE draw per port"
-                queries = [{ q = "max by (name, port_name) (unpoller_device_port_poe_watts{name=~\"$switch\"} > 0)" }]
+                queries = [{ metric = "unpoller_device_port_poe_watts", group_by = ["name", "port_name"], filter = "name IN $switch", legend = "Draw" }]
               },
               {
                 id      = "poe-history", w = 8, type = "ts", unit = "watt", title = "PoE draw per port"
@@ -74,7 +74,7 @@ locals {
             panels = [
               {
                 id      = "pdu-now", w = 4, type = "table", unit = "watt", title = "Draw per outlet"
-                queries = [{ q = "max by (outlet_name) (${local.unifi_pdu_outlets})" }]
+                queries = [{ metric = "unpoller_device_outlet_outlet_power", group_by = ["outlet_name"], filter = "outlet_name NOT REGEXP '^(USB )?Outlet [0-9]+$'", legend = "Draw" }]
               },
               {
                 id      = "pdu-history", w = 8, type = "ts", unit = "watt", title = "Draw per outlet"
