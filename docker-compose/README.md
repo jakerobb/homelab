@@ -2,8 +2,10 @@
 
 This is the Docker Compose stack that runs on the RPi5 16GB (`rpi5-1.lan`,
 `192.168.102.2`) — the box that stays outside the Talos cluster for
-hardware-pinned duties (e.g. UPS NUT client) plus the LAN's Caddy reverse proxy, Unbound
-resolver, and metrics/logging stack.
+hardware-pinned duties (e.g. UPS NUT client) plus the LAN's Unbound
+resolver and metrics/logging stack. Its web UIs are reached through the
+cluster's Gateway ([`manifests/lan-routes/`](../manifests/lan-routes/)), which
+replaced Caddy on 2026-09-29.
 
 Many of these workloads are not hardware dependent, and movement to
 Kubernetes will happen as time permits.
@@ -31,8 +33,7 @@ into a `~/dev/homelab` git checkout on rpi5-1 — one copy of the content,
 `git pull` is the only sync step needed, drift becomes structurally
 impossible instead of just easy to avoid.
 
-**Symlinked (works reliably):** `docker-compose.yml`, `caddy/Caddyfile`,
-`resolv-host.conf`, `telegraf/` (whole dir),
+**Symlinked (works reliably):** `docker-compose.yml`, `resolv-host.conf`, `telegraf/` (whole dir),
 `nut-influx-relay/` (whole dir), `vector/vector.yaml`, plus (added
 2026-09-24, none of them bind-mounted by any running service)
 `ntfy/conf/server.yml`, `nut-conf-office/ups.conf`, and
@@ -50,7 +51,7 @@ scenes,scripts}.yaml`, `homeassistant/blueprints/`,
 **Why those specifically fail** — two distinct Docker bind-mount behaviors,
 confirmed live against this stack, not just theory:
 1. A symlinked **file** as a bind-mount source works, whether it's the
-   direct source (`caddy/Caddyfile`) or reached through a symlinked parent
+   direct source (`resolv-host.conf`) or reached through a symlinked parent
    *directory* in the path (`telegraf/telegraf.conf`,
    `nut-influx-relay/config.yaml`) — Docker resolves the full host path,
    including any symlinks, before creating the mount.
@@ -85,9 +86,7 @@ changed; it does **not** notice a bind-mount source changing type on disk.
 A container whose mount source was directly replaced (not just a file
 *within* an unchanged directory) needs an explicit restart
 (`docker compose restart <service>`) to pick it up — confirmed necessary
-for `grafana`, `mosquitto`, `unbound`, `modbus-controller`, and `caddy`
-(which also needed it for its own separate reason: Caddy only re-reads
-`Caddyfile` on an explicit reload/restart, never continuously).
+for `grafana`, `mosquitto`, `unbound`, and `modbus-controller`.
 
 ## What's captured vs. excluded
 
@@ -128,7 +127,6 @@ and database files are **not** committed — they're excluded the same way
   similar name. Left in place rather than deleted, since removing it wasn't
   asked for and it's possible it predates the current image's
   auto-generation behavior and has some other purpose not yet understood.
-- `caddy/Caddyfile.bak` — a stale backup, superseded by `Caddyfile`.
 
 ## Secrets
 

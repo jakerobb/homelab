@@ -1,6 +1,6 @@
 # HTTPRoutes for things that run outside the cluster: the Compose apps still
-# on rpi5-1, plus LAN devices with their own web UIs. Replaces Caddy
-# (docker-compose/caddy/Caddyfile). Each file is one hostname: a Service with
+# on rpi5-1, plus LAN devices with their own web UIs. Replaced Caddy on
+# rpi5-1 (removed 2026-09-29). Each file is one hostname: a Service with
 # no selector, a hand-written EndpointSlice with the backend's fixed IP, and
 # the HTTPRoute. Not ExternalName Services, which Cilium's Gateway doesn't
 # support as backends. The `managed-by` label keeps Kubernetes' EndpointSlice

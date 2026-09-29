@@ -223,6 +223,17 @@ topic — see
 mapped to ntfy priority/tags today ([
 `../manifests/ntfy-alertmanager/configmap.yaml`](../manifests/ntfy-alertmanager/configmap.yaml)).
 
+## Caddy -> Gateway API (Compose workload migration)
+
+**Done (2026-09-29).** Caddy on rpi5-1 is gone. Every hostname it served, the Compose apps plus LAN devices
+(`gateway`, `kvm`, `rack-led`, `modbus-relay`), is an HTTPRoute in `manifests/lan-routes/`, pointing at the backend's
+fixed IP. Things that bit along the way: ArgoCD's default `resource.exclusions` silently skipped the EndpointSlices;
+Home Assistant keeps `trusted_proxies` in `.storage/http` and ignores YAML; the KVM loops on plain HTTP, so it now
+serves a private-CA certificate and the Gateway talks HTTPS to it; and the IoT VLAN firewall rules had to allow the
+whole Server VLAN, not just rpi5-1. The Cloudflare wildcard `*.jakerobb.org`, `caddy.jakerobb.org` and the UniFi
+`caddy.lan` entry were deleted by hand. Full writeup:
+[`../argocd/README.md`](../argocd/README.md#lan-routes-replacing-caddy-added-2026-09-29).
+
 ## Unpoller (Compose workload migration)
 
 **Done (2026-09-28).** The first service moved under the plan in [`READY.md`](READY.md) (ntfy went earlier, on its own).
