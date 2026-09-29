@@ -75,10 +75,19 @@ spec:
             # test page POSTs its results.
             - name: REVERSE_PROXIED_HOST_NAME
               value: optimizer.jakerobb.org
-            # The speed test/iperf3 LoadBalancer IP (service-lb.yaml), not
-            # the pod IP. Used for path analysis and the speed test URL.
+            # The IP of whichever node the pod is running on. The app looks
+            # it up in UniFi's client list to find the server's switch port
+            # for path analysis. UniFi knows each worker's own IP, but never
+            # sees the LoadBalancer IP (192.168.102.129) as a client, so
+            # using that failed with "Server not found in UniFi client list".
+            # Tests the app starts itself (e.g. LAN tests to the gateway)
+            # leave from this IP anyway, since pod egress is masqueraded to
+            # the node IP. The speed test URL comes from OPENSPEEDTEST_HOST
+            # below, not this.
             - name: HOST_IP
-              value: 192.168.102.129
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             # Plain HTTP on :3005 at the LB IP, bypassing the Gateway (see
             # service-lb.yaml for why). DNS comes from external-dns.
             - name: OPENSPEEDTEST_HOST
@@ -142,6 +151,9 @@ spec:
           env:
             - name: TZ
               value: America/Detroit
+            # Only a fallback for the result URL and host redirect, which
+            # REVERSE_PROXIED_HOST_NAME and OPENSPEEDTEST_HOST override, so
+            # it stays the LB IP clients actually connect to.
             - name: HOST_IP
               value: 192.168.102.129
             - name: OPENSPEEDTEST_HOST
