@@ -20,5 +20,14 @@ spec:
   # Omitting `interfaces` entirely announces over all of a node's interfaces
   # (Cilium default) — more robust than hardcoding a NIC name, especially
   # since future physical worker hardware may use yet another naming scheme.
+  #
+  # Services carrying the homelab.jakerobb.org/l2-announce label opt out of
+  # this catch-all policy and are announced by a narrower one instead (for
+  # now just l2-announcement-policy-10g.yaml). Otherwise both policies would
+  # match and any worker could win the lease.
+  serviceSelector:
+    matchExpressions:
+      - key: homelab.jakerobb.org/l2-announce
+        operator: DoesNotExist
   externalIPs: false
   loadBalancerIPs: true

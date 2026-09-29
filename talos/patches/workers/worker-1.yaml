@@ -1,6 +1,13 @@
 machine:
   network:
     hostname: talos-worker-1
+  # Host NIC link speed in Mbps (MS-A2 Proxmox VM, 10GbE uplink). An integer rather than
+  # "10GbE" so pods can use nodeAffinity's Gt/Lt operators: NetworkOptimizer
+  # prefers the fastest node, and talos/cilium/l2-announcement-policy-10g.yaml
+  # selects on it. Applied live, no reboot; see talos/README.md's
+  # "Node NIC-speed labels".
+  nodeLabels:
+    homelab.jakerobb.org/nic-speed-mbps: "10000"
   # Needed for democratic-csi's iSCSI node driver (added 2026-09-15) — see
   # talos/README.md#iscsi-tools-extension-added-2026-09-15. /etc/iscsi
   # genuinely exists on the node (the iscsi-tools extension creates it), but

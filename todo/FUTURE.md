@@ -90,12 +90,12 @@ investigate, but my plan is to eliminate most of it anyway. Every time I check t
 
 **Waiting on:** the stable NetworkOptimizer **2.9.0** release
 ([Ozark-Connect/NetworkOptimizer releases](https://github.com/Ozark-Connect/NetworkOptimizer/releases)). On 2026-09-24
-the `optimizer` service was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview7`
-on 2026-09-28) to try out a new feature the developer asked us to test. Renovate won't move it either: it treats
-`-previewN` as a variant suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, change the image to
-that version in `docker-compose/docker-compose.yml` (a pinned version, not `:latest`; Renovate tracks it from there).
-Also check `network-optimizer-speedtest`, which is pinned to stable `2.8.6` and should move to the same release. Merging deploys it to rpi5-1 automatically (see
-[`../docs/compose-deploy.md`](../docs/compose-deploy.md)).
+the app was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview7` on 2026-09-28) to
+try out a new feature the developer asked us to test. Renovate won't move it either: it treats `-previewN` as a variant
+suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, set both containers in
+[`../manifests/network-optimizer/deployment.yaml`](../manifests/network-optimizer/deployment.yaml) (`network-optimizer`
+and `speedtest`, which are released in lockstep) to that version. Renovate tracks them from there. (It ran on Compose
+until 2026-09-28; see [`DONE.md`](DONE.md).)
 
 ## Re-enable `KubeMemoryOvercommit` alert notifications
 
