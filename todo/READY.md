@@ -38,6 +38,34 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 When a service migrates, delete its file from `manifests/lan-routes/` in the same PR.
 
+## Dual-stack cluster (IPv4 + IPv6)
+
+The cluster is IPv4-only: pods (`10.244.0.0/16`), Services and the Cilium LB pool (`192.168.102.128/26`) have no
+IPv6, and the nodes have no IPv6 addresses. That was fine until the in-cluster Unbound
+([`../argocd/README.md`](../argocd/README.md#unbound-in-cluster-copy-deployed-2026-09-29)) needed an IPv6 address to
+hand out. Its VIP is IPv4 only (`192.168.102.130`), so for now DHCPv6/RA on the Server and Trusted VLANs should keep
+advertising only the jump box's `fd3d:b17d:9f8e:102::2` as an IPv6 resolver.
+
+Dual-stack is a project of its own, not a side effect of Unbound: it touches every workload and needs a maintenance
+window. Rough steps:
+
+- Add an IPv6 pod CIDR and service CIDR (from the `fd3d:b17d:9f8e::/48` ULA space) to the control-plane config, and
+  enable IPv6 in Cilium (`talos/cilium/values.yaml`). Cilium's pod CIDR allocation has to match the Talos
+  `podSubnets`, same as for IPv4.
+- Give every node a stable IPv6 address (SLAAC or a reservation), including the MBP's UTM VM.
+- Add an IPv6 block to the `homelab-pool` LB pool, and set `ipFamilyPolicy: PreferDualStack` on the Gateway's and the
+  Unbound Service, with a pinned IPv6 address for Unbound.
+- **Check first:** whether Cilium's L2 announcements answer IPv6 neighbor discovery (NDP) on the version we run. If
+  they don't, an IPv6 LB IP can't be announced on the LAN, and the alternatives (BGP, a different approach) change the
+  plan.
+- Check every workload that hard-codes an address family or a `0.0.0.0` bind, and the UniFi firewall rules between
+  VLANs, which need IPv6 equivalents for anything the cluster serves.
+- On the UniFi side, DHCPv6 only hands out DNS servers to clients that speak DHCPv6. SLAAC with RDNSS reaches more
+  devices (Android in particular ignores DHCPv6), so switch the Server and Trusted VLANs to SLAAC when adding the
+  Unbound IPv6 address, as some of the other dual-stack VLANs already are.
+
+Then add the IPv6 VIP to the Server and Trusted VLANs' IPv6 DNS servers next to the jump box's.
+
 ## NetworkOptimizer preview pin → stable release
 
 **Unblocked 2026-09-30:** the stable NetworkOptimizer **2.9.0** release shipped 2026-09-29. Was waiting on it
