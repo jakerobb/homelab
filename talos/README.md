@@ -152,9 +152,10 @@ build artifact again.
 2. Apply every committed patch (all of `talos/patches/control-plane/*.yaml`
    except the per-node hostname patches `cp1.yaml`/`cp2.yaml`/`cp3.yaml`,
    plus `talos/patches/discovery-registry-fix.yaml`,
-   `talos/patches/kubelet-log-limits.yaml` and
-   `talos/patches/kubelet-parallel-image-pulls.yaml`, for `controlplane.yaml`;
-   just the two `kubelet-*.yaml` patches for `worker.yaml` — the per-worker hostname
+   `talos/patches/kubelet-log-limits.yaml`,
+   `talos/patches/kubelet-parallel-image-pulls.yaml` and
+   `talos/patches/nameservers.yaml`, for `controlplane.yaml`;
+   just the two `kubelet-*.yaml` patches and `nameservers.yaml` for `worker.yaml` — the per-worker hostname
    *and* iSCSI kernel-module/extraMounts patches
    (`talos/patches/workers/worker-{1,2}.yaml`) are deliberately per-node,
    same as the control-plane hostname patches, and not folded into the
@@ -826,6 +827,29 @@ reboot and pods keep running. Also applied to the `controlplane.yaml` and
 kubectl get --raw /api/v1/nodes/talos-worker-mbp/proxy/configz | jq '.kubeletconfig | {serializeImagePulls, maxParallelImagePulls, containerLogMaxSize}'
 ```
 
+## Static nameservers (added 2026-09-30)
+
+Nodes used to take their resolvers from DHCP (`.2` and `.3`, the Pi's
+Ethernet and wlan0). That would have made them pick up the in-cluster
+Unbound's address (`192.168.102.130`) as soon as it went into the Server
+VLAN's DHCP, and nodes need DNS to pull the Unbound image, so they must not
+depend on it. [`patches/nameservers.yaml`](patches/nameservers.yaml) pins
+`192.168.102.2` (Compose's Unbound) and `1.1.1.1` (fallback; can't resolve
+`.lan`). Static nameservers take precedence over DHCP-supplied ones. CoreDNS
+forwards to the node's resolvers, so pods' external and `.lan` lookups use
+this pair too.
+
+```bash
+talosctl patch machineconfig -n <node-ip> -p @nameservers.yaml --mode=no-reboot
+talosctl -n <node-ip> get resolvers   # expect exactly .2 and 1.1.1.1
+```
+
+The patch appends to the list, so apply it once per node. Applied live to
+all 6 nodes the same day, with no reboot, and to the `controlplane.yaml` and
+`worker.yaml` templates on rpi5-1. When Compose's Unbound retires with the
+jump box swap, revisit this pair (see
+[`../todo/HARDWARE.md`](../todo/HARDWARE.md)).
+
 ## Node NIC-speed labels (added 2026-09-28)
 
 Each worker's per-node patch in [`patches/workers/`](patches/workers/) sets
@@ -970,7 +994,7 @@ recurrence since. Worth capturing here if/when that's dug up.
   (hostname plus the iSCSI kernel-module/extraMounts settings — see
   "iscsi-tools extension" below).
 - `discovery-registry-fix.yaml`, `kubelet-log-limits.yaml`,
-  `kubelet-parallel-image-pulls.yaml` — shared Talos machine-config patches
+  `kubelet-parallel-image-pulls.yaml`, `nameservers.yaml` — shared Talos machine-config patches
   applied to every node (control planes and workers alike).
 
 ## MS-A2 workers: decided values (2026-09-11)
