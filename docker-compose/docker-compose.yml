@@ -63,22 +63,11 @@ services:
     ports:
       - "3493:3493"
 
-  nut-webui:
-    <<: *dns
-    container_name: nut-webui
-    restart: unless-stopped
-    depends_on:
-      - nut-upsd
-    # Upstream only publishes `latest` (no version tags), so this is pinned by
-    # digest instead; Renovate opens a PR when `latest` moves.
-    image: edgd1er/webnut:latest@sha256:bb41f38d03c7129b720c4a2549dcc2ccd12918993bfca313a1551284d0a5b22b
-    environment:
-      - UPS_HOST=nut-upsd
-      - UPS_PORT=3493
-      - UPS_USER=${NUT_USER}
-      - UPS_PASSWORD=${NUT_PASSWORD}
-    ports:
-      - "6543:6543"
+  # nut-webui (webnut) and nut-influx-relay were retired 2026-09-29 in favor
+  # of nut_exporter in the k8s cluster (manifests/nut-exporter/), which reads
+  # nut-upsd's 3493 above over the LAN. The UPS shows on SigNoz's Power
+  # dashboard instead. compose-deploy's --remove-orphans stops the old
+  # containers on merge.
 
   change-detection:
     <<: *dns
@@ -216,24 +205,6 @@ services:
       - /usr/bin/jq:/usr/bin/jq:ro
       - /lib/aarch64-linux-gnu/libjq.so.1:/lib/aarch64-linux-gnu/libjq.so.1:ro
       - /lib/aarch64-linux-gnu/libonig.so.5:/lib/aarch64-linux-gnu/libonig.so.5:ro
-
-  nut-influx-relay:
-    <<: *dns
-    container_name: nut-influx-relay
-    image: jakerobb/nut-influx-relay:20260421
-    restart: unless-stopped
-    depends_on:
-      - influxdb
-    environment:
-#      - LOG_LEVEL=debug
-      - TZ=America/Detroit
-      - INFLUXDB_TOKEN=${NUT_RELAY_INFLUXDB_TOKEN}
-      - NUT_USER=${NUT_USER}
-      - NUT_PASSWORD=${NUT_PASSWORD}
-    volumes:
-      - ./nut-influx-relay/config.yaml:/etc/nut-influx-relay/config.yaml:ro
-    ports:
-      - "8085:8080"
 
   mosquitto:
     image: eclipse-mosquitto:2.1.2-alpine

@@ -1,0 +1,21 @@
+# Picked up by kube-prometheus-stack's Prometheus without label matching,
+# same as unpoller's. The scrape job is named "nut-exporter" after the
+# Service, which is what SigNoz's federation selector matches on.
+#
+# A scrape only reads what the exporter's pollers last stored (every 10s,
+# config.yaml); it never waits on a NUT server. Each metric carries a
+# `ups` label (rack, office) from the exporter itself.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nut-exporter
+  namespace: nut-exporter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nut-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

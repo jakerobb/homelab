@@ -124,9 +124,6 @@ data:
         - Logs:
             icon: victorialogs.png
             href: https://logs.jakerobb.org/select/vmui
-        - NUT (UPS Monitoring):
-            icon: nut.png
-            href: https://nut.jakerobb.org
         # Manual rather than discovered: the speed test is served straight
         # from a LoadBalancer IP, not an HTTPRoute (see
         # manifests/network-optimizer/service-lb.yaml). LAN only.

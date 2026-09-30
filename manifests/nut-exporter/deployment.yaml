@@ -1,0 +1,75 @@
+# nut-relay (github.com/jakerobb/nut-relay, renamed from
+# nut-influx-relay) in its Prometheus output mode, polling both UPSes: the
+# rack CyberPower from nut-upsd (which stays on rpi5-1 because the UPS is
+# plugged into it over USB) and the office UniFi UPS Tower from its own NUT
+# server. Replaces Compose's nut-influx-relay (the same app, writing to
+# InfluxDB) and nut-webui; SigNoz gets the data by federation
+# (argocd/apps/signoz/application.yaml) and shows it on the Power dashboard
+# (terraform/signoz/dashboard-unifi-power.tf). Stateless: no PVC.
+#
+# Why not DRuggeri/nut_exporter: its NUT client (go.nut) sends LIST CLIENT
+# and GET NUMLOGINS before reading anything, and the Tower's NUT server
+# answers both with ERR INVALID-ARGUMENT, which go.nut can't handle.
+# nut-relay only sends LIST VAR.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nut-exporter
+  namespace: nut-exporter
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nut-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nut-exporter
+    spec:
+      automountServiceAccountToken: false
+      # Matches the image's own USER.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nut-exporter
+          image: docker.io/jakerobb/nut-relay:20260930
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: metrics
+              containerPort: 8080
+          # /health doesn't depend on any UPS being reachable, so an
+          # unreachable NUT server shows as nut_up 0, not as pod restarts.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /etc/nut-relay
+              name: config
+              readOnly: true
+      volumes:
+        # Generated from config.yaml by kustomization.yaml; the name gets a
+        # content-hash suffix, so a config change rolls the pod.
+        - name: config
+          configMap:
+            name: nut-exporter-config

@@ -1,0 +1,17 @@
+# Kustomize for configMapGenerator, same reason as glance's: the exporter
+# reads config.yaml only at startup, and the generator's content-hash
+# suffix rolls the pod automatically whenever config.yaml changes. Old
+# hash-suffixed ConfigMaps get cleaned up by the Application's `prune: true`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: nut-exporter
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+  - prometheusrule.yaml
+configMapGenerator:
+  - name: nut-exporter-config
+    files:
+      - config.yaml

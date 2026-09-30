@@ -244,8 +244,18 @@ Authelia rule. The InfluxDB history was not migrated. Details:
 
 Its Grafana dashboards moved to SigNoz as Terraform-managed PromQL dashboards
 ([`../terraform/signoz/unifi-dashboards.tf`](../terraform/signoz/unifi-dashboards.tf)): unpoller's six stock ones and
-the PoE/PDU half of the old Power dashboard, plus the UPS Tower. That Power dashboard's NUT UPS rows stay in the Compose
-Grafana until NUT migrates.
+the PoE/PDU half of the old Power dashboard, plus the UPS Tower. The Power dashboard's NUT UPS rows followed on
+2026-09-29 (see nut-exporter below).
+
+## nut-exporter: NUT relay and web UI (Compose workload migration)
+
+**Done (2026-09-29).** `nut-influx-relay` and `nut-webui` were replaced rather than moved. The relay itself was renamed
+nut-relay and gained a Prometheus output alongside its InfluxDB one; in that mode it now runs in the cluster and reads
+both UPSes: the rack UPS from `nut-upsd`, which stays on rpi5-1 because the UPS is on its USB, and the UniFi UPS Tower
+directly. DRuggeri/nut_exporter was tried first and can't read the Tower (its NUT client chokes on the Tower's `ERR`
+replies). SigNoz federates `{job="nut-exporter"}`, and the Power dashboard has a section per UPS. New ntfy alerts cover
+on-battery, low battery, overload and a UPS going quiet. The InfluxDB history was not migrated. Details:
+[`../argocd/README.md`](../argocd/README.md#nut-exporter-replaced-composes-nut-relay-and-web-ui-2026-09-29).
 
 ## NetworkOptimizer (Compose workload migration)
 

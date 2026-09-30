@@ -56,7 +56,7 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | SearXNG | <https://search.jakerobb.org> | Private web search |
 | Glance | <https://glance.jakerobb.org> | Dashboard (trial) |
 
-The Compose apps on rpi5-1 (Home Assistant, Zigbee2MQTT, Z-Wave JS, NUT and
+The Compose apps on rpi5-1 (Home Assistant, Zigbee2MQTT, Z-Wave JS and
 others) and some LAN devices go through the same Gateway. Home Assistant,
 Scrypted, the UniFi gateway and the KVM use their own logins; the rest are
 behind Authelia. The hostnames are the files in `manifests/lan-routes/`; see

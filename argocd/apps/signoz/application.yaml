@@ -187,6 +187,9 @@ spec:
                           # keeps only 10 days, and these used to live in
                           # InfluxDB long-term, so SigNoz holds the history.
                           - '{job="unpoller"}'
+                          # Both UPSes (manifests/nut-exporter/), which used
+                          # to live in InfluxDB long-term too. ~100 series.
+                          - '{job="nut-exporter"}'
                           - 'up'
                       static_configs:
                         - targets:

@@ -1,0 +1,16 @@
+# Cluster-internal only (no HTTPRoute): Prometheus is the only consumer. The
+# exporter's JSON API (/ups) is reachable with a port-forward if needed.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nut-exporter
+  namespace: nut-exporter
+  labels:
+    app.kubernetes.io/name: nut-exporter
+spec:
+  selector:
+    app.kubernetes.io/name: nut-exporter
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics

@@ -153,7 +153,6 @@ spec:
                   - 'zigbee.jakerobb.org'
                   - 'zwave.jakerobb.org'
                   - 'modbus.jakerobb.org'
-                  - 'nut.jakerobb.org'
                   - 'changedetection.jakerobb.org'
                   - 'grafana.jakerobb.org'
                   - 'influxdb.jakerobb.org'

@@ -1,0 +1,68 @@
+# UPS alerts for both UPSes (the `ups` label: rack or office), through
+# Alertmanager to ntfy like the rest. Nothing alerted on the UPSes before
+# this; the Compose relay only wrote to InfluxDB. Shutting hosts down on low
+# battery is still the NUT clients' job (nut-monitor on rpi5-1), not this.
+#
+# UPSNotReporting covers an unreachable NUT server (the exporter keeps
+# serving, with nut_up 0); the chart's TargetDown covers the exporter itself.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: nut-exporter
+  namespace: nut-exporter
+spec:
+  groups:
+    - name: ups
+      rules:
+        # 5m rides out a NUT server restart or UPS firmware update.
+        - alert: UPSNotReporting
+          expr: nut_up == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: No data from the {{ $labels.ups }} UPS.
+            description: >-
+              Polls of the {{ $labels.ups }} UPS's NUT server have been failing
+              for 5 minutes, so its on-battery and low-battery alerts can't
+              fire. The poll error is in the nut-exporter pod's log, and in
+              its JSON API (/ups/{{ $labels.ups }}).
+        # 1m rides out a brief transfer to battery during a utility blip.
+        - alert: UPSOnBattery
+          expr: nut_ups_status{flag="OB"} == 1
+          for: 1m
+          labels:
+            severity: warning
+          # Don't start a line with a {{ template }}: Renovate strips
+          # templates before parsing, which breaks a folded block's
+          # indentation (scripts/ci/check-renovate-parse.py catches it).
+          annotations:
+            summary: The {{ $labels.ups }} UPS is running on battery.
+            description: >-
+              Mains power to the {{ $labels.ups }} UPS is out. Battery charge: {{ with query (printf "nut_battery_charge{ups='%s'}" $labels.ups) }}{{ . | first | value }}{{ end }}%.
+              Runtime left at the current load: {{ with query (printf "nut_battery_runtime{ups='%s'}" $labels.ups) }}{{ . | first | value | humanizeDuration }}{{ end }}.
+        # LB is the UPS's own low-battery flag (battery.charge.low or
+        # battery.runtime.low), the point where NUT clients shut down.
+        - alert: UPSBatteryLow
+          expr: nut_ups_status{flag="LB"} == 1
+          labels:
+            severity: critical
+          annotations:
+            summary: The {{ $labels.ups }} UPS battery is low.
+            description: >-
+              The {{ $labels.ups }} UPS reports low battery. NUT clients shut
+              down at this point; anything not on NUT loses power when it
+              runs out.
+        # Load over 80% of the UPS's real-power rating (ups.realpower.nominal:
+        # 1000 W rack, 600 W office) shortens runtime a lot and leaves little
+        # headroom.
+        - alert: UPSOverloaded
+          expr: nut_ups_realpower / nut_ups_realpower_nominal > 0.8
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: The {{ $labels.ups }} UPS is above 80% of its rated load.
+            description: >-
+              The {{ $labels.ups }} UPS has drawn {{ $value | humanizePercentage }}
+              of its rated real power for 15 minutes.

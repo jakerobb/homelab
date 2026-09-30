@@ -1,0 +1,26 @@
+# nut-relay's config: which NUT servers and UPSes to poll, and Prometheus
+# output (nut-relay's other mode writes to InfluxDB). Every numeric NUT
+# variable is exported (no `variables:` allowlist), about 30 per UPS, plus
+# one series per ups.status flag. Each UPS's `label` becomes the `ups`
+# label on its metrics, which the dashboard and alerts select on. Mounted
+# via kustomization.yaml's configMapGenerator.
+#
+# Values survive up to three missed polls (30s) before they're dropped as
+# stale; see nut-relay's README.
+output: prometheus
+poll_interval: 10s
+http_port: 8080
+upses:
+  # The CyberPower CP1500PFCRM2U in the rack, on USB to nut-upsd on
+  # rpi5-1, which publishes 3493 on the LAN. No login needed to read.
+  - label: rack
+    host: 192.168.102.2
+    ups_name: ups
+  # The UniFi UPS Tower in the office ("Office UPS" in UniFi), which
+  # runs its own NUT server. It also offers STARTTLS, but plain reads
+  # work (checked 2026-09-29, from every worker) and the Tower's
+  # certificate is self-signed anyway, so TLS would add nothing here.
+  # No login needed to read.
+  - label: office
+    host: 192.168.0.9
+    ups_name: office-ups
