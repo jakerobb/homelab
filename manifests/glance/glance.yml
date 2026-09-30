@@ -168,9 +168,6 @@ pages:
                   - title: ntfy
                     url: https://ntfy.jakerobb.org
                     icon: di:ntfy
-                  - title: NUT (UPS Monitoring)
-                    url: https://nut.jakerobb.org
-                    icon: di:nut
                   - title: Prometheus
                     url: https://prometheus.jakerobb.org
                     icon: di:prometheus

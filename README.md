@@ -276,14 +276,12 @@ Docker Compose is where everything started. It runs on rpi5-1, and includes the 
 * scrypted
 * modbus-controller
 * nut-upsd
-* nut-webui
 * change-detection
 * browserless
 * unbound
 * influxdb
 * grafana
 * telegraf
-* nut-influx-relay
 * mosquitto
 * zigbee2mqtt
 * matter-server

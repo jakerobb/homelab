@@ -18,13 +18,12 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   out of the "Log and Metrics aggregation" item instead of running two parallel timeseries stacks — see that section for
   the current direction. Where reasonably easy, migrate the existing InfluxDB history into the new stack for continuity
   (not required, per Jake).
+- **`nut-upsd`** — needs USB access to the CyberPower UPS, so it stays on rpi5-1 until the hardware plan in
+  [`HARDWARE.md`](HARDWARE.md) moves that Pi into the cluster. Its relay and web UI were replaced by nut-exporter
+  (see [`DONE.md`](DONE.md)).
 
 ### To be migrated
 
-- **NUT UPS monitoring** (`nut-upsd`, `nut-webui`, `nut-influx-relay`) —
-  `nut-upsd` needs direct USB access to the CyberPower UPS and almost certainly has to stay Pi-pinned; `nut-webui` and
-  `nut-influx-relay` only talk to it over the network, though, so those two could plausibly migrate independently even
-  if `nut-upsd` doesn't.
 - **Home automation stack** (`homeassistant`, `zigbee2mqtt`, `zwave-js-ui`,
   `matter-server`, `mosquitto`) — none hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
   Home Assistant doesn't use Bluetooth, so the `/run/dbus` mount can go. Its `/dev/ttyAMA0` / `/dev/serial0` devices

@@ -1195,6 +1195,55 @@ The first service moved under the "Compose workload migration" plan in
   migration. They're PromQL, because federation delivers every series as an
   untyped gauge and SigNoz's query builder only offers `rate` on counters.
 
+## nut-exporter (replaced Compose's NUT relay and web UI, 2026-09-29)
+
+UPS metrics for both UPSes, the rack CyberPower CP1500PFCRM2U and the
+office UniFi UPS Tower, from
+[nut-relay](https://github.com/jakerobb/nut-relay).
+Deployed as [`apps/nut-exporter/`](apps/nut-exporter/application.yaml) →
+[`manifests/nut-exporter/`](../manifests/nut-exporter/). It replaced two
+Compose services rather than moving them: `nut-influx-relay` (which wrote to
+InfluxDB) and `nut-webui` (webnut).
+
+- **Our own exporter.** nut-relay *is* nut-influx-relay, renamed and
+  reworked the same day to add a Prometheus output alongside the InfluxDB
+  one (one per process, picked by `output:` in its config; the InfluxDB
+  mode is unchanged). In Prometheus mode it exports every numeric NUT variable as
+  `nut_<variable>` with a `ups` label, `ups.status` as one 0/1 series per
+  flag, and `nut_up` per UPS. Values from a failed poll are dropped after
+  three missed polls rather than repeated. Details are in its README.
+- **Why not DRuggeri/nut_exporter,** the usual choice (tried first): its
+  NUT client library (`go.nut`, unchanged since 2024) sends `LIST CLIENT`
+  and `GET NUMLOGINS` before reading anything. The Tower's NUT server
+  answers both with `ERR INVALID-ARGUMENT`, and `go.nut` then waits for an
+  end-of-list line that never comes. Our exporter only sends `LIST VAR`.
+- **nut-upsd stays on rpi5-1.** The rack UPS is plugged into it over USB,
+  and rpi5-1's own `nut-monitor` shuts it down on low battery. The exporter
+  reads upsd over the LAN (`192.168.102.2:3493`) and the Tower directly
+  (`192.168.0.9:3493`). Neither needs a login to read variables, so there's
+  no credential.
+- **Plain NUT to the Tower.** It also offers STARTTLS (which the old relay
+  used), but plain reads work from every worker, and with a self-signed
+  certificate TLS wouldn't be verified anyway.
+- **Config** is `config.yaml`, turned into a ConfigMap by kustomize's
+  `configMapGenerator` (same as Glance), so an edit rolls the pod.
+- **Long-term history in SigNoz.** `{job="nut-exporter"}` was added to
+  SigNoz's `/federate` selectors, about 100 series. The InfluxDB `upsd`
+  history was not migrated.
+- **Dashboard:** a section per UPS on SigNoz's Power dashboard (formerly
+  "UniFi: Power",
+  [`../terraform/signoz/dashboard-unifi-power.tf`](../terraform/signoz/dashboard-unifi-power.tf)).
+  The Tower's section replaced the one built on unpoller's metrics, so both
+  UPSes show the same panels.
+- **Alerts** (new; nothing alerted on the UPSes before), per UPS:
+  `UPSOnBattery` (1m), `UPSBatteryLow` (critical), `UPSOverloaded` (over
+  80% of rated real power for 15m) and `UPSNotReporting` (`nut_up` 0 for
+  5m), in
+  [`../manifests/nut-exporter/prometheusrule.yaml`](../manifests/nut-exporter/prometheusrule.yaml).
+- **Removed:** `nut.jakerobb.org` (its LAN route and Authelia rule), the
+  Homepage and Glance tiles, and the relay's InfluxDB token from
+  `docker-compose/.env.sops.env`.
+
 ## NetworkOptimizer (migrated from Docker Compose, 2026-09-28)
 
 [NetworkOptimizer](https://github.com/Ozark-Connect/NetworkOptimizer) (UniFi

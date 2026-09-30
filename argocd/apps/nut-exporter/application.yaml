@@ -1,0 +1,27 @@
+# Own Application rather than raw manifests under root, same as unpoller's.
+# Replaced Compose's nut-influx-relay and nut-webui 2026-09-29; see
+# argocd/README.md's nut-exporter section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nut-exporter
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/nut-exporter
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nut-exporter
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

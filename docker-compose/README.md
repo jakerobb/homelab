@@ -34,7 +34,7 @@ into a `~/dev/homelab` git checkout on rpi5-1 — one copy of the content,
 impossible instead of just easy to avoid.
 
 **Symlinked (works reliably):** `docker-compose.yml`, `resolv-host.conf`, `telegraf/` (whole dir),
-`nut-influx-relay/` (whole dir), `vector/vector.yaml`, plus (added
+`vector/vector.yaml`, plus (added
 2026-09-24, none of them bind-mounted by any running service)
 `ntfy/conf/server.yml`, `nut-conf-office/ups.conf`, and
 `zigbee2mqtt/configuration.sops.yaml`.
@@ -52,8 +52,7 @@ scenes,scripts}.yaml`, `homeassistant/blueprints/`,
 confirmed live against this stack, not just theory:
 1. A symlinked **file** as a bind-mount source works, whether it's the
    direct source (`resolv-host.conf`) or reached through a symlinked parent
-   *directory* in the path (`telegraf/telegraf.conf`,
-   `nut-influx-relay/config.yaml`) — Docker resolves the full host path,
+   *directory* in the path (`telegraf/telegraf.conf`) — Docker resolves the full host path,
    including any symlinks, before creating the mount.
 2. A symlinked **directory** used as the bind-mount source itself does
    *not* get resolved the same way (`grafana-provisioning`,
