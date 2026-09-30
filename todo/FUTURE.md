@@ -22,19 +22,6 @@ issues surface before then.
 to remove, on or after 2026-10-15** (one month from the 1.20.1 upgrade — the 1.20.2 patch bump the next day doesn't
 reset this clock), assuming no issues surface before then.
 
-## Talos workload isolation (`SecurityProfileConfig`)
-
-**Waiting on:** a Talos release that actually fixes
-[siderolabs/talos#14374](https://github.com/siderolabs/talos/issues/14374) — a
-startup race between CRI and `sandboxd` that causes every node to
-restart-loop for 1–3 minutes on every boot with `workloadIsolation: true`
-enabled. Fixed upstream 2026-09-16, one day after the currently-running
-Talos version was published, so we're still on the affected release. See
-[`../talos/README.md`](../talos/README.md#workload-isolation-talos-114-feature-not-enabled)
-for what this feature would buy us and why it's otherwise appealing. No
-target date — check the changelog of each new Talos release for #14374
-specifically before assuming it's fixed.
-
 ## Authelia RBAC group/role mapping
 
 **Waiting on:** a second real Authelia user. Right now anyone who authenticates gets whatever ArgoCD's default policy
@@ -85,17 +72,6 @@ That $85/month saved will go a long way toward paying for the Mac Studio!
 
 Also, this setup is constantly emailing me about high CPU usage and container restarts. I have not had time to 
 investigate, but my plan is to eliminate most of it anyway. Every time I check the website itself, it seems fine. 
-
-## NetworkOptimizer preview pin → stable release
-
-**Waiting on:** the stable NetworkOptimizer **2.9.0** release
-([Ozark-Connect/NetworkOptimizer releases](https://github.com/Ozark-Connect/NetworkOptimizer/releases)). On 2026-09-24
-the app was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview7` on 2026-09-28) to
-try out a new feature the developer asked us to test. Renovate won't move it either: it treats `-previewN` as a variant
-suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, set both containers in
-[`../manifests/network-optimizer/deployment.yaml`](../manifests/network-optimizer/deployment.yaml) (`network-optimizer`
-and `speedtest`, which are released in lockstep) to that version. Renovate tracks them from there. (It ran on Compose
-until 2026-09-28; see [`DONE.md`](DONE.md).)
 
 ## InfluxDB 2.x pin → 3.x
 

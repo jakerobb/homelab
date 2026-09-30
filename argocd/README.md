@@ -1459,9 +1459,11 @@ Deployed as [`apps/unbound/`](apps/unbound/application.yaml) →
   Compose's Unbound retires or is replaced with a generated file.
 - **Capabilities.** The image starts as root, binds :53, chroots to
   `/var/unbound` and drops to its `unbound` user. The pod drops ALL
-  capabilities and adds back `NET_BIND_SERVICE`, `SETUID`, `SETGID` and
-  `SYS_CHROOT`. If pods crash-loop on a permissions error at startup,
-  suspect this list first.
+  capabilities and adds back `NET_BIND_SERVICE`, `SETUID`, `SETGID`,
+  `SYS_CHROOT` and `DAC_OVERRIDE`. The first deploy omitted `DAC_OVERRIDE`
+  and crash-looped with `Cannot bind local socket /var/unbound/unbound.ctl
+  (Permission denied)`, because `/var/unbound` belongs to the `unbound` user
+  and root can't write there without it.
 - **Not done yet:** the Talos nodes' own resolvers must stay off this IP
   (they need DNS to pull the Unbound image), per the jump box swap checklist
   in [`../todo/HARDWARE.md`](../todo/HARDWARE.md).
