@@ -136,9 +136,10 @@ services:
       - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d
 
   influxdb:
-    # Only Telegraf writes here now. NetworkOptimizer moved to its own
-    # in-cluster InfluxDB on 2026-09-29 (manifests/network-optimizer/); its
-    # buckets stay here untouched as a fallback until this retires.
+    # Nothing writes here now: NetworkOptimizer moved to its own in-cluster
+    # InfluxDB on 2026-09-29 (manifests/network-optimizer/), and Telegraf
+    # switched to SigNoz-only on 2026-09-30. Its buckets stay here untouched
+    # as a fallback until this retires.
     <<: *dns
     container_name: influxdb
     image: influxdb:2.9.1
@@ -194,30 +195,20 @@ services:
     image: telegraf:1.40.1
     restart: unless-stopped
     user: "telegraf:990"
-    depends_on:
-      - influxdb
     environment:
       - TZ=America/Detroit
-      - INFLUXDB_TOKEN=${INFLUXDB_ADMIN_TOKEN}
       - HOST_ETC=/hostfs/etc
       - HOST_PROC=/hostfs/proc
       - HOST_SYS=/hostfs/sys
       - HOST_VAR=/hostfs/var
       - HOST_RUN=/hostfs/run
       - HOST_MOUNT_PREFIX=/hostfs
-      - NUT_USER=${NUT_USER}
-      - NUT_PASSWORD=${NUT_PASSWORD}
-      - UNIFI_TOKEN=${UNIFI_TOKEN}
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
       - /run/udev:/run/udev:ro
       - /dev:/dev:ro
       - /:/hostfs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./telegraf/scripts:/etc/telegraf/scripts:ro
-      - /usr/bin/jq:/usr/bin/jq:ro
-      - /lib/aarch64-linux-gnu/libjq.so.1:/lib/aarch64-linux-gnu/libjq.so.1:ro
-      - /lib/aarch64-linux-gnu/libonig.so.5:/lib/aarch64-linux-gnu/libonig.so.5:ro
 
   mosquitto:
     image: eclipse-mosquitto:2.1.2-alpine
