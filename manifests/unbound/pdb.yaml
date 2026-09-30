@@ -1,0 +1,11 @@
+# Keeps at least one resolver up through node drains.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: unbound
+  namespace: unbound
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: unbound

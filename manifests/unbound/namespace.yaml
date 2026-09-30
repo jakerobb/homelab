@@ -1,0 +1,5 @@
+# Explicit Namespace, same as unpoller/namespace.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: unbound

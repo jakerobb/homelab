@@ -1,0 +1,26 @@
+# In-cluster Unbound, running alongside Compose's (which stays on rpi5-1)
+# until DHCP is switched over. See argocd/README.md's Unbound section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: unbound
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/unbound
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: unbound
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
