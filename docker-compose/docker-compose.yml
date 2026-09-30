@@ -140,10 +140,20 @@ services:
     container_name: influxdb
     image: influxdb:2.9.1
     restart: unless-stopped
+    # On 2026-09-29 a batch of heavy Flux queries grew influxd to 12.9G RSS,
+    # exhausting RAM and swap on the Pi. The thrashing stalled everything else
+    # on it, Unbound included, so LAN DNS went down. Cap it so a runaway query
+    # gets InfluxDB OOM-killed (and restarted) instead of taking the Pi with it.
+    # memswap_limit == mem_limit means no swap for this container.
+    mem_limit: 8g
+    memswap_limit: 8g
     ports:
       - "8086:8086"
     environment:
       - TZ=America/Detroit
+      # Per-query cap: an oversized query fails with an error instead of
+      # growing until the container limit kills the whole process.
+      - INFLUXD_QUERY_MEMORY_BYTES=4294967296
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
       - DOCKER_INFLUXDB_INIT_ORG=home
