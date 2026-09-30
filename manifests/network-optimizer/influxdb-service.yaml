@@ -1,0 +1,15 @@
+# In-cluster only. NetworkOptimizer reaches it as http://influxdb:8086 (set in
+# its UI, Settings > InfluxDB URL); the UI is exposed through
+# influxdb-httproute.yaml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb
+  namespace: network-optimizer
+spec:
+  selector:
+    app.kubernetes.io/name: influxdb
+  ports:
+    - name: http
+      port: 8086
+      targetPort: http

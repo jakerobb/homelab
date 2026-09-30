@@ -270,6 +270,18 @@ host networking measured no faster. Path analysis works once `HOST_IP` is the no
 upstream bug with VMs behind a Proxmox host. Details:
 [`../argocd/README.md`](../argocd/README.md#networkoptimizer-migrated-from-docker-compose-2026-09-28).
 
+## NetworkOptimizer's own InfluxDB
+
+**Done (2026-09-29).** NetworkOptimizer's Flux queries had grown the shared Compose InfluxDB to 12.9G RSS earlier that
+day, starving rpi5-1 and taking LAN DNS down with it. The app now has its own InfluxDB 2.9.1 in its namespace
+([`../manifests/network-optimizer/`](../manifests/network-optimizer/)), with memory caps and a 30Gi `hexos-iscsi` PVC.
+All of its history came across: a `--full` backup and restore (bucket IDs, org, `admin` and the app's token unchanged,
+so only the app's InfluxDB URL changed), then the points written between the backup and the URL switch, copied as line
+protocol. Record counts matched the source. `influxdb.jakerobb.org` moved to it. Renovate holds it below 3.0 because the
+app needs Flux ([`FUTURE.md`](FUTURE.md#influxdb-2x-pin--3x)). Prometheus instead was evaluated and rejected: the app's
+76 Flux queries would be a multi-week upstream rewrite. Details:
+[`../argocd/README.md`](../argocd/README.md#its-own-influxdb-added-2026-09-29).
+
 ## ntfy (Compose workload migration)
 
 **Done 2026-09-20.** Migrated off the RPi5 16GB's Docker Compose stack into the cluster — see

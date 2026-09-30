@@ -97,6 +97,16 @@ suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, set b
 and `speedtest`, which are released in lockstep) to that version. Renovate tracks them from there. (It ran on Compose
 until 2026-09-28; see [`DONE.md`](DONE.md).)
 
+## InfluxDB 2.x pin → 3.x
+
+**Waiting on:** NetworkOptimizer no longer depending on Flux
+([Ozark-Connect/NetworkOptimizer](https://github.com/Ozark-Connect/NetworkOptimizer)). Its InfluxDB
+([`../manifests/network-optimizer/influxdb-deployment.yaml`](../manifests/network-optimizer/influxdb-deployment.yaml))
+is held below 3.0 by an `allowedVersions: "<3"` rule in [`../renovate.json`](../renovate.json), because every query the
+app makes is Flux (all in `MonitoringInfluxClient.cs`), and InfluxDB 3 dropped Flux for SQL and InfluxQL. When upstream
+moves to SQL or InfluxQL, remove that rule and plan the 2.x → 3.x data migration; 3.x doesn't read 2.x's storage
+directly.
+
 ## Re-enable `KubeMemoryOvercommit` alert notifications
 
 **Waiting on:** the Mac Studio being onboarded as a Talos worker. On 2026-09-25 this alert was routed to Alertmanager's

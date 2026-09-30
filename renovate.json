@@ -35,6 +35,12 @@
         "nginxinc/nginx-unprivileged"
       ],
       "allowedVersions": "/^\\d+\\.\\d*[02468]\\.\\d+-alpine$/"
+    },
+    {
+      "description": "InfluxDB stays on 2.x. NetworkOptimizer (manifests/network-optimizer/influxdb-deployment.yaml) queries only in Flux, which InfluxDB 3 dropped for SQL and InfluxQL.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["influxdb", "docker.io/influxdb", "docker.io/library/influxdb"],
+      "allowedVersions": "<3"
     }
   ],
   "customManagers": [

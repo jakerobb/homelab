@@ -17,7 +17,8 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 - **Observability stack** (`influxdb`, `grafana`, `telegraf`, `victorialogs`, `vector`) - Superseded by whatever comes
   out of the "Log and Metrics aggregation" item instead of running two parallel timeseries stacks — see that section for
   the current direction. Where reasonably easy, migrate the existing InfluxDB history into the new stack for continuity
-  (not required, per Jake).
+  (not required, per Jake). NetworkOptimizer's buckets are the exception: they moved to the app's own in-cluster
+  InfluxDB on 2026-09-29 (see [`DONE.md`](DONE.md)), so the Compose InfluxDB now serves only Telegraf.
 - **`nut-upsd`** — needs USB access to the CyberPower UPS, so it stays on rpi5-1 until the hardware plan in
   [`HARDWARE.md`](HARDWARE.md) moves that Pi into the cluster. Its relay and web UI were replaced by nut-exporter
   (see [`DONE.md`](DONE.md)).
