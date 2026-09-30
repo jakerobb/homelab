@@ -1350,7 +1350,7 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   host. Superseded on 2026-09-29 by the app's own InfluxDB; see below.
 - **Version:** still on `2.9.0-preview7` for both containers, the build the
   migrated db was last opened with. See
-  [`../todo/FUTURE.md`](../todo/FUTURE.md#networkoptimizer-preview-pin--stable-release).
+  [`../todo/READY.md`](../todo/READY.md#networkoptimizer-preview-pin--stable-release).
 - **Pod security:** `baseline`, not hardened like unpoller/ntfy. The image's
   entrypoint starts as root to set the timezone and chown the data dir, then
   drops to UID 1654 with `gosu`, and traceroute/ping rely on `NET_RAW`. The
@@ -1459,9 +1459,11 @@ Deployed as [`apps/unbound/`](apps/unbound/application.yaml) →
   Compose's Unbound retires or is replaced with a generated file.
 - **Capabilities.** The image starts as root, binds :53, chroots to
   `/var/unbound` and drops to its `unbound` user. The pod drops ALL
-  capabilities and adds back `NET_BIND_SERVICE`, `SETUID`, `SETGID` and
-  `SYS_CHROOT`. If pods crash-loop on a permissions error at startup,
-  suspect this list first.
+  capabilities and adds back `NET_BIND_SERVICE`, `SETUID`, `SETGID`,
+  `SYS_CHROOT` and `DAC_OVERRIDE`. The first deploy omitted `DAC_OVERRIDE`
+  and crash-looped with `Cannot bind local socket /var/unbound/unbound.ctl
+  (Permission denied)`, because `/var/unbound` belongs to the `unbound` user
+  and root can't write there without it.
 - **Not done yet:** the Talos nodes' own resolvers must stay off this IP
   (they need DNS to pull the Unbound image), per the jump box swap checklist
   in [`../todo/HARDWARE.md`](../todo/HARDWARE.md).

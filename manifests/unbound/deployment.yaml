@@ -42,13 +42,14 @@ spec:
           image: docker.io/klutchell/unbound:1.26.1
           imagePullPolicy: IfNotPresent
           # The image starts as root, binds :53, then chroots to /var/unbound
-          # and drops to its own `unbound` user, so it needs those four caps
-          # (the same ones Docker grants by default) and nothing else.
+          # and drops to its own `unbound` user. DAC_OVERRIDE is needed because
+          # /var/unbound is owned by that user, which root can't write to
+          # without it (the control socket bind failed: Permission denied).
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ALL]
-              add: [NET_BIND_SERVICE, SETUID, SETGID, SYS_CHROOT]
+              add: [NET_BIND_SERVICE, SETUID, SETGID, SYS_CHROOT, DAC_OVERRIDE]
             seccompProfile:
               type: RuntimeDefault
           ports:

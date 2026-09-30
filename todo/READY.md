@@ -37,3 +37,29 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   waits until everything else has moved. No hardware dependency. Needs a persistent volume for the datastore.
 
 When a service migrates, delete its file from `manifests/lan-routes/` in the same PR.
+
+## NetworkOptimizer preview pin → stable release
+
+**Unblocked 2026-09-30:** the stable NetworkOptimizer **2.9.0** release shipped 2026-09-29. Was waiting on it
+([Ozark-Connect/NetworkOptimizer releases](https://github.com/Ozark-Connect/NetworkOptimizer/releases)). On 2026-09-24
+the app was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview7` on 2026-09-28) to
+try out a new feature the developer asked us to test. Renovate won't move it either: it treats `-previewN` as a variant
+suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, set both containers in
+[`../manifests/network-optimizer/deployment.yaml`](../manifests/network-optimizer/deployment.yaml) (`network-optimizer`
+and `speedtest`, which are released in lockstep) to that version. Renovate tracks them from there. (It ran on Compose
+until 2026-09-28; see [`DONE.md`](DONE.md).)
+
+## Talos workload isolation (`SecurityProfileConfig`)
+
+**Unblocked 2026-09-30:** Talos v1.14.2 (2026-09-29) includes the fix (`fix: use correct conditions on CRI <> sandboxd dependency`). Was waiting on a release that fixes
+[siderolabs/talos#14374](https://github.com/siderolabs/talos/issues/14374) — a
+startup race between CRI and `sandboxd` that causes every node to
+restart-loop for 1–3 minutes on every boot with `workloadIsolation: true`
+enabled. Fixed upstream 2026-09-16, one day after the currently-running
+Talos version was published, so we're still on the affected release. See
+[`../talos/README.md`](../talos/README.md#workload-isolation-talos-114-feature-not-enabled)
+for what this feature would buy us and why it's otherwise appealing. No
+target date — check the changelog of each new Talos release for #14374
+specifically before assuming it's fixed.
+
+Next step: upgrade the nodes to v1.14.2 first, then enable the feature and confirm a clean boot on one node before rolling it out.
