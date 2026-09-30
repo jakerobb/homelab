@@ -1,0 +1,83 @@
+# Two Unbound replicas serving the same config as Compose's Unbound on rpi5-1
+# (local.conf is a copy of docker-compose/unbound/custom.conf.d/local.conf).
+# Reached through the LoadBalancer IP in service.yaml.
+#
+# The hard anti-affinity keeps the replicas on different workers, so losing
+# one node never takes out both. It's "required" rather than "preferred" on
+# purpose: two resolvers on one node defeat the point. Consequences: a rolling
+# update can't surge (a third pod would have nowhere to go), hence maxSurge 0,
+# and with only one worker up the second replica stays Pending.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unbound
+  namespace: unbound
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: unbound
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: unbound
+    spec:
+      automountServiceAccountToken: false
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: unbound
+      containers:
+        - name: unbound
+          # renovate: datasource=docker depName=klutchell/unbound
+          image: docker.io/klutchell/unbound:1.26.1
+          imagePullPolicy: IfNotPresent
+          # The image starts as root, binds :53, then chroots to /var/unbound
+          # and drops to its own `unbound` user, so it needs those four caps
+          # (the same ones Docker grants by default) and nothing else.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_BIND_SERVICE, SETUID, SETGID, SYS_CHROOT]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: dns-tcp
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: dns-tcp
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - mountPath: /etc/unbound/custom.conf.d
+              name: config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: unbound-config

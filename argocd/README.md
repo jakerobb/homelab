@@ -1430,6 +1430,42 @@ The app's buckets are still in the Compose InfluxDB, untouched, as a
 fallback. They go when that InfluxDB retires, or sooner with
 `influx bucket delete` if the Pi needs the room.
 
+## Unbound (in-cluster copy, deployed 2026-09-29)
+
+A second Unbound, running in the cluster alongside the Compose one on rpi5-1.
+Compose's stays, and DHCP can point at both while they run in parallel.
+Deployed as [`apps/unbound/`](apps/unbound/application.yaml) →
+[`manifests/unbound/`](../manifests/unbound/).
+
+- **Two replicas on different workers.** A hard (`required`) pod
+  anti-affinity on `kubernetes.io/hostname`, plus a PodDisruptionBudget of
+  `minAvailable: 1`. With required anti-affinity a rolling update can't surge
+  a third pod, so the strategy is `maxSurge: 0, maxUnavailable: 1`. If only
+  one worker is up, the second replica stays Pending rather than doubling up.
+- **The address to hand out is `192.168.102.130`.** A LoadBalancer Service
+  with the IP pinned via `lbipam.cilium.io/ips`, on both UDP and TCP 53, and
+  announced by the catch-all L2 policy (either worker can hold it). `.128` is
+  the Gateway and `.129` is NetworkOptimizer.
+- **Clients appear as node IPs.** L2 announcements can't do
+  `externalTrafficPolicy: Local`, so a query that lands on a node without a
+  local pod is SNATed on its way to the other one. `local.conf` allows all of
+  `192.168.0.0/16`, so nothing breaks, but Unbound's own logs can't say which
+  client asked.
+- **One config, two copies.** `manifests/unbound/local.conf` is a copy of
+  `docker-compose/unbound/custom.conf.d/local.conf`, since ArgoCD can't read
+  files outside the app's directory. Both files say so in a header comment.
+  Clients don't reliably fail over in DHCP-list order, so the two resolvers
+  must answer identically. Change both together. The copy goes away when
+  Compose's Unbound retires or is replaced with a generated file.
+- **Capabilities.** The image starts as root, binds :53, chroots to
+  `/var/unbound` and drops to its `unbound` user. The pod drops ALL
+  capabilities and adds back `NET_BIND_SERVICE`, `SETUID`, `SETGID` and
+  `SYS_CHROOT`. If pods crash-loop on a permissions error at startup,
+  suspect this list first.
+- **Not done yet:** the Talos nodes' own resolvers must stay off this IP
+  (they need DNS to pull the Unbound image), per the jump box swap checklist
+  in [`../todo/HARDWARE.md`](../todo/HARDWARE.md).
+
 ## Docs site (added 2026-09-28)
 
 `docs.jakerobb.org` renders this repo's Markdown as a searchable site with

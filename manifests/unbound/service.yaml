@@ -1,0 +1,33 @@
+# The address to put in DHCP. Pinned (not pool-assigned) so it never changes
+# under the DHCP config. .128 is the Gateway and .129 is NetworkOptimizer.
+#
+# UDP and TCP 53 share one Service (mixed-protocol LoadBalancers are GA in
+# Kubernetes and supported by Cilium). No l2-announce label, so the catch-all
+# policy applies and either worker can hold the lease; DNS is nowhere near
+# bandwidth-bound, so the 10GbE-only policy isn't needed.
+#
+# externalTrafficPolicy stays at Cluster: L2 announcements don't support
+# Local. Queries that land on a node without a local pod are forwarded to a
+# pod on the other node and SNATed, so Unbound sees node IPs instead of
+# client IPs. That's harmless here, since local.conf allows all of
+# 192.168.0.0/16, but it means Unbound's logs can't identify clients.
+apiVersion: v1
+kind: Service
+metadata:
+  name: unbound
+  namespace: unbound
+  annotations:
+    lbipam.cilium.io/ips: 192.168.102.130
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: unbound
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: dns-udp
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: dns-tcp
+      protocol: TCP

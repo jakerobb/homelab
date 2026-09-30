@@ -1,0 +1,15 @@
+# Kustomize for configMapGenerator, same reason as nut-exporter's: Unbound
+# reads its config only at startup, and the generator's content-hash suffix
+# rolls the pods whenever local.conf changes.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: unbound
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - pdb.yaml
+configMapGenerator:
+  - name: unbound-config
+    files:
+      - local.conf
