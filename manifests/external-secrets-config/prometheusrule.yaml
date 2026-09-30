@@ -24,3 +24,9 @@ spec:
               The Secret still holds its last synced value. Check
               `kubectl -n {{ $labels.namespace }} describe externalsecret {{ $labels.name }}`
               for the provider error (missing item/field, bad token, rate limit).
+              If the error says `wasm error: out of bounds memory access`, the
+              1Password SDK client is wedged for every ExternalSecret and
+              never recovers on its own: run
+              `kubectl -n external-secrets rollout restart deploy/external-secrets`.
+              A DNS blip triggered this on 2026-09-30 (upstream:
+              external-secrets/external-secrets#6941).
