@@ -191,3 +191,13 @@ DHCP hands out. The IPv6 side is separate; see "Dual-stack cluster" in [`READY.m
 under 20Gi, nothing to do; if it's still climbing toward the limit, set `retentionSize` (a bit under the PVC size) on
 the Prometheus spec in `argocd/apps/kube-prometheus-stack/application.yaml`, and/or cut series cardinality (~240k
 series at last count).
+
+## ESO 1Password wedged-client fix
+
+**Waiting on:** an upstream fix for [external-secrets/external-secrets#6941](https://github.com/external-secrets/external-secrets/issues/6941)
+(the `onepasswordSDK` provider never recreates its cached client after a transient network error wedges the WASM
+instance, so every ExternalSecret fails with `wasm error: out of bounds memory access` until the pod restarts), which
+in turn depends on the SDK bug 1Password/onepassword-sdk-go#288. It hit us on 2026-09-30 after a DNS blip. Renovate will
+eventually bump the chart, but won't flag that the fix is in it, so check the issue's status. Once it's closed and the
+running ESO version contains the fix, remove the `wasm error` restart hint from the `ExternalSecretNotSynced` alert in
+`manifests/external-secrets-config/prometheusrule.yaml`. No target date; this depends on upstream, not elapsed time.
