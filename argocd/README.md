@@ -1350,7 +1350,7 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   host. Superseded on 2026-09-29 by the app's own InfluxDB; see below.
 - **Version:** still on `2.9.0-preview7` for both containers, the build the
   migrated db was last opened with. See
-  [`../todo/FUTURE.md`](../todo/FUTURE.md#networkoptimizer-preview-pin--stable-release).
+  [`../todo/READY.md`](../todo/READY.md#networkoptimizer-preview-pin--stable-release).
 - **Pod security:** `baseline`, not hardened like unpoller/ntfy. The image's
   entrypoint starts as root to set the timezone and chown the data dir, then
   drops to UID 1654 with `gosu`, and traceroute/ping rely on `NET_RAW`. The
