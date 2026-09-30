@@ -1,0 +1,112 @@
+# NetworkOptimizer's own InfluxDB, its only consumer. Moved off the shared
+# Compose InfluxDB on rpi5-1 (2026-09-29) after the app's Flux queries grew
+# that one to 12.9G RSS and starved the Pi, Unbound included. See
+# argocd/README.md's NetworkOptimizer section for the migration.
+#
+# No DOCKER_INFLUXDB_INIT_* env: the metadata (org, users, tokens, bucket IDs)
+# came from a full restore of the Compose instance's backup, so nothing here
+# needs the admin credentials. On an empty PVC the pod starts un-onboarded;
+# see argocd/README.md for how it was set up.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb
+  namespace: network-optimizer
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    # The data PVC is ReadWriteOnce, and the bolt db takes an exclusive lock.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: influxdb
+    spec:
+      affinity:
+        nodeAffinity:
+          # Soft preference for the MS-A2 workers over the MBP, whose iSCSI
+          # volumes have gone read-only after HexOS outages and whose host
+          # has frozen on a full disk. It also keeps it near the app, which
+          # prefers the same nodes. Still schedulable anywhere.
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.jakerobb.org/nic-speed-mbps
+                    operator: Gt
+                    values: ["9999"]
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: influxdb
+          image: influxdb:2.9.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            # The image's `influxdb` user; its entrypoint skips the
+            # chown-and-gosu step when not started as root.
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          env:
+            - name: INFLUXD_REPORTING_DISABLED
+              value: "true"
+            # Keep a runaway Flux query from taking the whole pod. A query
+            # past the per-query cap fails with an error; the total cap
+            # makes concurrent queries wait for memory instead of piling on.
+            # Total stays under the container limit to leave room for the
+            # storage engine's cache and compactions.
+            - name: INFLUXD_QUERY_CONCURRENCY
+              value: "8"
+            - name: INFLUXD_QUERY_QUEUE_SIZE
+              value: "100"
+            - name: INFLUXD_QUERY_INITIAL_MEMORY_BYTES
+              value: "10485760"
+            - name: INFLUXD_QUERY_MEMORY_BYTES
+              value: "1073741824"
+            - name: INFLUXD_QUERY_MAX_MEMORY_BYTES
+              value: "2684354560"
+          ports:
+            - name: http
+              containerPort: 8086
+          startupProbe:
+            # Opening ~90 days of shards takes a while on first boot.
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            # ~360MiB idle on rpi5-1 at migration; Flux queries spike it.
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - mountPath: /var/lib/influxdb2
+              name: data
+            # Only the CLI's connection profile, written by `influx setup`.
+            - mountPath: /etc/influxdb2
+              name: cli-config
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: influxdb-data
+        - name: cli-config
+          emptyDir: {}

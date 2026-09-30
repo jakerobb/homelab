@@ -10,7 +10,8 @@
 # manifests/glance/httproute.yaml the fourth, manifests/docs/httproute.yaml
 # the fifth, argocd/apps/kube-prometheus-stack/httproute.yaml (and its
 # httproute-alertmanager.yaml) the sixth, argocd/apps/cilium/httproute-hubble-ui.yaml
-# the seventh, manifests/lan-routes/ the eighth. Add
+# the seventh, manifests/lan-routes/ the eighth,
+# manifests/network-optimizer/influxdb-httproute.yaml the ninth. Add
 # another entry
 # here (not a second ReferenceGrant) as more apps adopt the ExternalAuth
 # pattern from todo/DONE.md's "Gateway API forward-auth" list.
@@ -45,6 +46,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: lan-routes
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: network-optimizer
   to:
     - group: ""
       kind: Service

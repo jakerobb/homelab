@@ -136,6 +136,9 @@ services:
       - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d
 
   influxdb:
+    # Only Telegraf writes here now. NetworkOptimizer moved to its own
+    # in-cluster InfluxDB on 2026-09-29 (manifests/network-optimizer/); its
+    # buckets stay here untouched as a fallback until this retires.
     <<: *dns
     container_name: influxdb
     image: influxdb:2.9.1

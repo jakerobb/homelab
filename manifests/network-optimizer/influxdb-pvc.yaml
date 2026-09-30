@@ -1,0 +1,18 @@
+# InfluxDB's data dir: TSM shards, WAL, and the bolt/sqlite metadata stores.
+# NetworkOptimizer's primary bucket was 12GB at migration (2026-09-29) with
+# 79 of its 90 retention days filled (~155MB/day); the long-term bucket was
+# under 10MB. 30Gi leaves room for growth plus compaction headroom.
+#
+# Block storage (iSCSI), not hexos-nfs, for the same reason as the app's own
+# PVC: InfluxDB's bolt db and WAL expect local-filesystem semantics.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-data
+  namespace: network-optimizer
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 30Gi

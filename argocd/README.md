@@ -1347,8 +1347,7 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   under host networking on rpi5-1 and fails from the pod with `Connection
   refused`. Fixed in the UI (Settings, InfluxDB URL) by pointing it at
   `http://rpi5-1.lan:8086`, the Compose InfluxDB, which is published on the
-  host. Revisit when InfluxDB is retired (see
-  [`../todo/READY.md`](../todo/READY.md)'s "Do not migrate" list).
+  host. Superseded on 2026-09-29 by the app's own InfluxDB; see below.
 - **Version:** still on `2.9.0-preview7` for both containers, the build the
   migrated db was last opened with. See
   [`../todo/FUTURE.md`](../todo/FUTURE.md#networkoptimizer-preview-pin--stable-release).
@@ -1363,6 +1362,73 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   `*.jakerobb.org → caddy.lan` wildcard CNAME, which the external-dns record
   overrides. The `optimizer.lan` UniFi DNS entry has been deleted, and so has
   the old Compose data on rpi5-1.
+
+### Its own InfluxDB (added 2026-09-29)
+
+The app's time-series monitoring used the shared Compose InfluxDB on rpi5-1
+until 2026-09-29, when a burst of its Flux queries grew `influxd` to 12.9G
+RSS, exhausted the Pi's RAM and swap, and took LAN DNS down with it.
+NetworkOptimizer is also the only InfluxDB user left once the Compose
+observability stack retires, so it now has its own:
+`influxdb-{deployment,pvc,service,httproute}.yaml` in
+[`../manifests/network-optimizer/`](../manifests/network-optimizer/).
+
+- **Why InfluxDB at all.** The app doesn't just write: every chart, Live
+  View playback, ISP Health scoring and its hourly/daily rollups run Flux
+  queries (76 of them, all in upstream's `MonitoringInfluxClient.cs`).
+  Swapping in Prometheus would be a multi-week upstream rewrite, so it
+  wasn't pursued.
+- **Pinned to 2.x.** InfluxDB 3 has no Flux, so `renovate.json` holds the
+  image below 3.0. See [`../todo/FUTURE.md`](../todo/FUTURE.md#influxdb-2x-pin--3x).
+- **Memory.** 4Gi limit. Flux queries are capped at 1GiB each and 2.5GiB
+  in total, with up to 8 running at once and 100 queued, so a runaway query
+  fails on its own instead of getting the pod OOM-killed. If charts start
+  failing with memory-limit errors, raise those env vars and the limit
+  together. It prefers the MS-A2 workers over the MBP.
+- **Storage.** 30Gi `hexos-iscsi`. The primary bucket was 12GB at
+  migration with 79 of its 90 retention days filled (~155MB/day). The
+  long-term bucket (365 days) is tiny.
+- **No secrets in the manifests.** The metadata (org `home`, the `admin`
+  user and token, the app's bucket-scoped token, bucket IDs) came from a
+  `--full` restore of the Compose instance's backup, so the `admin`
+  password is still `INFLUXDB_ADMIN_PASSWORD` in
+  [`../docker-compose/.env.sops.env`](../docker-compose/.env.sops.env), and
+  the app's stored token kept working. On an empty PVC the pod starts
+  un-onboarded. Onboard it with `influx setup`, then either restore a
+  backup the same way or re-run the app's InfluxDB setup wizard.
+- **UI.** `https://influxdb.jakerobb.org`, moved here from
+  `manifests/lan-routes/` and still behind Authelia. The Compose InfluxDB,
+  now holding only Telegraf's host metrics, is at `http://rpi5-1.lan:8086`
+  until it retires.
+
+**Migration (2026-09-29).**
+
+1. Onboarded the new pod with a throwaway admin (`influx setup`), took a
+   full `influx backup` of the Compose instance (T0 = 02:36 UTC, 11GB
+   gzipped, 14 minutes on the Pi), and ran `influx restore --full` into the
+   new pod through `kubectl port-forward` from rpi5-1.
+   - **Gotcha:** the restore replaces the metadata first, which revokes the
+     throwaway token, so its next step fails with `401 Unauthorized`.
+     Re-running the same restore with the Compose `admin` token works,
+     and took 2 minutes.
+2. Checked record counts per measurement against Compose over the same
+   window. They matched exactly, e.g. 1,945,060,043 `interface_counters`
+   values.
+3. Deleted the buckets and tokens that came along but belong to the
+   Compose stack: the `telegraf` and `unifi` buckets, and the unpoller and
+   nut-influx-relay tokens. That left 12GB.
+4. Changed the app's InfluxDB URL (Settings) to `http://influxdb:8086`.
+   It switched at 03:28 UTC, and Compose got nothing after that.
+5. Copied the points the app wrote to Compose between T0 and the switch:
+   `influxd inspect export-lp --start 02:30Z` in the Compose container for
+   both buckets (about 1.2M lines), then `influx write` into the new
+   instance. Rewriting a point with the same series and timestamp
+   overwrites it, so the overlap is harmless. Counts for that window
+   matched too.
+
+The app's buckets are still in the Compose InfluxDB, untouched, as a
+fallback. They go when that InfluxDB retires, or sooner with
+`influx bucket delete` if the Pi needs the room.
 
 ## Docs site (added 2026-09-28)
 
@@ -1452,8 +1518,9 @@ through `homelab-gateway` like everything else. Deployed as
 - **Auth.** Home Assistant, Scrypted, the UniFi gateway and the KVM keep their
   own logins and skip forward-auth. Home Assistant has to, since its phone
   app can't do an Authelia login. Everything else gets the `ExternalAuth`
-  filter. That includes Grafana and InfluxDB, which have their own logins
-  too, so they ask twice until the observability stack is retired.
+  filter. That includes Grafana, which has its own login too, so it asks
+  twice until the observability stack is retired. InfluxDB's route was here
+  too until 2026-09-29, when it moved to NetworkOptimizer's own instance.
 - **IoT VLAN firewall.** `kvm`, `rack-led` and `modbus-relay` are on the IoT
   VLAN (`192.168.62.0/24`). UniFi's firewall allowed rpi5-1 in but not the
   cluster nodes: a test pod on every node (2026-09-29) timed out on all three,
