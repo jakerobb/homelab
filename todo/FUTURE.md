@@ -172,3 +172,13 @@ changes: the Mac panels group by `host.name`. The likely snag is temperatures. `
 temperatures that way (step 5 of the runbook already warns about this). If it prints nothing there, pick another source
 for Apple Silicon's temperature sensors, and keep the metric name `smc_temperature_value` with `sensor=cpu_die` /
 `gpu_die` so the dashboard picks it up.
+
+## Add the in-cluster Unbound to the Server VLAN's DHCP
+
+**Waiting on:** time to trust the in-cluster Unbound ([`../argocd/README.md`](../argocd/README.md#unbound-in-cluster-copy-deployed-2026-09-29))
+on the Trusted VLAN, where `192.168.102.130` was added to DHCP on 2026-09-30 (alongside the Pi's `.2`). **On or after
+2026-10-07**, if nothing has gone wrong there, add `192.168.102.130` as a DNS server on the Server VLAN too, next to
+`.2`. Things to check first: no name-resolution problems or firewall gaps seen from the Trusted VLAN's clients (a Mac
+and an iPhone), and both replicas Ready on different workers. Don't touch the Talos nodes' resolvers; they're pinned to
+`.2` and `1.1.1.1` by [`../talos/patches/nameservers.yaml`](../talos/patches/nameservers.yaml), so they ignore what
+DHCP hands out. The IPv6 side is separate; see "Dual-stack cluster" in [`READY.md`](READY.md).
