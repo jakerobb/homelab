@@ -96,7 +96,7 @@ for what this feature would buy us and why it's otherwise appealing. No
 target date — check the changelog of each new Talos release for #14374
 specifically before assuming it's fixed.
 
-Next step: upgrade the nodes to v1.14.2 first, then enable the feature and confirm a clean boot on one node before rolling it out.
+Next step: the nodes are on v1.14.2 as of 2026-10-01, so enable the feature and confirm a clean boot on one node before rolling it out.
 
 ## UPS Tower adoption-bug follow-up
 
