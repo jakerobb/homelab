@@ -1,0 +1,20 @@
+# The Z-Wave JS "store": the driver's node cache (<homeId>.jsonl and friends), node
+# names/locations (nodes.json), settings.json, logs. Losing the cache means every
+# node is re-interviewed (battery devices only when they next wake), and loses node names. The
+# controller itself keeps the network, so it's recoverable, just tedious.
+# 17MB at time of migration, mostly logs (7 daily files kept).
+#
+# hexos-iscsi, like the other stateful apps. After a HexOS outage, iSCSI volumes on
+# the mbp worker can go silently read-only; delete the pod to recover (see
+# argocd/README.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zwave-js-ui-store
+  namespace: zwave-js-ui
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

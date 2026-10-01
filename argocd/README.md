@@ -1457,6 +1457,76 @@ programs against the Waveshare board at `modbus.lan:4196`. Deployed as
 - **Cutover.** Merging replaces the `lan-routes` HTTPRoute for `modbus.jakerobb.org` with the new one. Afterward, stop
   the Compose container on rpi5-1 and delete the stale `~/docker/modbus-programs/` copy.
 
+## zwave-js-ui (migrated from Docker Compose, 2026-10-01)
+
+Z-Wave JS UI, the Z-Wave controller's web UI and the Z-Wave JS WebSocket server Home Assistant connects to. The
+controller is a network radio at `tcp://192.168.102.20:6638`, so nothing is hardware-pinned. Deployed as
+[`apps/zwave-js-ui/`](apps/zwave-js-ui/application.yaml) →
+[`manifests/zwave-js-ui/`](../manifests/zwave-js-ui/).
+
+- **State is a PVC (`hexos-iscsi`, 1Gi).** The "store" holds the driver's node cache (`<homeId>.jsonl`,
+  `.metadata.jsonl`, `.values.jsonl`), `nodes.json` (node names and locations) and `settings.json`. Losing the cache
+  doesn't lose the network (the controller keeps that), but every node gets re-interviewed and the names are gone.
+- **Restore gate.** The `restore` init container waits for `/store/.restored` before the app starts, so a fresh PVC
+  can't start against an empty cache and trigger a re-interview of every node. The cutover below fills it. For a
+  brand-new install with no old store, `kubectl exec ... -c restore -- touch /store/.restored` skips the wait.
+- **Config ownership: seeded once, then the app's.** `settings.json` is copied in from the `zwave-js-ui-seed`
+  ConfigMap only if the store has none. After that, UI changes persist on the PVC and git is not authoritative. Editing
+  the ConfigMap later does nothing to a seeded store. (The reasoning is in `todo/READY.md`'s home automation entry.)
+- **Security keys are env vars, not file contents.** The S0/S2 and Long Range keys come from the
+  `zwave-js-ui-security-keys` ExternalSecret (1Password item of the same name in `homelab-k8s`) as `KEY_*` env vars. The
+  seed's key objects are empty on purpose: the app crashes at startup (`parseSecurityKeys`, `Cannot set properties of
+  undefined`) if `securityKeys`/`securityKeysLongRange` are missing entirely, even with the env vars set. Tested on
+  rpi5-1 with a scratch store before writing the manifest. Whether the env keys are actually applied could only be
+  confirmed against the real controller, which is the first thing the cutover checks.
+- **Non-root.** Runs as uid 1000 with all capabilities dropped (the image defaults to root; tested working as 1000).
+- **Two Services.** `zwave-js-ui` (8091) sits behind the Gateway. The WebSocket server on 3000 is raw TCP and gets its
+  own LoadBalancer VIP, `192.168.102.132`, published as `zwave-ws.jakerobb.org`. It has no authentication, same as
+  before, and is LAN-only.
+- **Auth.** Forward-auth through Authelia. The `zwave.jakerobb.org` rule already existed for the `lan-routes` version;
+  the `zwave-js-ui` namespace was added to the Authelia `ReferenceGrant`. The app's own login (`gateway.authEnabled`)
+  was already off, so the old `users.json` isn't carried over.
+
+### Cutover
+
+Before merging:
+
+1. Create the 1Password Secure Note `zwave-js-ui-security-keys` in the `homelab-k8s` vault with six concealed fields:
+   `S0_Legacy`, `S2_Unauthenticated`, `S2_Authenticated`, `S2_AccessControl`, `LR_S2_Authenticated`,
+   `LR_S2_AccessControl`. The values are in the old Compose settings (the SOPS file this PR deletes, still in git
+   history). In your own terminal, so they never land in a chat or log:
+
+   ```bash
+   git show origin/main:docker-compose/zwave-js-ui/settings.sops.json | sops -d --input-type json --output-type json /dev/stdin | python3 -c 'import json,sys; z=json.load(sys.stdin)["zwave"]; [print(k, v) for k, v in {**z["securityKeys"], **{"LR_"+k: v for k, v in z["securityKeysLongRange"].items()}}.items()]'
+   ```
+
+After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore):
+
+2. compose-deploy removes the Compose container within about 5 minutes (`--remove-orphans`). Home Assistant's Z-Wave
+   devices are unavailable from then until step 5. Confirm it's gone before copying, since the old container keeps
+   writing to the store until it stops:
+
+   ```bash
+   docker ps -a --format '{{.Names}}' | grep -c zwave-js-ui
+   ```
+
+3. Copy the store in, from rpi5-1. This leaves the old store untouched, and skips settings (seeded fresh), logs, the
+   re-downloadable config DB and the stale `*.lock` directories:
+
+   ```bash
+   sudo tar -C ~/docker/zwave-js-ui --exclude=./settings.json --exclude=./users.json --exclude=./logs --exclude=./.config-db --exclude=./sessions --exclude=./.session-secret --exclude='*.lock' -cf - . | kubectl -n zwave-js-ui exec -i deploy/zwave-js-ui -c restore -- sh -c 'tar -C /store -xof - && touch /store/.restored'
+   ```
+
+4. The pod starts. Check the log for a clean connect to the controller, that the nodes show alive in
+   `https://zwave.jakerobb.org`, and that a **secure** device (a lock, if there is one) still responds. That's the
+   check that the env-var keys were applied. If secure nodes don't respond, compare the 1Password values with the old
+   file. A wrong key doesn't harm the controller.
+5. In Home Assistant, reconfigure the Z-Wave JS integration's server URL to `ws://zwave-ws.jakerobb.org:3000` (it was
+   the Pi's `:3010`).
+6. After a few days of everything behaving, delete `~/docker/zwave-js-ui/` on rpi5-1. It holds the old store and the
+   keys in `settings.json`, and is root-owned (`sudo rm -rf`). Until then it's the rollback: revert the PR and restore
+   the Compose service.
+
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
 A second Unbound, running in the cluster alongside the Compose one on rpi5-1.

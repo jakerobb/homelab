@@ -1,39 +1,11 @@
-# Z-Wave JS UI (Compose on rpi5-1).
-# Gated by Authelia forward-auth.
-apiVersion: v1
-kind: Service
-metadata:
-  name: zwave-js-ui
-  namespace: lan-routes
-spec:
-  ports:
-    - name: http
-      port: 8091
----
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
-metadata:
-  name: zwave-js-ui
-  namespace: lan-routes
-  labels:
-    kubernetes.io/service-name: zwave-js-ui
-    endpointslice.kubernetes.io/managed-by: argocd
-addressType: IPv4
-ports:
-  - name: http
-    port: 8091
-    protocol: TCP
-endpoints:
-  - addresses:
-      - 192.168.102.2
-    conditions:
-      ready: true
----
+# Gated by Authelia forward-auth, same pattern as modbus-controller/httproute.yaml. The
+# `zwave.jakerobb.org` access_control rule is in argocd/apps/authelia/application.yaml,
+# and this namespace has an entry in argocd/apps/authelia/referencegrant.yaml.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: zwave-js-ui
-  namespace: lan-routes
+  namespace: zwave-js-ui
 spec:
   parentRefs:
     - name: homelab-gateway

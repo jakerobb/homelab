@@ -28,7 +28,9 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   Home Assistant doesn't use Bluetooth, so the `/run/dbus` mount can go. Its `/dev/ttyAMA0` / `/dev/serial0` devices
   (the Pi's GPIO UART) were for an integration that never worked and isn't in use, so drop them and `privileged: true`
   rather than carrying them over.
-  `mosquitto` already moved; see [`DONE.md`](DONE.md).
+  `mosquitto` already moved; see [`DONE.md`](DONE.md). `zwave-js-ui` is prepared but not live: cutover steps are in
+  [`../argocd/README.md`](../argocd/README.md#zwave-js-ui-migrated-from-docker-compose-2026-10-01). Move it to `DONE.md`
+  once that's done.
   **Decide config ownership per service before moving each one.** Zigbee2MQTT, `zwave-js-ui` and `change-detection`
   rewrite their own config files, and a ConfigMap/Secret mount is read-only, so they can't save UI changes there. Pick
   one: seed the file into the PVC once (the app owns it afterward, so UI edits survive but git isn't authoritative), or

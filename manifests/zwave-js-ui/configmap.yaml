@@ -1,0 +1,129 @@
+# Seed for the store's settings.json, copied in by the `seed` init container
+# ONLY when the file doesn't exist yet. After that the app owns it: changes made in
+# the Z-Wave JS UI persist on the PVC and git is not authoritative for them. Editing
+# this ConfigMap later does nothing to an already-seeded store.
+#
+# The S0/S2 security keys are deliberately empty. The app refuses to start if the two key
+# objects are missing altogether (tested 2026-10-01), but it fills them from the
+# `zwave-js-ui-security-keys` Secret (ESO, from 1Password) as KEY_* env vars, so no key
+# has to live in a file the app rewrites. See manifests/external-secrets-config/zwave-js-ui.yaml.
+#
+# Derived from the Compose settings.sops.json (2026-10-01), minus securityKeys and
+# securityKeysLongRange.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zwave-js-ui-seed
+  namespace: zwave-js-ui
+data:
+  settings.json: |
+    {
+      "zwave": {
+        "deviceConfigPriorityDir": "/usr/src/app/store/config",
+        "enableSoftReset": true,
+        "enabled": true,
+        "port": "tcp://192.168.102.20:6638",
+        "securityKeys": {},
+        "securityKeysLongRange": {},
+        "allowBootloaderOnly": false,
+        "commandsTimeout": 30,
+        "logLevel": "debug",
+        "rf": {
+          "maxLongRangePowerlevel": "auto",
+          "autoPowerlevels": true,
+          "txPower": {
+            "powerlevel": "auto"
+          },
+          "region": 1
+        },
+        "logEnabled": true,
+        "logToFile": true,
+        "maxFiles": 7,
+        "serverEnabled": true,
+        "serverServiceDiscoveryDisabled": false,
+        "disableOptimisticValueUpdate": false,
+        "enableStatistics": true,
+        "serverPort": 3000,
+        "maxNodeEventsQueueSize": 100,
+        "higherReportsTimeout": false,
+        "disableControllerRecovery": false,
+        "disableWatchdog": false,
+        "disableAutomaticFirmwareUpdateChecks": false,
+        "disclaimerVersion": 1
+      },
+      "mqtt": {
+        "name": "zwave-js-ui",
+        "host": "localhost",
+        "port": 1883,
+        "qos": 1,
+        "prefix": "zwave",
+        "reconnectPeriod": 3000,
+        "retain": true,
+        "clean": true,
+        "auth": false,
+        "_ca": "",
+        "ca": "",
+        "_cert": "",
+        "cert": "",
+        "_key": "",
+        "key": "",
+        "disabled": true
+      },
+      "gateway": {
+        "type": 1,
+        "plugins": [],
+        "authEnabled": false,
+        "payloadType": 0,
+        "nodeNames": true,
+        "hassDiscovery": false,
+        "discoveryPrefix": "homeassistant",
+        "useLocationAsSuggestedArea": false,
+        "logEnabled": false,
+        "logLevel": "debug",
+        "logToFile": false,
+        "values": [],
+        "jobs": [],
+        "disableChangelog": false,
+        "notifyNewVersions": false,
+        "versions": {
+          "app": "11.24.1",
+          "driver": "15.29.0",
+          "server": "3.10.2"
+        }
+      },
+      "backup": {
+        "storeBackup": false,
+        "storeCron": "0 0 * * *",
+        "storeKeep": 7,
+        "nvmBackup": false,
+        "nvmBackupOnEvent": false,
+        "nvmCron": "0 0 * * *",
+        "nvmKeep": 7
+      },
+      "zniffer": {
+        "enabled": false,
+        "port": "",
+        "logEnabled": true,
+        "logToFile": true,
+        "maxFiles": 7,
+        "securityKeys": {
+          "S2_Unauthenticated": "",
+          "S2_Authenticated": "",
+          "S2_AccessControl": "",
+          "S0_Legacy": ""
+        },
+        "securityKeysLongRange": {
+          "S2_Authenticated": "",
+          "S2_AccessControl": ""
+        },
+        "convertRSSI": false
+      },
+      "ui": {
+        "colorScheme": "system",
+        "navTabs": false,
+        "showTabLabels": false,
+        "compactMode": false,
+        "streamerMode": false,
+        "browserTitle": "Z-Wave JS UI"
+      }
+    }
