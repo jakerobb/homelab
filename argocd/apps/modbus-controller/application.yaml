@@ -1,0 +1,30 @@
+# Own Application rather than raw manifests under root — isolates
+# modbus-controller's sync/health status, same reasoning as homepage's own
+# Application. See argocd/README.md's app-of-apps section.
+#
+# `manifests/modbus-controller` is a Kustomize directory (kustomization.yaml),
+# not plain YAML — ArgoCD detects that automatically. See that file for why.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: modbus-controller
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/modbus-controller
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: modbus-controller
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

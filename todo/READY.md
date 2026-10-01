@@ -31,7 +31,6 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   (the Pi's GPIO UART) were for an integration that never worked and isn't in use, so drop them and `privileged: true`
   rather than carrying them over.
 - **scrypted** — camera/NVR bridge
-- **modbus-controller** — custom app talking to a Modbus-over-Ethernet device
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
   as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it
   waits until everything else has moved. No hardware dependency. Needs a persistent volume for the datastore.

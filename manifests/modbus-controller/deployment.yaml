@@ -1,0 +1,78 @@
+# Own image (github.com/jakerobb/modbus-eth-controller), a static Go binary on
+# `scratch`. Its publish workflow pushes a YYYYMMDD tag on every push to main;
+# Renovate tracks that tag like any other image.
+#
+# Talks to the Waveshare relay board at modbus.lan:4196 (IoT VLAN; see
+# manifests/lan-routes/modbus-relay.yaml for its web UI), which is reachable
+# from the Server VLAN. The programs' `modbus.lan` name resolves through
+# CoreDNS's forward to the node's resolver.
+#
+# Stateless: programs are read once at startup from /etc/modbus, so the pod
+# needs no volume beyond the ConfigMap. Single replica on purpose — two
+# controllers could fire the same relay program concurrently.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: modbus-controller
+  namespace: modbus-controller
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    # Recreate, not RollingUpdate, so old and new pods never overlap and
+    # can't both drive the relay board.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: modbus-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: modbus-controller
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: modbus-controller
+          image: docker.io/jakerobb/modbus-eth-controller:20251201
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+          # `/` serves the embedded static UI and never touches the relay
+          # board, so a board outage doesn't restart the pod.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /etc/modbus
+              name: programs
+              readOnly: true
+      volumes:
+        - name: programs
+          configMap:
+            name: modbus-programs
