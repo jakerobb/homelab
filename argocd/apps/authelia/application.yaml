@@ -146,6 +146,16 @@ spec:
                 policy: 'two_factor'
               - domain: 'hubble.jakerobb.org'
                 policy: 'two_factor'
+              # UniFi Protect rings the doorbell by calling this one URL, and
+              # can't log in. Bypass only that exact method, path and query
+              # (matched against path+query, hence the escaped `?`); every
+              # other request to the host falls through to the two_factor
+              # rule below. Must stay above it: first match wins.
+              - domain: 'modbus.jakerobb.org'
+                methods: ['GET']
+                resources:
+                  - '^/run\?program=doorbell&ignoreBody=true$'
+                policy: 'bypass'
               # manifests/lan-routes/ (Compose apps and LAN devices). The
               # ones with their own login (homeassistant, scrypted, gateway,
               # kvm) skip forward-auth and need no rule.
