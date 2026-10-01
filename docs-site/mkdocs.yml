@@ -118,6 +118,7 @@ nav:
           - Docker Compose stack: docker-compose/README.md
           - Compose auto-deploy: docs/compose-deploy.md
           - OS updates: docs/rpi5-1-os-updates.md
+          - Jump box swap runbook: docs/jump-box-swap.md
           - Email alerts: docs/email-alerts.md
           - UniFi GC report: docs/unifi-gc-report.md
       - Proxmox (MS-A2):
