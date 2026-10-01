@@ -115,15 +115,9 @@ data:
             icon: zigbee2mqtt.png
             href: https://zigbee.jakerobb.org
     - Monitoring:
-        - Grafana:
-            icon: grafana.png
-            href: https://grafana.jakerobb.org
         - InfluxDB:
             icon: influxdb.png
             href: https://influxdb.jakerobb.org
-        - Logs:
-            icon: victorialogs.png
-            href: https://logs.jakerobb.org/select/vmui
         # Manual rather than discovered: the speed test is served straight
         # from a LoadBalancer IP, not an HTTPRoute (see
         # manifests/network-optimizer/service-lb.yaml). LAN only.

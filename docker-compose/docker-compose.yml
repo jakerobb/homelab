@@ -125,60 +125,6 @@ services:
     volumes:
       - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d
 
-  influxdb:
-    # Nothing writes here now: NetworkOptimizer moved to its own in-cluster
-    # InfluxDB on 2026-09-29 (manifests/network-optimizer/), and Telegraf
-    # switched to SigNoz-only on 2026-09-30. Its buckets stay here untouched
-    # as a fallback until this retires.
-    <<: *dns
-    container_name: influxdb
-    image: influxdb:2.9.1
-    restart: unless-stopped
-    # On 2026-09-29 a batch of heavy Flux queries grew influxd to 12.9G RSS,
-    # exhausting RAM and swap on the Pi. The thrashing stalled everything else
-    # on it, Unbound included, so LAN DNS went down. Cap it so a runaway query
-    # gets InfluxDB OOM-killed (and restarted) instead of taking the Pi with it.
-    # memswap_limit == mem_limit means no swap for this container.
-    mem_limit: 8g
-    memswap_limit: 8g
-    ports:
-      - "8086:8086"
-    environment:
-      - TZ=America/Detroit
-      # Per-query cap: an oversized query fails with an error instead of
-      # growing until the container limit kills the whole process.
-      - INFLUXD_QUERY_MEMORY_BYTES=4294967296
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_ORG=home
-      - DOCKER_INFLUXDB_INIT_BUCKET=telegraf
-      - DOCKER_INFLUXDB_INIT_RETENTION=7d
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN}
-    volumes:
-      - ./influxdb/data:/var/lib/influxdb2
-      - ./influxdb/config:/etc/influxdb2
-
-  grafana:
-    <<: *dns
-    container_name: grafana
-    image: grafana/grafana:13.2.3
-    restart: unless-stopped
-    depends_on:
-      - influxdb
-    ports:
-      - "3001:3000"
-    environment:
-      - TZ=America/Detroit
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=https://grafana.jakerobb.org
-      - GF_SERVER_SERVE_FROM_SUB_PATH=false
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-      - GF_INSTALL_PLUGINS=grafana-clock-panel,victoriametrics-logs-datasource
-    volumes:
-      - ./grafana:/var/lib/grafana
-      - ./grafana-provisioning:/etc/grafana/provisioning:ro
-
   telegraf:
     <<: *dns
     container_name: telegraf
@@ -249,27 +195,10 @@ services:
     environment:
       - TZ=America/Detroit
 
-  victorialogs:
-    image: victoriametrics/victoria-logs:v1.52.0
-    container_name: victorialogs
-    restart: unless-stopped
-    command:
-      - -storageDataPath=/vlogs
-      - -retentionPeriod=90d
-      - '-syslog.streamFields.udp=[]'
-      - '-syslog.ignoreFields.udp=["app_name"]'
-      # - -syslog.useLocalTimestamp.udp    # uncomment if UniFi timestamps drift (the tz caveat from before)
-    ports:
-      - "9428:9428"        # HTTP API + web UI; logs.jakerobb.org reaches it via manifests/lan-routes/
-    volumes:
-      - victorialogs-data:/vlogs           # swap to a bind path if you want it in your backup set
-
   vector:
     image: timberio/vector:0.58.0-debian
     container_name: vector
     restart: unless-stopped
-    depends_on:
-      - victorialogs
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./vector/vector.yaml:/etc/vector/vector.yaml:ro
@@ -281,6 +210,3 @@ services:
     #   - "999"   # getent group docker | cut -d: -f3
     ports:
       - "514:514/udp"
-
-volumes:
-  victorialogs-data:

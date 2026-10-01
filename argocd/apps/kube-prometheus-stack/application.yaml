@@ -6,9 +6,8 @@
 # from the Kubernetes Metrics API metrics-server provides for `kubectl top`.
 #
 # Grafana still disabled deliberately for now:
-# - grafana.enabled: false — today's actual goal is just feeding OpenLens;
-#   the existing Compose-stack Grafana on the 16GB Pi already covers
-#   dashboarding until that workload migrates in (see todo/READY.md).
+# - grafana.enabled: false — dashboards live in SigNoz (terraform/signoz/);
+#   the Compose-stack Grafana on the 16GB Pi was retired 2026-10-01.
 #
 # Alertmanager enabled 2026-09-20, once ntfy actually landed in the cluster
 # (argocd/apps/ntfy/) — see argocd/README.md's kube-prometheus-stack section
