@@ -258,6 +258,21 @@ The 1Gi PVC holds `mosquitto.db`, which survived a pod restart. The old retained
 Zigbee2MQTT republishes its state on connect. Adding TLS and credentials would be a separate change touching both
 clients.
 
+## Z-Wave JS UI (Compose workload migration)
+
+**Done (2026-10-01).** Moved to the cluster as a bare Deployment ([`../manifests/zwave-js-ui/`](../manifests/zwave-js-ui/)),
+second of the home automation stack. The Z-Wave controller is a network radio, so nothing is hardware-pinned. State is a
+1Gi PVC holding the driver's node cache; an init container holds the pod back until the old store has been copied in,
+so the app can't start against an empty cache and re-interview every node. Home ID `0xca18e16e` and both nodes came up
+alive without re-interviewing. `settings.json` is seeded once from a ConfigMap and then owned by the app. The S0/S2 and
+Long Range keys come from a 1Password-backed ExternalSecret as `KEY_*` env vars; the app crashes at startup if the
+`securityKeys` objects are missing from `settings.json` entirely, so the seed carries them empty. The web UI is behind
+Authelia forward-auth at `zwave.jakerobb.org`, and the WebSocket server Home Assistant uses has its own LoadBalancer VIP,
+`192.168.102.132` (`zwave-ws.jakerobb.org`), unauthenticated and LAN-only as before. Home Assistant was repointed, and
+toggling a Z-Wave outlet from it confirmed the full path, including a secure command. Details and the cutover steps:
+[`../argocd/README.md`](../argocd/README.md#zwave-js-ui-migrated-from-docker-compose-2026-10-01). The old store on
+rpi5-1 is deleted on a schedule, see [`FUTURE.md`](FUTURE.md).
+
 ## nut-exporter: NUT relay and web UI (Compose workload migration)
 
 **Done (2026-09-29).** `nut-influx-relay` and `nut-webui` were replaced rather than moved. The relay itself was renamed
