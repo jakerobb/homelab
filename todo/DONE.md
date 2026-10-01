@@ -258,6 +258,22 @@ The 1Gi PVC holds `mosquitto.db`, which survived a pod restart. The old retained
 Zigbee2MQTT republishes its state on connect. Adding TLS and credentials would be a separate change touching both
 clients.
 
+## Zigbee2MQTT (Compose workload migration)
+
+**Done (2026-10-01).** Moved to the cluster as a bare Deployment ([`../manifests/zigbee2mqtt/`](../manifests/zigbee2mqtt/)),
+third of the home automation stack. The Zigbee coordinator is a network radio, so nothing is hardware-pinned. State is a
+1Gi PVC (device database, coordinator backup, `configuration.yaml`), and an init container holds the pod back until
+`scripts/zigbee2mqtt-cutover/restore.sh` has copied the old data in. That gate matters: Zigbee2MQTT started without a
+config would write `network_key: GENERATE` and form a new network on the coordinator, orphaning every paired device.
+The script also checks the cluster Secret's network key against the old config before releasing the pod. The key lives in
+a 1Password-backed ExternalSecret and reaches the app as a `!secret` reference rather than an env var, because
+Zigbee2MQTT's `write()` persists env overrides into the config file. Zigbee2MQTT resumed the existing network with all
+14 devices and no re-pairing, and a Zigbee lamp turned on from Home Assistant confirmed the full path. Home Assistant
+needed no change, since it only talks to MQTT. The web UI is behind Authelia forward-auth at `zigbee.jakerobb.org`.
+`configuration.yaml` (with the device names) now lives only on the PVC and no longer in git. Details and the cutover
+steps: [`../argocd/README.md`](../argocd/README.md#zigbee2mqtt-migrated-from-docker-compose-2026-10-01). The old data on
+rpi5-1 is deleted on a schedule, see [`FUTURE.md`](FUTURE.md).
+
 ## Z-Wave JS UI (Compose workload migration)
 
 **Done (2026-10-01).** Moved to the cluster as a bare Deployment ([`../manifests/zwave-js-ui/`](../manifests/zwave-js-ui/)),

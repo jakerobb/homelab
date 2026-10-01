@@ -204,7 +204,7 @@ Runbook: [`../argocd/README.md`](../argocd/README.md#zwave-js-ui-migrated-from-d
 ## Delete the old Zigbee2MQTT data on rpi5-1
 
 **Waiting on:** the in-cluster Zigbee2MQTT behaving for a stretch, since `~/docker/zigbee2mqtt/` on rpi5-1 is the rollback
-(revert the migration PR and restore the Compose service). **Consider it safe to delete one week after the cutover.**
+(revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08** (one week after the 2026-10-01 cutover).
 Then, on rpi5-1, `sudo rm -rf ~/docker/zigbee2mqtt` (partly root-owned). It holds the device database, the coordinator
 backup, and `configuration.yaml` with the Zigbee network key in plaintext, so don't leave it around indefinitely. Make
 sure the in-cluster copy is the one you want to keep first: it's now the only live copy of the device names.
