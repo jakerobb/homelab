@@ -884,7 +884,8 @@ endpoint.
 (`docker-compose/vector/vector.yaml`) now sends every source (`docker`,
 UniFi CEF syslog, journald) to both VictoriaLogs (unchanged, kept as the
 proven fallback during SigNoz's trial period — same "don't tear down until
-it's earned it" call as Alertmanager) and SigNoz's OTel Collector.
+it's earned it" call as Alertmanager) and SigNoz's OTel Collector. (Since
+2026-10-01 SigNoz is the only destination; VictoriaLogs was retired.)
 
 - **Ingestion path:** a second, dedicated `HTTPRoute`
   ([`apps/signoz/httproute-otel.yaml`](apps/signoz/httproute-otel.yaml)),
@@ -1397,9 +1398,8 @@ observability stack retires, so it now has its own:
   un-onboarded. Onboard it with `influx setup`, then either restore a
   backup the same way or re-run the app's InfluxDB setup wizard.
 - **UI.** `https://influxdb.jakerobb.org`, moved here from
-  `manifests/lan-routes/` and still behind Authelia. The Compose InfluxDB,
-  now holding only Telegraf's host metrics, is at `http://rpi5-1.lan:8086`
-  until it retires.
+  `manifests/lan-routes/` and still behind Authelia. The Compose InfluxDB
+  was retired 2026-10-01; its data directory stays on rpi5-1 (see below).
 
 **Migration (2026-09-29).**
 
@@ -1426,9 +1426,10 @@ observability stack retires, so it now has its own:
    overwrites it, so the overlap is harmless. Counts for that window
    matched too.
 
-The app's buckets are still in the Compose InfluxDB, untouched, as a
-fallback. They go when that InfluxDB retires, or sooner with
-`influx bucket delete` if the Pi needs the room.
+The app's buckets stayed in the Compose InfluxDB, untouched, as a
+fallback. That InfluxDB was retired 2026-10-01, but its data directory
+(`~/docker/influxdb/` on rpi5-1, about 17GB) was left in place, so the
+fallback still exists on disk; delete it when you're sure.
 
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
@@ -1556,9 +1557,9 @@ through `homelab-gateway` like everything else. Deployed as
 - **Auth.** Home Assistant, Scrypted, the UniFi gateway and the KVM keep their
   own logins and skip forward-auth. Home Assistant has to, since its phone
   app can't do an Authelia login. Everything else gets the `ExternalAuth`
-  filter. That includes Grafana, which has its own login too, so it asks
-  twice until the observability stack is retired. InfluxDB's route was here
-  too until 2026-09-29, when it moved to NetworkOptimizer's own instance.
+  filter. Grafana's and VictoriaLogs' routes were here too until 2026-10-01,
+  when the Compose observability stack was retired. InfluxDB's route was here
+  until 2026-09-29, when it moved to NetworkOptimizer's own instance.
 - **IoT VLAN firewall.** `kvm`, `rack-led` and `modbus-relay` are on the IoT
   VLAN (`192.168.62.0/24`). UniFi's firewall allowed rpi5-1 in but not the
   cluster nodes: a test pod on every node (2026-09-29) timed out on all three,

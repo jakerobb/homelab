@@ -37,9 +37,6 @@ docker-compose/ssh-keys/*
 docker-compose/logs/*
 docker-compose/ntfy/cache/*
 docker-compose/unbound/custom.conf.d/*.bak*
-docker-compose/influxdb/data/*
-docker-compose/influxdb/config/influx-configs
-docker-compose/grafana/*
 docker-compose/mosquitto/data/*
 docker-compose/mosquitto/log/*
 docker-compose/zigbee2mqtt/data/*

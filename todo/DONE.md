@@ -270,6 +270,23 @@ host networking measured no faster. Path analysis works once `HOST_IP` is the no
 upstream bug with VMs behind a Proxmox host. Details:
 [`../argocd/README.md`](../argocd/README.md#networkoptimizer-migrated-from-docker-compose-2026-09-28).
 
+## Compose observability stack retired
+
+**Done (2026-10-01).** SigNoz replaced the Compose InfluxDB, Grafana and VictoriaLogs. Telegraf on rpi5-1 now sends
+every metric to SigNoz over OTLP and nothing to InfluxDB, minus `procstat` (about 80% of the volume, one series per
+process) and Telegraf's own `internal_*`; its Docker input keeps only the compose service label. Vector's three
+VictoriaLogs sinks were dropped after its OTLP transforms were brought to parity (`image`, `container_created_at`, and
+every UniFi and journald field as attributes). Grafana's only alert, packet loss on rpi5-1's two interfaces, became a
+Terraform-managed SigNoz rule that notifies through ntfy-alertmanager
+([`../terraform/signoz/alert-packet-loss.tf`](../terraform/signoz/alert-packet-loss.tf)); SigNoz's rules and
+notification-channel APIs were opened to the Terraform service account's key in `argocd/apps/signoz/httproute.yaml`.
+`unifi_device_capacity` was dropped, since unpoller already reports PoE budgets. The `grafana.jakerobb.org` and
+`logs.jakerobb.org` routes, their Authelia rules and Homepage and Glance tiles went with them. History in InfluxDB and
+VictoriaLogs was not migrated. The old data was left on rpi5-1 (`~/docker/influxdb/`, `~/docker/grafana/`, and the
+`docker_victorialogs-data` volume); delete it when you're sure. `INFLUXDB_ADMIN_PASSWORD` and `INFLUXDB_ADMIN_TOKEN`
+stay in `docker-compose/.env.sops.env`, because NetworkOptimizer's in-cluster InfluxDB was restored from that
+instance's metadata.
+
 ## NetworkOptimizer's own InfluxDB
 
 **Done (2026-09-29).** NetworkOptimizer's Flux queries had grown the shared Compose InfluxDB to 12.9G RSS earlier that

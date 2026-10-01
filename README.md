@@ -279,14 +279,11 @@ Docker Compose is where everything started. It runs on rpi5-1, and includes the 
 * change-detection
 * browserless
 * unbound
-* influxdb
-* grafana
 * telegraf
 * mosquitto
 * zigbee2mqtt
 * matter-server
 * zwave-js-ui
-* victorialogs
 * vector
 
 ### Proxmox

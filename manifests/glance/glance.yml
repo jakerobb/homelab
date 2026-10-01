@@ -150,18 +150,12 @@ pages:
                   - title: Alertmanager
                     url: https://alertmanager.jakerobb.org
                     icon: di:alertmanager
-                  - title: Grafana
-                    url: https://grafana.jakerobb.org
-                    icon: di:grafana
                   - title: Hubble
                     url: https://hubble.jakerobb.org
                     icon: di:cilium
                   - title: InfluxDB
                     url: https://influxdb.jakerobb.org
                     icon: di:influxdb
-                  - title: Logs
-                    url: https://logs.jakerobb.org/select/vmui
-                    icon: di:victorialogs
                   - title: Network Optimizer
                     url: https://optimizer.jakerobb.org
                     icon: mdi:speedometer
