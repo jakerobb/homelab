@@ -236,3 +236,14 @@ Then, in the repo:
 - Add an alert for a failed `homeassistant-backup` Job.
 - Bluetooth and avahi on rpi5-1 can go (see `HARDWARE.md`).
 Runbook: [`../argocd/README.md`](../argocd/README.md#homeassistant-migrated-from-docker-compose-2026-10-01), step 5.
+
+## Delete the old Scrypted data on rpi5-1, and clean up after the move
+
+**Waiting on:** the in-cluster Scrypted behaving for a stretch, since `~/docker/scrypted/` on rpi5-1 is the rollback
+(revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08** (one
+week after the cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/scrypted`. It holds the HomeKit pairing identities, so
+don't leave it around indefinitely. Make sure a nightly backup has landed in the `scrypted-backups` PVC first.
+Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`, and add a Scrypted entry to
+[`DONE.md`](DONE.md) once the cutover is verified (the migration PR didn't add one, because the cutover is a manual step).
+Also add an alert for a failed `scrypted-backup` Job.
+Runbook: [`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01), step 5.

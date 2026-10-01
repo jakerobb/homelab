@@ -1719,6 +1719,65 @@ meantime, so don't do it with a timer-based automation mid-run. Pick a quiet day
    the rollback: revert the PR and restore the Compose service (the restore script never modifies the old directory).
    Anything changed in the new instance since the cutover is lost on rollback.
 
+## scrypted (migrated from Docker Compose, 2026-10-01)
+
+Scrypted, v0.147.0-noble-full (the version Compose ran; bump it after the move, not during). It exposes two UniFi
+cameras (Doorbell, Garage) to HomeKit, with HomeKit Secure Video, through the `unifi-protect`, `prebuffer-mixin`,
+`snapshot`, `webrtc` and `homekit` plugins. HKSV is a requirement, which is why this wasn't replaced by Home
+Assistant's UniFi Protect + HomeKit Bridge (that streams through ffmpeg and has no HKSV). Deployed as
+[`apps/scrypted/`](apps/scrypted/application.yaml) → [`manifests/scrypted/`](../manifests/scrypted/).
+
+- **Host network.** Each camera is a HomeKit accessory on its own port, advertised over mDNS by Scrypted's built-in
+  advertiser (`SCRYPTED_DOCKER_AVAHI` isn't set, so no avahi or dbus). That doesn't cross the pod network. The namespace is
+  labeled `pod-security.kubernetes.io/enforce: privileged` for the same reason as Home Assistant and matter-server. Home
+  Assistant is the precedent: it also runs `hostNetwork`.
+- **Any worker.** No node affinity. HomeKit controllers find accessories by mDNS service name, not IP, so a reschedule
+  should cost a few minutes of "No Response" in Apple Home. Not tested yet.
+- **Root, default capabilities.** Same as Compose (it wasn't privileged there either). No hardware acceleration is used.
+  Requests 1Gi, limit 2.5Gi; the container used about 850Mi on the Pi.
+- **Data is a PVC (`hexos-iscsi`, 5Gi), seeded once** from the Pi's `~/docker/scrypted` (72Mi: `scrypted.db`, a LevelDB
+  directory holding device settings, plugin state and the HomeKit pairing identities, and `plugins/`). The `restore` init
+  container holds the pod until `scripts/scrypted-cutover/restore.sh` has copied it in, because an empty volume would mint
+  new HomeKit identities and need both cameras re-added to Apple Home.
+- **Backups.** A nightly CronJob (03:27) tars the volume to a `hexos-nfs` PVC and keeps 14 days. `scrypted.db` is open while
+  the pod runs, so a live copy could be torn; treat it as a safety net. The job runs on the same node as the pod, because
+  the data volume is ReadWriteOnce. Nothing alerts if the job fails yet. To restore: scale the Deployment to 0, extract a
+  backup over `/server/volume` from a throwaway pod, scale back up.
+- **Ingress.** `scrypted.jakerobb.org` is now a normal Service → pod route, still not behind Authelia (the app has its own
+  login). Its old `lan-routes` file is gone.
+
+### Cutover
+
+HomeKit live view and recording for the two cameras stop from the moment the old container is removed until the new pod is
+ready, probably 5 minutes. The UniFi cameras themselves keep recording to Protect. Pick a quiet window.
+
+1. Merge. ArgoCD syncs and the pod sits at `Init:0/1`. `scrypted.jakerobb.org` returns 503 from now until the pod is
+   ready (the old Scrypted is still reachable at `http://192.168.102.2:11080`).
+2. compose-deploy removes the Compose container within about 5 minutes. On rpi5-1, dry-run the checks, then run it for
+   real. `--wait` polls (up to 10 minutes) until the container is gone and the pod is waiting. The marker that releases
+   the pod is created last:
+
+   ```bash
+   ~/dev/homelab/scripts/scrypted-cutover/restore.sh --check
+   ```
+
+   ```bash
+   ~/dev/homelab/scripts/scrypted-cutover/restore.sh --wait
+   ```
+
+3. Watch the pod: `kubectl -n scrypted logs -f deploy/scrypted`.
+4. Verify:
+   - `https://scrypted.jakerobb.org` loads and logs in.
+   - The UniFi Protect plugin reconnects and both cameras show video. Check the plugin's and the HomeKit plugin's
+     settings for anything holding the Pi's address (an address override, a bind address, or a selected network
+     interface); with several interfaces on a Cilium node, mDNS may need the right one pinned.
+   - Both cameras appear in Apple Home without re-pairing, live view starts, and an HKSV recording is made (trigger motion
+     and check Apple Home's recorded clips).
+   - Run the backup once: `kubectl -n scrypted create job --from=cronjob/scrypted-backup scrypted-backup-test`.
+5. After a week of stable behavior, delete `~/docker/scrypted/` on rpi5-1 (see `todo/FUTURE.md`). Until then it's the
+   rollback: revert the PR and restore the Compose service (the restore script never modifies the old directory). Anything
+   changed in the new instance since the cutover is lost on rollback.
+
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
 A second Unbound, running in the cluster alongside the Compose one on rpi5-1.

@@ -98,7 +98,8 @@ and database files are **not** committed:
   from scratch, those integrations must be re-added manually.
 - `homeassistant/custom_components/` (53MB, HACS-managed: `hacs` itself and
   `ac_infinity`) — reinstall via HACS rather than vendoring the code.
-- `scrypted/` — just plugin binaries + a SQLite db, no meaningful config file.
+- `scrypted/` — just plugin binaries + a LevelDB database, no meaningful config file. (Moved to the cluster
+  2026-10-01; the directory on rpi5-1 is the rollback until deleted, see `todo/FUTURE.md`.)
 - `matter-server/data/` — Matter fabric/commissioning state.
 - `change-detection/` — only `url-watches.json` (the watch list) is
   captured; per-watch history, screenshots, and snapshot archives are not.

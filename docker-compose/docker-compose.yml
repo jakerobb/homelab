@@ -6,17 +6,9 @@ services:
   # homeassistant moved to the cluster on 2026-10-01 (manifests/homeassistant/).
   # The old config directory stays on rpi5-1 as the rollback until it's deleted
   # (see todo/FUTURE.md).
-
-  scrypted:
-    <<: *dns
-    container_name: scrypted
-    image: koush/scrypted:v0.147.0-noble-full
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - TZ=America/Detroit
-    volumes:
-      - ./scrypted:/server/volume
+  # scrypted moved to the cluster on 2026-10-01 (manifests/scrypted/).
+  # The old data directory stays on rpi5-1 as the rollback until it's deleted
+  # (see todo/FUTURE.md).
 
   nut-upsd:
     <<: *dns

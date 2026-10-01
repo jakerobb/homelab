@@ -35,7 +35,6 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   the old data directory rather than a ConfigMap, since it holds device names). Both keep their secrets in an
   ExternalSecret, as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env
   overrides into the PVC).
-- **scrypted** — camera/NVR bridge
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
   as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it
   waits until everything else has moved. No hardware dependency. Needs a persistent volume for the datastore.
