@@ -1,0 +1,23 @@
+# MQTT is raw TCP, so it can't go through the HTTP Gateway; it gets its own
+# LoadBalancer VIP instead. Pinned (not pool-assigned) so it never changes
+# under the clients' configs. .128 is the Gateway, .129 NetworkOptimizer, .130
+# Unbound. No l2-announce label, so the catch-all policy applies.
+#
+# external-dns publishes mqtt.jakerobb.org -> the VIP. Clients should use that
+# name, not the IP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mosquitto
+  namespace: mosquitto
+  annotations:
+    lbipam.cilium.io/ips: 192.168.102.131
+    external-dns.kubernetes.io/hostname: mqtt.jakerobb.org
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: mosquitto
+  ports:
+    - name: mqtt
+      port: 1883
+      targetPort: mqtt
