@@ -146,17 +146,6 @@ services:
       - /:/hostfs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  matter-server:
-    image: ghcr.io/home-assistant-libs/python-matter-server:8.1.0
-    container_name: matter-server
-    restart: unless-stopped
-    network_mode: host
-    security_opt:
-      - apparmor=unconfined
-    volumes:
-      - ./matter-server/data:/data
-      - /run/dbus:/run/dbus:ro
-
   vector:
     image: timberio/vector:0.58.0-debian
     container_name: vector
