@@ -191,3 +191,12 @@ in turn depends on the SDK bug 1Password/onepassword-sdk-go#288. It hit us on 20
 eventually bump the chart, but won't flag that the fix is in it, so check the issue's status. Once it's closed and the
 running ESO version contains the fix, remove the `wasm error` restart hint from the `ExternalSecretNotSynced` alert in
 `manifests/external-secrets-config/prometheusrule.yaml`. No target date; this depends on upstream, not elapsed time.
+
+## Delete the old Z-Wave JS UI store on rpi5-1
+
+**Waiting on:** a stretch of the in-cluster zwave-js-ui behaving, since `~/docker/zwave-js-ui/` on rpi5-1 is the
+rollback (revert the migration PR and restore the Compose service). Cut over 2026-10-01; Home Assistant toggling a
+Z-Wave outlet through the new server is confirmed. **Consider it safe to delete on or after 2026-10-08.** Then, on
+rpi5-1, `sudo rm -rf ~/docker/zwave-js-ui` (root-owned). Besides the node cache, it still holds the old
+`settings.json` with the Z-Wave security keys in plaintext, and `users.json`, so don't leave it around indefinitely.
+Runbook: [`../argocd/README.md`](../argocd/README.md#zwave-js-ui-migrated-from-docker-compose-2026-10-01), step 6.
