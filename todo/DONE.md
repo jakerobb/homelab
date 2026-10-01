@@ -270,6 +270,15 @@ host networking measured no faster. Path analysis works once `HOST_IP` is the no
 upstream bug with VMs behind a Proxmox host. Details:
 [`../argocd/README.md`](../argocd/README.md#networkoptimizer-migrated-from-docker-compose-2026-09-28).
 
+## modbus-controller (Compose workload migration)
+
+**Done (2026-09-30). Goes live when merged.** The `modbus-controller` Compose service now runs as a single-replica
+Deployment ([`../manifests/modbus-controller/`](../manifests/modbus-controller/)), behind Authelia forward-auth at
+`modbus.jakerobb.org`. It's stateless: the five program files moved from `docker-compose/modbus-programs/` into a
+Kustomize-generated ConfigMap, so editing one rolls the pod. Host networking was only a workaround for the Compose DNS
+problem fixed on 2026-09-28; in the cluster, `modbus.lan` resolves through CoreDNS. The old `lan-routes` entry is gone.
+Details: [`../argocd/README.md`](../argocd/README.md#modbus-controller-migrated-from-docker-compose-2026-09-30).
+
 ## Compose observability stack retired
 
 **Done (2026-10-01).** SigNoz replaced the Compose InfluxDB, Grafana and VictoriaLogs. Telegraf on rpi5-1 now sends

@@ -1431,6 +1431,26 @@ fallback. That InfluxDB was retired 2026-10-01, but its data directory
 (`~/docker/influxdb/` on rpi5-1, about 17GB) was left in place, so the
 fallback still exists on disk; delete it when you're sure.
 
+## modbus-controller (migrated from Docker Compose, 2026-09-30)
+
+[jakerobb/modbus-eth-controller](https://github.com/jakerobb/modbus-eth-controller), the HTTP front end that runs relay
+programs against the Waveshare board at `modbus.lan:4196`. Deployed as
+[`apps/modbus-controller/`](apps/modbus-controller/application.yaml) →
+[`manifests/modbus-controller/`](../manifests/modbus-controller/).
+
+- **Stateless.** The program files (`manifests/modbus-controller/programs/*.json`) are loaded once at startup, so
+  `kustomization.yaml` generates a hash-named ConfigMap from them and an edit rolls the pod. The `Recreate` strategy and
+  single replica keep two pods from driving the board at once.
+- **No host networking.** Compose used `network_mode: host` to dodge its DNS problem (fixed 2026-09-28). In the
+  cluster the pod uses the pod network, and `modbus.lan` resolves through CoreDNS's forward to the node's resolver.
+  Traffic to the IoT VLAN depends on the UniFi rule described under
+  [LAN routes](#lan-routes-replacing-caddy-added-2026-09-29).
+- **Auth.** Forward-auth through Authelia, like the other non-OIDC apps. The `modbus.jakerobb.org` access-control rule
+  already existed for the `lan-routes` version; the `modbus-controller` namespace was added to the Authelia
+  `ReferenceGrant`.
+- **Cutover.** Merging replaces the `lan-routes` HTTPRoute for `modbus.jakerobb.org` with the new one. Afterward, stop
+  the Compose container on rpi5-1 and delete the stale `~/docker/modbus-programs/` copy.
+
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
 A second Unbound, running in the cluster alongside the Compose one on rpi5-1.

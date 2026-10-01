@@ -274,7 +274,6 @@ Docker Compose is where everything started. It runs on rpi5-1, and includes the 
 
 * homeassistant
 * scrypted
-* modbus-controller
 * nut-upsd
 * change-detection
 * browserless

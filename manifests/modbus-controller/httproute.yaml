@@ -1,39 +1,12 @@
-# Modbus controller (Compose on rpi5-1).
-# Gated by Authelia forward-auth.
-apiVersion: v1
-kind: Service
-metadata:
-  name: modbus-controller
-  namespace: lan-routes
-spec:
-  ports:
-    - name: http
-      port: 8080
----
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
-metadata:
-  name: modbus-controller
-  namespace: lan-routes
-  labels:
-    kubernetes.io/service-name: modbus-controller
-    endpointslice.kubernetes.io/managed-by: argocd
-addressType: IPv4
-ports:
-  - name: http
-    port: 8080
-    protocol: TCP
-endpoints:
-  - addresses:
-      - 192.168.102.2
-    conditions:
-      ready: true
----
+# Gated by Authelia forward-auth, same pattern as searxng/httproute.yaml. The
+# `modbus.jakerobb.org` access_control rule is in
+# argocd/apps/authelia/application.yaml, and this namespace has an entry in
+# argocd/apps/authelia/referencegrant.yaml.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: modbus-controller
-  namespace: lan-routes
+  namespace: modbus-controller
 spec:
   parentRefs:
     - name: homelab-gateway

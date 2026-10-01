@@ -46,7 +46,7 @@ restarted and failed on it): `homeassistant/{configuration,automations,
 scenes,scripts}.yaml`, `homeassistant/blueprints/`,
 `homeassistant/lutron_caseta-*.pem`, `change-detection/url-watches.json`,
 `unbound/custom.conf.d/local.conf`,
-`modbus-programs/`, `mosquitto/config/`.
+`mosquitto/config/`.
 
 **Why those specifically fail** — two distinct Docker bind-mount behaviors,
 confirmed live against this stack, not just theory:
@@ -84,7 +84,7 @@ changed; it does **not** notice a bind-mount source changing type on disk.
 A container whose mount source was directly replaced (not just a file
 *within* an unchanged directory) needs an explicit restart
 (`docker compose restart <service>`) to pick it up — confirmed necessary
-for `mosquitto`, `unbound`, and `modbus-controller`.
+for `mosquitto` and `unbound`.
 
 ## What's captured vs. excluded
 

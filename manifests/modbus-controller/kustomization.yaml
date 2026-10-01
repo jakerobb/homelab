@@ -1,0 +1,25 @@
+# Kustomize for configMapGenerator, same reason as glance's: the controller
+# reads its program files (programs/*.json) once at startup, so an edited
+# program has to roll the pod. The generator appends a content hash to the
+# ConfigMap's name and rewrites the Deployment's reference to match, so any
+# edit under programs/ rolls the pod automatically on sync. The programs live
+# here as real files instead of block scalars inside a ConfigMap manifest.
+#
+# Old hash-suffixed ConfigMaps get cleaned up by the Application's
+# `prune: true`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: modbus-controller
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+configMapGenerator:
+  - name: modbus-programs
+    files:
+      - programs/all-off.json
+      - programs/bad.json
+      - programs/christmas.json
+      - programs/doorbell.json
+      - programs/mega-doorbell.json

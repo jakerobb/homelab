@@ -37,16 +37,6 @@ services:
     volumes:
       - ./scrypted:/server/volume
 
-  modbus-controller:
-    <<: *dns
-    container_name: modbus-controller
-    image: jakerobb/modbus-eth-controller:20251201
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-      - ./modbus-programs:/etc/modbus:ro
-      - ./resolv-host.conf:/etc/resolv.conf:ro
-
   nut-upsd:
     <<: *dns
     image: instantlinux/nut-upsd:2.8.5-r1
