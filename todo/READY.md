@@ -23,11 +23,11 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 ### To be migrated
 
-- **Home automation stack** (`homeassistant`, `matter-server`) — none hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
+- **Home automation stack** (`homeassistant`) — not hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
   Home Assistant doesn't use Bluetooth, so the `/run/dbus` mount can go. Its `/dev/ttyAMA0` / `/dev/serial0` devices
   (the Pi's GPIO UART) were for an integration that never worked and isn't in use, so drop them and `privileged: true`
   rather than carrying them over.
-  `mosquitto`, `zwave-js-ui` and `zigbee2mqtt` already moved; see [`DONE.md`](DONE.md).
+  `mosquitto`, `zwave-js-ui`, `zigbee2mqtt` and `matter-server` already moved; see [`DONE.md`](DONE.md).
   **Decide config ownership per service before moving each one.** `change-detection` rewrites its own config files,
   and a ConfigMap/Secret mount is read-only, so it can't save UI changes there. Pick one: seed the file into the PVC
   once (the app owns it afterward, so UI edits survive but git isn't authoritative), or overwrite it on every start (git
@@ -105,3 +105,5 @@ last minute, and `server.log` has no "Adopting" entries. Todo: post the accumula
 symptoms, fix) to the UniFi community thread —
 <https://community.ui.com/releases/UniFi-UPS-1-6-4/3170942e-7d0e-48b6-81c0-a8bb5d3edd78> — since Ubiquiti's UI-Team is
 actively engaging there.
+
+## Consider secrets rotation
