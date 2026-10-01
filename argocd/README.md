@@ -1448,6 +1448,12 @@ programs against the Waveshare board at `modbus.lan:4196`. Deployed as
 - **Auth.** Forward-auth through Authelia, like the other non-OIDC apps. The `modbus.jakerobb.org` access-control rule
   already existed for the `lan-routes` version; the `modbus-controller` namespace was added to the Authelia
   `ReferenceGrant`.
+- **Doorbell webhook bypass (2026-10-01).** UniFi Protect rings the doorbell with
+  `GET https://modbus.jakerobb.org/run?program=doorbell&ignoreBody=true` and can't log in, so Authelia has a `bypass`
+  rule for exactly that method, path and query, above the host's `two_factor` rule. Anything else on the host,
+  including a different program or an extra query parameter, still needs a login. Checked offline with
+  `authelia access-control check-policy` against a patched copy of the live config. If Protect's URL changes, the rule's
+  regex in `apps/authelia/application.yaml` has to change with it.
 - **Cutover.** Merging replaces the `lan-routes` HTTPRoute for `modbus.jakerobb.org` with the new one. Afterward, stop
   the Compose container on rpi5-1 and delete the stale `~/docker/modbus-programs/` copy.
 
