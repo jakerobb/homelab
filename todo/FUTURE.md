@@ -28,16 +28,6 @@ reset this clock), assuming no issues surface before then.
 grants, which is fine with a single user — but worth building real group/role mapping (`argocd-rbac-cm`) before that
 stops being true. No target date — this depends on a new user showing up, not on elapsed time.
 
-## UPS Tower adoption-bug stability
-
-**Waiting on:** the 2026-09-20 fix (factory reset + re-adopt + upgrade to UniFi UPS firmware 1.6.4.432 RC) proving
-durable. The UPS Tower (192.168.0.236) has repeatedly gotten stuck in the UniFi controller's "Adopting" state before —
-previous resets looked fully fixed for weeks before recurring, so a clean state alone isn't enough evidence yet.
-**Consider it stable on or after 2026-10-01**, assuming no recurrence before then. Todo once stable: post the
-accumulated diagnostic write-up (timeline, symptoms, fix) to the UniFi community thread —
-<https://community.ui.com/releases/UniFi-UPS-1-6-4/3170942e-7d0e-48b6-81c0-a8bb5d3edd78>
-— since Ubiquiti's UI-Team is actively engaging there.
-
 ## Alertmanager label-based routing
 
 **Waiting on:** enough real alert volume/noise to know what routing is actually worth building. Only `severity` maps to

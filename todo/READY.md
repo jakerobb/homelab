@@ -97,3 +97,13 @@ target date — check the changelog of each new Talos release for #14374
 specifically before assuming it's fixed.
 
 Next step: upgrade the nodes to v1.14.2 first, then enable the feature and confirm a clean boot on one node before rolling it out.
+
+## UPS Tower adoption-bug follow-up
+
+**Unblocked 2026-10-01:** the stability window after the 2026-09-20 fix (factory reset + re-adopt + UniFi UPS firmware
+1.6.4.432 RC) has elapsed with no recurrence. Checked on 2026-10-01 on the controller (`ssh root@47Net.lan`): the UPS
+shows as "Office UPS" (USWDA23, now at 192.168.0.9, not .236), adopted, on firmware 1.6.4.432, checking in within the
+last minute, and `server.log` has no "Adopting" entries. Todo: post the accumulated diagnostic write-up (timeline,
+symptoms, fix) to the UniFi community thread —
+<https://community.ui.com/releases/UniFi-UPS-1-6-4/3170942e-7d0e-48b6-81c0-a8bb5d3edd78> — since Ubiquiti's UI-Team is
+actively engaging there.
