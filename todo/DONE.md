@@ -247,6 +247,17 @@ Its Grafana dashboards moved to SigNoz as Terraform-managed PromQL dashboards
 the PoE/PDU half of the old Power dashboard, plus the UPS Tower. The Power dashboard's NUT UPS rows followed on
 2026-09-29 (see nut-exporter below).
 
+## Mosquitto (Compose workload migration)
+
+**Done (2026-09-30).** Moved to the cluster as a bare Deployment ([`../manifests/mosquitto/`](../manifests/mosquitto/)),
+first of the home automation stack. MQTT is raw TCP, so it has its own LoadBalancer VIP, `192.168.102.131`, published
+as `mqtt.jakerobb.org` by external-dns, rather than going through the Gateway. Config is unchanged from Compose:
+plaintext listener on 1883 and anonymous access, LAN only. Zigbee2MQTT and Home Assistant were repointed at
+`mqtt://mqtt.jakerobb.org:1883`, and a Zigbee switch triggering a Home Assistant automation confirmed the whole loop.
+The 1Gi PVC holds `mosquitto.db`, which survived a pod restart. The old retained-message DB was not migrated, since
+Zigbee2MQTT republishes its state on connect. Adding TLS and credentials would be a separate change touching both
+clients.
+
 ## nut-exporter: NUT relay and web UI (Compose workload migration)
 
 **Done (2026-09-29).** `nut-influx-relay` and `nut-webui` were replaced rather than moved. The relay itself was renamed
