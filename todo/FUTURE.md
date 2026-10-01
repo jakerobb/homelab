@@ -209,3 +209,13 @@ Then, on rpi5-1, `sudo rm -rf ~/docker/zigbee2mqtt` (partly root-owned). It hold
 backup, and `configuration.yaml` with the Zigbee network key in plaintext, so don't leave it around indefinitely. Make
 sure the in-cluster copy is the one you want to keep first: it's now the only live copy of the device names.
 Runbook: [`../argocd/README.md`](../argocd/README.md#zigbee2mqtt-migrated-from-docker-compose-2026-10-01), step 5.
+
+## Delete the old matter-server data on rpi5-1
+
+**Waiting on:** the in-cluster matter-server behaving for a stretch, since `~/docker/matter-server/` on rpi5-1 is the
+rollback (revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08**
+(one week after the 2026-10-01 cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/matter-server` (root-owned). It holds the
+Matter fabric and its signing keys, so don't leave it around indefinitely. The in-cluster PVC is now the only live copy.
+Also delete `~/docker/homeassistant/.storage/core.config_entries.pre-matter-url`, which still points Home Assistant at
+the old `ws://localhost:5580/ws`.
+Runbook: [`../argocd/README.md`](../argocd/README.md#matter-server-migrated-from-docker-compose-2026-10-01), step 5.

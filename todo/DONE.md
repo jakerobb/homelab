@@ -274,6 +274,24 @@ needed no change, since it only talks to MQTT. The web UI is behind Authelia for
 steps: [`../argocd/README.md`](../argocd/README.md#zigbee2mqtt-migrated-from-docker-compose-2026-10-01). The old data on
 rpi5-1 is deleted on a schedule, see [`FUTURE.md`](FUTURE.md).
 
+## matter-server (Compose workload migration)
+
+**Done (2026-10-01).** Moved to the cluster as a bare Deployment ([`../manifests/matter-server/`](../manifests/matter-server/)),
+last of the standalone home automation services. It runs on the host network, because Matter discovery is mDNS multicast
+plus IPv6 and neither crosses the pod network, in a namespace labeled `privileged` since Talos enforces `baseline`. The
+container picks its mDNS interface from the node's default route at start, so it works on any worker whatever its NIC is
+called (it landed on the mbp, `enp0s1`) without per-node config. It runs non-root with all capabilities dropped. State is a
+1Gi PVC (the fabric, `chip_*.ini`, PAA certs) behind the same restore-gate init container as Zigbee2MQTT, released by
+`scripts/matter-server-cutover/restore.sh`. Home Assistant is still in Compose, so it reaches the server through a pinned
+LoadBalancer VIP, `192.168.102.133`, published as `matter.jakerobb.org`. The Matter integration has no UI field for the
+server URL, so it was changed in `.storage/core.config_entries` with Home Assistant stopped (backup alongside as
+`core.config_entries.pre-matter-url`). The thermostat reconnected with no re-commissioning. No Bluetooth commissioning is
+available from the pod, which is why `/run/dbus` is gone; use the Home Assistant phone app, or share from another
+ecosystem. Two gotchas: the 8.1.1 and 8.1.2 GitHub releases of python-matter-server have no image on ghcr, so the tag
+is pinned to 8.1.0 until they're published, and the first deploy sat in `ImagePullBackOff` because of that. Details and
+the cutover steps: [`../argocd/README.md`](../argocd/README.md#matter-server-migrated-from-docker-compose-2026-10-01). The old
+data on rpi5-1 is deleted on a schedule, see [`FUTURE.md`](FUTURE.md).
+
 ## Z-Wave JS UI (Compose workload migration)
 
 **Done (2026-10-01).** Moved to the cluster as a bare Deployment ([`../manifests/zwave-js-ui/`](../manifests/zwave-js-ui/)),
