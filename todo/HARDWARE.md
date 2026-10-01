@@ -41,8 +41,8 @@ Prerequisite: every Compose workload is migrated to k8s, except Unbound (see bel
 * **Host cleanup on the jump box**
     * Drop the wlan0 interface (`.3`) and `wlan0-watchdog.{service,timer}`. They were only a DNS-reliability fallback
       for a flaky wired link; dual-homed Unbound makes them unnecessary.
-    * Remove Bluetooth (`bluez`, `pi-bluetooth`) and avahi once Home Assistant and matter-server are off Compose,
-      unless something else on the jump box still needs them.
+    * Remove Bluetooth (`bluez`, `pi-bluetooth`) and avahi. Home Assistant and matter-server are both off Compose now
+      (2026-10-01), so only check that nothing else on the jump box needs them.
     * Remove the `compose-deploy.py` cron entry once no Compose services remain other than Unbound (or keep it, if
       Unbound's Compose config should still auto-deploy).
     * Clean out one-off files in `~` (`from-bwmbp`, `Weirdness.zip`, `.MOV`s, `nvme-test.tmp`; ~31G).
