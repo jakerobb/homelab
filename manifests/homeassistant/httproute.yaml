@@ -1,0 +1,21 @@
+# Deliberately NOT gated by Authelia: the app has its own login, and forward-auth
+# would break the Home Assistant companion app, which can't do an Authelia login.
+#
+# Home Assistant only accepts X-Forwarded-For from its trusted proxies (.storage/http). Envoy
+# now reaches it from a pod address (10.244.0.0/16) rather than a node address, so
+# scripts/homeassistant-cutover/restore.sh adds that range there.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: homeassistant
+  namespace: homeassistant
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - homeassistant.jakerobb.org
+  rules:
+    - backendRefs:
+        - name: homeassistant
+          port: 8123

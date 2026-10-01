@@ -1653,6 +1653,72 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
    revert the PR and restore the Compose service (the restore script never modifies it). Then Bluetooth and avahi on
    rpi5-1 can go once Home Assistant has moved too.
 
+## homeassistant (migrated from Docker Compose, 2026-10-01)
+
+Home Assistant Core, 2026.9.4 (the version Compose ran; bump it after the move, not during). Deployed as
+[`apps/homeassistant/`](apps/homeassistant/application.yaml) → [`manifests/homeassistant/`](../manifests/homeassistant/).
+
+- **Host network.** HomeKit bridges (about nine, ports 21064–21076, advertised over mDNS), and discovery of Apple TV,
+  HEOS, Denon (SSDP), Lutron, ESPHome, WLED, Nanoleaf, SMLIGHT and the printer all use LAN multicast, which doesn't cross
+  the pod network. The namespace is labeled `pod-security.kubernetes.io/enforce: privileged` for the same reason as
+  matter-server. The gateway's mDNS proxy doesn't necessarily cover SSDP, so check the Denon after the move.
+- **Any worker.** No node affinity. HomeKit controllers find bridges by mDNS service name, not IP, so a reschedule should
+  cost a few minutes of "No Response" in Apple Home. Not tested yet; if it turns out to be a problem, add an affinity.
+- **Root, default capabilities.** The official image's s6 init needs root (Compose ran it that way). `privileged`,
+  `/dev/ttyAMA0` and `/dev/serial0` (the Pi's UART, for an integration that never worked), and `/run/dbus` (Bluetooth,
+  unused) are gone. So is the `OFFICE_UPS_NUT_PASSWORD` variable: the NUT integration keeps its credentials in
+  `.storage/core.config_entries`, and nothing in the YAML reads it.
+- **Config is a PVC (`hexos-iscsi`, 5Gi), seeded once** from the Pi's `~/docker/homeassistant`, like Z-Wave JS UI and
+  Zigbee2MQTT. Home Assistant owns `automations.yaml`, `scenes.yaml`, `scripts.yaml` and `.storage` from then on, so git is
+  no longer authoritative for them (`docker-compose/homeassistant/` goes stale; see `todo/FUTURE.md`). The seed includes
+  the recorder database (~225Mi), `custom_components/` (HACS), and the Lutron key. The `restore` init container holds the
+  pod until `scripts/homeassistant-cutover/restore.sh` has copied everything in, because starting on an empty `/config`
+  would onboard a brand-new instance and mint new HomeKit bridge identities.
+- **Backups.** A nightly CronJob (03:17) tars `/config` (minus the database, logs and caches) to a `hexos-nfs` PVC and keeps 14
+  days. `.storage` is the part that matters (integration entries, HomeKit pairing identities). The job runs on the same
+  node as the pod, because the config volume is ReadWriteOnce. Nothing alerts if the job fails yet. To restore: scale the
+  Deployment to 0, extract a backup over `/config` from a throwaway pod, scale back up.
+- **Ingress.** The route is now a normal Service → pod (`homeassistant.jakerobb.org`, still not behind Authelia: the
+  companion app can't log in through it). Envoy reaches Home Assistant from a pod address instead of a node address, and
+  Home Assistant answers 400 to `X-Forwarded-For` from an untrusted proxy, so the restore script adds `10.244.0.0/16` to
+  `trusted_proxies` in `.storage/http` (the setting lives there, not in `configuration.yaml`).
+- **Database on iSCSI.** After a HexOS outage the volume can go read-only (delete the pod). If the recorder database gets
+  corrupted, delete `home-assistant_v2.db*` from the volume; it's only history.
+
+### Cutover
+
+Home Assistant is off from the moment the old container is removed until the new pod passes its startup probe, probably
+5–10 minutes. Devices keep their last state (lights, locks, Z-Wave/Zigbee, garage door), but no automation runs in the
+meantime, so don't do it with a timer-based automation mid-run. Pick a quiet daytime window.
+
+1. Merge. ArgoCD syncs and the pod sits at `Init:0/1`. `homeassistant.jakerobb.org` returns 503 from now until the pod
+   is ready (the old Home Assistant is still reachable at `http://192.168.102.2:8123`).
+2. compose-deploy removes the Compose container within about 5 minutes. On rpi5-1, dry-run the checks, then run it for
+   real. `--wait` polls (up to 10 minutes) until the container is gone and the pod is waiting. The marker that releases
+   the pod is created last:
+
+   ```bash
+   ~/dev/homelab/scripts/homeassistant-cutover/restore.sh --check
+   ```
+
+   ```bash
+   ~/dev/homelab/scripts/homeassistant-cutover/restore.sh --wait
+   ```
+
+3. Watch the pod: `kubectl -n homeassistant logs -f deploy/homeassistant`. Startup takes a few minutes. If the container
+   fails on permissions or s6 init, that's the `securityContext` (see the comments in `deployment.yaml`).
+4. Verify:
+   - `https://homeassistant.jakerobb.org` loads and logs in (a 400 means `trusted_proxies` didn't take).
+   - The integrations with credentials or pairing come back: Matter (thermostat), Z-Wave JS, MQTT, NUT (`nut.lan`
+     must resolve from the pod), Lutron, UniFi Protect, TP-Link, AC Infinity, HEOS, Denon (SSDP), the three Apple TVs.
+   - Every HomeKit bridge shows up in Apple Home without re-pairing. If Home Assistant advertises on `cilium_host`
+     or `lxc*` addresses, pick the right adapter in Settings → System → Network.
+   - The companion app reconnects, and one automation fires.
+   - Run the backup once: `kubectl -n homeassistant create job --from=cronjob/homeassistant-backup ha-backup-test`.
+5. After a week of stable behavior, delete `~/docker/homeassistant/` on rpi5-1 (see `todo/FUTURE.md`). Until then it's
+   the rollback: revert the PR and restore the Compose service (the restore script never modifies the old directory).
+   Anything changed in the new instance since the cutover is lost on rollback.
+
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
 A second Unbound, running in the cluster alongside the Compose one on rpi5-1.

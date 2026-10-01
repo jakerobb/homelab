@@ -1,0 +1,12 @@
+# Explicit, labeled Namespace, applied by the homeassistant Application
+# (argocd/apps/homeassistant/application.yaml) alongside the rest of this directory.
+#
+# `privileged` because the pod runs with hostNetwork: HomeKit bridges, Apple TV, HEOS, Denon,
+# Lutron, ESPHome, WLED and Nanoleaf are all found by mDNS/SSDP multicast, which never reaches
+# a pod-network pod, and Talos enforces `baseline` cluster-wide, which blocks hostNetwork.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homeassistant
+  labels:
+    pod-security.kubernetes.io/enforce: privileged

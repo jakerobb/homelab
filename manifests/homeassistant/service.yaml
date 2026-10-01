@@ -1,0 +1,14 @@
+# Web UI/API, behind the Gateway (see httproute.yaml). The pod runs on the host network, so the
+# backend is the node's IP:8123 and this Service follows the pod around.
+apiVersion: v1
+kind: Service
+metadata:
+  name: homeassistant
+  namespace: homeassistant
+spec:
+  selector:
+    app.kubernetes.io/name: homeassistant
+  ports:
+    - name: http
+      port: 8123
+      targetPort: http

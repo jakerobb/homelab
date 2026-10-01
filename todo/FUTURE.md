@@ -219,3 +219,20 @@ Matter fabric and its signing keys, so don't leave it around indefinitely. The i
 Also delete `~/docker/homeassistant/.storage/core.config_entries.pre-matter-url`, which still points Home Assistant at
 the old `ws://localhost:5580/ws`.
 Runbook: [`../argocd/README.md`](../argocd/README.md#matter-server-migrated-from-docker-compose-2026-10-01), step 5.
+
+## Delete the old Home Assistant config on rpi5-1, and clean up after the move
+
+**Waiting on:** the in-cluster Home Assistant behaving for a stretch, since `~/docker/homeassistant/` on rpi5-1 is the
+rollback (revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08**
+(one week after the cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/homeassistant`. It holds the HomeKit pairing
+identities, so don't leave it around indefinitely. Make sure the in-cluster copy is the one you want to keep first (and
+that a nightly backup has landed in the `homeassistant-backups` PVC).
+Then, in the repo:
+- Delete `docker-compose/homeassistant/` (it goes stale as soon as Home Assistant edits its own files), the
+  `homeassistant/*` entries in `DECRYPTED` and `VALIDATORS` in `scripts/compose-deploy/compose-deploy.py`, the
+  `.gitignore` lines for it, and the Home Assistant mentions in `docker-compose/README.md` and `docs/compose-deploy.md`.
+- Point Home Assistant at in-cluster addresses instead of the LAN VIPs (`matter.jakerobb.org`, `zwave-ws.jakerobb.org`,
+  `mqtt.jakerobb.org`), then drop the LoadBalancer VIPs where nothing else needs them.
+- Add an alert for a failed `homeassistant-backup` Job.
+- Bluetooth and avahi on rpi5-1 can go (see `HARDWARE.md`).
+Runbook: [`../argocd/README.md`](../argocd/README.md#homeassistant-migrated-from-docker-compose-2026-10-01), step 5.
