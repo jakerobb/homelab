@@ -1,0 +1,28 @@
+# The Zigbee network key, as the `secret.yaml` file Zigbee2MQTT's `!secret network_key`
+# reference reads (manifests/zigbee2mqtt/deployment.yaml mounts it at /app/data/secret.yaml).
+#
+# 1Password: a Secure Note titled `zigbee2mqtt-network-key` in the homelab-k8s vault,
+# with one concealed field `network_key` holding the key as a JSON array of 16 numbers,
+# e.g. [1,2,3,...,16]. A JSON array is also a valid YAML flow sequence, so the template
+# only has to put it after a key name.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: zigbee2mqtt-network-key
+  namespace: zigbee2mqtt
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: zigbee2mqtt-network-key
+    template:
+      engineVersion: v2
+      data:
+        secret.yaml: |
+          network_key: {{ .network_key }}
+  data:
+    - secretKey: network_key
+      remoteRef:
+        key: zigbee2mqtt-network-key/network_key

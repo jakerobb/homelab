@@ -37,7 +37,6 @@ docker-compose/ssh-keys/*
 docker-compose/logs/*
 docker-compose/ntfy/cache/*
 docker-compose/unbound/custom.conf.d/*.bak*
-docker-compose/zigbee2mqtt/data/*
 docker-compose/matter-server/data/*
 
 # Terraform

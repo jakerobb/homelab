@@ -954,9 +954,8 @@ conventions would have flagged it). The symptom was confusing: ICMP ping to
 the VIP worked fine (the other device answered), but every TCP connection
 was refused, and `cilium monitor` on the VIP-holding node showed *zero*
 trace of the inbound SYN — proof the packets weren't even reaching the Pi.
-Moved the Zigbee coordinator to `192.168.102.4` (see
-[`docker-compose/zigbee2mqtt/configuration.sops.yaml`](../docker-compose/zigbee2mqtt/configuration.sops.yaml),
-`serial.port`) before re-attempting, and confirmed via `ip neigh` that
+Moved the Zigbee coordinator to `192.168.102.4` (`serial.port` in Zigbee2MQTT's configuration, formerly
+`docker-compose/zigbee2mqtt/configuration.sops.yaml`, now in the cluster's data volume) before re-attempting, and confirmed via `ip neigh` that
 `.10` resolved to the control plane's real MAC before proceeding.
 
 Verified failover works: `talosctl -n 192.168.102.11 reboot` while watching

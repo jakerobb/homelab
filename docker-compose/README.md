@@ -36,8 +36,7 @@ impossible instead of just easy to avoid.
 **Symlinked (works reliably):** `docker-compose.yml`, `resolv-host.conf`, `telegraf/` (whole dir),
 `vector/vector.yaml`, plus (added
 2026-09-24, none of them bind-mounted by any running service)
-`ntfy/conf/server.yml`, `nut-conf-office/ups.conf`, and
-`zigbee2mqtt/configuration.sops.yaml`.
+`ntfy/conf/server.yml` and `nut-conf-office/ups.conf`.
 
 **NOT symlinked — reverted to real (manually re-copied) files after a live
 test broke Home Assistant** (config unreadable inside the container within
@@ -103,11 +102,6 @@ and database files are **not** committed:
 - `matter-server/data/` — Matter fabric/commissioning state.
 - `change-detection/` — only `url-watches.json` (the watch list) is
   captured; per-watch history, screenshots, and snapshot archives are not.
-- `zigbee2mqtt/data/{database.db,state.json,coordinator_backup.json,log}`
-  — device state and coordinator network backup (**note:** losing the
-  coordinator backup without the live network key means re-pairing every
-  Zigbee device if the coordinator ever needs replacing — the network key
-  itself is captured, encrypted, below).
 - `ntfy/cache/`.
 - `nut-conf/` — genuinely empty (confirmed 2026-09-20, permissions had
   drifted to unreadable — fixed to `u+x`), and unreferenced by anything: the
@@ -132,7 +126,6 @@ sops -d --input-type dotenv --output-type dotenv docker-compose/.env.sops.env > 
 sops -d docker-compose/homeassistant/secrets.sops.yaml > homeassistant/secrets.yaml
 sops -d --output-type binary docker-compose/homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml > homeassistant/lutron_caseta-0512b4cc-key.pem
 sops -d --output-type binary docker-compose/secrets/nut-upsd-password.sops.yaml > secrets/nut-upsd-password
-sops -d docker-compose/zigbee2mqtt/configuration.sops.yaml > zigbee2mqtt/data/configuration.yaml
 sops -d --output-type binary docker-compose/change-detection/secret.txt.sops.yaml > change-detection/secret.txt
 ```
 
@@ -145,7 +138,6 @@ Encrypted files (all under `docker-compose/`, matched by the
 | `homeassistant/secrets.sops.yaml` | NUT UPS password used by the HA UPS integration |
 | `homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml` | Lutron Caséta bridge mTLS private key (the paired `-ca.pem`/`-cert.pem` are public certs, committed in the clear) |
 | `secrets/nut-upsd-password.sops.yaml` | NUT UPS daemon password (mounted into `nut-upsd` as a Docker secret) |
-| `zigbee2mqtt/configuration.sops.yaml` | Zigbee network key + PAN ID (whole file encrypted since the key is embedded inline) |
 | `change-detection/secret.txt.sops.yaml` | changedetection.io API key |
 
 `.env` is `--input-type dotenv --output-type dotenv` (encrypted line-by-line,

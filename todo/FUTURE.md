@@ -200,3 +200,12 @@ Z-Wave outlet through the new server is confirmed. **Consider it safe to delete 
 rpi5-1, `sudo rm -rf ~/docker/zwave-js-ui` (root-owned). Besides the node cache, it still holds the old
 `settings.json` with the Z-Wave security keys in plaintext, and `users.json`, so don't leave it around indefinitely.
 Runbook: [`../argocd/README.md`](../argocd/README.md#zwave-js-ui-migrated-from-docker-compose-2026-10-01), step 6.
+
+## Delete the old Zigbee2MQTT data on rpi5-1
+
+**Waiting on:** the in-cluster Zigbee2MQTT behaving for a stretch, since `~/docker/zigbee2mqtt/` on rpi5-1 is the rollback
+(revert the migration PR and restore the Compose service). **Consider it safe to delete one week after the cutover.**
+Then, on rpi5-1, `sudo rm -rf ~/docker/zigbee2mqtt` (partly root-owned). It holds the device database, the coordinator
+backup, and `configuration.yaml` with the Zigbee network key in plaintext, so don't leave it around indefinitely. Make
+sure the in-cluster copy is the one you want to keep first: it's now the only live copy of the device names.
+Runbook: [`../argocd/README.md`](../argocd/README.md#zigbee2mqtt-migrated-from-docker-compose-2026-10-01), step 5.

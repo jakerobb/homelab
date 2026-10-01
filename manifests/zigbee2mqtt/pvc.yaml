@@ -1,0 +1,20 @@
+# Zigbee2MQTT's data directory: configuration.yaml (settings, and the friendly
+# names/groups, which exist nowhere else), database.db (the paired devices),
+# state.json, coordinator_backup.json, and logs (the last 10 startups' worth).
+# Losing database.db or the coordinator backup means re-pairing every Zigbee
+# device, so this is the one that matters. 8MB at time of migration, mostly logs.
+#
+# hexos-iscsi, like the other stateful apps. After a HexOS outage, iSCSI volumes on
+# the mbp worker can go silently read-only; delete the pod to recover (see
+# argocd/README.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zigbee2mqtt-data
+  namespace: zigbee2mqtt
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

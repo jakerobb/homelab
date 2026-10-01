@@ -1527,6 +1527,76 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
    keys in `settings.json`, and is root-owned (`sudo rm -rf`). Until then it's the rollback: revert the PR and restore
    the Compose service.
 
+## zigbee2mqtt (migrated from Docker Compose, 2026-10-01)
+
+Zigbee2MQTT, the Zigbee network's brain and web UI. The coordinator is a network radio at `tcp://192.168.102.4:6638`, so
+nothing is hardware-pinned. Deployed as [`apps/zigbee2mqtt/`](apps/zigbee2mqtt/application.yaml) →
+[`manifests/zigbee2mqtt/`](../manifests/zigbee2mqtt/). It talks to the in-cluster Mosquitto at
+`mosquitto.mosquitto.svc.cluster.local:1883`, not through the VIP.
+
+- **State is a PVC (`hexos-iscsi`, 1Gi).** `database.db` (the paired devices) and `coordinator_backup.json` are the
+  parts that matter: losing them means re-pairing every Zigbee device. `configuration.yaml` also lives only here now: it
+  holds the device and group friendly names, which stayed out of this public repo, so there's no seed ConfigMap and
+  changes made in the UI persist on the PVC. Git is not authoritative for it.
+- **The restore gate is a safety interlock, not a convenience.** If Zigbee2MQTT starts without a config it writes a
+  default one with `network_key: GENERATE`, which forms a new network on the coordinator and orphans every paired
+  device. The `restore` init container holds the pod until `scripts/zigbee2mqtt-cutover/restore.sh` has copied the data
+  in and verified the key.
+- **Network key: `!secret`, not an env var.** The obvious `ZIGBEE2MQTT_CONFIG_ADVANCED_NETWORK_KEY` doesn't keep the key
+  out of the PVC: Zigbee2MQTT's `write()` persists whatever env overrides are applied, so the first device rename would
+  copy the key into `configuration.yaml`. A `!secret` reference does survive writes. `configuration.yaml` says
+  `network_key: '!secret network_key'` and the key sits in `secret.yaml`, mounted read-only from the
+  `zigbee2mqtt-network-key` ExternalSecret (1Password item of the same name in `homelab-k8s`, one `network_key` field
+  holding a JSON array). Tested on rpi5-1 with dummy values: the reference resolves, a device or channel write leaves
+  it intact, and a read-only `secret.yaml` is tolerated. The PAN ID and extended PAN ID stay in the PVC's
+  `configuration.yaml`. They're broadcast over the air, so they aren't secret the way the key is.
+- **Non-root.** Runs as uid 1000 with all capabilities dropped (the image defaults to root; tested working as 1000).
+- **Auth.** Forward-auth through Authelia. The `zigbee.jakerobb.org` rule already existed for the `lan-routes` version;
+  the `zigbee2mqtt` namespace was added to the Authelia `ReferenceGrant`.
+
+### Cutover
+
+Before merging:
+
+1. Create the 1Password Secure Note `zigbee2mqtt-network-key` in the `homelab-k8s` vault with one concealed field,
+   `network_key`, holding the key as a JSON array of 16 numbers. In your own terminal, so the value never lands in a
+   chat or log:
+
+   ```bash
+   sops -d docker-compose/zigbee2mqtt/configuration.sops.yaml | python3 -c 'import sys, yaml, json; print(json.dumps(yaml.safe_load(sys.stdin)["advanced"]["network_key"], separators=(",", ":")))'
+   ```
+
+After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore):
+
+2. compose-deploy removes the Compose container within about 5 minutes (`--remove-orphans`). Zigbee devices that depend
+   on the coordinator are unavailable from then until step 3 finishes. Mains-powered routers keep routing meanwhile.
+3. On rpi5-1, dry-run the safety checks, then run it for real. The checks refuse to continue if the old container is
+   still up, the pod isn't waiting, the PVC was already restored, or the network key in the cluster Secret differs from
+   the one in the old config. The script prints only MATCH or MISMATCH, never the key. It copies the database, state
+   and coordinator backup, writes a `configuration.yaml` with the key swapped for the `!secret` reference and MQTT
+   pointed at the in-cluster broker, and creates the marker last:
+
+   ```bash
+   ~/dev/homelab/scripts/zigbee2mqtt-cutover/restore.sh --check
+   ```
+
+   ```bash
+   ~/dev/homelab/scripts/zigbee2mqtt-cutover/restore.sh
+   ```
+
+4. Check the pod's log for a connection to the MQTT server, the 14 joined devices, and no "Configuration is not
+   consistent" error. Toggle a Zigbee device from Home Assistant. Then confirm the key didn't get written into the
+   PVC's config (this should print `1`):
+
+   ```bash
+   kubectl -n zigbee2mqtt exec deploy/zigbee2mqtt -- grep -c "network_key: '!secret network_key'" /app/data/configuration.yaml
+   ```
+
+   Home Assistant needs no change, since it only talks to MQTT.
+5. After a few days of everything behaving, delete `~/docker/zigbee2mqtt/` on rpi5-1. It holds the old data and the
+   network key in plaintext. Until then it's the rollback: revert the PR and restore the Compose service (the restore
+   script never modifies it).
+
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
 A second Unbound, running in the cluster alongside the Compose one on rpi5-1.

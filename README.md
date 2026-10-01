@@ -279,7 +279,6 @@ Docker Compose is where everything started. It runs on rpi5-1, and includes the 
 * browserless
 * unbound
 * telegraf
-* zigbee2mqtt
 * matter-server
 * vector
 
