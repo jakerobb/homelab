@@ -1,14 +1,17 @@
 # SigNoz (Terraform)
 
 Provider: [`SigNoz/signoz`](https://registry.terraform.io/providers/SigNoz/signoz/latest) — pinned
-version lives in `versions.tf`. Needs SigNoz v0.135.0 or newer (the v2 dashboard API).
+version lives in `versions.tf`. Needs SigNoz v0.135.0 or newer (the v2 dashboard API; alert rules need v0.133.0+).
 
-Manages SigNoz dashboards. SigNoz itself is deployed by ArgoCD (`argocd/apps/signoz/`).
+Manages SigNoz dashboards and alerts. SigNoz itself is deployed by ArgoCD (`argocd/apps/signoz/`).
 
 - `dashboard-temperatures.tf` — temperatures (CPU, NVMe, GPU, memory, other components),
   fan speed and throttling for every physical host: the Raspberry Pi control planes,
   rpi5-1, the MS-A2 and the Macs. Where each host's data comes from is in the file's
   header comment.
+- `alert-packet-loss.tf` — the packet-loss alert on rpi5-1's interfaces (ported from the
+  old Compose Grafana), and the `ntfy-alertmanager` webhook channel it notifies through.
+  New alerts can reuse that channel.
 - `unifi-dashboards.tf` plus one `dashboard-unifi-*.tf` per dashboard: seven UniFi
   dashboards (Network, Gateway, Switches, Access Points, Clients, Client DPI, Power)
   built from unpoller's metrics. They're ports of unpoller's stock Grafana dashboards,
@@ -20,19 +23,19 @@ Manages SigNoz dashboards. SigNoz itself is deployed by ArgoCD (`argocd/apps/sig
 
 ## Auth
 
-A SigNoz **service account** named `terraform`, with the **Editor** role (enough to
-create, update and delete dashboards; the provider's docs suggest Admin, which this
-doesn't need). In SigNoz: Settings → Service Accounts → New Service Account, then its
+A SigNoz **service account** named `terraform`, with the **Admin** role (Editor is
+enough for dashboards and rules, but creating notification channels is Admin-only). In
+SigNoz: Settings → Service Accounts → New Service Account, then its
 Keys tab → Add Key, no expiry. The key is shown once.
 
 Stored at `secrets/signoz-api-key.sops.yaml` — copy the `.example`, fill it in,
 `sops -e -i` it. The B2 state key is shared with `terraform/proxmox`.
 
 The provider talks to `https://signoz.jakerobb.org`. Everything there is behind
-Authelia except `/api/v2/dashboards`, which skips it so the API key gets through; SigNoz
-still checks the key on every request there. See `argocd/apps/signoz/httproute.yaml`,
-including why only that path is open. Managing another kind of resource (alerts, say)
-means opening its API path there too.
+Authelia except `/api/v2/dashboards`, `/api/v2/rules` and `/api/v2/notification_channels`,
+which skip it so the API key gets through; SigNoz still checks the key on every request
+there. See `argocd/apps/signoz/httproute.yaml`, including why only those paths are open.
+Managing another kind of resource means opening its API path there too.
 
 ## Running this
 
