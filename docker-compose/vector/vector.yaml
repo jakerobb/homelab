@@ -63,8 +63,8 @@ transforms:
   # already-OTLP-shaped events, not a converter; found live (Vector 0.58.0
   # refused every event with "Log event does not contain OTLP top-level
   # fields") before adding these. One per source since each has different
-  # field names for its message/attributes (matching the per-sink
-  # `_msg_field`/`_stream_fields` VictoriaLogs config below).
+  # field names for its message/attributes (they mirrored the per-sink
+  # `_msg_field` settings of the VictoriaLogs sinks, since removed).
   #
   # Gotcha found live (2026-09-22): `to_string(.missing_field) ?? fallback`
   # does NOT fall through the way it looks like it should — VRL's
@@ -103,6 +103,8 @@ transforms:
               "attributes": [
                 {"key": "container_name", "value": {"stringValue": to_string(.container_name) ?? ""}},
                 {"key": "container_id", "value": {"stringValue": to_string(.container_id) ?? ""}},
+                {"key": "image", "value": {"stringValue": to_string(.image) ?? ""}},
+                {"key": "container_created_at", "value": {"stringValue": to_string(.container_created_at) ?? ""}},
                 {"key": "stream", "value": {"stringValue": to_string(.stream) ?? ""}}
               ]
             }]
@@ -119,6 +121,16 @@ transforms:
       if body == "" { body = to_string(.message) ?? "" }
       if body == "" { body = to_string(.name) ?? "" }
       ts_ns = to_string(to_unix_timestamp!(.timestamp, unit: "nanoseconds"))
+      # Every remaining field becomes an attribute, so SigNoz carries what
+      # VictoriaLogs did. The body, timestamp and source_type already go
+      # elsewhere (log body, timeUnixNano, resource attribute).
+      attrs = []
+      for_each(object!(.)) -> |key, value| {
+        if !includes(["timestamp", "message", "msg", "source_type"], key) {
+          val = to_string(value) ?? encode_json(value)
+          attrs = push(attrs, {"key": key, "value": {"stringValue": val}})
+        }
+      }
       . = {
         "resourceLogs": [{
           "resource": {
@@ -132,10 +144,7 @@ transforms:
             "logRecords": [{
               "timeUnixNano": ts_ns,
               "body": {"stringValue": body},
-              "attributes": [
-                {"key": "deviceVendor", "value": {"stringValue": to_string(.deviceVendor) ?? ""}},
-                {"key": "deviceProduct", "value": {"stringValue": to_string(.deviceProduct) ?? ""}}
-              ]
+              "attributes": attrs
             }]
           }]
         }]
@@ -148,6 +157,16 @@ transforms:
     source: |
       body = to_string(.message) ?? ""
       ts_ns = to_string(to_unix_timestamp!(.timestamp, unit: "nanoseconds"))
+      # Every remaining field becomes an attribute, so SigNoz carries what
+      # VictoriaLogs did. The body, timestamp and source_type already go
+      # elsewhere (log body, timeUnixNano, resource attribute).
+      attrs = []
+      for_each(object!(.)) -> |key, value| {
+        if !includes(["timestamp", "message", "msg", "source_type"], key) {
+          val = to_string(value) ?? encode_json(value)
+          attrs = push(attrs, {"key": key, "value": {"stringValue": val}})
+        }
+      }
       . = {
         "resourceLogs": [{
           "resource": {
@@ -161,71 +180,20 @@ transforms:
             "logRecords": [{
               "timeUnixNano": ts_ns,
               "body": {"stringValue": body},
-              "attributes": [
-                {"key": "unit", "value": {"stringValue": to_string(.unit) ?? ""}}
-              ]
+              "attributes": attrs
             }]
           }]
         }]
       }
 
 sinks:
-  vlogs:
-    type: elasticsearch
-    inputs:
-      - docker
-    endpoints:
-      - http://victorialogs:9428/insert/elasticsearch/
-    mode: bulk
-    api_version: v8
-    compression: gzip
-    healthcheck:
-      enabled: false
-    query:
-      _msg_field: message
-      _time_field: timestamp
-      _stream_fields: source_type,host,container_name
-
-  vl_unifi:
-    type: elasticsearch
-    inputs:
-      - unifi_cef
-    endpoints:
-      - http://victorialogs:9428/insert/elasticsearch/
-    mode: bulk
-    api_version: v8
-    compression: gzip
-    healthcheck:
-      enabled: false
-    query:
-      _msg_field: msg,message,name
-      _time_field: timestamp
-      _stream_fields: source_type,deviceVendor,deviceProduct
-
-  vl_pi_journal:
-    type: elasticsearch
-    inputs:
-      - pi_journal_tag
-    endpoints:
-      - http://victorialogs:9428/insert/elasticsearch/
-    mode: bulk
-    api_version: v8
-    compression: gzip
-    healthcheck:
-      enabled: false
-    query:
-      _msg_field: message
-      _time_field: timestamp
-      _stream_fields: source_type,host,unit
-
-  # Dual-shipped alongside VictoriaLogs above (decided 2026-09-22) — SigNoz
-  # is on trial, VictoriaLogs stays as the proven fallback until it's earned
-  # full replacement (same "don't tear down until it's proven" call already
-  # made for Alertmanager). One combined sink covers all three sources; OTLP
-  # doesn't need VictoriaLogs's per-source _msg_field/_stream_fields
-  # juggling — the otlp codec just carries the whole Vector event across as
-  # the log record's body/attributes. See argocd/README.md's SigNoz section
-  # and argocd/apps/signoz/httproute-otel.yaml for the ingestion endpoint —
+  # SigNoz is the only destination. Logs also went to VictoriaLogs until
+  # 2026-10-01 (dual-shipped since 2026-09-22 while SigNoz was on trial); its
+  # three elasticsearch sinks are gone from here. One combined OTLP sink covers
+  # all three sources: the *_otlp transforms above reshape each event into
+  # OTLP log records, carrying every field as an attribute. See
+  # argocd/README.md's SigNoz section and
+  # argocd/apps/signoz/httproute-otel.yaml for the ingestion endpoint —
   # unauthenticated on purpose (machine-to-machine OTLP, not a human page).
   signoz_otel:
     type: opentelemetry
