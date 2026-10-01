@@ -38,8 +38,8 @@ moving to the cluster get ArgoCD's reconciliation instead.
      added in its UI) — it doesn't overwrite it. It alerts until you either
      backfill the change into the repo (once the repo matches what's on the
      host, the alert clears by itself) or revert it on the host.
-   - `change-detection` and `zigbee2mqtt` rewrite their own
-     config at runtime or on shutdown, so they're stopped before their files
+   - `change-detection` rewrites its own
+     config at runtime or on shutdown, so it's stopped before its files
      are written and started again by step 4.
 4. **`docker compose up -d --remove-orphans`**, every run, not just after a
    merge. That applies compose-file and `.env` changes, and also undoes

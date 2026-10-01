@@ -1,0 +1,9 @@
+# Explicit, labeled Namespace rather than relying on CreateNamespace=true — applied
+# by the zigbee2mqtt Application (argocd/apps/zigbee2mqtt/application.yaml)
+# alongside the rest of this directory. Same reasoning as ntfy/namespace.yaml.
+#
+# No PodSecurity override needed: the pod runs non-root with all capabilities dropped.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zigbee2mqtt

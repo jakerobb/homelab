@@ -23,19 +23,20 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 ### To be migrated
 
-- **Home automation stack** (`homeassistant`, `zigbee2mqtt`, `matter-server`) — none hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
+- **Home automation stack** (`homeassistant`, `matter-server`) — none hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
   Home Assistant doesn't use Bluetooth, so the `/run/dbus` mount can go. Its `/dev/ttyAMA0` / `/dev/serial0` devices
   (the Pi's GPIO UART) were for an integration that never worked and isn't in use, so drop them and `privileged: true`
   rather than carrying them over.
-  `mosquitto` and `zwave-js-ui` already moved; see [`DONE.md`](DONE.md).
-  **Decide config ownership per service before moving each one.** Zigbee2MQTT and `change-detection` rewrite their own
-  config files, and a ConfigMap/Secret mount is read-only, so they can't save UI changes there. Pick one: seed the
-  file into the PVC once (the app owns it afterward, so UI edits survive but git isn't authoritative), or overwrite it
-  on every start (git wins, UI edits are lost). `zwave-js-ui` took the seed-once route, with its keys as env vars from
-  an ExternalSecret; Zigbee2MQTT should follow the same pattern, passing the network key and PAN IDs as
-  `ZIGBEE2MQTT_CONFIG_*` env vars from a Secret so no secret lives in a file the app rewrites. The compose-deploy
-  drift check (byte hashes) can't clear after a Zigbee2MQTT UI save, because it writes single-quoted
-  keys and sops can only emit double-quoted ones. That's not worth fixing, since both remaining services are moving.
+  `mosquitto` and `zwave-js-ui` already moved; see [`DONE.md`](DONE.md). `zigbee2mqtt` is prepared but not live: cutover
+  steps are in [`../argocd/README.md`](../argocd/README.md#zigbee2mqtt-migrated-from-docker-compose-2026-10-01). Move it
+  to `DONE.md` once that's done.
+  **Decide config ownership per service before moving each one.** `change-detection` rewrites its own config files,
+  and a ConfigMap/Secret mount is read-only, so it can't save UI changes there. Pick one: seed the file into the PVC
+  once (the app owns it afterward, so UI edits survive but git isn't authoritative), or overwrite it on every start (git
+  wins, UI edits are lost). `zwave-js-ui` and `zigbee2mqtt` both took the seed-once route (Zigbee2MQTT's config comes from
+  the old data directory rather than a ConfigMap, since it holds device names). Both keep their secrets in an
+  ExternalSecret, as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env
+  overrides into the PVC).
 - **scrypted** — camera/NVR bridge
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
   as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it

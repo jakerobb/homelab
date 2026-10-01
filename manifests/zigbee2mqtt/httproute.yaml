@@ -1,39 +1,11 @@
-# Zigbee2MQTT (Compose on rpi5-1).
-# Gated by Authelia forward-auth.
-apiVersion: v1
-kind: Service
-metadata:
-  name: zigbee2mqtt
-  namespace: lan-routes
-spec:
-  ports:
-    - name: http
-      port: 8090
----
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
-metadata:
-  name: zigbee2mqtt
-  namespace: lan-routes
-  labels:
-    kubernetes.io/service-name: zigbee2mqtt
-    endpointslice.kubernetes.io/managed-by: argocd
-addressType: IPv4
-ports:
-  - name: http
-    port: 8090
-    protocol: TCP
-endpoints:
-  - addresses:
-      - 192.168.102.2
-    conditions:
-      ready: true
----
+# Gated by Authelia forward-auth, same pattern as modbus-controller/httproute.yaml. The
+# `zigbee.jakerobb.org` access_control rule is in argocd/apps/authelia/application.yaml,
+# and this namespace has an entry in argocd/apps/authelia/referencegrant.yaml.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: zigbee2mqtt
-  namespace: lan-routes
+  namespace: zigbee2mqtt
 spec:
   parentRefs:
     - name: homelab-gateway
@@ -68,4 +40,4 @@ spec:
                 - remote-email
       backendRefs:
         - name: zigbee2mqtt
-          port: 8090
+          port: 8080
