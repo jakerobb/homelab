@@ -54,8 +54,6 @@ DECRYPTED = {
     "homeassistant/lutron_caseta-0512b4cc-key.pem": (
         "homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml", ["--output-type", "binary"]),
     "secrets/nut-upsd-password": ("secrets/nut-upsd-password.sops.yaml", ["--output-type", "binary"]),
-    "influxdb/config/influx-configs": (
-        "influxdb/config/influx-configs.sops.yaml", ["--output-type", "binary"]),
     "zigbee2mqtt/data/configuration.yaml": ("zigbee2mqtt/configuration.sops.yaml", []),
     "zwave-js-ui/settings.json": ("zwave-js-ui/settings.sops.json", []),
     "zwave-js-ui/users.json": ("zwave-js-ui/users.json.sops.yaml", ["--output-type", "binary"]),

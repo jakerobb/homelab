@@ -45,7 +45,7 @@ seconds of creating the symlink, caught and fixed before anything actually
 restarted and failed on it): `homeassistant/{configuration,automations,
 scenes,scripts}.yaml`, `homeassistant/blueprints/`,
 `homeassistant/lutron_caseta-*.pem`, `change-detection/url-watches.json`,
-`unbound/custom.conf.d/local.conf`, `grafana-provisioning/`,
+`unbound/custom.conf.d/local.conf`,
 `modbus-programs/`, `mosquitto/config/`.
 
 **Why those specifically fail** — two distinct Docker bind-mount behaviors,
@@ -55,8 +55,7 @@ confirmed live against this stack, not just theory:
    *directory* in the path (`telegraf/telegraf.conf`) — Docker resolves the full host path,
    including any symlinks, before creating the mount.
 2. A symlinked **directory** used as the bind-mount source itself does
-   *not* get resolved the same way (`grafana-provisioning`,
-   `mosquitto/config` — confirmed via a from-scratch container restart:
+   *not* get resolved the same way (`mosquitto/config` — confirmed via a from-scratch container restart:
    `cat` inside the container returned `No such file or directory` even
    though the symlink itself was intact and pointed somewhere real).
    Similarly, a symlink for a single file *nested inside* an
@@ -85,13 +84,12 @@ changed; it does **not** notice a bind-mount source changing type on disk.
 A container whose mount source was directly replaced (not just a file
 *within* an unchanged directory) needs an explicit restart
 (`docker compose restart <service>`) to pick it up — confirmed necessary
-for `grafana`, `mosquitto`, `unbound`, and `modbus-controller`.
+for `mosquitto`, `unbound`, and `modbus-controller`.
 
 ## What's captured vs. excluded
 
 Only hand-authored configuration is captured. Runtime state, caches, logs,
-and database files are **not** committed — they're excluded the same way
-`grafana/grafana.db` was excluded from this capture:
+and database files are **not** committed:
 
 - `homeassistant/.storage/`, `.cloud/`, `.cache/`, `core/`, `deps/`, `tts/`,
   `*.log*`, `home-assistant_v2.db*` — Home Assistant's internal state
@@ -113,9 +111,7 @@ and database files are **not** committed — they're excluded the same way
   coordinator backup without the live network key means re-pairing every
   Zigbee device if the coordinator ever needs replacing — the network key
   itself is captured, encrypted, below).
-- `influxdb/data/`, `mosquitto/data/`, `mosquitto/log/`, `ntfy/cache/`,
-  `grafana/` (all of it — `grafana-provisioning/` is captured separately
-  and is the only hand-authored part).
+- `mosquitto/data/`, `mosquitto/log/`, `ntfy/cache/`.
 - `nut-conf/` — genuinely empty (confirmed 2026-09-20, permissions had
   drifted to unreadable — fixed to `u+x`), and unreferenced by anything: the
   `nut-upsd` container generates its real `/etc/nut/ups.conf` itself
@@ -139,7 +135,6 @@ sops -d --input-type dotenv --output-type dotenv docker-compose/.env.sops.env > 
 sops -d docker-compose/homeassistant/secrets.sops.yaml > homeassistant/secrets.yaml
 sops -d --output-type binary docker-compose/homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml > homeassistant/lutron_caseta-0512b4cc-key.pem
 sops -d --output-type binary docker-compose/secrets/nut-upsd-password.sops.yaml > secrets/nut-upsd-password
-sops -d --output-type binary docker-compose/influxdb/config/influx-configs.sops.yaml > influxdb/config/influx-configs
 sops -d docker-compose/zigbee2mqtt/configuration.sops.yaml > zigbee2mqtt/data/configuration.yaml
 sops -d docker-compose/zwave-js-ui/settings.sops.json > zwave-js-ui/settings.json
 sops -d --output-type binary docker-compose/zwave-js-ui/users.json.sops.yaml > zwave-js-ui/users.json
@@ -151,11 +146,10 @@ Encrypted files (all under `docker-compose/`, matched by the
 
 | File | Contains |
 |---|---|
-| `.env.sops.env` | Cloudflare API token, NUT/InfluxDB/Grafana/UniFi credentials and tokens, app passwords |
+| `.env.sops.env` | Cloudflare API token, NUT/UniFi credentials and tokens, app passwords. `INFLUXDB_ADMIN_PASSWORD` and `INFLUXDB_ADMIN_TOKEN` stay for NetworkOptimizer's in-cluster InfluxDB (restored from the Compose instance's metadata), no longer used by anything in Compose |
 | `homeassistant/secrets.sops.yaml` | NUT UPS password used by the HA UPS integration |
 | `homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml` | Lutron Caséta bridge mTLS private key (the paired `-ca.pem`/`-cert.pem` are public certs, committed in the clear) |
 | `secrets/nut-upsd-password.sops.yaml` | NUT UPS daemon password (mounted into `nut-upsd` as a Docker secret) |
-| `influxdb/config/influx-configs.sops.yaml` | InfluxDB CLI default-profile auth token |
 | `zigbee2mqtt/configuration.sops.yaml` | Zigbee network key + PAN ID (whole file encrypted since the key is embedded inline) |
 | `zwave-js-ui/settings.sops.json` | Z-Wave S0/S2 network security keys |
 | `zwave-js-ui/users.json.sops.yaml` | Z-Wave JS UI admin password hash |
@@ -163,7 +157,7 @@ Encrypted files (all under `docker-compose/`, matched by the
 
 `.env` is `--input-type dotenv --output-type dotenv` (encrypted line-by-line,
 keeping the `KEY=value` shape); `*.pem.sops.yaml`, `nut-upsd-password.sops.yaml`,
-`influx-configs.sops.yaml`, and `secret.txt.sops.yaml` are `--input-type binary`
+and `secret.txt.sops.yaml` are `--input-type binary`
 (not valid YAML/JSON on their own, so SOPS wraps the raw bytes); the rest are
 encrypted in their native YAML/JSON with SOPS's normal per-value encryption.
 

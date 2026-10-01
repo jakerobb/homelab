@@ -4,7 +4,6 @@ sources:
     docker_host: unix:///var/run/docker.sock
     exclude_containers:
       - vector
-      - victorialogs
 
   unifi_syslog:
     type: socket
