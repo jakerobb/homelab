@@ -1,0 +1,35 @@
+# Z-Wave S0/S2 and Long Range security keys, passed to zwave-js-ui as KEY_* env vars
+# (manifests/zwave-js-ui/deployment.yaml). Same 1Password item/field convention as the
+# other secrets: a Secure Note titled `zwave-js-ui-security-keys` in the homelab-k8s
+# vault, one concealed field per key, field labels matching the `remoteRef` keys below.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: zwave-js-ui-security-keys
+  namespace: zwave-js-ui
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: zwave-js-ui-security-keys
+  data:
+    - secretKey: S0_Legacy
+      remoteRef:
+        key: zwave-js-ui-security-keys/S0_Legacy
+    - secretKey: S2_Unauthenticated
+      remoteRef:
+        key: zwave-js-ui-security-keys/S2_Unauthenticated
+    - secretKey: S2_Authenticated
+      remoteRef:
+        key: zwave-js-ui-security-keys/S2_Authenticated
+    - secretKey: S2_AccessControl
+      remoteRef:
+        key: zwave-js-ui-security-keys/S2_AccessControl
+    - secretKey: LR_S2_Authenticated
+      remoteRef:
+        key: zwave-js-ui-security-keys/LR_S2_Authenticated
+    - secretKey: LR_S2_AccessControl
+      remoteRef:
+        key: zwave-js-ui-security-keys/LR_S2_AccessControl

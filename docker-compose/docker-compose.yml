@@ -169,18 +169,6 @@ services:
       - ./matter-server/data:/data
       - /run/dbus:/run/dbus:ro
 
-  zwave-js-ui:
-    container_name: zwave-js-ui
-    image: zwavejs/zwave-js-ui:11.24.2
-    restart: unless-stopped
-    ports:
-      - "8091:8091"   # Web UI
-      - "3010:3000"   # WebSocket for HA
-    volumes:
-      - ./zwave-js-ui:/usr/src/app/store
-    environment:
-      - TZ=America/Detroit
-
   vector:
     image: timberio/vector:0.58.0-debian
     container_name: vector

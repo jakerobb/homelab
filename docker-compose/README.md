@@ -103,8 +103,6 @@ and database files are **not** committed:
 - `matter-server/data/` — Matter fabric/commissioning state.
 - `change-detection/` — only `url-watches.json` (the watch list) is
   captured; per-watch history, screenshots, and snapshot archives are not.
-- `zwave-js-ui/nodes.json`, `.config-db/`, `logs/`, `sessions/`, `*.jsonl*`
-  — Z-Wave node state and session data.
 - `zigbee2mqtt/data/{database.db,state.json,coordinator_backup.json,log}`
   — device state and coordinator network backup (**note:** losing the
   coordinator backup without the live network key means re-pairing every
@@ -135,8 +133,6 @@ sops -d docker-compose/homeassistant/secrets.sops.yaml > homeassistant/secrets.y
 sops -d --output-type binary docker-compose/homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml > homeassistant/lutron_caseta-0512b4cc-key.pem
 sops -d --output-type binary docker-compose/secrets/nut-upsd-password.sops.yaml > secrets/nut-upsd-password
 sops -d docker-compose/zigbee2mqtt/configuration.sops.yaml > zigbee2mqtt/data/configuration.yaml
-sops -d docker-compose/zwave-js-ui/settings.sops.json > zwave-js-ui/settings.json
-sops -d --output-type binary docker-compose/zwave-js-ui/users.json.sops.yaml > zwave-js-ui/users.json
 sops -d --output-type binary docker-compose/change-detection/secret.txt.sops.yaml > change-detection/secret.txt
 ```
 
@@ -150,8 +146,6 @@ Encrypted files (all under `docker-compose/`, matched by the
 | `homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml` | Lutron Caséta bridge mTLS private key (the paired `-ca.pem`/`-cert.pem` are public certs, committed in the clear) |
 | `secrets/nut-upsd-password.sops.yaml` | NUT UPS daemon password (mounted into `nut-upsd` as a Docker secret) |
 | `zigbee2mqtt/configuration.sops.yaml` | Zigbee network key + PAN ID (whole file encrypted since the key is embedded inline) |
-| `zwave-js-ui/settings.sops.json` | Z-Wave S0/S2 network security keys |
-| `zwave-js-ui/users.json.sops.yaml` | Z-Wave JS UI admin password hash |
 | `change-detection/secret.txt.sops.yaml` | changedetection.io API key |
 
 `.env` is `--input-type dotenv --output-type dotenv` (encrypted line-by-line,

@@ -55,14 +55,12 @@ DECRYPTED = {
         "homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml", ["--output-type", "binary"]),
     "secrets/nut-upsd-password": ("secrets/nut-upsd-password.sops.yaml", ["--output-type", "binary"]),
     "zigbee2mqtt/data/configuration.yaml": ("zigbee2mqtt/configuration.sops.yaml", []),
-    "zwave-js-ui/settings.json": ("zwave-js-ui/settings.sops.json", []),
-    "zwave-js-ui/users.json": ("zwave-js-ui/users.json.sops.yaml", ["--output-type", "binary"]),
     "change-detection/secret.txt": ("change-detection/secret.txt.sops.yaml", ["--output-type", "binary"]),
 }
 
 # Services that rewrite their own config files at runtime/shutdown: stop them
 # before writing, or they'd clobber the new file on the way down.
-STOP_BEFORE_WRITE = {"change-detection", "zigbee2mqtt", "zwave-js-ui"}
+STOP_BEFORE_WRITE = {"change-detection", "zigbee2mqtt"}
 
 # Config checks run before restarting a service; on failure the running
 # container keeps its old config and we alert instead of restarting into a

@@ -38,7 +38,7 @@ moving to the cluster get ArgoCD's reconciliation instead.
      added in its UI) — it doesn't overwrite it. It alerts until you either
      backfill the change into the repo (once the repo matches what's on the
      host, the alert clears by itself) or revert it on the host.
-   - `change-detection`, `zigbee2mqtt`, and `zwave-js-ui` rewrite their own
+   - `change-detection` and `zigbee2mqtt` rewrite their own
      config at runtime or on shutdown, so they're stopped before their files
      are written and started again by step 4.
 4. **`docker compose up -d --remove-orphans`**, every run, not just after a
@@ -138,7 +138,7 @@ already.
   `compose-deploy.py --adopt <path relative to ~/docker>`. It stays adopted
   until the repo's copy changes again, which then overwrites it as usual.
   Prefer backfilling into the repo; adopting just hides the difference.
-- **`can't write` alerts for `zwave-js-ui/*`:** those files are root-owned
-  (the container runs as root), so the script can't update them. Copy by
-  hand with `sudo` using the README's decrypt command, then run
+- **`can't write` alerts for root-owned files:** a container that runs as root
+  (as `zwave-js-ui` did) can leave its config root-owned, so the script can't
+  update it. Copy by hand with `sudo` using the README's decrypt command, then run
   `compose-deploy.py` to record the result.

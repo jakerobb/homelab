@@ -1,0 +1,13 @@
+# Web UI, behind the Gateway (see httproute.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: zwave-js-ui
+  namespace: zwave-js-ui
+spec:
+  selector:
+    app.kubernetes.io/name: zwave-js-ui
+  ports:
+    - name: http
+      port: 8091
+      targetPort: http

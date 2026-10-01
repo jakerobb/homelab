@@ -1,0 +1,9 @@
+# Explicit, labeled Namespace rather than relying on CreateNamespace=true — applied
+# by the zwave-js-ui Application (argocd/apps/zwave-js-ui/application.yaml)
+# alongside the rest of this directory. Same reasoning as ntfy/namespace.yaml.
+#
+# No PodSecurity override needed: the pod runs non-root with all capabilities dropped.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zwave-js-ui
