@@ -3,28 +3,9 @@ x-dns: &dns
     - 192.168.102.2
 
 services:
-  homeassistant:
-    <<: *dns
-    container_name: homeassistant
-    image: ghcr.io/home-assistant/home-assistant:2026.9.4
-    privileged: true
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - TZ=America/Detroit
-      - OFFICE_UPS_NUT_PASSWORD=__from-file__
-    volumes:
-      - ./homeassistant:/config
-      - /run/dbus:/run/dbus:ro
-      - ./resolv-host.conf:/etc/resolv.conf:ro
-    # Added directly on rpi5-1 at some point, never backfilled here until
-    # the docker-compose/ split-brain cleanup (2026-09-20) — found via a
-    # live diff against the deployed compose file. RPi5 GPIO UART, presumably
-    # for a serial-connected integration (not one of the standalone
-    # Zigbee2MQTT/Z-Wave JS UI containers, which own their own USB dongles).
-    devices:
-      - /dev/ttyAMA0
-      - /dev/serial0
+  # homeassistant moved to the cluster on 2026-10-01 (manifests/homeassistant/).
+  # The old config directory stays on rpi5-1 as the rollback until it's deleted
+  # (see todo/FUTURE.md).
 
   scrypted:
     <<: *dns

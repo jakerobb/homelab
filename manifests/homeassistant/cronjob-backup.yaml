@@ -1,0 +1,86 @@
+# Nightly backup of /config to the homeassistant-backups PVC (hexos-nfs, so a different
+# dataset on the NAS from the iSCSI volume). Keeps 14 days.
+#
+# Home Assistant owns its UI-edited files after the migration (automations.yaml, scenes.yaml,
+# scripts.yaml, .storage), so git no longer holds them; this is the copy. .storage matters
+# most: it holds the integration entries and the HomeKit pairing identities.
+#
+# Excluded: the recorder database (home-assistant_v2.db*; it's history, and copying a live
+# SQLite file isn't safe), logs, the lock file, deps/tts/.cache (re-created on start), and
+# `core` (a stale crash dump).
+#
+# Same node as the Home Assistant pod (required podAffinity) because the config volume is
+# ReadWriteOnce: a second pod can mount it only from the node that already has it attached.
+# The job mounts it read-only. Root, because /config is root-owned; the NFS export has
+# maproot=root (docs/nfs-storage.md).
+#
+# To restore: scale homeassistant to 0, extract a backup over /config from a throwaway pod,
+# scale back up.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: homeassistant-backup
+  namespace: homeassistant
+spec:
+  schedule: "17 3 * * *"
+  timeZone: America/Detroit
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      template:
+        spec:
+          restartPolicy: Never
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: homeassistant
+          containers:
+            - name: backup
+              image: busybox:1.37.0
+              command:
+                - sh
+                - -euc
+                - |
+                  cd /config
+                  set -- $(ls -A | grep -Ev '^(core|deps|tts|\.cache|\.ha_run\.lock|\.restored|home-assistant.*)$')
+                  out=/backups/ha-config-$(date +%Y%m%d-%H%M%S).tar.gz
+                  tar -czf "$out.tmp" "$@"
+                  mv "$out.tmp" "$out"
+                  find /backups -name 'ha-config-*.tar.gz' -mtime +14 -delete
+                  ls -l /backups
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                  add: [DAC_OVERRIDE]
+                readOnlyRootFilesystem: true
+                runAsUser: 0
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi
+              volumeMounts:
+                - mountPath: /config
+                  name: config
+                  readOnly: true
+                - mountPath: /backups
+                  name: backups
+          volumes:
+            - name: config
+              persistentVolumeClaim:
+                claimName: homeassistant-config
+                readOnly: true
+            - name: backups
+              persistentVolumeClaim:
+                claimName: homeassistant-backups

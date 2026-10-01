@@ -1,0 +1,33 @@
+# /config: the YAML config, .storage (entity/device registries, integration entries, HomeKit
+# pairing identities, auth), custom_components (HACS) and the recorder database. ~300Mi at time
+# of migration without the database; the SQLite database was ~225Mi.
+#
+# hexos-iscsi, like the other stateful apps. After a HexOS outage, iSCSI volumes on the mbp
+# worker can go silently read-only; delete the pod to recover (see argocd/README.md). If the
+# recorder database is corrupted by that, delete home-assistant_v2.db* from the volume: it is
+# only history, and Home Assistant creates a new one.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homeassistant-config
+  namespace: homeassistant
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Nightly config backups (cronjob-backup.yaml). hexos-nfs so the backups sit on a different
+# dataset from the iSCSI volume they were taken from, and can be read from the NAS directly.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homeassistant-backups
+  namespace: homeassistant
+spec:
+  storageClassName: hexos-nfs
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 10Gi
