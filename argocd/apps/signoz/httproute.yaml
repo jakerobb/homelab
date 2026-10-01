@@ -30,11 +30,13 @@ spec:
   hostnames:
     - signoz.jakerobb.org
   rules:
-    # SigNoz's dashboard API skips Authelia, so terraform/signoz can reach it
-    # with a service-account key (SIGNOZ-API-KEY header) from the jump box.
-    # Safe because SigNoz requires a session or API key with a role on every
-    # route under this prefix (checked in pkg/apiserver/signozapiserver/
-    # dashboard.go, v0.143.0); its public-dashboard routes live under
+    # SigNoz's dashboard, alert rule and notification channel APIs skip
+    # Authelia, so terraform/signoz can reach them with a service-account key
+    # (SIGNOZ-API-KEY header) from the jump box. Safe because SigNoz requires
+    # a session or API key with a role on every route under these prefixes
+    # (checked in pkg/apiserver/signozapiserver/ dashboard.go, ruler.go and
+    # alertmanager.go, v0.143.0: Viewer to read, Editor for rules and
+    # dashboards, Admin for channels); its public-dashboard routes live under
     # /api/v2/public/, which stays behind Authelia. Keep this to the paths
     # the Terraform provider actually uses: opening all of /api/ would expose
     # SigNoz's own password login without Authelia's 2FA.
@@ -42,6 +44,12 @@ spec:
         - path:
             type: PathPrefix
             value: /api/v2/dashboards
+        - path:
+            type: PathPrefix
+            value: /api/v2/rules
+        - path:
+            type: PathPrefix
+            value: /api/v2/notification_channels
       backendRefs:
         - name: signoz
           port: 8080
