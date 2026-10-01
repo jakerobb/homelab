@@ -1,0 +1,139 @@
+# Bare Deployment, no Helm chart: single container, no per-environment variation
+# (same reasoning as ntfy/deployment.yaml).
+#
+# Migrated from the docker-compose `matter-server` service on rpi5-1.
+#
+# hostNetwork, like the Compose version's `network_mode: host`. Matter finds devices with
+# mDNS/DNS-SD multicast and talks to them over IPv6, and neither crosses the pod network.
+# The IoT/Cloud IoT -> Server mDNS reflection is the UniFi gateway's mDNS proxy. The worker
+# nodes get a ULA address on the Server VLAN by SLAAC, which is all the Wi-Fi Matter devices
+# need. (Thread devices would additionally need net.ipv6.conf.*.accept_ra=2 on the node;
+# there are none today.)
+#
+# No nodeAffinity: the container picks its mDNS interface from the node's default route at
+# start, so any worker works whatever its NIC is called (ens18 on the Proxmox VMs, enp0s1 on
+# the mbp, something else on a Pi). Without --primary-interface it would bind every interface
+# it finds on the host, cilium_host and lxc* included.
+#
+# The `restore` init container WAITS until /store/.restored exists, then exits. Starting on
+# an empty data directory would mint a brand-new Matter fabric next to the one the commissioned
+# devices belong to. The cutover script (scripts/matter-server-cutover/restore.sh) copies the
+# old data in and only then creates the marker.
+#
+# Dropped from the Compose version: /run/dbus and apparmor=unconfined (both were for
+# Bluetooth commissioning, which Home Assistant's phone-based flow doesn't use).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matter-server
+  namespace: matter-server
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    # Not RollingUpdate: the data PVC is ReadWriteOnce, and two controllers on one fabric
+    # would fight over it.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: matter-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: matter-server
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: restore
+          image: busybox:1.37.0
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -e /store/.restored ]; then
+                echo "Waiting for the old data to be restored (see argocd/README.md, matter-server cutover)..."
+                until [ -e /store/.restored ]; do sleep 5; done
+              fi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /store
+              name: data
+      containers:
+        - name: matter-server
+          image: ghcr.io/home-assistant-libs/python-matter-server:8.1.2
+          imagePullPolicy: IfNotPresent
+          # Same arguments as the image's default CMD, plus the interface found from the
+          # node's default route.
+          command:
+            - sh
+            - -c
+            - |
+              set -- $(ip -4 -o route show default)
+              iface=
+              while [ $# -gt 0 ]; do
+                [ "$1" = dev ] && iface=$2
+                shift
+              done
+              [ -n "$iface" ] || { echo "no IPv4 default route; can't pick an mDNS interface" >&2; exit 1; }
+              echo "using primary interface $iface"
+              exec matter-server --storage-path /data --paa-root-cert-dir /data/credentials --primary-interface "$iface"
+          env:
+            - name: TZ
+              value: America/Detroit
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: ws
+              containerPort: 5580
+          startupProbe:
+            tcpSocket:
+              port: ws
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: ws
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: ws
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: matter-server-data

@@ -1597,6 +1597,62 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
    network key in plaintext. Until then it's the rollback: revert the PR and restore the Compose service (the restore
    script never modifies it).
 
+## matter-server (migrated from Docker Compose, 2026-10-01)
+
+python-matter-server, the Matter controller Home Assistant's Matter integration talks to. Deployed as
+[`apps/matter-server/`](apps/matter-server/application.yaml) → [`manifests/matter-server/`](../manifests/matter-server/).
+
+- **Host network.** Matter discovers devices with mDNS multicast and talks to them over IPv6, and neither crosses the
+  pod network, so the pod runs with `hostNetwork: true` (the Compose version used `network_mode: host`). The namespace is
+  labeled `pod-security.kubernetes.io/enforce: privileged` because Talos enforces `baseline`, which blocks host
+  networking. The container itself runs non-root with all capabilities dropped.
+- **What it relies on.** The UniFi gateway's mDNS proxy reflects the IoT and Cloud IoT VLANs to the Server VLAN (all
+  VLANs, all services, as of the migration). The workers each have a SLAAC ULA address (`fd3d:b17d:9f8e:102::/64`) on the
+  Server VLAN, which is enough for Wi-Fi Matter devices. Thread devices would additionally need the node sysctl
+  `net.ipv6.conf.*.accept_ra=2` (Linux ignores router advertisements on forwarding hosts otherwise) and IPv6 firewall
+  rules between the Thread border routers' VLAN and Server. There are none today (the only commissioned device is a Wi-Fi
+  Nest thermostat).
+- **Any worker.** A shell wrapper reads the node's IPv4 default route at start and passes that interface as
+  `--primary-interface`, so the pod works on a Proxmox VM (`ens18`), the mbp (`enp0s1`) or the future Pi
+  worker without per-node configuration. Without the flag it binds every interface on the host, including the Cilium
+  ones.
+- **State is a PVC (`hexos-iscsi`, 1Gi):** the fabric JSON (commissioned nodes and the controller's identity),
+  `chip_*.ini`, and the PAA certificate cache. Losing the fabric means re-commissioning every Matter device. The
+  `restore` init container holds the pod until `scripts/matter-server-cutover/restore.sh` has copied the old data in,
+  because starting on an empty directory would create a second, empty fabric.
+- **Home Assistant** is still in Compose on rpi5-1, so it can't reach a ClusterIP. The Service is a LoadBalancer pinned to
+  `192.168.102.133`, published as `matter.jakerobb.org`. The server has no authentication, LAN only, like Z-Wave JS.
+- **No Bluetooth.** `/run/dbus` and `apparmor=unconfined` are gone. BLE commissioning isn't available from the pod; commission
+  new devices from the Home Assistant phone app, or share them from another ecosystem with a multi-admin pairing code.
+
+### Cutover
+
+After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore):
+
+1. compose-deploy removes the Compose container within about 5 minutes. The thermostat is unavailable in Home Assistant
+   from then until step 3 finishes.
+2. On rpi5-1, dry-run the checks, then run it for real. The checks refuse to continue if the old container is still
+   up, the pod isn't waiting, or the PVC was already restored. The marker that releases the pod is created last:
+
+   ```bash
+   ~/dev/homelab/scripts/matter-server-cutover/restore.sh --check
+   ```
+
+   ```bash
+   ~/dev/homelab/scripts/matter-server-cutover/restore.sh
+   ```
+
+3. Check the pod log: it should print `using primary interface <name>` and load the one node. If the container fails
+   to start as non-root (a permissions error on `/data` or the mDNS socket), set `runAsUser: 0` on the container and
+   note why here.
+4. In Home Assistant, open the Matter integration and change the server URL from `ws://localhost:5580/ws` to
+   `ws://matter.jakerobb.org:5580/ws`. The thermostat should come back as available. If it stays unavailable, check
+   mDNS first: `kubectl -n matter-server logs deploy/matter-server`, and that the node holding the pod is on the
+   Server VLAN's `ens18`/equivalent interface.
+5. After a few days of everything behaving, delete `~/docker/matter-server/` on rpi5-1. Until then it's the rollback:
+   revert the PR and restore the Compose service (the restore script never modifies it). Then Bluetooth and avahi on
+   rpi5-1 can go once Home Assistant has moved too.
+
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
 A second Unbound, running in the cluster alongside the Compose one on rpi5-1.

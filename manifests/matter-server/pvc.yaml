@@ -1,0 +1,18 @@
+# python-matter-server's storage path: the fabric JSON (the commissioned nodes, plus the
+# controller's operational identity), chip_*.ini, and the PAA root certificate cache. Losing
+# the fabric means re-commissioning every Matter device, so this is the part that matters.
+# A few MB at time of migration.
+#
+# hexos-iscsi, like the other stateful apps. After a HexOS outage, iSCSI volumes on the mbp
+# worker can go silently read-only; delete the pod to recover (see argocd/README.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: matter-server-data
+  namespace: matter-server
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

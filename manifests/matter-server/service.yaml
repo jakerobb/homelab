@@ -1,0 +1,27 @@
+# The matter-server WebSocket API (port 5580), which Home Assistant's Matter integration
+# connects to. Raw WebSocket outside the Gateway, so it gets its own LoadBalancer VIP, pinned
+# so the integration's URL never changes. .128 is the Gateway, .129 NetworkOptimizer, .130
+# Unbound, .131 Mosquitto, .132 Z-Wave JS. No l2-announce label, so the catch-all policy applies.
+#
+# The pod runs on the host network, so the backend is the node's IP:5580, and the VIP just
+# follows the pod around.
+#
+# external-dns publishes matter.jakerobb.org -> the VIP. Point Home Assistant at
+# ws://matter.jakerobb.org:5580/ws. Like before the migration, the server has no
+# authentication and is reachable on the LAN only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: matter-server
+  namespace: matter-server
+  annotations:
+    lbipam.cilium.io/ips: 192.168.102.133
+    external-dns.kubernetes.io/hostname: matter.jakerobb.org
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: matter-server
+  ports:
+    - name: ws
+      port: 5580
+      targetPort: ws

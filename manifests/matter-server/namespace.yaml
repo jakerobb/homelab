@@ -1,0 +1,12 @@
+# Explicit, labeled Namespace, applied by the matter-server Application
+# (argocd/apps/matter-server/application.yaml) alongside the rest of this directory.
+#
+# `privileged` because the pod runs with hostNetwork: Matter discovery is mDNS multicast, which
+# never reaches a pod-network pod, and Talos enforces `baseline` cluster-wide, which blocks
+# hostNetwork. The container itself still drops all capabilities and runs non-root.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: matter-server
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
