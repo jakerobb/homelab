@@ -2,13 +2,13 @@
 
 ## Current state
 
-_(as of 2026-09-24)_
+_(as of 2026-10-01)_
 
-- **Talos v1.14.1** on all 5 nodes (control planes and both workers), **Kubernetes v1.37.1** (upgraded from v1.37.0 2026-09-24 via `talosctl upgrade-k8s --to 1.37.1`).
+- **Talos v1.14.2** on all 6 nodes (3 control planes, 3 workers; upgraded from v1.14.1 on 2026-10-01 — see "Talos v1.14.2 upgrade (2026-10-01)" below), **Kubernetes v1.37.1** (upgraded from v1.37.0 2026-09-24 via `talosctl upgrade-k8s --to 1.37.1`).
   Both already fully upgraded — see "Talos control-plane upgrade" and "Talos v1.14.1 upgrade
   blocked by Pi5 EFI-variable firmware bug" below for how the control planes got there.
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
-  Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.1-1`,
+  Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.2-1`,
   since stock Talos doesn't support the Pi5 directly (no NVMe-capable U-Boot in the official
   `rpi_5` overlay — see [siderolabs/sbc-raspberrypi#96](https://github.com/siderolabs/sbc-raspberrypi/issues/96)).
   Previously `ghcr.io/talos-rpi5/installer` (`talos-rpi5/talos-builder`) — switched 2026-09-17
@@ -18,7 +18,7 @@ _(as of 2026-09-24)_
   fix (credited, not reinvented) while tracking current Talos releases itself — see its own
   [FUTURE_WORK.md](https://github.com/yama6a/talos-raspberry-pi5/blob/main/FUTURE_WORK.md): the
   goal is to retire itself once that U-Boot patch lands upstream.
-  **`v1.14.1-1`'s plain tag is not what's actually running on these 3 nodes** — it still ships the
+  **`v1.14.2-1`'s plain tag is not what's actually running on these 3 nodes** — it still ships the
   broken (unpatched) `u-boot.bin` (confirmed 2026-09-21: no EFI-variable fix in the fork's commits
   since), so it's only safe as a *version/architecture reference*, never as a real `talosctl
   upgrade --image` target. See "Talos v1.14.1 upgrade blocked by Pi5 EFI-variable firmware bug"
@@ -26,7 +26,7 @@ _(as of 2026-09-24)_
   **Any amd64 worker (e.g. the MS-A2 Talos VM) must use a Factory schematic image
   (`factory.talos.dev/installer/<schematic-id>:<version>`) — `ghcr.io/siderolabs/installer` doesn't
   exist for recent releases, and the rpi5 installer image must never be reused for amd64 hardware.**
-  Currently `factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.1`
+  Currently `factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.2`
   (the `iscsi-tools` + `util-linux-tools` schematic — see "iscsi-tools extension" below), confirmed
   against both workers' live `get extensions` output and correctly persisted in machine config as
   of 2026-09-21.
@@ -650,6 +650,23 @@ reference is `factory.talos.dev/installer/<schematic-id>:v1.14.1`, not
 `ghcr.io/siderolabs/installer:v1.14.1`, which doesn't exist for recent
 releases).
 
+## Talos v1.14.2 upgrade (2026-10-01)
+
+All 6 nodes moved from v1.14.1 to v1.14.2, one at a time, taking an etcd snapshot first.
+
+- **Control planes** (talos-cp-1 → cp-2 → cp-3): the combined-image recipe from "Full sequence per node" above, with
+  `FROM ghcr.io/yama6a/talos-raspberry-pi5:v1.14.2-1` and the same `hive.2` `u-boot.bin` (sha256 `9aa3c44a…`) copied
+  to `/overlay/artifacts/arm64/u-boot/rpi5/u-boot.bin`, built on rpi5-1 and pushed to `ttl.sh`. The firmware was already
+  patched and power-cycled on 2026-09-18, so no new power-cycle was needed. The "updating EFI variables" step succeeded
+  on all three. The fork's plain `v1.14.2-1` tag still hasn't been checked for the U-Boot fix, so keep building the
+  combined image.
+- **Workers**: `talosctl upgrade --image factory.talos.dev/installer/<schematic>:v1.14.2` (the standard schematic on
+  worker-1/2, the `tsc=reliable` one on worker-mbp), then `talosctl patch machineconfig` to update
+  `.machine.install.image`.
+- Verified per node: version, extensions (`iscsi-tools`, `util-linux-tools`), fresh uptime, etcd status, nodes Ready.
+  After talos-worker-mbp rebooted, Prometheus and SigNoz's ClickHouse took a few minutes to reattach their iSCSI
+  volumes. Everything was Healthy and only `Watchdog` was firing afterward.
+
 ## Machine-config install.image drift found and partially fixed (2026-09-21)
 
 A scheduled cluster health check found all 5 nodes' persisted machine config
@@ -749,9 +766,8 @@ confirmed blocker, not just a theoretical one:
   restart-loop (`sandbox namespace not available yet`, kubelet down,
   `NotReady`) for 1–3 minutes on **every boot** with isolation enabled.
   Fixed upstream 2026-09-16 — one day *after* our current `v1.14.1` was
-  published (2026-09-15). We're on the affected version, and no `v1.14.2`
-  exists yet to upgrade past it (checked — `v1.14.1` is still latest as of
-  2026-09-18).
+  published (2026-09-15). **Update 2026-10-01:** `v1.14.2` (2026-09-29) carries
+  the fix, and the cluster is now on it.
 - Softer, unverified risk: `node-exporter` runs `hostPID`/`hostNetwork` and
   mounts `/proc`/`/sys`/`/` from the host to read real host metrics — under
   isolation its process-level metrics may describe the sandbox instead of

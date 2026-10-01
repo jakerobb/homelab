@@ -34,7 +34,7 @@ machine:
   # hardware host, no hypervisor scheduling jitter to misread).
   install:
     disk: /dev/sda
-    image: factory.talos.dev/installer/0b0257c7d2fd5e4693af3859e726ce2216f60d8456d330009efb1ac249789386:v1.14.1
+    image: factory.talos.dev/installer/0b0257c7d2fd5e4693af3859e726ce2216f60d8456d330009efb1ac249789386:v1.14.2
   # Needed for democratic-csi's iSCSI node driver, same as worker-1/worker-2
   # — see talos/README.md#iscsi-tools-extension-added-2026-09-15.
   kernel:
