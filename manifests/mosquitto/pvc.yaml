@@ -1,0 +1,14 @@
+# Holds mosquitto.db (retained messages + persistent sessions). Tiny — 656KB
+# at time of migration — and rebuilt by Zigbee2MQTT's retained publishes if
+# lost, so 1Gi is plenty.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mosquitto-data
+  namespace: mosquitto
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

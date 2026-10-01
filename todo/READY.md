@@ -28,6 +28,10 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   Home Assistant doesn't use Bluetooth, so the `/run/dbus` mount can go. Its `/dev/ttyAMA0` / `/dev/serial0` devices
   (the Pi's GPIO UART) were for an integration that never worked and isn't in use, so drop them and `privileged: true`
   rather than carrying them over.
+  **Mosquitto is first (in progress):** manifests are in `manifests/mosquitto/`, VIP `192.168.102.131`
+  (`mqtt.jakerobb.org`). After the PR merges, repoint Zigbee2MQTT (`mqtt://mosquitto:1883` in
+  `docker-compose/zigbee2mqtt/configuration.sops.yaml`) and Home Assistant's MQTT integration (UI, in `.storage`) at it,
+  then remove `mosquitto` from the Compose file and move this item to `DONE.md`.
 - **scrypted** — camera/NVR bridge
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
   as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it

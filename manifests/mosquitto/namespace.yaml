@@ -1,0 +1,10 @@
+# Explicit, labeled Namespace rather than relying on CreateNamespace=true —
+# applied by mosquitto's own Application (argocd/apps/mosquitto/application.yaml)
+# alongside the rest of this directory. Same reasoning as ntfy/namespace.yaml.
+#
+# No PodSecurity override needed: the pod runs fully non-root with all
+# capabilities dropped (see deployment.yaml).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mosquitto
