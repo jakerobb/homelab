@@ -1,6 +1,9 @@
 # Bare Deployment, no Helm chart: single container, no per-environment variation
 # (same reasoning as ntfy/deployment.yaml).
 #
+# Pinned to 8.1.0: the 8.1.1 and 8.1.2 GitHub releases have no image on ghcr (checked
+# 2026-10-01); bump once they're published.
+#
 # Migrated from the docker-compose `matter-server` service on rpi5-1.
 #
 # hostNetwork, like the Compose version's `network_mode: host`. Matter finds devices with
@@ -78,7 +81,7 @@ spec:
               name: data
       containers:
         - name: matter-server
-          image: ghcr.io/home-assistant-libs/python-matter-server:8.1.2
+          image: ghcr.io/home-assistant-libs/python-matter-server:8.1.0
           imagePullPolicy: IfNotPresent
           # Same arguments as the image's default CMD, plus the interface found from the
           # node's default route.
