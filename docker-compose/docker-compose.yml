@@ -146,25 +146,11 @@ services:
       - /:/hostfs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  mosquitto:
-    image: eclipse-mosquitto:2.1.2-alpine
-    container_name: mosquitto
-    restart: unless-stopped
-    <<: *dns
-    volumes:
-      - ./mosquitto/config:/mosquitto/config:ro
-      - ./mosquitto/data:/mosquitto/data
-      - ./mosquitto/log:/mosquitto/log
-    ports:
-      - "1883:1883"
-
   zigbee2mqtt:
     image: koenkk/zigbee2mqtt:2.14.1
     container_name: zigbee2mqtt
     restart: unless-stopped
     <<: *dns
-    depends_on:
-      - mosquitto
     volumes:
       - ./zigbee2mqtt/data:/app/data
     ports:

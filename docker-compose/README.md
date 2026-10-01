@@ -45,8 +45,7 @@ seconds of creating the symlink, caught and fixed before anything actually
 restarted and failed on it): `homeassistant/{configuration,automations,
 scenes,scripts}.yaml`, `homeassistant/blueprints/`,
 `homeassistant/lutron_caseta-*.pem`, `change-detection/url-watches.json`,
-`unbound/custom.conf.d/local.conf`,
-`mosquitto/config/`.
+`unbound/custom.conf.d/local.conf`.
 
 **Why those specifically fail** — two distinct Docker bind-mount behaviors,
 confirmed live against this stack, not just theory:
@@ -111,7 +110,7 @@ and database files are **not** committed:
   coordinator backup without the live network key means re-pairing every
   Zigbee device if the coordinator ever needs replacing — the network key
   itself is captured, encrypted, below).
-- `mosquitto/data/`, `mosquitto/log/`, `ntfy/cache/`.
+- `ntfy/cache/`.
 - `nut-conf/` — genuinely empty (confirmed 2026-09-20, permissions had
   drifted to unreadable — fixed to `u+x`), and unreferenced by anything: the
   `nut-upsd` container generates its real `/etc/nut/ups.conf` itself

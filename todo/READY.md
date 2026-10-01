@@ -24,14 +24,19 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 ### To be migrated
 
 - **Home automation stack** (`homeassistant`, `zigbee2mqtt`, `zwave-js-ui`,
-  `matter-server`, `mosquitto`) — none hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
+  `matter-server`) — none hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
   Home Assistant doesn't use Bluetooth, so the `/run/dbus` mount can go. Its `/dev/ttyAMA0` / `/dev/serial0` devices
   (the Pi's GPIO UART) were for an integration that never worked and isn't in use, so drop them and `privileged: true`
   rather than carrying them over.
-  **Mosquitto is first (in progress):** manifests are in `manifests/mosquitto/`, VIP `192.168.102.131`
-  (`mqtt.jakerobb.org`). After the PR merges, repoint Zigbee2MQTT (`mqtt://mosquitto:1883` in
-  `docker-compose/zigbee2mqtt/configuration.sops.yaml`) and Home Assistant's MQTT integration (UI, in `.storage`) at it,
-  then remove `mosquitto` from the Compose file and move this item to `DONE.md`.
+  `mosquitto` already moved; see [`DONE.md`](DONE.md).
+  **Decide config ownership per service before moving each one.** Zigbee2MQTT, `zwave-js-ui` and `change-detection`
+  rewrite their own config files, and a ConfigMap/Secret mount is read-only, so they can't save UI changes there. Pick
+  one: seed the file into the PVC once (the app owns it afterward, so UI edits survive but git isn't authoritative), or
+  overwrite it on every start (git wins, UI edits are lost). For Zigbee2MQTT, lean toward seeding once, and pass the
+  network key and PAN IDs as `ZIGBEE2MQTT_CONFIG_*` env vars from a Secret so no secret lives in a file the app
+  rewrites. That depends on settling secret handling first (KSOPS or ESO; SOPS isn't wired into ArgoCD yet). The
+  compose-deploy drift check (byte hashes) can't clear after a Zigbee2MQTT UI save, because it writes single-quoted
+  keys and sops can only emit double-quoted ones. That's not worth fixing, since all three services are moving.
 - **scrypted** — camera/NVR bridge
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
   as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it
