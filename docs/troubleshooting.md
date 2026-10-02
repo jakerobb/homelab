@@ -112,8 +112,9 @@ one, reapply both. See [UniFi GC report](unifi-gc-report.md).
 
 A known UniFi UPS firmware bug. The outlets keep supplying power the whole
 time; only management is lost. What fixed it last time (2026-09-20): factory
-reset, adopt again, then upgrade to firmware 1.6.4 or later. See
-[FUTURE](../todo/READY.md#ups-tower-adoption-bug-follow-up).
+reset, adopt again, then upgrade to firmware 1.6.4 or later (no recurrence
+through 2026-10-01). Discussion:
+[UniFi UPS 1.6.4 release thread](https://community.ui.com/releases/UniFi-UPS-1-6-4/3170942e-7d0e-48b6-81c0-a8bb5d3edd78).
 
 ## An ArgoCD app won't sync
 
