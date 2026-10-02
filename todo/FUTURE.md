@@ -243,7 +243,6 @@ Runbook: [`../argocd/README.md`](../argocd/README.md#homeassistant-migrated-from
 (revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08** (one
 week after the cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/scrypted`. It holds the HomeKit pairing identities, so
 don't leave it around indefinitely. Make sure a nightly backup has landed in the `scrypted-backups` PVC first.
-Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`, and add a Scrypted entry to
-[`DONE.md`](DONE.md) once the cutover is verified (the migration PR didn't add one, because the cutover is a manual step).
+Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`.
 Also add an alert for a failed `scrypted-backup` Job.
 Runbook: [`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01), step 5.

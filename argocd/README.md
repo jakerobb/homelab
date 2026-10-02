@@ -1774,6 +1774,8 @@ ready, probably 5 minutes. The UniFi cameras themselves keep recording to Protec
    - Both cameras appear in Apple Home without re-pairing, live view starts, and an HKSV recording is made (trigger motion
      and check Apple Home's recorded clips).
    - Run the backup once: `kubectl -n scrypted create job --from=cronjob/scrypted-backup scrypted-backup-test`.
+   - If a camera's live view won't load and the log says "video codec must be h264 but is h265", set its encoding to
+     Standard in UniFi Protect (Enhanced is H.265, which HomeKit can't play). That was the Garage camera's problem.
 5. After a week of stable behavior, delete `~/docker/scrypted/` on rpi5-1 (see `todo/FUTURE.md`). Until then it's the
    rollback: revert the PR and restore the Compose service (the restore script never modifies the old directory). Anything
    changed in the new instance since the cutover is lost on rollback.
