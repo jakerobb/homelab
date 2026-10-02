@@ -736,3 +736,11 @@ the CRI/sandboxd boot race (siderolabs/talos#14374). The config is
 procedure and one memory-pressure gotcha are in
 [`../talos/README.md`](../talos/README.md#workload-isolation-talos-114-feature-enabled-2026-10-01). democratic-csi
 iSCSI and node-exporter both work under it.
+
+## Renovate npm install breakage (`@yarnpkg/core@4.9.2`)
+
+**Done (2026-10-02).** `npm install renovate@44.131.1+` failed with `EUNSUPPORTEDPROTOCOL` because `@yarnpkg/core@4.9.2`
+depended on a yarn-only `patch:got@...` spec, which broke the "Renovate config" lint check on every PR. Fixed upstream
+([renovatebot/renovate#46656](https://github.com/renovatebot/renovate/discussions/46656)); `renovate@44.132.2` installs
+cleanly. The in-cluster CronJob image (`manifests/renovate/cronjob.yaml`) was bumped to 44.132.2 at the same time. Nothing
+in the repo needed fixing otherwise, and no workaround pin was applied.

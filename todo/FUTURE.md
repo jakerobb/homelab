@@ -246,26 +246,3 @@ don't leave it around indefinitely. Make sure a nightly backup has landed in the
 Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`.
 Also add an alert for a failed `scrypted-backup` Job.
 Runbook: [`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01), step 5.
-
-## Renovate npm install breakage (`@yarnpkg/core@4.9.2`)
-
-**Waiting on:** a fix for `npm install renovate@44.131.1+` failing with `EUNSUPPORTEDPROTOCOL` on a `patch:` dependency. It
-broke the PR lint check "Renovate config" (`suzuki-shunsuke/github-action-renovate-config-validator`, which runs the
-latest Renovate via `npx`) on 2026-10-01, and it fails on any PR until it's fixed. Cause: Renovate 44.131.1 bumped
-`@yarnpkg/core` to 4.9.2, whose published manifest depends on `got` as a yarn-only `patch:got@npm%3A11.8.2#...`
-spec (4.9.1 had `^11.7.0`). 44.131.0 and earlier install fine, and our `renovate.json` validates against them.
-Reported 2026-10-02 as a Renovate discussion:
-<https://github.com/renovatebot/renovate/discussions/46656> (outside contributors can't open issues). Our config didn't
-change and nothing in the repo needs fixing; no workaround is applied.
-
-**Watch for, and tell Jake about:**
-- Replies on the discussion, especially questions directed at Jake (maintainers may ask for more detail or a repro).
-- Any issue the maintainers open from it, which Jake should follow (and likely subscribe to).
-- A patch or PR submitted or merged, in Renovate (pinning `@yarnpkg/core` back to 4.9.1, or moving to a fixed
-  version) or upstream in yarnpkg/berry (a corrected `@yarnpkg/core` publish).
-- A release that includes the fix. Confirm it with `npm i renovate@latest --dry-run` in an empty directory (no
-  `EUNSUPPORTEDPROTOCOL`), and check whether `npm view @yarnpkg/core dist-tags` has moved past 4.9.2.
-
-**When it's fixed:** re-run the failed "Renovate config" lint job on any open PR that hit it, then delete this item. If it
-drags on and PRs are blocked, pinning the validator to Renovate 44.131.0 in `.github/workflows/lint.yml` is the
-fallback; remove the pin once a fixed release is out.
