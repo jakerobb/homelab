@@ -1,0 +1,12 @@
+# Workload isolation (Talos 1.14+): runs CRI containerd, the kubelet and all
+# pods in a dedicated PID + mount namespace anchored by `sandboxd`. See
+# talos/README.md, "Workload isolation (Talos 1.14 feature)".
+#
+# Needs Talos >= 1.14.2 (earlier releases restart-loop for 1-3 minutes on every
+# boot, siderolabs/talos#14374). Takes effect on the next boot of the node.
+#
+# This is a standalone machine-config *document*, not a strategic-merge patch of
+# the v1alpha1 config, so it's applied with `talosctl patch machineconfig`.
+apiVersion: v1alpha1
+kind: SecurityProfileConfig
+workloadIsolation: true

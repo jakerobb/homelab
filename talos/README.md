@@ -754,35 +754,50 @@ Also fixed the same setting in the shared `~/talos/homelab/controlplane.yaml`
 template on rpi5-1, so a future from-scratch control-plane node won't
 reintroduce this.
 
-## Workload isolation (Talos 1.14 feature): not enabled
+## Workload isolation (Talos 1.14 feature): enabled 2026-10-01
 
-Considered enabling `SecurityProfileConfig`'s `workloadIsolation: true` (runs
-CRI/kubelet/all pods in a dedicated PID+mount namespace that Talos can tear
-down and relaunch without a full reboot if it dies). Not enabled — found a
-confirmed blocker, not just a theoretical one:
+[`patches/security-profile.yaml`](patches/security-profile.yaml) adds a `SecurityProfileConfig` document with
+`workloadIsolation: true` to every node. CRI containerd, the kubelet and all pods now run in a dedicated PID + mount
+namespace anchored by `sandboxd` (`talosctl -n <ip> service sandboxd`, `talosctl logs sandboxd`), which Talos can
+tear down and relaunch without a full reboot if it dies.
 
-- [siderolabs/talos#14374](https://github.com/siderolabs/talos/issues/14374):
-  a startup race between CRI and `sandboxd` causes every node to
-  restart-loop (`sandbox namespace not available yet`, kubelet down,
-  `NotReady`) for 1–3 minutes on **every boot** with isolation enabled.
-  Fixed upstream 2026-09-16 — one day *after* our current `v1.14.1` was
-  published (2026-09-15). **Update 2026-10-01:** `v1.14.2` (2026-09-29) carries
-  the fix, and the cluster is now on it.
-- Softer, unverified risk: `node-exporter` runs `hostPID`/`hostNetwork` and
-  mounts `/proc`/`/sys`/`/` from the host to read real host metrics — under
-  isolation its process-level metrics may describe the sandbox instead of
-  the true host unless specific collector exclusions are configured, which
-  ours aren't today.
+It was held back on v1.14.1 by [siderolabs/talos#14374](https://github.com/siderolabs/talos/issues/14374), a startup
+race between CRI and `sandboxd` that restart-looped every node for 1-3 minutes on every boot. v1.14.2 fixes it. No
+boot showed the `sandbox namespace not available yet` error on any of the 6 nodes.
 
-democratic-csi is *not* at risk from this feature when it does get enabled
-— it's a real CSI driver (attach/mount happens in its own privileged node
-pod), not the in-tree iSCSI volume plugin that workload isolation is known
-to break.
+**Rollout (2026-10-01):** canary on talos-worker-2, then talos-worker-1, talos-worker-mbp, and talos-cp-1, -2, -3,
+one at a time, each cordoned and drained first. Per node:
 
-Tracked in [`../todo/FUTURE.md`](../todo/FUTURE.md) — blocked on a Talos
-release shipping with the CRI/sandboxd race (#14374) actually fixed; check
-the changelog for that issue specifically before assuming a later patch
-release includes it.
+```bash
+kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
+talosctl patch machineconfig -n <node-ip> -p @security-profile.yaml --mode=auto   # applies, does NOT reboot
+talosctl reboot -n <node-ip> --wait
+kubectl uncordon <node>
+```
+
+`talosctl patch machineconfig` takes `auto|no-reboot|staged|try` (there's no `reboot` mode), and `auto` doesn't reboot
+for this document, so the explicit `reboot` is what turns isolation on. The patch appends a new document, so applying
+it twice duplicates nothing but is pointless; check `get machineconfig -o yaml | grep workloadIsolation` first. It's
+also appended to the `controlplane.yaml` and `worker.yaml` templates on rpi5-1 (backups `*.bak-20261001`), so new
+nodes get it.
+
+**What was checked on the canary, and held up:**
+
+- **democratic-csi iSCSI still works.** A fresh `hexos-iscsi` PVC pinned to the isolated node provisioned, attached,
+  mounted and took a write. This was the main risk: the deprecated *in-tree* iSCSI plugin breaks under isolation,
+  but democratic-csi is a real CSI driver that does the attach in its own privileged pod. (The test PVC's `Retain`
+  PV was switched to `Delete` so its zvol went away too.)
+- **node-exporter still reports real host numbers.** Memory total, filesystem count, load and the `up` series on the
+  isolated node matched its un-isolated neighbour. The `hostPID`/`/proc` concern turned out not to matter for the
+  node-level collectors we use.
+- Cilium, Authelia, ArgoCD, SigNoz and Prometheus all came back Healthy, `Watchdog` was the only alert firing, and
+  the only restarts were the democratic-csi registrars, which restart on every node reboot anyway.
+
+**Operational note:** draining talos-worker-mbp pushes most of its pods onto the other two workers, which have 8GB
+each. worker-1 ended up at 99% of allocatable memory requests, and its node-exporter pod sat `Pending`
+(`Insufficient memory`) after the node came back. Pods don't move back on their own, so delete a big movable pod
+there (the SigNoz otel-collector was one) and let the scheduler place it on the emptier MBP, or wait for the
+descheduler's nightly run. Let pods settle between nodes, and don't drain the MBP while another worker is mid-reboot.
 
 ## Container log size limits (added 2026-09-18)
 
@@ -1009,7 +1024,7 @@ recurrence since. Worth capturing here if/when that's dug up.
   (hostname plus the iSCSI kernel-module/extraMounts settings — see
   "iscsi-tools extension" below).
 - `discovery-registry-fix.yaml`, `kubelet-log-limits.yaml`,
-  `kubelet-parallel-image-pulls.yaml`, `nameservers.yaml` — shared Talos machine-config patches
+  `kubelet-parallel-image-pulls.yaml`, `nameservers.yaml`, `security-profile.yaml` — shared Talos machine-config patches
   applied to every node (control planes and workers alike).
 
 ## MS-A2 workers: decided values (2026-09-11)

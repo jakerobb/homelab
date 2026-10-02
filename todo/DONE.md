@@ -724,3 +724,11 @@ Checked before upgrading:
   `VOLUME_ACCESSIBILITY_CONSTRAINTS`, and democratic-csi's iSCSI/NFS drivers don't, so nothing changes; v4's
   volume-mode-conversion check only affects restores from snapshots, which aren't in use.
 
+## Talos workload isolation (`SecurityProfileConfig`)
+
+**Done (2026-10-01).** `workloadIsolation: true` is on all 6 nodes, rolled out one at a time after Talos v1.14.2 fixed
+the CRI/sandboxd boot race (siderolabs/talos#14374). The config is
+[`../talos/patches/security-profile.yaml`](../talos/patches/security-profile.yaml); the canary results, per-node
+procedure and one memory-pressure gotcha are in
+[`../talos/README.md`](../talos/README.md#workload-isolation-talos-114-feature-enabled-2026-10-01). democratic-csi
+iSCSI and node-exporter both work under it.
