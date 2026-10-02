@@ -80,21 +80,6 @@ suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, set b
 and `speedtest`, which are released in lockstep) to that version. Renovate tracks them from there. (It ran on Compose
 until 2026-09-28; see [`DONE.md`](DONE.md).)
 
-## Talos workload isolation (`SecurityProfileConfig`)
-
-**Unblocked 2026-09-30:** Talos v1.14.2 (2026-09-29) includes the fix (`fix: use correct conditions on CRI <> sandboxd dependency`). Was waiting on a release that fixes
-[siderolabs/talos#14374](https://github.com/siderolabs/talos/issues/14374) — a
-startup race between CRI and `sandboxd` that causes every node to
-restart-loop for 1–3 minutes on every boot with `workloadIsolation: true`
-enabled. Fixed upstream 2026-09-16, one day after the currently-running
-Talos version was published, so we're still on the affected release. See
-[`../talos/README.md`](../talos/README.md#workload-isolation-talos-114-feature-not-enabled)
-for what this feature would buy us and why it's otherwise appealing. No
-target date — check the changelog of each new Talos release for #14374
-specifically before assuming it's fixed.
-
-Next step: the nodes are on v1.14.2 as of 2026-10-01, so enable the feature and confirm a clean boot on one node before rolling it out.
-
 ## UPS Tower adoption-bug follow-up
 
 **Unblocked 2026-10-01:** the stability window after the 2026-09-20 fix (factory reset + re-adopt + UniFi UPS firmware
