@@ -69,17 +69,6 @@ window. Rough steps:
 
 Then add the IPv6 VIP to the Server and Trusted VLANs' IPv6 DNS servers next to the jump box's.
 
-## NetworkOptimizer preview pin → stable release
-
-**Unblocked 2026-09-30:** the stable NetworkOptimizer **2.9.0** release shipped 2026-09-29. Was waiting on it
-([Ozark-Connect/NetworkOptimizer releases](https://github.com/Ozark-Connect/NetworkOptimizer/releases)). On 2026-09-24
-the app was pinned to `ghcr.io/ozark-connect/network-optimizer:2.9.0-preview2` (bumped to `-preview7` on 2026-09-28) to
-try out a new feature the developer asked us to test. Renovate won't move it either: it treats `-previewN` as a variant
-suffix, so it never proposes a plain `2.9.0`. Once 2.9.0 (or later) ships, set both containers in
-[`../manifests/network-optimizer/deployment.yaml`](../manifests/network-optimizer/deployment.yaml) (`network-optimizer`
-and `speedtest`, which are released in lockstep) to that version. Renovate tracks them from there. (It ran on Compose
-until 2026-09-28; see [`DONE.md`](DONE.md).)
-
 ## Secrets rotation (external systems)
 
 The goal is peace of mind and following best practice, not a compliance regime. Nothing has ever been rotated, and

@@ -1349,9 +1349,10 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   refused`. Fixed in the UI (Settings, InfluxDB URL) by pointing it at
   `http://rpi5-1.lan:8086`, the Compose InfluxDB, which is published on the
   host. Superseded on 2026-09-29 by the app's own InfluxDB; see below.
-- **Version:** still on `2.9.0-preview7` for both containers, the build the
-  migrated db was last opened with. See
-  [`../todo/READY.md`](../todo/READY.md#networkoptimizer-preview-pin--stable-release).
+- **Version:** stable `2.9.0` for both containers (on `2.9.0-preview2` to
+  `-preview7` from 2026-09-24 to 2026-10-01, to test a feature the developer
+  asked for). The migrated db was last opened with 2.9.0, so don't drop back to
+  2.8.x. Renovate tracks the tags from here.
 - **Pod security:** `baseline`, not hardened like unpoller/ntfy. The image's
   entrypoint starts as root to set the timezone and chown the data dir, then
   drops to UID 1654 with `gosu`, and traceroute/ping rely on `NET_RAW`. The

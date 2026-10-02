@@ -59,11 +59,9 @@ spec:
             value: "4096 65536 33554432"
       containers:
         - name: network-optimizer
-          # Still on the 2.9.0 preview the developer asked us to try (see
-          # docker-compose.yml's history). The migrated db was last opened by
-          # this version, so don't drop back to 2.8.x stable. Move to 2.9.0
-          # once it's released.
-          image: ghcr.io/ozark-connect/network-optimizer:2.9.0-preview7
+          # The migrated db was last opened by 2.9.0, so don't drop back to
+          # 2.8.x.
+          image: ghcr.io/ozark-connect/network-optimizer:2.9.0
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
@@ -146,7 +144,7 @@ spec:
               name: logs
         - name: speedtest
           # Released in lockstep with the app; keep the tags matched.
-          image: ghcr.io/ozark-connect/speedtest:2.9.0-preview7
+          image: ghcr.io/ozark-connect/speedtest:2.9.0
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
