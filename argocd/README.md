@@ -1392,9 +1392,9 @@ observability stack retires, so it now has its own:
 - **No secrets in the manifests.** The metadata (org `home`, the `admin`
   user and token, the app's bucket-scoped token, bucket IDs) came from a
   `--full` restore of the Compose instance's backup, so the `admin`
-  password is still `INFLUXDB_ADMIN_PASSWORD` in
-  [`../docker-compose/.env.sops.env`](../docker-compose/.env.sops.env), and
-  the app's stored token kept working. On an empty PVC the pod starts
+  password is still the old `INFLUXDB_ADMIN_PASSWORD` from
+  `docker-compose/.env.sops.env` (deleted from that file on 2026-10-01; it's
+  in git history), and the app's stored token kept working. On an empty PVC the pod starts
   un-onboarded. Onboard it with `influx setup`, then either restore a
   backup the same way or re-run the app's InfluxDB setup wizard.
 - **UI.** `https://influxdb.jakerobb.org`, moved here from

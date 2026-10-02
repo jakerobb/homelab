@@ -368,8 +368,8 @@ notification-channel APIs were opened to the Terraform service account's key in 
 `logs.jakerobb.org` routes, their Authelia rules and Homepage and Glance tiles went with them. History in InfluxDB and
 VictoriaLogs was not migrated. The old data was left on rpi5-1 (`~/docker/influxdb/`, `~/docker/grafana/`, and the
 `docker_victorialogs-data` volume); delete it when you're sure. `INFLUXDB_ADMIN_PASSWORD` and `INFLUXDB_ADMIN_TOKEN`
-stay in `docker-compose/.env.sops.env`, because NetworkOptimizer's in-cluster InfluxDB was restored from that
-instance's metadata.
+were kept in `docker-compose/.env.sops.env` for NetworkOptimizer's in-cluster InfluxDB (restored from that
+instance's metadata), then deleted from it on 2026-10-01. They're still in git history if the admin login is ever needed.
 
 ## NetworkOptimizer's own InfluxDB
 
