@@ -22,7 +22,7 @@ spec:
           serviceAccountName: pv-janitor
           containers:
             - name: pv-janitor
-              image: docker.io/library/python:3.14.7-alpine3.24
+              image: docker.io/library/python:3.14.8-alpine3.24
               command: [python3, /app/pv-janitor.py]
               env:
                 - name: GRACE_DAYS
