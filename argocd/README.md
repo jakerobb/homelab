@@ -157,7 +157,7 @@ on every device, no manually-added DNS entries per app:
    `jakerobb.org` zone → Create → copy the token (shown once).
 2. Paste it into the `api-token` field of the `cloudflare-api-token` item in
    the `homelab-k8s` 1Password vault. ESO updates both namespaces' Secrets
-   within the hour; see "Adding or rotating a secret" under "External
+   within 24 hours; see "Adding or rotating a secret" under "External
    Secrets Operator" to sync sooner.
 
 ## Authelia SSO (decided 2026-09-13)
@@ -603,8 +603,18 @@ apply -f -`), which ArgoCD had no way to do itself.
   [`apps/external-secrets-config/`](apps/external-secrets-config/application.yaml)
   (wave 0). They're centralized because most consumers are Helm-only
   Applications with no `manifests/` directory of their own.
-- **Refresh:** `refreshInterval: 1h` on every `ExternalSecret`. That's about
-  20 field reads an hour, far below 1Password's service-account rate limits.
+- **Refresh:** `refreshInterval: 24h` on every `ExternalSecret` (was `1h` until
+  2026-10-02). The binding limit is 1Password's *daily* cap of 1,000 combined
+  requests (Individual/Families; rolling 24h window, shared by every service
+  account). The 1Password SDK provider costs more than one request per field,
+  so hourly refreshes of 18 ExternalSecrets used about 1,000 a day. On
+  2026-10-02 the store hit the cap at 03:04 EDT and every ExternalSecret
+  failed with `rate limit exceeded` until 10:06, exactly 24h after the ESO pod
+  started at 10:04 the day before (the restart re-reads everything at once).
+  Failed retries (~150/hour) probably kept it pegged. Nothing broke, since the
+  last synced Secrets stayed in place. Cost of the longer interval: a rotated
+  value can take up to 24h to land, so force a sync (below) when it matters,
+  and note that every ESO restart re-reads all ExternalSecrets in one burst.
 - **1Password outages:** ESO copies values into ordinary Secrets in etcd, and
   pods read those, never 1Password. During an outage, running pods, restarts,
   reschedules and node reboots all keep working. Only new or changed values
@@ -628,7 +638,7 @@ apply -f -`), which ArgoCD had no way to do itself.
 To rotate a value, edit the field in the `homelab-k8s` vault. To add one,
 create a Secure Note there (one concealed field per Secret key) and add an
 `ExternalSecret` to `manifests/external-secrets-config/<app>.yaml`. Either
-way, sync now instead of waiting up to an hour (on rpi5-1):
+way, sync now instead of waiting up to 24 hours (on rpi5-1):
 
 ```bash
 kubectl -n <namespace> annotate externalsecret <name> force-sync=$(date +%s) --overwrite

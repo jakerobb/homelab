@@ -8,7 +8,7 @@ metadata:
   name: zwave-js-ui-security-keys
   namespace: zwave-js-ui
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword

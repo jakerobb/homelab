@@ -8,7 +8,7 @@ metadata:
   name: authelia-secrets
   namespace: authelia
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword
@@ -34,7 +34,7 @@ metadata:
   name: users-database
   namespace: authelia
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword
@@ -51,7 +51,7 @@ metadata:
   name: oidc-jwk
   namespace: authelia
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword

@@ -5,7 +5,7 @@ metadata:
   name: renovate-github-token
   namespace: renovate
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword
