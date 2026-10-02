@@ -121,3 +121,24 @@ the Prometheus spec in `argocd/apps/kube-prometheus-stack/application.yaml`, and
 series at last count).
 
 **Update 2026-10-03:** window has elapsed. PVC is at ~10.1 GB of 21 GB (48%), up from 8.8 GB on 09-30, so growth has slowed but is worth one more look before deciding on `retentionSize`.
+
+## Let ArgoCD manage its own Helm chart
+
+ArgoCD's own chart is the one recurring manual `helm upgrade`
+([`argocd/README.md`](../argocd/README.md#upgrading-argocd-itself)). Everything else, Cilium included, is an
+Application. Make ArgoCD adopt itself so a merged Renovate PR is the whole deploy, with no cron job or runner. (A cron on
+rpi5-1 like [compose-deploy](../docs/compose-deploy.md) would work but means parsing the version out of a README code
+block. A GitHub Actions deploy is out: the only runner is on rpi5-1, which holds the Talos secrets.)
+
+1. Add an `argocd` Application for `argo/argo-cd` with the values from
+   [`argocd/install/values.yaml`](../argocd/install/values.yaml) (multi-source with a `$values` ref, or `valuesObject`).
+   Renovate tracks its `targetRevision`.
+2. Start with manual sync, like Cilium, and flip to automated after watching a couple of upgrades. A bad version can break
+   the controller that's applying it; recovery is `helm install` against the same values from rpi5-1.
+3. One-time adoption: sync the Application over the live resources, then delete the stale Helm release Secrets
+   (`sh.helm.release.v1.argocd.*` in the `argocd` namespace) without uninstalling, so nobody runs `helm upgrade` against
+   stale state.
+4. Expect to need `ignoreDifferences` or sync options for the chart's CRDs, `argocd-initial-admin-secret` and the redis
+   secret-init job, so Argo doesn't fight them.
+5. Update "Upgrading ArgoCD itself" and the "Bootstrap pattern" section of `argocd/README.md` (the "manual permanently"
+   claim), and move the Renovate comment off the `helm install` block.
