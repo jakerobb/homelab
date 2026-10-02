@@ -8,7 +8,7 @@ metadata:
   name: homepage-proxmox-credentials
   namespace: homepage
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword
@@ -28,7 +28,7 @@ metadata:
   name: homepage-truenas-credentials
   namespace: homepage
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword
@@ -45,7 +45,7 @@ metadata:
   name: homepage-unifi-credentials
   namespace: homepage
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword

@@ -9,7 +9,7 @@ metadata:
   name: argocd-oidc-authelia
   namespace: argocd
 spec:
-  refreshInterval: 1h
+  refreshInterval: 24h
   secretStoreRef:
     kind: ClusterSecretStore
     name: onepassword

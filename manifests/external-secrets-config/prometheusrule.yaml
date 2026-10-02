@@ -3,7 +3,9 @@
 # 1Password that never lands, or a revoked/expired service-account token,
 # would otherwise go unnoticed until something restarts and gets a stale
 # credential rejected. 30m tolerates a transient 1Password blip; with the
-# 1h refreshInterval, one failed refresh stays Ready=False until the next.
+# 24h refreshInterval, one failed refresh stays Ready=False until the next
+# retry (ESO backs off and retries failures on its own, so this is usually
+# much sooner than 24h).
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -24,6 +26,10 @@ spec:
               The Secret still holds its last synced value. Check
               `kubectl -n {{ $labels.namespace }} describe externalsecret {{ $labels.name }}`
               for the provider error (missing item/field, bad token, rate limit).
+              A rate limit is 1Password's rolling 24h cap on service-account
+              requests (1,000/day on Individual/Families); failed retries count
+              against it, so it clears ~24h after the burst that caused it
+              (see the 2026-10-02 incident in argocd/README.md).
               If the error says `wasm error: out of bounds memory access`, the
               1Password SDK client is wedged for every ExternalSecret and
               never recovers on its own: run
