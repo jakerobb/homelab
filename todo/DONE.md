@@ -383,6 +383,10 @@ app needs Flux ([`FUTURE.md`](FUTURE.md#influxdb-2x-pin--3x)). Prometheus instea
 76 Flux queries would be a multi-week upstream rewrite. Details:
 [`../argocd/README.md`](../argocd/README.md#its-own-influxdb-added-2026-09-29).
 
+**Done (2026-10-01).** Moved both containers off `2.9.0-preview7` to the stable 2.9.0 release (shipped 2026-09-29). The
+preview had been pinned since 2026-09-24 to test a feature the developer asked for, and Renovate couldn't move it
+because it treats `-previewN` as a variant suffix. Renovate tracks the tags normally from here.
+
 ## ntfy (Compose workload migration)
 
 **Done 2026-09-20.** Migrated off the RPi5 16GB's Docker Compose stack into the cluster — see
