@@ -69,16 +69,6 @@ window. Rough steps:
 
 Then add the IPv6 VIP to the Server and Trusted VLANs' IPv6 DNS servers next to the jump box's.
 
-## UPS Tower adoption-bug follow-up
-
-**Unblocked 2026-10-01:** the stability window after the 2026-09-20 fix (factory reset + re-adopt + UniFi UPS firmware
-1.6.4.432 RC) has elapsed with no recurrence. Checked on 2026-10-01 on the controller (`ssh root@47Net.lan`): the UPS
-shows as "Office UPS" (USWDA23, now at 192.168.0.9, not .236), adopted, on firmware 1.6.4.432, checking in within the
-last minute, and `server.log` has no "Adopting" entries. Todo: post the accumulated diagnostic write-up (timeline,
-symptoms, fix) to the UniFi community thread —
-<https://community.ui.com/releases/UniFi-UPS-1-6-4/3170942e-7d0e-48b6-81c0-a8bb5d3edd78> — since Ubiquiti's UI-Team is
-actively engaging there.
-
 ## Secrets rotation (external systems)
 
 The goal is peace of mind and following best practice, not a compliance regime. Nothing has ever been rotated, and
