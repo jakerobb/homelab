@@ -135,7 +135,7 @@ Encrypted files (all under `docker-compose/`, matched by the
 
 | File | Contains |
 |---|---|
-| `.env.sops.env` | Cloudflare API token, NUT/UniFi credentials and tokens, app passwords. `INFLUXDB_ADMIN_PASSWORD` and `INFLUXDB_ADMIN_TOKEN` stay for NetworkOptimizer's in-cluster InfluxDB (restored from the Compose instance's metadata), no longer used by anything in Compose |
+| `.env.sops.env` | Cloudflare API token, NUT/UniFi credentials and tokens, app passwords |
 | `homeassistant/secrets.sops.yaml` | NUT UPS password used by the HA UPS integration |
 | `homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml` | Lutron Caséta bridge mTLS private key (the paired `-ca.pem`/`-cert.pem` are public certs, committed in the clear) |
 | `secrets/nut-upsd-password.sops.yaml` | NUT UPS daemon password (mounted into `nut-upsd` as a Docker secret) |

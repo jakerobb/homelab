@@ -90,4 +90,44 @@ symptoms, fix) to the UniFi community thread —
 <https://community.ui.com/releases/UniFi-UPS-1-6-4/3170942e-7d0e-48b6-81c0-a8bb5d3edd78> — since Ubiquiti's UI-Team is
 actively engaging there.
 
-## Consider secrets rotation
+## Secrets rotation (external systems)
+
+The goal is peace of mind and following best practice, not a compliance regime. Nothing has ever been rotated, and
+there's no inventory. The scope is deliberately narrow: credentials issued by an *external* system (a provider's API
+token, a service account), because those are the ones that grant access beyond this cluster and that a leak would
+make worst. Out of scope: Authelia's internal keys and OIDC client secrets, the SOPS age key, the Talos secrets
+bundle, and the Zigbee and Z-Wave network keys. Rotating those is invasive (re-pairing devices, re-encrypting the
+Authelia database, re-keying every SOPS file) for little gain at this scale.
+
+Rotating one of these is mostly small: create a new credential at the provider, put it in the `homelab-k8s` vault (or
+re-encrypt the SOPS file), force-sync and restart the consumer (see "Adding or rotating a secret" in
+[`../argocd/README.md`](../argocd/README.md#adding-or-rotating-a-secret)), confirm it works, then revoke the old one.
+The old credential should be revoked last, so nothing breaks in between.
+
+Rough inventory, to be checked against the repo, 1Password and each provider before trusting it:
+
+- **Cloudflare:** the cluster's API token (cert-manager and external-dns, from the `homelab-k8s` vault) and Terraform's
+  separate token (`terraform/cloudflare/secrets/`).
+- **TrueNAS:** API keys for democratic-csi (two drivers), `truenas-exporter` and Homepage. democratic-csi's key is
+  already due for replacement with a least-privilege user; see [`FUTURE.md`](FUTURE.md#democratic-csi-on-truenass-json-rpc-api-hold-hexostruenas-below-26x),
+  and rotate it as part of that.
+- **UniFi:** Homepage's API key, Unpoller's login, and `UNIFI_TOKEN` in the Compose `.env`.
+- **Proxmox:** the token Homepage uses and Terraform's token (`terraform/proxmox/secrets/`).
+- **GitHub:** the Renovate token, and the self-hosted runner's registration.
+- **Backblaze B2:** the Terraform state key, the etcd-backup key, and the P3 Plus backup key. All three should already
+  be scoped to one bucket each; confirm that, and that none is the master key.
+- **Brevo:** the SMTP login in `scripts/secrets/msmtprc.sops.yaml`.
+- **1Password:** the `homelab-external-secrets` service account token, which can be replaced as documented under
+  [ESO bootstrap](../argocd/README.md#eso-bootstrap-one-time-manual). It's the least risky one to practice on.
+- **Not in the repo:** account logins (Cloudflare, B2, GitHub, UniFi, HexOS/TrueNAS admin, Hover). Passwords and 2FA are
+  1Password's job; just check each account for long-lived API tokens nobody remembers creating.
+
+Suggested approach:
+
+1. Finish the Compose migration first, so the list shrinks (e.g. `UNIFI_TOKEN` and the NUT passwords may go with it).
+2. Write a runbook under `docs/` (and add it to `docs-site/mkdocs.yml`'s `nav:`): for each credential, which provider
+   issued it, its scopes, where it's stored, and how to rotate it. Note any that are over-privileged and replace them
+   with narrower or per-consumer credentials as you go, which is the bigger win than the rotation itself.
+3. Do one rotation of everything as a dry run, noting where it hurt.
+4. Set an expiry wherever the provider allows one, and otherwise a yearly calendar reminder to rotate. Rotate
+   immediately if a credential might have leaked (pasted somewhere, a laptop lost).
