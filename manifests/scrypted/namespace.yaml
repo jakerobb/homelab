@@ -1,0 +1,12 @@
+# Explicit, labeled Namespace, applied by the scrypted Application
+# (argocd/apps/scrypted/application.yaml) alongside the rest of this directory.
+#
+# `privileged` because the pod runs with hostNetwork: the HomeKit accessories are advertised
+# over mDNS, which never reaches a pod-network pod, and Talos enforces `baseline` cluster-wide,
+# which blocks hostNetwork.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scrypted
+  labels:
+    pod-security.kubernetes.io/enforce: privileged

@@ -272,7 +272,6 @@ there. Flex mini, currently unused
 
 Docker Compose is where everything started. It runs on rpi5-1, and includes the following containers:
 
-* scrypted
 * nut-upsd
 * change-detection
 * browserless
@@ -321,6 +320,7 @@ Operations
 
 Applications
 * Home Assistant
+* Scrypted
 * homepage
 * searxng
 * docs

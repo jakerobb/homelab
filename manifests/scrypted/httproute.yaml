@@ -1,0 +1,16 @@
+# Deliberately NOT gated by Authelia: the app has its own login.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: scrypted
+  namespace: scrypted
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - scrypted.jakerobb.org
+  rules:
+    - backendRefs:
+        - name: scrypted
+          port: 11080

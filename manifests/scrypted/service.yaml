@@ -1,0 +1,14 @@
+# Web UI, behind the Gateway (see httproute.yaml). The pod runs on the host network, so the
+# backend is the node's IP:11080 and this Service follows the pod around.
+apiVersion: v1
+kind: Service
+metadata:
+  name: scrypted
+  namespace: scrypted
+spec:
+  selector:
+    app.kubernetes.io/name: scrypted
+  ports:
+    - name: http
+      port: 11080
+      targetPort: http

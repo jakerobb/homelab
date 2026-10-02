@@ -1,0 +1,86 @@
+# Nightly backup of /server/volume to the scrypted-backups PVC (hexos-nfs, so a different
+# dataset on the NAS from the iSCSI volume). Keeps 14 days.
+#
+# scrypted.db holds the HomeKit pairing identities: lose it and both cameras have to be
+# re-added to Apple Home. The plugins/ directory is re-downloadable but small, so it's included.
+#
+# scrypted.db is a LevelDB directory that's open while the pod runs, so a backup taken live
+# can in principle be torn. In practice LevelDB's files are append-only/immutable, and the
+# restore path (below) has been the better bet than losing everything. Treat it as a safety
+# net, not a guarantee.
+#
+# Same node as the scrypted pod (required podAffinity) because the data volume is
+# ReadWriteOnce: a second pod can mount it only from the node that already has it attached.
+# The job mounts it read-only. Root, because the volume is root-owned; the NFS export has
+# maproot=root (docs/nfs-storage.md).
+#
+# To restore: scale scrypted to 0, extract a backup over /server/volume from a throwaway pod,
+# scale back up.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scrypted-backup
+  namespace: scrypted
+spec:
+  schedule: "27 3 * * *"
+  timeZone: America/Detroit
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      template:
+        spec:
+          restartPolicy: Never
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: scrypted
+          containers:
+            - name: backup
+              image: busybox:1.37.0
+              command:
+                - sh
+                - -euc
+                - |
+                  cd /server/volume
+                  set -- $(ls -A | grep -Ev '^\.restored$')
+                  out=/backups/scrypted-$(date +%Y%m%d-%H%M%S).tar.gz
+                  tar -czf "$out.tmp" "$@"
+                  mv "$out.tmp" "$out"
+                  find /backups -name 'scrypted-*.tar.gz' -mtime +14 -delete
+                  ls -l /backups
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                  add: [DAC_OVERRIDE]
+                readOnlyRootFilesystem: true
+                runAsUser: 0
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi
+              volumeMounts:
+                - mountPath: /server/volume
+                  name: data
+                  readOnly: true
+                - mountPath: /backups
+                  name: backups
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: scrypted-data
+                readOnly: true
+            - name: backups
+              persistentVolumeClaim:
+                claimName: scrypted-backups

@@ -1,0 +1,30 @@
+# /server/volume: scrypted.db (a LevelDB directory: device settings, plugin state and the
+# HomeKit pairing identities) and plugins/ (downloaded plugin code). ~72Mi at time of migration.
+#
+# hexos-iscsi, like the other stateful apps. After a HexOS outage, iSCSI volumes on the mbp
+# worker can go silently read-only; delete the pod to recover (see argocd/README.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scrypted-data
+  namespace: scrypted
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Nightly backups (cronjob-backup.yaml). hexos-nfs so the backups sit on a different dataset
+# from the iSCSI volume they were taken from, and can be read from the NAS directly.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scrypted-backups
+  namespace: scrypted
+spec:
+  storageClassName: hexos-nfs
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 5Gi
