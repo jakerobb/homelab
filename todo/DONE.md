@@ -292,6 +292,21 @@ is pinned to 8.1.0 until they're published, and the first deploy sat in `ImagePu
 the cutover steps: [`../argocd/README.md`](../argocd/README.md#matter-server-migrated-from-docker-compose-2026-10-01). The old
 data on rpi5-1 is deleted on a schedule, see [`FUTURE.md`](FUTURE.md).
 
+## Scrypted (Compose workload migration)
+
+**Done (2026-10-02).** Moved to the cluster as a bare Deployment ([`../manifests/scrypted/`](../manifests/scrypted/)),
+bridging the UniFi cameras to HomeKit with HomeKit Secure Video. It stayed Scrypted rather than moving to Home
+Assistant's UniFi Protect + HomeKit Bridge, because HKSV is a requirement and that path has no HKSV. It runs on the host
+network, because each camera is a HomeKit accessory advertised over mDNS, in a namespace labeled `privileged`, like Home
+Assistant. State is a 5Gi `hexos-iscsi` PVC (`scrypted.db`, which holds the HomeKit pairing identities, plus `plugins/`)
+behind the same restore-gate init container, released by `scripts/scrypted-cutover/restore.sh`. A nightly CronJob backs it
+up to a `hexos-nfs` PVC, 14 days. The cameras reconnected in Apple Home with no re-pairing. Gotcha: the Garage camera's
+live view wouldn't load, because its UniFi encoding was set to Enhanced (H.265, 4K) and HomeKit needs H.264; Scrypted
+passes the stream through (`-vcodec copy`) rather than transcoding it. Setting the camera's encoding to Standard in
+Protect fixed it within seconds. It's unclear whether it worked on the Pi, which was never checked before the move. Details and the cutover steps:
+[`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01). The old data on rpi5-1 is
+deleted on a schedule, see [`FUTURE.md`](FUTURE.md).
+
 ## Z-Wave JS UI (Compose workload migration)
 
 **Done (2026-10-01).** Moved to the cluster as a bare Deployment ([`../manifests/zwave-js-ui/`](../manifests/zwave-js-ui/)),
