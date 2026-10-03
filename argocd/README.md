@@ -1953,11 +1953,9 @@ downloads included).
   GitHub outbound. No ingress or route. Each job starts a fresh pod
   (requests 1 CPU / 1Gi, memory limit 3Gi) on an amd64 node and deletes it when
   the job ends. `maxRunners: 3`.
-- **Stock runner image.** `ghcr.io/actions/actions-runner` has git, curl and
-  python3 but no node, pip, kubectl, helm or shellcheck. `lint.yml` installs
-  what it needs into `RUNNER_TEMP`, with checksums where upstream publishes
-  them, instead of baking a custom image. If setup time ever matters, a
-  derived image is the next step.
+- **Runner image.** Jobs run in `ghcr.io/jakerobb/homelab-arc-runner`, the stock
+  Actions runner plus everything `lint.yml` uses (see "Custom runner image"
+  below), so a job is checkout plus the checks.
 - **Isolation.** Job pods run code from PRs on a public repo, so: no
   ServiceAccount token, no privilege escalation, all capabilities dropped,
   and a NetworkPolicy allowing only DNS and non-RFC1918 egress, so they can't
@@ -1976,34 +1974,34 @@ downloads included).
   Renovate opens separate PRs for them, so merge both together, and read the
   release notes first: ARC's minor releases have carried breaking changes.
 
-### Custom runner image (built, not in use yet)
+### Custom runner image
 
-A warm lint job on the stock image took ~92s, mostly setup: Node and the
+On the stock runner image a warm lint job took ~92s, mostly setup: Node and the
 Renovate package (28s), `setup-python` (17s), the docs `pip install` (~12s)
-and the tool downloads. [`images/arc-runner/Dockerfile`](../images/arc-runner/Dockerfile)
-bakes all of it into the runner image instead: Python with PyYAML, pyflakes
-and the mkdocs pins, Node with `renovate`, helm, kubectl, kubeconform,
-shellcheck and actionlint. Tested on an arm64 build (the Pi, nothing cached):
-all the lint checks together took ~21s.
+and the tool downloads. A cold one took 213s: the `actions/cache` entry for
+the Renovate package is scoped to a PR's own branch (or `main`), and lint only
+runs on PRs, so nothing ever seeded it for the next PR.
+[`images/arc-runner/Dockerfile`](../images/arc-runner/Dockerfile) bakes all of it into the
+runner image instead: Python with PyYAML, pyflakes and the mkdocs pins, Node
+with `renovate`, helm, kubectl, kubeconform, shellcheck and actionlint. Tested
+on an arm64 build (the Pi, nothing cached): all the lint checks together took
+~21s.
 
-[`runner-image.yml`](../.github/workflows/runner-image.yml) builds it on a
-GitHub-hosted runner (ARC pods have no Docker). PRs build without pushing; a
-merge to `main` pushes `ghcr.io/jakerobb/homelab-arc-runner:1.<run number>`.
-Tool versions are `ARG`s with Renovate annotations, so bumps are PRs.
-
-Using it takes a second PR after the first image is published:
-
-1. Make the `homelab-arc-runner` package public (GitHub profile → Packages →
-   the package → Package settings → Change visibility), so the cluster can pull
-   it without credentials.
-2. Point the scale set's `image:` in
-   [`apps/arc-runners/application.yaml`](apps/arc-runners/application.yaml) at the
-   new tag, and change its Renovate annotation to the new `depName`.
-3. Drop `lint.yml`'s setup steps (`setup-python`, `setup-helm`, the kubeconform,
-   kubectl and shellcheck installs, and the env pins) and run the tools directly:
-   `renovate-config-validator --strict` and `actionlint` in place of the two
-   actions. Keep `pip install -r docs-site/requirements.txt`; it's a no-op unless
-   a PR changes the pins.
+- **Build.** [`runner-image.yml`](../.github/workflows/runner-image.yml) builds it on a
+  GitHub-hosted runner (ARC pods have no Docker). PRs build without pushing; a
+  merge to `main` pushes `ghcr.io/jakerobb/homelab-arc-runner:1.<run number>`.
+  The package is public, so the cluster pulls it without a secret. amd64 only
+  for now, matching the scale set's `nodeSelector`; the Dockerfile also builds
+  for arm64.
+- **Versions.** Tool versions are `ARG`s with Renovate annotations, and the
+  scale set's tag in [`apps/arc-runners/application.yaml`](apps/arc-runners/application.yaml)
+  is bumped by Renovate too. So a Dockerfile change takes two merges: one to
+  publish a new tag, then Renovate's PR to use it. `renovate` itself is
+  updated weekly, since each bump rebuilds the image.
+- **Docs pins.** `lint.yml` still runs `pip install -r docs-site/requirements.txt`.
+  It's a no-op until a PR changes the mkdocs pins, and then it installs the
+  new ones (the venv is owned by the `runner` user for that reason).
+- **The first job on a node** pulls the image (~2GB uncompressed).
 
 ### GitHub App and 1Password (one-time, manual)
 

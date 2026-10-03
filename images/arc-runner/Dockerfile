@@ -93,12 +93,14 @@ RUN npm install -g --no-fund --no-audit "renovate@${RENOVATE_VERSION}" \
 # Python: PyYAML (the scripts/ci checks), pyflakes (actionlint's `run: python`
 # checks), and the docs build's own pins, so `pip install -r
 # docs-site/requirements.txt` in lint.yml is a no-op unless a PR changes them.
-COPY images/arc-runner/requirements.txt /tmp/requirements.txt
-COPY docs-site/requirements.txt /tmp/docs-requirements.txt
+# Built as `runner` and left owned by it: when a PR does change the pins (a
+# Renovate mkdocs-material bump), that pip install has to be able to write.
+RUN install -d -o runner -g runner /opt/lint-venv
+COPY --chown=runner:runner images/arc-runner/requirements.txt /tmp/requirements.txt
+COPY --chown=runner:runner docs-site/requirements.txt /tmp/docs-requirements.txt
+USER runner
 RUN python3 -m venv /opt/lint-venv \
  && /opt/lint-venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt -r /tmp/docs-requirements.txt \
  && rm /tmp/requirements.txt /tmp/docs-requirements.txt
 
 ENV PATH=/opt/lint-venv/bin:$PATH
-
-USER runner
