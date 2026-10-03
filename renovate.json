@@ -13,6 +13,12 @@
   },
   "packageRules": [
     {
+      "description": "Renovate itself releases several times a day. It's baked into the ARC runner image (images/arc-runner/Dockerfile) just to validate renovate.json, and every bump rebuilds that image, so take it weekly.",
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["renovate"],
+      "schedule": ["before 5am on monday"]
+    },
+    {
       "description": "instantlinux/nut-upsd tags are <nut version>-r<Alpine package revision> (e.g. 2.8.5-r1). Default docker versioning treats `-r1` as a fixed variant suffix and would never propose -r2 or 2.8.6-r0; regex versioning treats the revision as a build number instead.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["instantlinux/nut-upsd"],
@@ -62,6 +68,14 @@
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+tag: '(?<currentValue>.*?)'"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Tool versions pinned as ARGs in the ARC runner image's Dockerfile (helm, kubectl, shellcheck, node, renovate, ...) via an explicit annotation comment on the line above, same pattern as the workflow env vars. The FROM line is handled by the built-in dockerfile manager.",
+      "managerFilePatterns": ["/^images/.+/Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG [A-Z_]+=(?<currentValue>\\S+)"
       ]
     },
     {

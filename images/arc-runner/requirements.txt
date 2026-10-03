@@ -1,0 +1,5 @@
+# Python packages baked into the ARC runner image (images/arc-runner/Dockerfile),
+# besides the docs build's own docs-site/requirements.txt. PyYAML is for
+# scripts/ci/*.py; pyflakes is for actionlint's checks of `run: python` blocks.
+pyyaml==6.0.3
+pyflakes==4.0.1

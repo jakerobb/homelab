@@ -1976,6 +1976,35 @@ downloads included).
   Renovate opens separate PRs for them, so merge both together, and read the
   release notes first: ARC's minor releases have carried breaking changes.
 
+### Custom runner image (built, not in use yet)
+
+A warm lint job on the stock image took ~92s, mostly setup: Node and the
+Renovate package (28s), `setup-python` (17s), the docs `pip install` (~12s)
+and the tool downloads. [`images/arc-runner/Dockerfile`](../images/arc-runner/Dockerfile)
+bakes all of it into the runner image instead: Python with PyYAML, pyflakes
+and the mkdocs pins, Node with `renovate`, helm, kubectl, kubeconform,
+shellcheck and actionlint. Tested on an arm64 build (the Pi, nothing cached):
+all the lint checks together took ~21s.
+
+[`runner-image.yml`](../.github/workflows/runner-image.yml) builds it on a
+GitHub-hosted runner (ARC pods have no Docker). PRs build without pushing; a
+merge to `main` pushes `ghcr.io/jakerobb/homelab-arc-runner:1.<run number>`.
+Tool versions are `ARG`s with Renovate annotations, so bumps are PRs.
+
+Using it takes a second PR after the first image is published:
+
+1. Make the `homelab-arc-runner` package public (GitHub profile → Packages →
+   the package → Package settings → Change visibility), so the cluster can pull
+   it without credentials.
+2. Point the scale set's `image:` in
+   [`apps/arc-runners/application.yaml`](apps/arc-runners/application.yaml) at the
+   new tag, and change its Renovate annotation to the new `depName`.
+3. Drop `lint.yml`'s setup steps (`setup-python`, `setup-helm`, the kubeconform,
+   kubectl and shellcheck installs, and the env pins) and run the tools directly:
+   `renovate-config-validator --strict` and `actionlint` in place of the two
+   actions. Keep `pip install -r docs-site/requirements.txt`; it's a no-op unless
+   a PR changes the pins.
+
 ### GitHub App and 1Password (one-time, manual)
 
 The scale set authenticates to GitHub as a GitHub App, not a personal token.
