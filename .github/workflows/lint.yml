@@ -42,7 +42,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.x"
-      - run: pip install pyyaml
+      # pyflakes is for actionlint's checks of `run: python` blocks: its action
+      # installs missing tools with pipx/sudo, neither of which the ARC pod has.
+      - run: pip install pyyaml pyflakes
       - uses: azure/setup-helm@v5
         with:
           version: ${{ env.HELM_VERSION }}
