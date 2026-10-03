@@ -4,11 +4,11 @@
 # and the cluster's workers render the manifests ~3x faster than ubuntu-latest.
 # Outside contributors' runs still need approval, per the repo setting.
 #
-# The runner image is stock (no kubectl, helm, shellcheck, node), so the
-# setup steps below install what ubuntu-latest had preinstalled.
+# The runner image (images/arc-runner/) has every tool the checks use, so a
+# job is just checkout plus the checks. Tool versions live in its Dockerfile.
 #
 # One job, not one per check: every check takes seconds, and each job pays
-# for its own pod start and tool setup.
+# for its own pod start.
 # PRs only — a merge to main re-runs checks the PR already passed.
 name: lint
 
@@ -26,47 +26,8 @@ jobs:
   lint:
     name: lint
     runs-on: arc-runner
-    env:
-      # renovate: datasource=github-releases depName=helm/helm
-      HELM_VERSION: v4.3.0
-      # renovate: datasource=github-releases depName=yannh/kubeconform
-      KUBECONFORM_VERSION: v0.8.0
-      # renovate: datasource=github-releases depName=kubernetes/kubernetes
-      KUBECTL_VERSION: v1.37.1
-      # renovate: datasource=github-releases depName=koalaman/shellcheck
-      SHELLCHECK_VERSION: v0.11.0
     steps:
-      # --- Setup: everything the checks need, before any check runs, so a
-      # failing check can't skip setup for the ones after it.
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.x"
-      # pyflakes is for actionlint's checks of `run: python` blocks: its action
-      # installs missing tools with pipx/sudo, neither of which the ARC pod has.
-      - run: pip install pyyaml pyflakes
-      - uses: azure/setup-helm@v5
-        with:
-          version: ${{ env.HELM_VERSION }}
-      - name: Install kubeconform
-        run: |
-          cd "$RUNNER_TEMP"
-          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
-          curl -fsSLO "${base}/kubeconform-linux-amd64.tar.gz"
-          curl -fsSL "${base}/CHECKSUMS" | grep ' kubeconform-linux-amd64.tar.gz$' | sha256sum -c -
-          tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      # kubectl is only for `kubectl kustomize` in render-manifests.py (no
-      # cluster access); shellcheck is preinstalled on ubuntu-latest, not here.
-      # Neither can use sudo (the pod blocks privilege escalation), so both
-      # go next to kubeconform in RUNNER_TEMP.
-      - name: Install kubectl and shellcheck
-        run: |
-          cd "$RUNNER_TEMP"
-          curl -fsSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-          echo "$(curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256")  kubectl" | sha256sum -c -
-          chmod +x kubectl
-          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.gz" | tar -xz --strip-components=1 "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
 
       # --- Checks: each runs even if an earlier one failed (!cancelled()),
       # so one run reports every problem, same as separate jobs did.
@@ -76,9 +37,7 @@ jobs:
 
       - name: Renovate config
         if: ${{ !cancelled() }}
-        uses: suzuki-shunsuke/github-action-renovate-config-validator@v2.2.0
-        with:
-          strict: "true"
+        run: renovate-config-validator --strict
 
       - name: Renovate can parse Applications
         if: ${{ !cancelled() }}
@@ -97,6 +56,7 @@ jobs:
           DOCS_GIT_DATES: "false"
           NO_MKDOCS_2_WARNING: "true"
         run: |
+          # A no-op unless the PR changes the pins the image was built with.
           pip install -r docs-site/requirements.txt
           mkdocs build --strict -f docs-site/mkdocs.yml -d "$RUNNER_TEMP/site"
 
@@ -128,4 +88,4 @@ jobs:
       # shellchecks workflow run: blocks too.
       - name: actionlint
         if: ${{ !cancelled() }}
-        uses: raven-actions/actionlint@v2
+        run: actionlint
