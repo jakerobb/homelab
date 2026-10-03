@@ -1,0 +1,4 @@
+# Build context is the repo root, but the image only copies two files from it.
+*
+!images/arc-runner/requirements.txt
+!docs-site/requirements.txt
