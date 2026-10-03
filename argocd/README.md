@@ -413,40 +413,32 @@ chart `kube-prometheus-stack` from `prometheus-community`.
   host-level access, so nothing else had hit this default before.
   Overridden per-namespace rather than touching the cluster-wide
   exemptions list.
-- **`crds.enabled: false` — this chart's CRDs are installed manually,
-  out-of-band, once** (see "kube-prometheus-stack CRDs" below), same
-  one-time-step pattern as the Cloudflare tokens/Authelia secrets above.
-  6 of the 10 CRDs (`Prometheus`, `Alertmanager`, `AlertmanagerConfig`,
-  `ScrapeConfig`, `PrometheusAgent`, `ThanosRuler`) are 600-860KB as
-  authored — almost entirely their OpenAPI schema, not
-  `metadata.annotations` (checked directly: `crd-prometheuses.yaml`'s own
-  authored annotations are 80 bytes). ArgoCD's diffing pipeline duplicates
-  the *entire* manifest into a `metadata.annotations` value somewhere in
-  that process and hits Kubernetes' 256KiB total-annotations limit —
-  confirmed neither `ServerSideApply=true` nor `Replace=true` sync options
-  avoid this (tried both, identical failure each time), while a plain
-  `kubectl create` outside ArgoCD entirely works instantly. Matches Helm's
-  own general convention of not touching CRDs on upgrade anyway.
-  **Consequence: bumping `targetRevision` needs a manual CRD re-apply if
-  that release changed any CRD schemas** — check the chart's release notes,
-  and re-run the step below against the new chart version if so.
-
-### kube-prometheus-stack CRDs (one-time, manual, and again on any CRD-affecting upgrade)
-
-```bash
-export KUBECONFIG=~/.kube/config
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update prometheus-community
-helm pull prometheus-community/kube-prometheus-stack \
-  --version <targetRevision from argocd/apps/kube-prometheus-stack/application.yaml> \
-  --untar --untardir /tmp/kps-chart
-kubectl create -f /tmp/kps-chart/kube-prometheus-stack/charts/crds/crds/
-```
-
-(`kubectl create`, not `apply` — same reasoning as above. If a CRD already
-exists this errors harmlessly on that one; re-run per-file with `kubectl
-replace -f` for just the changed ones on an upgrade instead of blanket
-re-creating.)
+- **`crds.enabled: true`, applied server-side.** ArgoCD manages this chart's
+  CRDs (changed 2026-10-02; they were installed by hand with `kubectl create`
+  until then). 6 of the 10 CRDs (`Prometheus`, `Alertmanager`,
+  `AlertmanagerConfig`, `ScrapeConfig`, `PrometheusAgent`, `ThanosRuler`) are
+  600-900KB as authored, almost entirely OpenAPI schema. Client-side apply
+  copies the whole manifest into the `last-applied-configuration` annotation
+  and hits Kubernetes' 256KiB annotation cap (`metadata.annotations: Too
+  long`). `ServerSideApply=true` avoids that by tracking ownership in
+  `managedFields`. Two things are load-bearing, both found by a retest on
+  2026-10-02 (ArgoCD v3.5.3, using a throwaway 900KB CRD under a fake API
+  group; the real CRDs weren't touched):
+  - `ServerSideApply=true` in the Application's `syncOptions`. Without it the
+    sync fails with the annotation-too-long error. `Replace=true` isn't needed.
+  - The `argocd.argoproj.io/compare-options: ServerSideDiff=true` annotation
+    on the Application. Without it the CRDs sync but stay OutOfSync forever,
+    because the client-side diff doesn't account for API-server defaulting.
+    (An earlier attempt probably misread that OutOfSync as SSA not working.)
+  Taking over CRDs created by `kubectl create` worked cleanly.
+  **Consequence: CRD changes now ride along with `targetRevision` bumps; no
+  manual re-apply.** (The hand-applied CRDs had drifted a patch release behind
+  the chart: `operator.prometheus.io/version: 0.94.0` live against 0.94.1.)
+  **Danger: this app has `prune: true`.** Removing the CRDs from the chart, or
+  flipping `crds.enabled` back to `false`, would delete the CRDs and every
+  Prometheus/Alertmanager/ServiceMonitor/PrometheusRule with them. Before ever
+  going back to manual CRDs, annotate each live CRD with
+  `argocd.argoproj.io/sync-options: Prune=false`, or turn off prune for the app.
 
 ### external-snapshotter CRDs (one-time, manual, and again on any schema-affecting upgrade)
 
