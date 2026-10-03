@@ -56,14 +56,16 @@ spec:
             spec:
               # Plain runner pods: no Docker, no Kubernetes API, so no token.
               automountServiceAccountToken: false
-              # The workflow downloads amd64 binaries (helm, kubeconform,
-              # shellcheck, kubectl), same as ubuntu-latest.
+              # The runner image is built for amd64 only
+              # (.github/workflows/runner-image.yml).
               nodeSelector:
                 kubernetes.io/arch: amd64
               containers:
                 - name: runner
-                  # renovate: datasource=docker depName=ghcr.io/actions/actions-runner
-                  image: ghcr.io/actions/actions-runner:2.337.0
+                  # Our image: the stock runner plus lint's tools, built from
+                  # images/arc-runner/. Public, so no pull secret.
+                  # renovate: datasource=docker depName=ghcr.io/jakerobb/homelab-arc-runner
+                  image: ghcr.io/jakerobb/homelab-arc-runner:1.2
                   command: ["/home/runner/run.sh"]
                   # A lint run peaks well under this (the helm renders are the
                   # biggest part); the limit is there so a runaway job can't
