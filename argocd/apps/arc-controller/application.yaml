@@ -1,0 +1,65 @@
+# Actions Runner Controller (ARC), the controller half. It watches the
+# scale set in argocd/apps/arc-runners/ and creates one ephemeral runner pod
+# per queued GitHub Actions job. Idle cost is this one Deployment (~50MiB);
+# with minRunners: 0 nothing else runs between jobs.
+#
+# Wave 0, ahead of arc-runners (wave 1): the scale set's resources are CRs of
+# the CRDs installed here. The ExternalSecret for the scale set's GitHub App
+# credentials is in manifests/external-secrets-config/arc-runners.yaml.
+#
+# OCI chart: ArgoCD takes the registry path as repoURL with no oci:// prefix.
+#
+# ServerSideApply: the chart's CRDs (EphemeralRunner et al.) are large enough
+# that the client-side last-applied annotation can blow past the 256KiB limit,
+# same reason as kube-prometheus-stack. See argocd/README.md's ARC section.
+#
+# Not a Terraform/jump-box replacement: those workflows stay on the jump-box
+# runner (docs/gha-terraform.md) because they manage the VMs this cluster
+# runs on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/actions/actions-runner-controller-charts
+    chart: gha-runner-scale-set-controller
+    targetRevision: 0.15.0
+    helm:
+      releaseName: arc-controller
+      valuesObject:
+        # Fixed names: the scale set chart binds its RBAC to the controller's
+        # ServiceAccount by name, and can't look it up under ArgoCD (see
+        # controllerServiceAccount in arc-runners).
+        fullnameOverride: arc-controller
+        serviceAccount:
+          name: arc-controller
+        # The chart's default is debug.
+        flags:
+          logLevel: info
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-systems
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

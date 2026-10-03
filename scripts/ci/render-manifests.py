@@ -4,7 +4,8 @@ kubeconform (see .github/workflows/lint.yml).
 
 - argocd/apps/**: every file as-is (the root app syncs that tree recursively),
   plus, for each Application in it, what its source(s) render to:
-    - Helm chart from a chart repo (`chart:`) -> `helm template` with the
+    - Helm chart from a chart repo or OCI registry (`chart:`; an OCI repoURL has
+      no `://`) -> `helm template` with the
       Application's releaseName/namespace/valuesObject/values/valueFiles
       (`$ref/...` valueFiles resolve against this checkout)
     - Helm chart in an external git repo (`path:`) -> shallow clone at
@@ -94,7 +95,11 @@ def helm_template(app: str, src: dict, namespace: str, refs: dict, tmp: Path, ca
     chart_dir = None  # set for git-hosted charts, where relative valueFiles resolve
 
     if "chart" in src:
-        cmd += [src["chart"], "--repo", src["repoURL"], "--version", str(src["targetRevision"])]
+        if "://" in src["repoURL"]:
+            cmd += [src["chart"], "--repo", src["repoURL"], "--version", str(src["targetRevision"])]
+        else:
+            # OCI registry: ArgoCD takes the path with no scheme (ghcr.io/org/charts).
+            cmd += [f"oci://{src['repoURL'].rstrip('/')}/{src['chart']}", "--version", str(src["targetRevision"])]
     else:
         checkout = clone(src["repoURL"], str(src["targetRevision"]), cache)
         if checkout is None:

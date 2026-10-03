@@ -1929,3 +1929,83 @@ through `homelab-gateway` like everything else. Deployed as
 - **When an app migrates** into the cluster, delete its file here in the same
   PR. Its own HTTPRoute takes over the hostname, and its `access_control`
   rule may move or change.
+
+## ARC: in-cluster GitHub Actions runners (added 2026-10-03)
+
+[Actions Runner Controller](https://github.com/actions/actions-runner-controller)
+runs the `lint` workflow's job in a pod on the cluster instead of on a
+GitHub-hosted runner. A 2026-10-02 benchmark of the same checks: ~23s on
+`talos-worker-1` and ~39s on `talos-worker-mbp` (image cached), against ~60s
+on `ubuntu-latest` and 68s on rpi5-1 (cold, with `pip install` and chart
+downloads included).
+
+- **Two Applications, both OCI charts** (`ghcr.io/actions/actions-runner-controller-charts`,
+  no `oci://` in ArgoCD's `repoURL`). [`apps/arc-controller/`](apps/arc-controller/application.yaml)
+  (wave 0, namespace `arc-systems`) is the controller. [`apps/arc-runners/`](apps/arc-runners/application.yaml)
+  (wave 1, namespace `arc-runners`) is the scale set, plus a NetworkPolicy from
+  [`manifests/arc-runners/`](../manifests/arc-runners/networkpolicy.yaml).
+- **The scale set's name is the label.** Scale sets don't take a `labels:` list.
+  Workflows say `runs-on: arc-runner` (`runnerScaleSetName`), and
+  [`.github/actionlint.yaml`](../.github/actionlint.yaml) lists it so actionlint
+  doesn't flag it as unknown.
+- **Idle cost.** `minRunners: 0`, so between jobs it's the controller
+  (requests 10m / 64Mi) and one listener pod (10m / 32Mi), which long-polls
+  GitHub outbound. No ingress or route. Each job starts a fresh pod
+  (requests 1 CPU / 1Gi, memory limit 3Gi) on an amd64 node and deletes it when
+  the job ends. `maxRunners: 3`.
+- **Stock runner image.** `ghcr.io/actions/actions-runner` has git, curl and
+  python3 but no node, pip, kubectl, helm or shellcheck. `lint.yml` installs
+  what it needs into `RUNNER_TEMP`, with checksums where upstream publishes
+  them, instead of baking a custom image. If setup time ever matters, a
+  derived image is the next step.
+- **Isolation.** Job pods run code from PRs on a public repo, so: no
+  ServiceAccount token, no privilege escalation, all capabilities dropped,
+  and a NetworkPolicy allowing only DNS and non-RFC1918 egress, so they can't
+  reach the LAN or the cluster. Fork PRs still need approval first (repo
+  setting). Anything that needs cluster-admin or secrets stays on the
+  jump-box runner ([Terraform via GitHub Actions](../docs/gha-terraform.md)),
+  not here.
+- **`controllerServiceAccount` is set explicitly.** The scale-set chart looks
+  up the controller's ServiceAccount with Helm `lookup`, which returns nothing
+  under ArgoCD, so both charts use fixed names (`arc-controller`).
+- **CRDs** come from the controller chart and are applied by ArgoCD with
+  `ServerSideApply=true` (they're large; same reason as kube-prometheus-stack).
+  `kubeconform` skips `AutoscalingRunnerSet` because the community schema
+  lags the chart.
+- **Chart bumps:** controller and scale set must be on the same version.
+  Renovate opens separate PRs for them, so merge both together, and read the
+  release notes first: ARC's minor releases have carried breaking changes.
+
+### GitHub App and 1Password (one-time, manual)
+
+The scale set authenticates to GitHub as a GitHub App, not a personal token.
+
+1. GitHub → Settings → Developer settings → GitHub Apps → New. Name it
+   `jakerobb-homelab-arc` (`homelab-arc` was taken), any homepage URL, webhooks off. Repository permissions:
+   **Actions: read**, **Administration: read and write**, **Metadata: read**.
+   Install it on **only** `jakerobb/homelab`.
+2. On the App's page, note the **App ID**; generate a **private key** (a
+   `.pem` download). On the installation's URL
+   (`.../settings/installations/<number>`), note the **installation ID**.
+3. In the `homelab-k8s` vault, create an **SSH Key** item named
+   `arc-github-app` (not a Secure Note: a PEM doesn't fit a plain concealed
+   field) with the `.pem` as its **private key**, plus concealed fields
+   `github_app_id` and `github_app_installation_id`. The ExternalSecret reads
+   the key from the field labeled `private key`. 1Password may re-serialize an
+   imported RSA key as PKCS#8 (`BEGIN PRIVATE KEY`); ARC parses either format.
+4. Merge. `external-secrets-config` creates the `arc-github-app` Secret in
+   `arc-runners`, then the scale set registers. Until step 3 is done the
+   ExternalSecret errors and the scale set stays unhealthy, but nothing else
+   is affected. Force a sync if you've just added the item (command under
+   [Adding or rotating a secret](#adding-or-rotating-a-secret)).
+
+### Checking it
+
+On rpi5-1:
+
+```bash
+kubectl -n arc-systems get pods         # controller + the scale set's listener
+kubectl -n arc-runners get autoscalingrunnerset,ephemeralrunners
+```
+
+The scale set also appears under the repo's Settings → Actions → Runners.

@@ -66,6 +66,14 @@
     },
     {
       "customType": "regex",
+      "description": "ARC runner image (ghcr.io/actions/actions-runner) pinned in the arc-runners scale set's pod template, which neither built-in manager sees (it's nested under valuesObject). Annotation comment on the line above, same pattern as the others.",
+      "managerFilePatterns": ["/^argocd/apps/arc-runners/application\\.yaml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+image: \\S+?:(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
       "description": "ArgoCD's own chart version is bumped by hand via the `helm install`/`helm upgrade` command documented in argocd/README.md (see 'Upgrading ArgoCD itself') — it isn't a Kubernetes/ArgoCD Application manifest the built-in managers scan, so this catches it via an explicit annotation comment, same pattern as the Authelia one above. A PR here only updates the doc; the actual `helm upgrade` against the cluster is still a manual step by design.",
       "managerFilePatterns": ["/^argocd/README\\.md$/"],
       "matchStrings": [
