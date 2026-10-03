@@ -1,0 +1,100 @@
+# ARC runner scale set: the runners the lint workflow's `runs-on: arc-runner`
+# lands on. The scale set's name is the label. Scale sets don't use a
+# `labels:` list; `runs-on` takes the name (runnerScaleSetName) directly.
+#
+# minRunners: 0, so nothing runs between jobs; each job gets a fresh,
+# ephemeral pod that's deleted when it finishes. maxRunners caps a burst of
+# PRs (lint's concurrency group already cancels superseded runs).
+#
+# Credentials: a GitHub App (id, installation id, private key) synced from
+# 1Password into the `arc-github-app` Secret by
+# manifests/external-secrets-config/arc-runners.yaml. One-time App setup:
+# argocd/README.md's ARC section.
+#
+# Two sources: the chart, plus manifests/arc-runners/ (a NetworkPolicy that
+# keeps job pods off the LAN).
+#
+# Wave 1: after arc-controller (CRDs) and external-secrets-config (the Secret).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-runners
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    - repoURL: ghcr.io/actions/actions-runner-controller-charts
+      chart: gha-runner-scale-set
+      targetRevision: 0.15.0
+      helm:
+        releaseName: arc-runner
+        valuesObject:
+          githubConfigUrl: https://github.com/jakerobb/homelab
+          githubConfigSecret: arc-github-app
+          runnerScaleSetName: arc-runner
+          minRunners: 0
+          maxRunners: 3
+          # The chart finds the controller's ServiceAccount with a Helm
+          # `lookup`, which returns nothing under ArgoCD (templated, never
+          # installed). Name it explicitly; matches arc-controller.
+          controllerServiceAccount:
+            namespace: arc-systems
+            name: arc-controller
+          listenerTemplate:
+            spec:
+              containers:
+                - name: listener
+                  resources:
+                    requests:
+                      cpu: 10m
+                      memory: 32Mi
+                    limits:
+                      memory: 128Mi
+          template:
+            spec:
+              # Plain runner pods: no Docker, no Kubernetes API, so no token.
+              automountServiceAccountToken: false
+              # The workflow downloads amd64 binaries (helm, kubeconform,
+              # shellcheck, kubectl), same as ubuntu-latest.
+              nodeSelector:
+                kubernetes.io/arch: amd64
+              containers:
+                - name: runner
+                  # renovate: datasource=docker depName=ghcr.io/actions/actions-runner
+                  image: ghcr.io/actions/actions-runner:2.337.0
+                  command: ["/home/runner/run.sh"]
+                  # A lint run peaks well under this (the helm renders are the
+                  # biggest part); the limit is there so a runaway job can't
+                  # take a shared worker down. See argocd/README.md.
+                  resources:
+                    requests:
+                      cpu: "1"
+                      memory: 1Gi
+                    limits:
+                      memory: 3Gi
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop: ["ALL"]
+                    seccompProfile:
+                      type: RuntimeDefault
+    - repoURL: https://github.com/jakerobb/homelab.git
+      targetRevision: main
+      path: manifests/arc-runners
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-runners
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    syncOptions:
+      - CreateNamespace=true

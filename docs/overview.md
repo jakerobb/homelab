@@ -86,6 +86,7 @@ and merging to `main` deploys it:
 | --- | --- | --- |
 | Kubernetes apps (`argocd/apps/`, `manifests/`) | ArgoCD, automatically on merge | [ArgoCD and apps](../argocd/README.md) |
 | Compose stack (`docker-compose/`) | A cron job on rpi5-1 that pulls `main` | [Compose auto-deploy](compose-deploy.md) |
+| PR lint checks (`.github/workflows/lint.yml`) | GitHub Actions on in-cluster ARC runners | [ARC runners](../argocd/README.md#arc-in-cluster-github-actions-runners-added-2026-10-03) |
 | Proxmox VMs, Cloudflare, SigNoz dashboards (`terraform/`) | GitHub Actions on the jump box's runner | [Terraform via GitHub Actions](gha-terraform.md) |
 | Talos machine config (`talos/patches/`) | By hand with `talosctl` from rpi5-1 | [Talos cluster](../talos/README.md) |
 | Secrets | 1Password (`homelab-k8s` vault), synced by External Secrets Operator | [Adding an app](adding-an-app.md#5-secrets-1password--external-secrets-operator) |

@@ -173,15 +173,6 @@ and an iPhone), and both replicas Ready on different workers. Don't touch the Ta
 `.2` and `1.1.1.1` by [`../talos/patches/nameservers.yaml`](../talos/patches/nameservers.yaml), so they ignore what
 DHCP hands out. The IPv6 side is separate; see "Dual-stack cluster" in [`READY.md`](READY.md).
 
-## Prometheus PVC steady-state usage
-
-**Waiting on:** the 10-day retention window to fill. The PVC was expanded from 10Gi to 20Gi on 2026-09-30 after it hit
-~85% (8.8 GB) while still growing ~0.4 GB per 12 hours, so its steady-state size is unknown. **Check on or after
-2026-10-03**: look at `kubelet_volume_stats_used_bytes` for the `prometheus-...-db` PVC. If growth has flattened well
-under 20Gi, nothing to do; if it's still climbing toward the limit, set `retentionSize` (a bit under the PVC size) on
-the Prometheus spec in `argocd/apps/kube-prometheus-stack/application.yaml`, and/or cut series cardinality (~240k
-series at last count).
-
 ## ESO 1Password wedged-client fix
 
 **Waiting on:** an upstream fix for [external-secrets/external-secrets#6941](https://github.com/external-secrets/external-secrets/issues/6941)

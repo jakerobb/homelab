@@ -1,0 +1,37 @@
+# Job pods run arbitrary workflow code from this (public) repo's PRs, so keep
+# them off the LAN and the cluster: egress is DNS plus the public internet
+# only (GitHub, ghcr.io, PyPI, chart repos). 10/8 covers the pod CIDR
+# (10.244/16) and service CIDR (10.96/12); 192.168/16 is the LAN. Ingress is
+# denied outright, since runners only ever dial out.
+#
+# Applied by the arc-runners Application (argocd/apps/arc-runners/), into the
+# arc-runners namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: runner-egress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16

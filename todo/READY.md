@@ -110,3 +110,14 @@ Suggested approach:
 3. Do one rotation of everything as a dry run, noting where it hurt.
 4. Set an expiry wherever the provider allows one, and otherwise a yearly calendar reminder to rotate. Rotate
    immediately if a credential might have leaked (pasted somewhere, a laptop lost).
+
+## Prometheus PVC steady-state usage
+
+**Was waiting on:** the 10-day retention window to fill. The PVC was expanded from 10Gi to 20Gi on 2026-09-30 after it hit
+~85% (8.8 GB) while still growing ~0.4 GB per 12 hours, so its steady-state size is unknown. **Check on or after
+2026-10-03**: look at `kubelet_volume_stats_used_bytes` for the `prometheus-...-db` PVC. If growth has flattened well
+under 20Gi, nothing to do; if it's still climbing toward the limit, set `retentionSize` (a bit under the PVC size) on
+the Prometheus spec in `argocd/apps/kube-prometheus-stack/application.yaml`, and/or cut series cardinality (~240k
+series at last count).
+
+**Update 2026-10-03:** window has elapsed. PVC is at ~10.1 GB of 21 GB (48%), up from 8.8 GB on 09-30, so growth has slowed but is worth one more look before deciding on `retentionSize`.

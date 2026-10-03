@@ -1,0 +1,28 @@
+# GitHub App credentials for the ARC scale set (argocd/apps/arc-runners/).
+# The App needs repository permissions Actions: read, Administration:
+# read & write (runner registration), Metadata: read, installed on this repo.
+# See argocd/README.md's ARC section for the one-time setup. The 1Password item
+# is an SSH Key (the PEM doesn't fit a plain field), so the private key's field
+# is labeled `private key` there, with a space.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: arc-github-app
+  namespace: arc-runners
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: arc-github-app
+  data:
+    - secretKey: github_app_id
+      remoteRef:
+        key: arc-github-app/github_app_id
+    - secretKey: github_app_installation_id
+      remoteRef:
+        key: arc-github-app/github_app_installation_id
+    - secretKey: github_app_private_key
+      remoteRef:
+        key: arc-github-app/private key

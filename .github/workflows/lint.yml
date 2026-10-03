@@ -1,9 +1,14 @@
-# Repo-wide static checks. GitHub-hosted runners only — none of this needs
-# the homelab network or any secrets, so it's safe on any PR (outside
-# contributors' runs still need approval, per the repo setting).
+# Repo-wide static checks. Runs on the in-cluster ARC scale set `arc-runner`
+# (argocd/apps/arc-runners/) rather than a GitHub-hosted runner: the pods have
+# no secrets, no cluster credentials, and no route to the LAN (NetworkPolicy),
+# and the cluster's workers render the manifests ~3x faster than ubuntu-latest.
+# Outside contributors' runs still need approval, per the repo setting.
 #
-# One job, not one per check: every check takes seconds, and Actions bills
-# each job rounded up to a whole minute, so six jobs cost ~6 min a run vs ~2.
+# The runner image is stock (no kubectl, helm, shellcheck, node), so the
+# setup steps below install what ubuntu-latest had preinstalled.
+#
+# One job, not one per check: every check takes seconds, and each job pays
+# for its own pod start and tool setup.
 # PRs only — a merge to main re-runs checks the PR already passed.
 name: lint
 
@@ -20,12 +25,16 @@ concurrency:
 jobs:
   lint:
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: arc-runner
     env:
       # renovate: datasource=github-releases depName=helm/helm
       HELM_VERSION: v4.3.0
       # renovate: datasource=github-releases depName=yannh/kubeconform
       KUBECONFORM_VERSION: v0.8.0
+      # renovate: datasource=github-releases depName=kubernetes/kubernetes
+      KUBECTL_VERSION: v1.37.1
+      # renovate: datasource=github-releases depName=koalaman/shellcheck
+      SHELLCHECK_VERSION: v0.11.0
     steps:
       # --- Setup: everything the checks need, before any check runs, so a
       # failing check can't skip setup for the ones after it.
@@ -45,6 +54,17 @@ jobs:
           curl -fsSL "${base}/CHECKSUMS" | grep ' kubeconform-linux-amd64.tar.gz$' | sha256sum -c -
           tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      # kubectl is only for `kubectl kustomize` in render-manifests.py (no
+      # cluster access); shellcheck is preinstalled on ubuntu-latest, not here.
+      # Neither can use sudo (the pod blocks privilege escalation), so both
+      # go next to kubeconform in RUNNER_TEMP.
+      - name: Install kubectl and shellcheck
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          echo "$(curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256")  kubectl" | sha256sum -c -
+          chmod +x kubectl
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.gz" | tar -xz --strip-components=1 "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
 
       # --- Checks: each runs even if an earlier one failed (!cancelled()),
       # so one run reports every problem, same as separate jobs did.
@@ -62,7 +82,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/ci/check-renovate-parse.py
 
-      # shellcheck is preinstalled on ubuntu-latest.
       - name: shellcheck
         if: ${{ !cancelled() }}
         run: git ls-files -z '*.sh' | xargs -0 shellcheck
@@ -91,12 +110,14 @@ jobs:
       # cert-manager, prometheus-operator, ArgoCD, Cilium...). -strict rejects
       # unknown fields, i.e. typos. CustomResourceDefinitions themselves are
       # skipped: there's no upstream schema for that kind, and they're
-      # chart-vendored anyway.
+      # chart-vendored anyway. AutoscalingRunnerSet (ARC) is skipped too: the
+      # catalog's schema lags the chart (it rejects `listenerConfig`, which
+      # chart 0.15.0 sets by default).
       - name: Validate Kubernetes manifests
         if: ${{ !cancelled() && steps.render.outcome == 'success' }}
         run: |
           kubeconform -strict -summary -output text \
-            -skip CustomResourceDefinition \
+            -skip CustomResourceDefinition,AutoscalingRunnerSet \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             "$RUNNER_TEMP/rendered"
