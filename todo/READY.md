@@ -138,7 +138,31 @@ block. A GitHub Actions deploy is out: the only runner is on rpi5-1, which holds
 3. One-time adoption: sync the Application over the live resources, then delete the stale Helm release Secrets
    (`sh.helm.release.v1.argocd.*` in the `argocd` namespace) without uninstalling, so nobody runs `helm upgrade` against
    stale state.
-4. Expect to need `ignoreDifferences` or sync options for the chart's CRDs, `argocd-initial-admin-secret` and the redis
-   secret-init job, so Argo doesn't fight them.
+4. Expect to need `ignoreDifferences` or sync options for `argocd-initial-admin-secret` and the redis secret-init job, so
+   Argo doesn't fight them. The chart's CRDs need the same treatment as kube-prometheus-stack's: the `applicationsets`
+   CRD is ~377KB, over the client-side-apply annotation cap, so the Application needs `ServerSideApply=true` plus the
+   `argocd.argoproj.io/compare-options: ServerSideDiff=true` annotation (see the CRD item below). Also protect the CRDs
+   from `prune` (`Prune=false`): ArgoCD's own CRDs vanishing would take every Application with them.
 5. Update "Upgrading ArgoCD itself" and the "Bootstrap pattern" section of `argocd/README.md` (the "manual permanently"
    claim), and move the Renovate comment off the `helm install` block.
+
+## Move the remaining hand-applied CRDs under ArgoCD
+
+kube-prometheus-stack's CRDs have been ArgoCD-managed since 2026-10-02, using `ServerSideApply=true` plus the
+`argocd.argoproj.io/compare-options: ServerSideDiff=true` annotation on the Application (no `Replace`). See the
+`crds.enabled` bullet in [`argocd/README.md`](../argocd/README.md) for why both settings matter and the retest that proved
+it. Three CRD sets are still applied by hand and drift on every chart bump (the Prometheus ones had fallen a patch
+release behind before the move):
+
+- **External Secrets Operator** (`clustersecretstores`/`secretstores` are ~724KB as rendered; chart CRDs are installed
+  with `installCRDs: false`, see `argocd/apps/external-secrets/application.yaml`).
+- **external-snapshotter** (the "external-snapshotter CRDs" section of `argocd/README.md`).
+- **SigNoz's clickhouse-operator** (3 CRDs shipped in the chart's `crds/`, see the SigNoz section of `argocd/README.md`).
+
+The same recipe should work for each, but it's untested on these charts. For each one: render the chart's CRDs and run
+`kubectl diff --server-side --force-conflicts` against the cluster first (the dry run is what showed the Prometheus
+version drift), then flip the chart to ship CRDs (or add a small Application for the raw manifests), add the SSA and
+ServerSideDiff settings, and confirm `argocd-controller/Apply` shows up in the live CRDs' managed fields. Weigh the
+prune risk before enabling: with `prune: true`, removing a CRD from the source deletes every custom resource of that
+kind. Adding `argocd.argoproj.io/sync-options: Prune=false` to each CRD, where the chart lets you, is the safeguard.
+When a set moves, delete its manual-apply section from the README in the same PR.
