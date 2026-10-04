@@ -58,7 +58,7 @@ services:
     volumes:
       - ./resolv-host.conf:/etc/resolv.conf:ro
     network_mode: host
-    image: ghcr.io/browserless/chromium:v2.56.7
+    image: ghcr.io/browserless/chromium:v2.57.0
     container_name: browserless
     environment:
       - SCREEN_WIDTH=1920
