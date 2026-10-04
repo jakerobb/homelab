@@ -15,14 +15,15 @@ Names used below:
 
 | | Hardware | Before | After |
 |---|---|---|---|
-| **Old Pi** | 16GB Pi 5 | rpi5-1, `192.168.102.2` | `talos-worker-4`, `<WORKER-IP>` |
+| **Old Pi** | 16GB Pi 5 | rpi5-1, `192.168.102.2` | `talos-worker-3`, `<WORKER-IP>` |
 | **New Pi** | 4GB Pi 5 | spare | rpi5-1, `192.168.102.2` |
 
 `<WORKER-IP>` is a free address in `.21`–`.29` (the physical-host range; see
 "MS-A2 workers" in [`talos/README.md`](../talos/README.md)). Pick it, and
-check it's free, before the window. `talos-worker-4` follows the normal
-decoupled `talos-worker-N` naming; this node is permanent, unlike
-`talos-worker-mbp`.
+check it's free, before the window. `talos-worker-3` follows the normal
+decoupled `talos-worker-N` naming (`-3` is the first free number, since the
+MBP worker took a hardware-identified name instead); this node is permanent,
+unlike `talos-worker-mbp`. The Mac Studio's worker becomes `talos-worker-4`.
 
 ## What is unavailable during the window
 
@@ -51,7 +52,9 @@ and fix it, or postpone.
 - [ ] `docker ps` on rpi5-1 shows only `unbound`, `telegraf`, `vector` and
       `nut-upsd`. Home Assistant, Zigbee2MQTT, `zwave-js-ui`, matter-server,
       Scrypted, change-detection and browserless are all in the cluster and
-      verified.
+      verified. (As of 2026-10-01, `change-detection` and `browserless` were
+      still running here, with `manifests/lan-routes/change-detection.yaml`
+      routing to `.2`.)
 - [ ] `manifests/lan-routes/` has no route whose backend is `192.168.102.2`.
 - [ ] Every cutover branch is merged. Nothing is half-migrated, and
       `docker-compose/` matches what's running.
@@ -75,8 +78,15 @@ and fix it, or postpone.
       copy is confirmed.
 - [ ] No firing alerts in SigNoz, and no pods in `CrashLoopBackOff` or
       `Pending`.
-- [ ] No PVC is read-only (see the HexOS outage notes in the
-      [troubleshooting](troubleshooting.md) doc if unsure).
+- [ ] No PVC is read-only. Headlamp's "ReadOnly" is the access mode, not the
+      failure we care about: that one is the *filesystem* remounting
+      read-only inside the node after an iSCSI hiccup, which Kubernetes
+      doesn't surface. Check the node kernel logs instead; zero matches on
+      every node is a pass (see [troubleshooting](troubleshooting.md)):
+
+      ```bash
+      for n in 11 12 13 31 32 34; do echo -n "$n: "; talosctl -n 192.168.102.$n dmesg | grep -cE "EXT4-fs.*(aborted journal|read-only|Remounting)"; done
+      ```
 - [ ] The MBP host has disk headroom (see
       [`utm-talos-worker.md`](utm-talos-worker.md)).
 - [ ] [`talos/cilium/validate.sh`](../talos/cilium/validate.sh) passes.
@@ -86,9 +96,20 @@ and fix it, or postpone.
 - [ ] The cluster Unbound (`192.168.102.130`) is in the DHCP DNS list of every
       VLAN that used `.2`, **ahead of** `.2` or alongside it.
 - [ ] At least the longest DHCP lease time has passed since that change. Check
-      by looking at Unbound's recent query log on rpi5-1: any client still
-      querying `.2` is a client that hasn't renewed, or one with a hardcoded
-      DNS server.
+      with a short query-log window on rpi5-1 (Unbound doesn't log queries by
+      default). Turn it on without a restart, let it run a few minutes, count
+      queries per client, and turn it off again:
+
+      ```bash
+      docker exec unbound unbound-control -s /var/unbound/unbound.ctl set_option log-queries: yes
+      docker logs --since 10m unbound 2>&1 | grep -E 'info: [0-9a-f:.]+ .* IN$' | awk '{print $4}' | sort | uniq -c | sort -rn
+      docker exec unbound unbound-control -s /var/unbound/unbound.ctl set_option log-queries: no
+      ```
+
+      Any client still querying `.2` is a client that hasn't renewed, or one
+      with a hardcoded DNS server. The Talos nodes are expected: they pin
+      `.2` (then `1.1.1.1`) in
+      [`nameservers.yaml`](../talos/patches/nameservers.yaml).
 - [ ] Hardcoded-DNS devices are accounted for (UniFi gateway's own settings,
       Proxmox, TrueNAS, the MBP host, any static-IP gear). Either they're
       changed, or you've accepted they'll fall back to their secondary or
@@ -113,8 +134,9 @@ and fix it, or postpone.
 - [ ] The 256GB SSD is flashed and verified (below).
 - [ ] You know which switch port and cable each Pi uses, and that the new
       Pi's port is on the Server VLAN.
-- [ ] The old Pi's EEPROM already boots NVMe (it does today, since it boots
-      from the SSD). You have a keyboard-free way to power-cycle each Pi.
+- [ ] Both Pis' EEPROMs have `BOOT_ORDER=0xf641` (SD, USB, NVMe) and neither
+      has an SD card or USB stick in it, so each falls through to its SSD.
+      You have a keyboard-free way to power-cycle each Pi.
 - [ ] Both Pis' Ethernet MACs are written down.
 
 ### Timing
@@ -139,7 +161,7 @@ downtime.
 
 Boot the new Pi from a Raspberry Pi OS Lite SD card, not from the SSD.
 
-Update the EEPROM and set NVMe-first boot:
+Update the EEPROM and set the boot order to SD, USB, NVMe:
 
 ```bash
 sudo rpi-eeprom-update -a
@@ -149,9 +171,25 @@ sudo rpi-eeprom-update -a
 sudo rpi-eeprom-config --edit
 ```
 
-In the editor, set `BOOT_ORDER=0xf416` (NVMe, then SD, then USB, repeating;
-`6` is NVMe). Compare the other lines with the old Pi's
-`sudo rpi-eeprom-config`, and copy anything related to PCIe so it matches.
+In the editor, use this (the old Pi's config, with `BOOT_ORDER` changed):
+
+```ini
+[all]
+BOOT_UART=1
+BOOT_ORDER=0xf641
+NET_INSTALL_AT_POWER_ON=1
+PCIE_PROBE=1
+```
+
+`BOOT_ORDER` digits are read right to left: `1` is SD, `4` is USB, `6` is
+NVMe, `f` repeats. So `0xf641` tries SD, then USB, then NVMe, which means a
+bootable SD card or USB stick always wins over the SSD and you can override a
+Pi's boot without touching its config. The flip side: **an SD card left in a
+Pi will boot instead of the SSD**, so take it out before the window. rpi5-1's
+EEPROM (the old Pi, which becomes the worker) was set to this order on
+2026-10-02, replacing `0xf146`. It's written to flash but only shows in
+`sudo rpi-eeprom-config` after its next boot. Confirm then that it reads
+`0xf641`.
 Reboot, then check `lsblk` sees an NVMe device if you've temporarily put any
 SSD in its HAT. Then shut down and take the SD card out, but keep it for
 rollback.
@@ -186,8 +224,8 @@ node with:
   `kubelet-parallel-image-pulls.yaml`, `nameservers.yaml`
   (`discovery-registry-fix.yaml` is control-plane-only; check the
   README section if unsure)
-- a new `talos/patches/workers/worker-4.yaml` with:
-    - `machine.network.hostname: talos-worker-4`
+- a new `talos/patches/workers/worker-3.yaml` with:
+    - `machine.network.hostname: talos-worker-3`
     - `machine.nodeLabels` `homelab.jakerobb.org/nic-speed-mbps: "1000"`
     - `machine.install.image`: the **Pi 5 installer**, not the Factory amd64
       schematic that the shared `worker.yaml` template now points at. This
@@ -201,7 +239,7 @@ node with:
       PVC-backed pods, skip it and keep it cordoned off from them with a
       taint.
 
-Commit `worker-4.yaml` in a PR and merge it before the window, so nothing
+Commit `worker-3.yaml` in a PR and merge it before the window, so nothing
 needs committing while the jump box is off. Only the rendered `worker.yaml`
 stays on the jump box.
 
@@ -209,18 +247,31 @@ stays on the jump box.
 
 Every Pod that could land on the new node has to have an arm64 image. The
 three Pi control planes are tainted, so very little arm64 scheduling has
-been tested. Check every image in the cluster's workloads for a
-`linux/arm64` manifest, or add a `nodeAffinity` / taint so only
-arm64-capable workloads can go there. DaemonSets (Cilium, node-exporter,
-democratic-csi's node plugin and so on) already run on the Pi control planes,
-so they're fine.
+been tested.
 
-### 5. Extend the NIC watchdog DaemonSet
+**Done 2026-10-01:** all 68 distinct images across the cluster's Pods,
+DaemonSets, Deployments, StatefulSets, CronJobs and Jobs (including init
+containers) have a `linux/arm64` manifest (`docker buildx imagetools
+inspect`), and no workload pins `kubernetes.io/arch`. Re-run the audit if
+workloads were added since:
+
+```bash
+kubectl get pods,ds,deploy,sts,cronjob,job -A -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{range .spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}{range .spec.template.spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.jobTemplate.spec.template.spec.containers[*]}{.image}{"\n"}{end}{end}' | sort -u | while read -r img; do docker buildx imagetools inspect "$img" 2>&1 | grep -q 'Platform:.*linux/arm64' && echo "OK    $img" || echo "NOARM $img"; done | grep -v '^OK'
+```
+
+Empty output means every image has an arm64 build.
+
+### 5. NIC watchdog DaemonSet
 
 [`nic-watchdog-mitigation.yaml`](../talos/patches/control-plane/nic-watchdog-mitigation.yaml)
-selects `node-role.kubernetes.io/control-plane` only. The new worker is the
-same Pi 5 NIC, so it needs the same mitigation. Widen the selector (or add a
-second DaemonSet) in a PR before the window.
+now selects `kubernetes.io/arch: arm64` rather than the control-plane label,
+so the new worker (same Pi 5 NIC) picks it up automatically. It isn't
+ArgoCD-managed, so after the PR merges, apply it once from rpi5-1 (no change
+to the three control planes):
+
+```bash
+kubectl apply -f ~/dev/homelab/talos/patches/control-plane/nic-watchdog-mitigation.yaml
+```
 
 ### 6. DHCP and DNS prep
 
@@ -254,7 +305,7 @@ cd ~/dev/homelab && git status --short && git rev-parse --abbrev-ref HEAD
 ```
 
 ```bash
-~/dev/homelab/scripts/etcd-snapshot-backup.sh
+~/bin/etcd-snapshot-backup.sh
 ```
 
 Confirm the snapshot's email arrives (or its log shows success), that no GHA
@@ -345,10 +396,10 @@ The node should reboot into a configured state and register.
 kubectl get nodes -o wide
 ```
 
-As soon as `talos-worker-4` appears:
+As soon as `talos-worker-3` appears:
 
 ```bash
-kubectl cordon talos-worker-4
+kubectl cordon talos-worker-3
 ```
 
 Cordoning stops ordinary pods from landing on it before you've audited it.
@@ -359,7 +410,7 @@ DaemonSet pods still schedule.
 **On rpi5-1:**
 
 ```bash
-kubectl get pods -A -o wide --field-selector spec.nodeName=talos-worker-4
+kubectl get pods -A -o wide --field-selector spec.nodeName=talos-worker-3
 ```
 
 Expect the Cilium agent, node-exporter, the NIC watchdog and democratic-csi's
@@ -379,7 +430,7 @@ others; confirm those addresses still answer from another machine, and that
 the `nic-10g` Services are still announced only by 10GbE nodes.
 
 Leave it cordoned until the arm64 audit from "Before the window" is done
-and you're happy. Then `kubectl uncordon talos-worker-4`.
+and you're happy. Then `kubectl uncordon talos-worker-3`.
 
 ### 8. Put DHCP and RA back
 
@@ -401,7 +452,7 @@ it. Note the end time.
 | GHA runner | `systemctl status 'actions.runner.*'`, and GitHub → Settings → Actions → Runners | service active, runner **Idle** |
 | Terraform | push a trivial change on a branch, or re-run the latest plan job | plan job runs on the runner and succeeds |
 | Talos access | `talosctl -n 192.168.102.11 version`, `kubectl get nodes` | all 7 nodes `Ready` (cordoned worker shows `SchedulingDisabled`) |
-| etcd backup | `~/dev/homelab/scripts/etcd-snapshot-backup.sh` | success, B2 copy appears |
+| etcd backup | `~/bin/etcd-snapshot-backup.sh` | success, B2 copy appears |
 | Email relay | send a test through `msmtpq`, and check `~/.msmtp.queue/` is empty | mail arrives, queue empty |
 | Telegraf and Vector | SigNoz | host metrics and logs flowing again, no more "no data" |
 | Proxmox backup | next 03:00 run, or run `proxmox-config-backup.sh` on the Proxmox host | files land under `~pve-backup/backups/proxmox/` |
@@ -427,14 +478,14 @@ jump box depends on it, so you can just power the old Pi off and leave it.
 The cluster has worked without it so far; retry later.
 
 **If the cluster misbehaves after the worker joins** (unexpected churn,
-Cilium trouble): `kubectl drain` and `kubectl delete node talos-worker-4`,
+Cilium trouble): `kubectl drain` and `kubectl delete node talos-worker-3`,
 then power the Pi off.
 
 ## After the swap: follow-ups
 
 - Update the docs that name the old arrangement: the rpi5-1 sections of
   [`todo/HARDWARE.md`](../todo/HARDWARE.md) (delete the finished checklist
-  items), `README.md`, `talos/README.md` (a new "talos-worker-4" section and
+  items), `README.md`, `talos/README.md` (a new "talos-worker-3" section and
   the node counts), [`talos/patches/nameservers.yaml`](../talos/patches/nameservers.yaml)'s
   comment, the overview, and [`todo/DONE.md`](../todo/DONE.md).
 - Host cleanup on the new rpi5-1, from `todo/HARDWARE.md`: drop `wlan0` (`.3`)
@@ -442,11 +493,11 @@ then power the Pi off.
   and clear the ~31G of one-off files in `~`.
 - Remove the `compose-deploy` cron entry only if no Compose services remain
   (Unbound is still there, so it stays for now).
-- Uncordon `talos-worker-4` once the arm64 audit is done, then watch it for a
+- Uncordon `talos-worker-3` once the arm64 audit is done, then watch it for a
   few days before moving the UPS.
 - Move the UPS to the worker as its own change: deploy `nut-upsd` in the
   cluster pinned to that node with USB access, add the NUT client extension
   for the worker's own clean shutdown, and point the jump box's
   `nut-monitor.service` at it.
-- Apply the U-Boot fix to `talos-worker-4` before its first Talos upgrade, if
+- Apply the U-Boot fix to `talos-worker-3` before its first Talos upgrade, if
   you didn't build it in from the start.

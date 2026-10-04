@@ -2,10 +2,10 @@
 # Functional Cilium check — goes beyond "is the DaemonSet Ready", which
 # stayed green through two real incidents where external traffic was
 # silently broken: the BGP routing bug and the L2-announcement interface
-# regex miss (see talos/README.md). Curls every LoadBalancer IP and
-# HTTPRoute hostname from outside the cluster (run this from rpi5-1, or
-# anywhere on the LAN with kubectl access — running it from inside the
-# cluster defeats the point) and checks each agent's own datapath mode
+# regex miss (see talos/README.md). TCP-connects to every LoadBalancer IP,
+# curls every HTTPRoute hostname from outside the cluster (run this from
+# rpi5-1, or anywhere on the LAN with kubectl access — running it from inside
+# the cluster defeats the point) and checks each agent's own datapath mode
 # instead of assuming it from config intent.
 #
 # Run after any Cilium change, and always before trusting an ArgoCD Sync of
@@ -95,22 +95,29 @@ fi
 echo "== LoadBalancer Services: IP assignment + external reachability =="
 while IFS=$'\t' read -r ns name ip port; do
   [[ -z "$ns" ]] && continue
+  port="${port%% *}"  # jsonpath yields every TCP port, space-separated; probe the first
   if [[ -z "$ip" ]]; then
     bad "$ns/$name: no external IP assigned"
     continue
   fi
   ok "$ns/$name: external IP $ip assigned"
 
-  # The Service's first port, not always 80: network-optimizer-lb only
+  # The Service's first TCP port, not always 80: network-optimizer-lb only
   # listens on 3005 and 5201, and Cilium drops a SYN to a port with no
-  # backend, which looked exactly like an L2 announcement failure.
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time "$CURL_TIMEOUT" "http://$ip:$port/" 2>/dev/null)
-  if [[ "$code" != "000" ]]; then
-    ok "$ns/$name: http://$ip:$port/ got a response (HTTP $code) — not a timeout/refusal"
-  else
-    bad "$ns/$name: http://$ip:$port/ got NO response within ${CURL_TIMEOUT}s — check L2 announcements (talos/README.md)"
+  # backend, which looked exactly like an L2 announcement failure. A bare TCP
+  # connect rather than an HTTP request, since several of these aren't HTTP
+  # (Unbound on 53, Mosquitto on 1883, zwave-js-ui's websocket on 3000) and an
+  # HTTP client reads a successful connect that gets no HTTP reply as a failure.
+  if [[ -z "$port" ]]; then
+    echo "  SKIP  $ns/$name: no TCP port to probe (UDP-only Service)"
+    continue
   fi
-done < <(kubectl get svc -A -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.loadBalancer.ingress[0].ip}{"\t"}{.spec.ports[0].port}{"\n"}{end}')
+  if nc -z -w "$CURL_TIMEOUT" "$ip" "$port" >/dev/null 2>&1; then
+    ok "$ns/$name: tcp://$ip:$port accepted a connection"
+  else
+    bad "$ns/$name: tcp://$ip:$port did NOT accept a connection within ${CURL_TIMEOUT}s — check L2 announcements (talos/README.md)"
+  fi
+done < <(kubectl get svc -A -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.loadBalancer.ingress[0].ip}{"\t"}{.spec.ports[?(@.protocol=="TCP")].port}{"\n"}{end}')
 
 echo "== Gateway API objects =="
 while IFS=$'\t' read -r name accepted; do

@@ -15,8 +15,11 @@ spec:
         app: rpi5-nic-mitigation
     spec:
       hostNetwork: true
+      # Every arm64 node, not just control planes: the only arm64 hardware is
+      # Raspberry Pi 5s (same onboard NIC), and the jump-box swap adds a Pi 5
+      # worker (talos-worker-3). amd64 nodes have no `end0`.
       nodeSelector:
-        node-role.kubernetes.io/control-plane: ""
+        kubernetes.io/arch: arm64
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists

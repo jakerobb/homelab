@@ -237,3 +237,12 @@ don't leave it around indefinitely. Make sure a nightly backup has landed in the
 Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`.
 Also add an alert for a failed `scrypted-backup` Job.
 Runbook: [`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01), step 5.
+
+## Turn Unbound query logging back off
+
+**Waiting on:** the jump-box swap and the rest of the migration finishing. On 2026-10-01 query logging was switched on in
+the Compose Unbound on rpi5-1 at runtime (`unbound-control set_option log-queries: yes`, not in git) to see which clients
+still use `.2` (about 16 queries/min at the time, so the volume is negligible; Vector ships it to SigNoz like any other
+container's stdout). Turn it off once the DNS cutover is verified:
+`docker exec unbound unbound-control -s /var/unbound/unbound.ctl set_option log-queries: no`. The setting also resets on
+any container restart, including the jump-box swap itself.
