@@ -65,7 +65,7 @@ spec:
                   # Our image: the stock runner plus lint's tools, built from
                   # images/arc-runner/. Public, so no pull secret.
                   # renovate: datasource=docker depName=ghcr.io/jakerobb/homelab-arc-runner
-                  image: ghcr.io/jakerobb/homelab-arc-runner:1.2
+                  image: ghcr.io/jakerobb/homelab-arc-runner:1.6
                   command: ["/home/runner/run.sh"]
                   # A lint run peaks well under this (the helm renders are the
                   # biggest part); the limit is there so a runaway job can't
