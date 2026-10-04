@@ -134,8 +134,9 @@ and fix it, or postpone.
 - [ ] The 256GB SSD is flashed and verified (below).
 - [ ] You know which switch port and cable each Pi uses, and that the new
       Pi's port is on the Server VLAN.
-- [ ] The old Pi's EEPROM already boots NVMe (it does today, since it boots
-      from the SSD). You have a keyboard-free way to power-cycle each Pi.
+- [ ] Both Pis' EEPROMs have `BOOT_ORDER=0xf641` (SD, USB, NVMe) and neither
+      has an SD card or USB stick in it, so each falls through to its SSD.
+      You have a keyboard-free way to power-cycle each Pi.
 - [ ] Both Pis' Ethernet MACs are written down.
 
 ### Timing
@@ -160,7 +161,7 @@ downtime.
 
 Boot the new Pi from a Raspberry Pi OS Lite SD card, not from the SSD.
 
-Update the EEPROM and set NVMe-first boot:
+Update the EEPROM and set the boot order to SD, USB, NVMe:
 
 ```bash
 sudo rpi-eeprom-update -a
@@ -170,20 +171,25 @@ sudo rpi-eeprom-update -a
 sudo rpi-eeprom-config --edit
 ```
 
-In the editor, make the file match the old Pi's `sudo rpi-eeprom-config`
-(checked 2026-10-01):
+In the editor, use this (the old Pi's config, with `BOOT_ORDER` changed):
 
 ```ini
 [all]
 BOOT_UART=1
-BOOT_ORDER=0xf146
+BOOT_ORDER=0xf641
 NET_INSTALL_AT_POWER_ON=1
 PCIE_PROBE=1
 ```
 
-`BOOT_ORDER` digits are read right to left: `6` is NVMe, `1` is SD, `4` is
-USB, `f` repeats. Re-run `sudo rpi-eeprom-config` on the old Pi first in case
-it has changed.
+`BOOT_ORDER` digits are read right to left: `1` is SD, `4` is USB, `6` is
+NVMe, `f` repeats. So `0xf641` tries SD, then USB, then NVMe, which means a
+bootable SD card or USB stick always wins over the SSD and you can override a
+Pi's boot without touching its config. The flip side: **an SD card left in a
+Pi will boot instead of the SSD**, so take it out before the window. rpi5-1's
+EEPROM (the old Pi, which becomes the worker) was set to this order on
+2026-10-02, replacing `0xf146`. It's written to flash but only shows in
+`sudo rpi-eeprom-config` after its next boot. Confirm then that it reads
+`0xf641`.
 Reboot, then check `lsblk` sees an NVMe device if you've temporarily put any
 SSD in its HAT. Then shut down and take the SD card out, but keep it for
 rollback.
