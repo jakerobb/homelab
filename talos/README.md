@@ -980,7 +980,8 @@ moved to `talos-cp-2` within the outage window, and `kubectl` against
 
 ## Pi 5 NIC watchdog mitigation (added 2026-09-18)
 
-Deployed as a `DaemonSet` on the 3 control-plane Pis
+Deployed as a `DaemonSet` on every arm64 node (`kubernetes.io/arch: arm64`; the
+3 control-plane Pis, plus the Pi 5 worker once the jump-box swap adds it)
 ([`patches/control-plane/nic-watchdog-mitigation.yaml`](patches/control-plane/nic-watchdog-mitigation.yaml)),
 looping every 30s to disable TSO/GSO offload and EEE (Energy Efficient
 Ethernet) on `end0` via `ethtool`:
