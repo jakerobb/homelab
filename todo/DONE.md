@@ -292,6 +292,29 @@ is pinned to 8.1.0 until they're published, and the first deploy sat in `ImagePu
 the cutover steps: [`../argocd/README.md`](../argocd/README.md#matter-server-migrated-from-docker-compose-2026-10-01). The old
 data on rpi5-1 is deleted on a schedule, see [`FUTURE.md`](FUTURE.md).
 
+## Home Assistant (Compose workload migration)
+
+**Done (2026-10-01).** Moved to the cluster as a bare Deployment ([`../manifests/homeassistant/`](../manifests/homeassistant/)),
+the last of the home automation stack. It runs on the host network (HomeKit bridges on ports 21064-21076 are advertised over
+mDNS, and Apple TV, HEOS, Denon, Lutron, ESPHome and the rest are found by multicast), in a `privileged`-labeled namespace,
+with no node affinity (it landed on the mbp). Same image as Compose (2026.9.4) so the move and a version bump didn't
+overlap. It runs as root with default capabilities, since the image's s6 init needs it, and `privileged`, the Pi's
+`/dev/ttyAMA0`/`/dev/serial0`, `/run/dbus` and the unused NUT password variable are gone. `/config` is a 5Gi PVC seeded
+once from the old directory (about 280Mi: the registry and `.storage`, HomeKit pairing identities, HACS, the recorder
+database, the Lutron key), behind the same restore-gate init container, released by
+`scripts/homeassistant-cutover/restore.sh`. Home Assistant owns its UI-edited files from now on, so git isn't
+authoritative for them; a nightly CronJob backs `/config` up to a `hexos-nfs` PVC (14 days; the database is left out).
+The route is now a Service pointing at the pod (still not behind Authelia, since the companion app can't log in through it).
+Because Envoy reaches the pod from a pod address instead of a node address, the restore script adds `10.244.0.0/16` to
+`trusted_proxies` in `.storage/http`. Home Assistant was down for roughly five minutes, from the old container being removed until the new pod was ready.
+All 10 paired HomeKit bridges kept their pairings, but Apple Home showed "No Response" on about half of them for several
+minutes until the hub reconnected by itself; no reboot or re-pairing was needed. Matter, Z-Wave JS, MQTT, NUT, the
+Apple TVs, HEOS, Lutron, ESPHome, UniFi Protect and the Denon all came back, and the companion app works after updating its
+URL. A porch-light motion automation that looked broken was a pre-existing condition problem: the doorbell's own "Is dark"
+sensor flips to light on motion, so the automation's first check failed (not a migration issue). Details and the cutover
+steps: [`../argocd/README.md`](../argocd/README.md#homeassistant-migrated-from-docker-compose-2026-10-01). Cleanup of the old
+directory and the repo's Compose copy is scheduled in [`FUTURE.md`](FUTURE.md).
+
 ## Scrypted (Compose workload migration)
 
 **Done (2026-10-02).** Moved to the cluster as a bare Deployment ([`../manifests/scrypted/`](../manifests/scrypted/)),

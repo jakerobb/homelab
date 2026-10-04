@@ -23,18 +23,12 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 ### To be migrated
 
-- **Home automation stack** (`homeassistant`) — not hardware-pinned. The Zigbee and Z-Wave coordinators are on Ethernet, not USB.
-  Home Assistant doesn't use Bluetooth, so the `/run/dbus` mount can go. Its `/dev/ttyAMA0` / `/dev/serial0` devices
-  (the Pi's GPIO UART) were for an integration that never worked and isn't in use, so drop them and `privileged: true`
-  rather than carrying them over.
-  `mosquitto`, `zwave-js-ui`, `zigbee2mqtt` and `matter-server` already moved; see [`DONE.md`](DONE.md).
-  **Decide config ownership per service before moving each one.** `change-detection` rewrites its own config files,
+- **Decide config ownership per service before moving each one.** `change-detection` rewrites its own config files,
   and a ConfigMap/Secret mount is read-only, so it can't save UI changes there. Pick one: seed the file into the PVC
   once (the app owns it afterward, so UI edits survive but git isn't authoritative), or overwrite it on every start (git
-  wins, UI edits are lost). `zwave-js-ui` and `zigbee2mqtt` both took the seed-once route (Zigbee2MQTT's config comes from
-  the old data directory rather than a ConfigMap, since it holds device names). Both keep their secrets in an
-  ExternalSecret, as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env
-  overrides into the PVC).
+  wins, UI edits are lost). `zwave-js-ui`, `zigbee2mqtt` and `homeassistant` all took the seed-once route (Zigbee2MQTT's
+  and Home Assistant's config come from the old data directory rather than a ConfigMap). Secrets go in an ExternalSecret,
+  as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env overrides into the PVC).
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
   as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it
   waits until everything else has moved. No hardware dependency. Needs a persistent volume for the datastore.
