@@ -2,6 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "timezone": "America/Detroit",
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 5,
   "kubernetes": {
     "managerFilePatterns": [
       "/^argocd/apps/.+\\.ya?ml$/",
