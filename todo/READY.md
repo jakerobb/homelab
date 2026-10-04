@@ -105,6 +105,97 @@ Suggested approach:
 4. Set an expiry wherever the provider allows one, and otherwise a yearly calendar reminder to rotate. Rotate
    immediately if a credential might have leaked (pasted somewhere, a laptop lost).
 
+## Security hardening (from the 2026-10-04 review)
+
+A read-only review of the repo, the cluster and rpi5-1 found a solid baseline (Authelia default-deny with two-factor,
+pinned image tags, key-only SSH, protected `main`) and the gaps below. Each is its own small effort. What the review
+did *not* cover (UniFi's inter-VLAN firewall and any WAN port forwards, what Cloudflare exposes to the internet,
+Proxmox and TrueNAS/HexOS API exposure, and 2FA on the GitHub, 1Password, Cloudflare and UniFi accounts) still needs a
+separate look.
+
+### Secure browserless
+
+`browserless` (Compose, `network_mode: host`) listens on `0.0.0.0:3000` with **no `TOKEN`**, so anything that can reach
+`192.168.102.2:3000` can drive a remote Chromium: run arbitrary pages and scripts from the Pi's network position, and
+reach whatever the Pi can. `change-detection` also connects to it with `--disable-web-security`
+(`PLAYWRIGHT_DRIVER_URL` in `docker-compose/docker-compose.yml`). Both containers run on the same host, so the usual fix
+is to stop exposing it. Check browserless v2's docs for a bind-address setting (`HOST`) to put it on `127.0.0.1` and
+change `PLAYWRIGHT_DRIVER_URL` to `ws://127.0.0.1:3000/...`. If that doesn't work, set a `TOKEN` (from 1Password, like the
+other secrets) and add `?token=` to the URL. Verify from another machine that `:3000` is closed. This is a stopgap:
+when browserless moves into the cluster (see "Compose workload migration"), it should get a ClusterIP Service that
+only `change-detection` can reach.
+
+### Secure ChangeDetection
+
+`change-detection` listens on `0.0.0.0:5000` on rpi5-1 (host networking, so the compose `ports: 9898:5000` mapping
+doesn't apply). Authelia's two-factor rule only covers `changedetection.jakerobb.org`; hitting `rpi5-1:5000` directly
+skips it and reaches an unauthenticated UI that can fetch arbitrary URLs. It can't bind to loopback, since the
+Gateway's Envoy proxies to it from the cluster nodes. Instead, restrict the port with a host firewall rule on rpi5-1
+that allows `:5000` only from the node IPs (`.11`-`.13`, `.31`, `.32`, `.34`; Envoy's upstream connections leave
+through the node's IP, see the "LAN routes" section of `argocd/README.md`). Host-network container ports are ordinary
+host sockets, so a normal INPUT rule applies, unlike Docker-published ports. Also set a password in ChangeDetection's
+own settings as a second layer. Like browserless, this is a stopgap until the workload moves into the cluster.
+
+### Scope Headlamp's ServiceAccount
+
+The `headlamp` ClusterRoleBinding gives Headlamp's own ServiceAccount `cluster-admin`
+([`manifests/headlamp/clusterrolebinding.yaml`](../manifests/headlamp/clusterrolebinding.yaml)), so a compromised
+Headlamp pod would own the cluster. That was a deliberate 2026-09-21 call, because Headlamp ran in `-in-cluster` mode and
+used the SA's token for every request. Since then kube-apiserver was wired to Authelia's OIDC
+([`talos/patches/control-plane/oidc.yaml`](../talos/patches/control-plane/oidc.yaml)) with an `oidc-admin` binding for
+`jakerobb@gmail.com`, and the comment on that binding says the SA is for Headlamp's backend only, not for requests that
+carry a user's token. **Find out which is true now** before changing anything: bind the SA to `view` (or a narrower
+role) and check that Headlamp still works for you, including writes, since those should then be authorized by your own
+`oidc-admin` identity. If writes break, Headlamp is still using the SA's token, and the answer is a smaller custom role
+instead of `view`. Update the "RBAC" bullet in the Headlamp section of `argocd/README.md` either way.
+
+### Default-deny NetworkPolicies
+
+Only `argocd` and `arc-runners` have NetworkPolicies, and there are no Cilium policies. The pod network is flat, so any
+compromised pod can reach ESO, Prometheus, the Kubernetes API and everything else. Start with the namespaces whose
+compromise would cost the most (`external-secrets`, `monitoring`, `headlamp`) and add a default-deny ingress policy
+plus the specific allows each needs (the Gateway's Envoy for web UIs, Prometheus scrapes, DNS and the Kubernetes API for
+egress). Cilium enforces standard NetworkPolicies, so no new CRDs are needed. Test one namespace at a time, because a
+missing allow rule fails quietly.
+
+### Harden SSH and the host firewall on rpi5-1
+
+`sshd` is already key-only. Still to do: `PermitRootLogin` is `without-password`, so set it to `no`, and set
+`X11Forwarding no`. `3493` (the NUT data port for the UPS) is reachable from the LAN without authentication; it's
+read-only data, but consider limiting it to the hosts that need it. A first look at the nftables ruleset showed only
+Docker's NAT chains, so confirm what, if anything, filters INPUT, and settle on a default-deny baseline (SSH from the
+LAN, DNS on `:53`, `:3493` from where it's needed, and whatever the two entries above leave open) so that new
+host-network containers aren't exposed by default. Jump-box OS upgrade (Debian 12 to 13) is tracked in `FUTURE.md`.
+
+### Pin GitHub Actions to commit SHAs
+
+The workflows use tags (`actions/checkout@v7`, `docker/build-push-action@v7`, ...), so a retagged or compromised action
+would run in our jobs, one of which (`runner-image`) has `packages: write`. Add `helpers:pinGitHubActionDigests` to the
+`extends` list in `renovate.json` so Renovate rewrites tags to SHAs (keeping the version in a comment) and keeps them
+current. Once everything is pinned, turn on "Require actions to be pinned to a full-length commit SHA" in Settings,
+Actions, General. Turning that on first breaks every workflow.
+
+### Turn on the remaining free GitHub security features
+
+Code scanning's default setup with the `actions` language (CodeQL looks for script injection in workflow files, which
+matters with self-hosted runners on a public repo; Settings, Advanced Security). Dependabot malware alerts (Dependabot
+alerts are already on). A `SECURITY.md`, plus private vulnerability reporting if you ever want outside reports.
+
+### Pin container images by digest
+
+Images are pinned by tag, which a registry can repoint. Add `docker:pinDigests` to Renovate's `extends` so it adds
+`@sha256:` digests and updates them with the tag. Expect a one-time PR touching most manifests, and review it as you
+would a bulk change; the `# renovate:` annotated pins in custom managers may need their regexes widened to cope with a
+digest after the tag.
+
+### Gate the jump-box Terraform jobs with an Environment
+
+Deferred 2026-10-04. The Terraform plan and apply jobs run on rpi5-1, which holds Terraform's SOPS age key, for any PR
+from a branch in this repo. Renovate's token now has the Workflows permission, so a stolen token could push a branch
+that changes a workflow and runs on that runner. Putting those jobs behind a GitHub Environment with you as a required
+reviewer closes that, at the cost of approving each Terraform PR (including Renovate's provider bumps) before it runs.
+Revisit if the token's scope widens, a second person gets write access, or the jump box gains more access.
+
 ## Prometheus PVC steady-state usage
 
 **Was waiting on:** the 10-day retention window to fill. The PVC was expanded from 10Gi to 20Gi on 2026-09-30 after it hit
