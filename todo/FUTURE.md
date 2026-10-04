@@ -246,3 +246,22 @@ still use `.2` (about 16 queries/min at the time, so the volume is negligible; V
 container's stdout). Turn it off once the DNS cutover is verified:
 `docker exec unbound unbound-control -s /var/unbound/unbound.ctl set_option log-queries: no`. The setting also resets on
 any container restart, including the jump-box swap itself.
+
+## Enable the `all-branches` signed-commits ruleset
+
+**Waiting on:** Renovate successfully pushing a signed branch. The `all-branches` ruleset (Settings → Rules → Rulesets)
+already exists, matches every branch, and requires signed commits, but it's set to **Disabled**. Enforcing it now would
+reject Renovate's pushes, because Renovate used to commit over plain git with its personal token and every one of those
+commits was unsigned (checked 2026-10-03 on PRs #145-#155). `"platformCommit": "enabled"` in `renovate.json` is meant to
+fix that by making Renovate commit through GitHub's API, which GitHub signs (see the Renovate section of
+[`../argocd/README.md`](../argocd/README.md)). **The gate:** after that change has merged, a Renovate PR whose branch was
+created or rewritten since then has a head commit with `verified=true`:
+
+```bash
+gh api repos/jakerobb/homelab/commits/<head-sha> --jq '.commit.verification'
+```
+
+Tick the rebase checkbox on an open Renovate PR to force a rewrite instead of waiting for one. Once it shows verified,
+set `all-branches` to **Active**, and watch the next 04:17 Renovate run to confirm it can still push. If the commits are
+still unsigned, don't enable it as is. Add `refs/heads/renovate/**` to the ruleset's exclude list first; those commits
+get squash-merged into signed `main` commits anyway. No target date; this depends on that check, not on elapsed time.

@@ -266,6 +266,14 @@ Renovate PRs like everything else) — see the
   bootstrap step (the GitHub token below).
 - **Schedule:** daily, 4:17am America/Detroit — the same off-peak slot
   Watchtower used to run in.
+- **Signed commits (added 2026-10-04).** The repo's rulesets require signed
+  commits. Squash merges are signed by GitHub, but Renovate used to push its
+  branch commits over plain git with the personal token, so they were
+  unsigned (`verified=false, reason=unsigned`). `"platformCommit": "enabled"`
+  in `renovate.json` makes it commit through GitHub's API instead, which
+  GitHub signs. The default (`auto`) didn't do that with this PAT, as the
+  unsigned commits showed. If a Renovate branch's head commit shows as
+  unverified again, that's the setting to check.
 - **Image tag is pinned, not `:latest`** — deliberately, so the `kubernetes`
   manager picks it up and Renovate ends up opening a PR against its own
   CronJob when a new version ships.

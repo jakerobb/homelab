@@ -2,6 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "timezone": "America/Detroit",
+  "platformCommit": "enabled",
   "prHourlyLimit": 0,
   "prConcurrentLimit": 5,
   "kubernetes": {
