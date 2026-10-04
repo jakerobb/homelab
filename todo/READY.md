@@ -29,11 +29,6 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   wins, UI edits are lost). `zwave-js-ui`, `zigbee2mqtt` and `homeassistant` all took the seed-once route (Zigbee2MQTT's
   and Home Assistant's config come from the old data directory rather than a ConfigMap). Secrets go in an ExternalSecret,
   as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env overrides into the PVC).
-- **scrypted** — camera/NVR bridge
-  wins, UI edits are lost). `zwave-js-ui` and `zigbee2mqtt` both took the seed-once route (Zigbee2MQTT's config comes from
-  the old data directory rather than a ConfigMap, since it holds device names). Both keep their secrets in an
-  ExternalSecret, as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env
-  overrides into the PVC).
 - **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
   as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it
   waits until everything else has moved. No hardware dependency. Needs a persistent volume for the datastore.
