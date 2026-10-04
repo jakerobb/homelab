@@ -43,7 +43,7 @@ spec:
                       app.kubernetes.io/name: scrypted
           containers:
             - name: backup
-              image: busybox:1.37.0
+              image: busybox:1.38.0
               command:
                 - sh
                 - -euc
