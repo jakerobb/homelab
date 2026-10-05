@@ -200,6 +200,20 @@ Apps (each repo's `.github/workflows/docker-publish.y*ml`; the `date` step diffe
 `manifests/restock-radar/`, `nut-exporter/`, `truenas-exporter/` and `modbus-controller/`. Once restock-radar has a
 unique tag, its digest pin is optional; keep it if "Pin container images by digest" below goes ahead.
 
+## VolumeSnapshots for the iSCSI volumes
+
+Nothing here can take a VolumeSnapshot today. The external-snapshotter CRDs are installed
+([`../manifests/external-snapshotter/`](../manifests/external-snapshotter)) but not the snapshot-controller or its
+validating webhook (`../argocd/README.md`, "external-snapshotter CRDs"), there's no `VolumeSnapshotClass`, and
+democratic-csi has `volumeSnapshotClasses: []` in
+[`../argocd/apps/democratic-csi/application.yaml`](../argocd/apps/democratic-csi/application.yaml). Turning them on
+means installing the controller, defining a class for the driver (which makes ZFS snapshots on HexOS through the
+TrueNAS API), proving a snapshot and a restore on a throwaway PVC, and adding something to take them on a schedule
+and prune them. That touches the storage path every PVC shares, so it's a project of its own. Services that need a
+backup today do it themselves onto `hexos-nfs` (Home Assistant, Scrypted and restock-radar all do), which keeps
+working whatever happens to snapshots. Worth doing if a service turns up that can't copy its own data, or for
+Prometheus and ClickHouse, whose volumes are too big to copy.
+
 ## Prometheus PVC steady-state usage
 
 **Was waiting on:** the 10-day retention window to fill. The PVC was expanded from 10Gi to 20Gi on 2026-09-30 after it hit

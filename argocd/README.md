@@ -1308,13 +1308,77 @@ still on Compose until it's retired.
   authoritative for themselves (removing one unwatches it), UI additions
   persist. The JSON API (`/v1/products`, `/v1/events`, `/health`) is served on
   the same host.
-- **Metrics and alert.** `/metrics` is scraped by a ServiceMonitor, federated
+- **Metrics and alerts.** `/metrics` is scraped by a ServiceMonitor, federated
   into SigNoz (`{job="restock-radar"}` in `apps/signoz/application.yaml`), and
   [`../terraform/signoz/alert-restock-radar.tf`](../terraform/signoz/alert-restock-radar.tf)
-  raises "Restock Radar stalled" through the ntfy-alertmanager channel when no
-  fetch has succeeded for an hour, or the metric has been missing for 30
-  minutes. `restock_radar_fetches_total{result}` says whether it was the store
+  raises four alerts through the ntfy-alertmanager channel:
+  "Restock Radar stalled" (no fetch has succeeded for an hour, or the metric
+  has been missing for 30 minutes), "notifications stuck" (detected changes
+  undelivered for 30 minutes), "notification rejected" (ntfy refused one for
+  good, so it was dropped) and "backup stale" (no backup in 36 hours).
+  `restock_radar_fetches_total{result}` says whether a stall was the store
   blocking us (`blocked`), its JSON changing (`schema`), or something else.
+- **Backups.** Products added in the UI exist only in the database, so the app
+  copies it (SQLite `VACUUM INTO`, safe while running) to the
+  `restock-radar-backups` volume every 24 hours and keeps the newest 14
+  (`backup_dir` in `config.yaml`). That volume is `hexos-nfs`, a different
+  dataset on the NAS from the iSCSI data volume, the same split
+  `homeassistant-backups` and `scrypted-backups` use. **VolumeSnapshots were
+  considered and not used:** none of it exists here (no snapshot controller, no
+  `VolumeSnapshotClass`, snapshots off in democratic-csi's values), and turning
+  it on changes the storage path every PVC shares (READY.md has the details).
+- **Restoring a backup.** Scale the app down, copy a backup over the live
+  database from a throwaway pod that mounts both volumes, and scale it back up:
+
+```bash
+kubectl -n restock-radar scale deploy/restock-radar --replicas=0
+kubectl -n restock-radar apply -f - <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restore
+  namespace: restock-radar
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: restore
+      image: busybox:1.38.0
+      command: ["sleep", "3600"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - {name: data, mountPath: /data}
+        - {name: backups, mountPath: /backups, readOnly: true}
+  volumes:
+    - name: data
+      persistentVolumeClaim: {claimName: restock-radar-data}
+    - name: backups
+      persistentVolumeClaim: {claimName: restock-radar-backups}
+EOF
+kubectl -n restock-radar exec restore -- ls -l /backups
+kubectl -n restock-radar exec restore -- sh -c 'rm -f /data/restock-radar.db* && cp /backups/restock-radar-YYYYMMDD-HHMMSS.db /data/restock-radar.db'
+kubectl -n restock-radar delete pod restore
+kubectl -n restock-radar scale deploy/restock-radar --replicas=1
+```
+
+  (Pick the file from the `ls`, and run the `kubectl` lines on rpi5-1.) The
+  copy is a normal database file; the app migrates it forward if it's from an
+  older version.
+- **Hardening.** The namespace enforces the `restricted` Pod Security Standard,
+  and the pod has a readiness probe. The app rate limits adding products,
+  caps the watch list, sets a strict Content-Security-Policy, and stops
+  retrying a notification ntfy permanently rejects instead of letting it block
+  the queue (see the app's DESIGN.md). Renovate also covers the
+  `jakerobb/restock-radar` repo now (its token needs access to it).
 - **Image** is `docker.io/jakerobb/restock-radar:<date>@sha256:<digest>`,
   pinned by hand like nut-exporter's; Renovate can bump it. The digest is there
   because the date tag can be re-published the same day (see READY.md's "Unique

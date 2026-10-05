@@ -1,6 +1,11 @@
-# Explicit Namespace, same as nut-exporter/namespace.yaml. No PodSecurity
-# override needed: the pod runs non-root with all capabilities dropped.
+# Explicit Namespace, same as nut-exporter/namespace.yaml. The pod runs
+# non-root with a read-only root filesystem, all capabilities dropped, the
+# default seccomp profile and only configMap/PVC volumes, so it meets the
+# `restricted` Pod Security Standard, and this namespace enforces it: nothing
+# privileged can be scheduled here by mistake.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: restock-radar
+  labels:
+    pod-security.kubernetes.io/enforce: restricted

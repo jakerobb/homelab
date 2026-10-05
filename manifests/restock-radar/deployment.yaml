@@ -54,6 +54,13 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 30
+          # Without this the Service would route to the pod as soon as it
+          # starts, before the server is listening.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
           resources:
             requests:
               cpu: 5m
@@ -66,6 +73,8 @@ spec:
               readOnly: true
             - mountPath: /data
               name: data
+            - mountPath: /backups
+              name: backups
       volumes:
         # Generated from config.yaml by kustomization.yaml; the name gets a
         # content-hash suffix, so a config change rolls the pod.
@@ -75,3 +84,6 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: restock-radar-data
+        - name: backups
+          persistentVolumeClaim:
+            claimName: restock-radar-backups

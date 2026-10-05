@@ -11,6 +11,13 @@ request_delay: 2s
 http_port: 8080
 db_path: /data/restock-radar.db
 
+# Nightly copies of the database to the restock-radar-backups volume
+# (manifests/restock-radar/pvc.yaml), newest 14 kept. To restore, see the
+# restock-radar section of argocd/README.md.
+backup_dir: /backups
+backup_interval: 24h
+backup_keep: 14
+
 # In-cluster ntfy, which has no auth configured (see argocd/README.md's ntfy
 # section), so there's no token.
 ntfy:

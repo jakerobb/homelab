@@ -14,3 +14,24 @@ spec:
   resources:
     requests:
       storage: 1Gi
+---
+# Copies of the database, written by restock-radar itself (backup_dir in
+# config.yaml: nightly, newest 14 kept). hexos-nfs, so they live on a different
+# dataset on the NAS from the iSCSI volume above and survive losing it, the same
+# split homeassistant-backups and scrypted-backups use. ReadWriteMany is just
+# what the NFS class offers; only this pod mounts it. Any UID can write to an
+# hexos-nfs volume (docs/nfs-storage.md), and fsGroup is applied to it.
+#
+# The copies matter because products added through the web UI live only in the
+# database. Items in config.yaml are in git; the UI's are not.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: restock-radar-backups
+  namespace: restock-radar
+spec:
+  storageClassName: hexos-nfs
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 1Gi

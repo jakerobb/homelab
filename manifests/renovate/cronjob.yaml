@@ -35,6 +35,10 @@ spec:
               image: renovate/renovate:44.134.3
               args:
                 - jakerobb/homelab
+                # The app behind manifests/restock-radar/: its Go and npm
+                # dependencies, Actions pins and Dockerfile base images.
+                # RENOVATE_TOKEN has to be granted this repository too.
+                - jakerobb/restock-radar
               env:
                 - name: RENOVATE_PLATFORM
                   value: github
