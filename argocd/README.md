@@ -2162,6 +2162,9 @@ app built from what each one actually talks to.
   then `hubble observe -n <namespace> --verdict DROPPED --last 200`. The drop
   names the source, destination and port to add. Deleting the namespace's
   `default-deny` is the quick way to confirm a policy is the cause.
-- **Known guesses.** NetworkOptimizer has LAN-only egress; if its update check
-  or a WAN speed test needs the internet, add an `internet()` rule. The
+- **Port gotcha.** Policy sees the pod's port, after Service translation, not the Service port. The
+  NetworkOptimizer speed test is Service port 3005 but pod port 3000, and the first version of its policy allowed
+  3005. Check `kubectl get endpointslices` for the real port.
+- **Known guesses.** NetworkOptimizer may use TCP to the internet for an update check or WAN test; today it gets only
+  ICMP echo out (path analysis), found from Hubble drops. If a feature stops working, add an `internet()` rule. The
   democratic-csi controllers get TrueNAS on 80 and 443 only.

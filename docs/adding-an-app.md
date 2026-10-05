@@ -268,7 +268,8 @@ Copy a neighbor's (restock-radar's is a good template) and list only the
 real flows: the Gateway as `fromEntities: [ingress]`, Prometheus if there's a
 ServiceMonitor, DNS, the API server if it uses a ServiceAccount, and each
 outbound destination by IP and port. Apps on `hostNetwork` can't be
-restricted by pod policy, so don't bother. After it syncs, watch
+restricted by pod policy, so don't bother. Policy sees the pod's port, not the Service's, so take ports
+from `kubectl get endpointslices`. After it syncs, watch
 `hubble observe -n <name> --verdict DROPPED` for anything you missed.
 
 ## Checklist
