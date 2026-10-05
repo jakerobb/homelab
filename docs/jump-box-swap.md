@@ -495,6 +495,9 @@ then power the Pi off.
 
 ## After the swap: follow-ups
 
+- After the worker joins and the cluster settles, run the descheduler by hand to spread pods onto the new
+  node (see "After a rolling node change" in [`talos/README.md`](../talos/README.md)).
+
 - Update the docs that name the old arrangement: the rpi5-1 sections of
   [`todo/HARDWARE.md`](../todo/HARDWARE.md) (delete the finished checklist
   items), `README.md`, `talos/README.md` (a new "talos-worker-3" section and
