@@ -1,5 +1,5 @@
 # ntfy. Push alerts come in from in-cluster senders (ntfy-alertmanager, restock-radar, descheduler,
-# pv-janitor) and from phones through the Gateway; it relays iOS wake-ups through ntfy.sh upstream.
+# pv-janitor, change-detection) and from phones through the Gateway; it relays iOS wake-ups through ntfy.sh upstream.
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
@@ -45,6 +45,8 @@ spec:
             k8s:io.kubernetes.pod.namespace: descheduler
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: pv-janitor
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: change-detection
       toPorts:
         - ports:
             - port: '8080'
