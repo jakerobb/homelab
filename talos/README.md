@@ -26,10 +26,10 @@ _(as of 2026-10-01)_
   **Any amd64 worker (e.g. the MS-A2 Talos VM) must use a Factory schematic image
   (`factory.talos.dev/installer/<schematic-id>:<version>`) — `ghcr.io/siderolabs/installer` doesn't
   exist for recent releases, and the rpi5 installer image must never be reused for amd64 hardware.**
-  Currently `factory.talos.dev/installer/613e1592b2da41ae5e265e8789429f22e121aab91cb4deb6bc3c0b6262961245:v1.14.2`
-  (the `iscsi-tools` + `util-linux-tools` schematic — see "iscsi-tools extension" below), confirmed
-  against both workers' live `get extensions` output and correctly persisted in machine config as
-  of 2026-09-21.
+  Currently `factory.talos.dev/installer/85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615:v1.14.2`
+  (the `iscsi-tools` + `util-linux-tools` schematic, plus the kernel-log arg — see "iscsi-tools extension" and
+  "Talos kernel logs" below), confirmed against both workers' live `get extensions` output and persisted in machine
+  config as of 2026-10-05. (Before that: `613e1592…`, the same extensions without the kernel arg.)
 - CNI: Cilium — version tracked in
   [`../argocd/apps/cilium/application.yaml`](../argocd/apps/cilium/application.yaml)'s
   `targetRevision` (see "Cilium: version management" below for how upgrades work), with
@@ -1335,6 +1335,44 @@ separately, and
 updated to match. **Likely worth baking into the Mac Studio's schematic
 from the start** rather than waiting to hit the same alert again — real
 hardware (the Proxmox workers) isn't affected, only UTM/QEMU VMs are.
+
+## Talos kernel logs (added 2026-10-05)
+
+The three workers send their kernel logs to SigNoz. Each worker's Image Factory schematic carries
+`talos.logging.kernel=udp://192.168.102.2:5140/`, which makes Talos push every kernel message (and the
+`user`-facility Talos messages that share the ring buffer), one JSON object per UDP datagram. The Compose
+Vector on rpi5-1 listens on `5140/udp` (`talos_kernel` source in
+[`../docker-compose/vector/vector.yaml`](../docker-compose/vector/vector.yaml)) and forwards it to SigNoz over
+OTLP, with `source_type=talos-kernel` and `k8s.node.name` set from the sender's IP. The "Kernel storage error"
+alert ([`../terraform/signoz/alert-kernel-storage.tf`](../terraform/signoz/alert-kernel-storage.tf)) fires on
+disk-failure lines.
+
+**Why:** on 2026-09-29 and 2026-10-05, writes to Prometheus's own iSCSI volume hung for 180 seconds. The kernel
+failed them, ext4 logged "potential data loss", and Prometheus later panicked and lost head-chunk data.
+`ISCSIVolumeIOStall` didn't fire, since it reads the same Prometheus whose disk stalled. This path doesn't
+depend on Prometheus, and it works while a node's kubelet or pod network is down. (A DaemonSet reading
+`/dev/kmsg` was considered and dropped for that reason.)
+
+| Schematic | ID | Used by |
+|---|---|---|
+| `iscsi-tools`, `util-linux-tools`, kernel-log arg | `85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615` | talos-worker-1, -2 |
+| the same plus `tsc=reliable` | `fc5e78730c2f3ed1f1939294d5cf2340c160d940f03994daf3ca4fbaf022f203` | talos-worker-mbp |
+
+Both were rolled out 2026-10-05 with `talosctl upgrade --image factory.talos.dev/installer/<id>:v1.14.2`, one
+node at a time, then `talosctl patch machineconfig -p '{"machine":{"install":{"image":"<same>"}}}'` (a
+strategic-merge patch; the JSON6902 form is rejected on multi-document configs). The kernel arg only takes
+effect through a schematic, not `machine.install.extraKernelArgs`; see the `tsc=reliable` section below.
+`terraform/proxmox/images.tf` still points at the older v1.11.5 schematic, as before, so a from-scratch worker
+rebuild should use one of these IDs.
+
+- **Volume:** a reboot re-sends about 1,000 lines (60-125KB); steady state is a trickle.
+- **Control planes don't send kernel logs.** They boot the custom Pi 5 image, which doesn't take a schematic,
+  and they use local NVMe rather than iSCSI. Revisit if something makes us want them.
+- **New nodes:** bake the arg into their schematics, and add their IP to the `nodes` map in the Vector
+  transform so `k8s.node.name` is right (an unmapped node shows up under its IP). The Pi 5 worker from the
+  jump-box swap is the open problem; see [`../docs/jump-box-swap.md`](../docs/jump-box-swap.md).
+- **Receiver address:** the arg is baked into each node's boot entry, so changing `.2` or the port means
+  another upgrade per node. The swapped jump box keeps `.2`.
 
 ## kube-apiserver OIDC trust for Authelia (added 2026-09-21)
 

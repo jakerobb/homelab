@@ -134,3 +134,5 @@ services:
     #   - "999"   # getent group docker | cut -d: -f3
     ports:
       - "514:514/udp"
+      # Talos kernel logs (talos.logging.kernel in the workers' schematics).
+      - "5140:5140/udp"

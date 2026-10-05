@@ -12,6 +12,17 @@ sources:
     decoding:
       codec: bytes
 
+  # Talos nodes' kernel logs (the `talos.logging.kernel` kernel arg in each
+  # worker's Image Factory schematic; see talos/README.md). One JSON object
+  # per datagram, and Talos replays the whole boot's buffer once the network
+  # is up, so a reboot re-sends about a thousand lines.
+  talos_kernel:
+    type: socket
+    mode: udp
+    address: 0.0.0.0:5140
+    decoding:
+      codec: json
+
   pi_journal:
     type: journald
     current_boot_only: true
@@ -185,11 +196,56 @@ transforms:
         }]
       }
 
+  # Talos kernel log -> OTLP. `host` is the sending node's IP (the socket
+  # source sets it), mapped to the Kubernetes node name so SigNoz's
+  # k8s.node.name matches what the kubelet-side logs use. A node missing from
+  # the map falls back to its IP; add new nodes here (and see the "Talos
+  # kernel logs" section of talos/README.md).
+  talos_kernel_otlp:
+    type: remap
+    inputs:
+      - talos_kernel
+    source: |
+      nodes = {
+        "192.168.102.31": "talos-worker-1",
+        "192.168.102.32": "talos-worker-2",
+        "192.168.102.34": "talos-worker-mbp"
+      }
+      ip = to_string(.host) ?? ""
+      node, err = string(get!(nodes, [ip]))
+      if err != null { node = ip }
+      body = strip_whitespace(to_string(.msg) ?? "")
+      ts = parse_timestamp(to_string(get!(., ["talos-time"])) ?? "", format: "%+") ?? now()
+      ts_ns = to_string(to_unix_timestamp(ts, unit: "nanoseconds"))
+      . = {
+        "resourceLogs": [{
+          "resource": {
+            "attributes": [
+              {"key": "host.name", "value": {"stringValue": node}},
+              {"key": "k8s.node.name", "value": {"stringValue": node}},
+              {"key": "source_type", "value": {"stringValue": "talos-kernel"}}
+            ]
+          },
+          "scopeLogs": [{
+            "scope": {},
+            "logRecords": [{
+              "timeUnixNano": ts_ns,
+              "severityText": to_string(get!(., ["priority"])) ?? "",
+              "body": {"stringValue": body},
+              "attributes": [
+                {"key": "facility", "value": {"stringValue": to_string(get!(., ["facility"])) ?? ""}},
+                {"key": "seq", "value": {"stringValue": to_string(get!(., ["seq"])) ?? ""}}
+              ]
+            }]
+          }]
+        }]
+      }
+
 sinks:
   # SigNoz is the only destination. Logs also went to VictoriaLogs until
   # 2026-10-01 (dual-shipped since 2026-09-22 while SigNoz was on trial); its
   # three elasticsearch sinks are gone from here. One combined OTLP sink covers
-  # all three sources: the *_otlp transforms above reshape each event into
+  # all four sources: the *_otlp transforms above reshape each event into
   # OTLP log records, carrying every field as an attribute. See
   # argocd/README.md's SigNoz section and
   # argocd/apps/signoz/httproute-otel.yaml for the ingestion endpoint —
@@ -200,6 +256,7 @@ sinks:
       - docker_otlp
       - unifi_otlp
       - pi_journal_otlp
+      - talos_kernel_otlp
     protocol:
       type: http
       uri: https://otel.jakerobb.org/v1/logs
