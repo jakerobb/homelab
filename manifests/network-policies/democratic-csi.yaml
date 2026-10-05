@@ -1,0 +1,49 @@
+# democratic-csi controllers (iSCSI and NFS). They call the TrueNAS API at 192.168.102.33 and the
+# API server. The node pods are hostNetwork, so no pod policy applies to them (they mount from the host).
+# TrueNAS answers on 443, and on 80 for the HTTP redirect/API variant.
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
+# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# Kubelet probes come from the node (`host`), which Cilium always allows. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: democratic-csi
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: democratic-csi
+  namespace: democratic-csi
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toEntities:
+        - kube-apiserver
+    - toCIDR:
+        - 192.168.102.33/32
+      toPorts:
+        - ports:
+            - port: '80'
+              protocol: TCP
+            - port: '443'
+              protocol: TCP

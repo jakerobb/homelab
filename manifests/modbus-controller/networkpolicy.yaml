@@ -1,0 +1,50 @@
+# modbus-controller: HTTP front end for the Waveshare relay board at modbus.lan:4196 (192.168.62.3).
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
+# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# Kubelet probes come from the node (`host`), which Cilium always allows. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: modbus-controller
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: modbus-controller
+  namespace: modbus-controller
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: '8080'
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toCIDR:
+        - 192.168.62.3/32
+      toPorts:
+        - ports:
+            - port: '4196'
+              protocol: TCP
