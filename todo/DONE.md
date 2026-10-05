@@ -772,3 +772,20 @@ depended on a yarn-only `patch:got@...` spec, which broke the "Renovate config" 
 ([renovatebot/renovate#46656](https://github.com/renovatebot/renovate/discussions/46656)); `renovate@44.132.2` installs
 cleanly. The in-cluster CronJob image (`manifests/renovate/cronjob.yaml`) was bumped to 44.132.2 at the same time. Nothing
 in the repo needed fixing otherwise, and no workaround pin was applied.
+
+## Default-deny NetworkPolicies
+
+**Done (2026-10-05).** Every app namespace is now default-deny in both directions, with a per-app allow-list built from
+what each one talks to: the Gateway (Cilium's `ingress` entity), Prometheus scrapes, DNS, the API server, in-cluster
+peers, LAN hosts by IP and port, and the internet minus RFC1918. Standard `NetworkPolicy` does the deny and
+`CiliumNetworkPolicy` the allows, since the Gateway, API server, node IPs and LAN are Cilium entities. Hand-written apps
+carry `manifests/<app>/networkpolicy.yaml`; chart-managed namespaces are in `manifests/network-policies/`. Not covered:
+`hostNetwork` pods (Home Assistant, Matter Server, Scrypted, node-exporter, CSI node pods), `kube-system`, and `argocd`
+(its chart's own policies). Details and the debugging recipe:
+[`../argocd/README.md`](../argocd/README.md#networkpolicies-added-2026-10-05).
+
+## Pin GitHub Actions to commit SHAs
+
+**Done (2026-10-05).** All workflow actions are pinned to full-length commit SHAs (#165), and "Require actions to be
+pinned to a full-length commit SHA" is on in Settings, Actions, General. `renovate.json` extends `helpers:pinGitHubActionDigests`, so Renovate pins any newly added tag and keeps the pins
+current.
