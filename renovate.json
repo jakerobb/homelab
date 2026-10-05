@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "timezone": "America/Detroit",
-  "platformCommit": "enabled",
+  "gitAuthor": "Jake Robb <jakerobb@users.noreply.github.com>",
+  "platformCommit": "disabled",
   "prHourlyLimit": 0,
   "prConcurrentLimit": 5,
   "kubernetes": {

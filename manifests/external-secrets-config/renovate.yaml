@@ -1,4 +1,4 @@
-# Renovate's GitHub token (manifests/renovate/).
+# Renovate's GitHub token and commit-signing key (manifests/renovate/).
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -15,3 +15,27 @@ spec:
     - secretKey: token
       remoteRef:
         key: renovate-github-token/token
+---
+# SSH private key Renovate signs its branch commits with: a 1Password SSH Key
+# item, whose `private key` field comes back in OpenSSH format. The template
+# flattens it to one line with literal \n escapes, which is the format
+# RENOVATE_GIT_PRIVATE_KEY wants. See argocd/README.md, "Signed commits".
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: renovate-signing-key
+  namespace: renovate
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: renovate-signing-key
+    template:
+      data:
+        private-key: '{{ .key | replace "\n" "\\n" }}'
+  data:
+    - secretKey: key
+      remoteRef:
+        key: renovate-signing-key/private key

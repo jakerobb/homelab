@@ -266,14 +266,31 @@ Renovate PRs like everything else) — see the
   bootstrap step (the GitHub token below).
 - **Schedule:** daily, 4:17am America/Detroit — the same off-peak slot
   Watchtower used to run in.
-- **Signed commits (added 2026-10-04).** The repo's rulesets require signed
-  commits. Squash merges are signed by GitHub, but Renovate used to push its
-  branch commits over plain git with the personal token, so they were
-  unsigned (`verified=false, reason=unsigned`). `"platformCommit": "enabled"`
-  in `renovate.json` makes it commit through GitHub's API instead, which
-  GitHub signs. The default (`auto`) didn't do that with this PAT, as the
-  unsigned commits showed. If a Renovate branch's head commit shows as
-  unverified again, that's the setting to check.
+- **Signed commits (SSH key, added 2026-10-05).** The repo's rulesets
+  require signed commits. Squash merges are signed by GitHub, but Renovate's
+  branch commits were unsigned (`verified=false, reason=unsigned`). Neither
+  `platformCommit: "auto"` nor `"enabled"` helped: with a personal access
+  token, GitHub doesn't sign API-made commits (it seems to do so only for
+  GitHub App tokens). So Renovate signs its own commits: the CronJob gets an
+  SSH private key in `RENOVATE_GIT_PRIVATE_KEY` (from the
+  `renovate-signing-key` Secret, synced by ESO from the 1Password item of the
+  same name), and `renovate.json`
+  sets `platformCommit: "disabled"` (so it commits over git, where the key
+  applies) and a `gitAuthor` whose email is one GitHub knows is yours. GitHub
+  only marks an SSH-signed commit verified if the committer email belongs to
+  the account that registered the public key as a **Signing key**.
+  - **One-time setup:** create a 1Password **SSH Key** item named
+    `renovate-signing-key` in the `homelab-k8s` vault, generating the key there
+    (ed25519) or importing one made with
+    `ssh-keygen -t ed25519 -N "" -C renovate-signing -f renovate-signing`. No
+    passphrase, since Renovate runs headless. Add the public key at GitHub →
+    Settings → SSH and GPG keys → New SSH key → Key type **Signing Key**. The
+    ExternalSecret reads the item's `private key` field (OpenSSH format) and
+    flattens it to the one-line `\n`-escaped form Renovate wants.
+  - **If a Renovate head commit shows as unverified again:** check that the
+    key is still registered as a *Signing* key (not just Authentication),
+    that `gitAuthor`'s email matches one on the account, and that the
+    Renovate log doesn't have a key-import warning.
 - **Image tag is pinned, not `:latest`** — deliberately, so the `kubernetes`
   manager picks it up and Renovate ends up opening a PR against its own
   CronJob when a new version ships.

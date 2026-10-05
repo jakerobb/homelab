@@ -661,7 +661,7 @@ kubectl create job -n descheduler --from=cronjob/descheduler descheduler-manual-
 kubectl logs -n descheduler job/descheduler-manual-<timestamp>   # which pods it evicted, and why it stopped
 ```
 
-Each run evicts at most 3 pods (2 per node), so after a big shuffle it can take a few runs; check
+Each run evicts at most 5 pods (3 per node), so after a big shuffle it can take a few runs; check
 `kubectl top nodes` and the workers' memory requests (`kubectl describe node`), and repeat until the workers are
 roughly level. Details and tuning are in [`../todo/DONE.md`](../todo/DONE.md#descheduler). Run it on the jump box
 (`rpi5-1`), where `kubectl` already works. Delete old `descheduler-manual-*` Jobs when you're done, or let them age out.
