@@ -31,7 +31,6 @@ docker-compose/homeassistant/home-assistant_v2.db*
 docker-compose/homeassistant/lutron_caseta-*-key.pem
 docker-compose/scrypted/*
 docker-compose/nut-conf/*
-docker-compose/change-detection/*
 docker-compose/data/*
 docker-compose/ssh-keys/*
 docker-compose/logs/*

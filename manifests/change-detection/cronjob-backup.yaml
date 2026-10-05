@@ -1,0 +1,82 @@
+# Nightly backup of /datastore (watches, their snapshot history, settings) to the
+# change-detection-backups PVC (hexos-nfs, so a different dataset on the NAS from the iSCSI
+# volume). Keeps 14 days.
+#
+# The datastore is JSON and snapshot files the app rewrites while it runs, so a backup taken
+# live can in principle catch one mid-write. Treat it as a safety net, not a guarantee.
+#
+# Same node as the change-detection pod (required podAffinity) because the data volume is
+# ReadWriteOnce: a second pod can mount it only from the node that already has it attached.
+# The job mounts it read-only. Root, because the files belong to the app's UID and the NFS
+# export has maproot=root (docs/nfs-storage.md).
+#
+# To restore: scale change-detection to 0, extract a backup over /datastore from a throwaway
+# pod, scale back up.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: change-detection-backup
+  namespace: change-detection
+spec:
+  schedule: "27 3 * * *"
+  timeZone: America/Detroit
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      template:
+        spec:
+          restartPolicy: Never
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: change-detection
+          containers:
+            - name: backup
+              image: busybox:1.38.0
+              command:
+                - sh
+                - -euc
+                - |
+                  cd /datastore
+                  set -- $(ls -A | grep -Ev '^\.restored$')
+                  out=/backups/change-detection-$(date +%Y%m%d-%H%M%S).tar.gz
+                  tar -czf "$out.tmp" "$@"
+                  mv "$out.tmp" "$out"
+                  find /backups -name 'change-detection-*.tar.gz' -mtime +14 -delete
+                  ls -l /backups
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                  add: [DAC_OVERRIDE]
+                readOnlyRootFilesystem: true
+                runAsUser: 0
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi
+              volumeMounts:
+                - mountPath: /datastore
+                  name: data
+                  readOnly: true
+                - mountPath: /backups
+                  name: backups
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: change-detection-data
+                readOnly: true
+            - name: backups
+              persistentVolumeClaim:
+                claimName: change-detection-backups

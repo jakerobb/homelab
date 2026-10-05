@@ -273,8 +273,6 @@ there. Flex mini, currently unused
 Docker Compose is where everything started. It runs on rpi5-1, and includes the following containers:
 
 * nut-upsd
-* change-detection
-* browserless
 * unbound
 * telegraf
 * vector

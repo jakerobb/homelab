@@ -23,20 +23,12 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
 
 ### To be migrated
 
-- **Decide config ownership per service before moving each one.** `change-detection` rewrites its own config files,
-  and a ConfigMap/Secret mount is read-only, so it can't save UI changes there. Pick one: seed the file into the PVC
-  once (the app owns it afterward, so UI edits survive but git isn't authoritative), or overwrite it on every start (git
-  wins, UI edits are lost). `zwave-js-ui`, `zigbee2mqtt` and `homeassistant` all took the seed-once route (Zigbee2MQTT's
+- **Decide config ownership per service before moving each one.** An app that rewrites its own config files can't save
+  UI changes to a read-only ConfigMap/Secret mount. Pick one: seed the file into the PVC once (the app owns it
+  afterward, so UI edits survive but git isn't authoritative), or overwrite it on every start (git wins, UI edits are
+  lost). `change-detection`, `zwave-js-ui`, `zigbee2mqtt` and `homeassistant` all took the seed-once route (Zigbee2MQTT's
   and Home Assistant's config come from the old data directory rather than a ConfigMap). Secrets go in an ExternalSecret,
   as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env overrides into the PVC).
-- **change-detection.io** (`change-detection` + its `browserless` dependency) — **ready to migrate.** It was held back
-  because browserless (headless Chromium) is heavy and Jake wanted to rely on it less. The UniFi store watches were
-  what drove that, and [restock-radar](https://github.com/jakerobb/restock-radar) replaced them on 2026-10-05
-  (`argocd/README.md`'s restock-radar section), so **retire the 26 UniFi store entries instead of migrating them.**
-  The rest are three non-store pages (the changedetection.io changelog, `smarthomeshop.io`'s UltimateSensor, and
-  `ui.com/us/en/whats-new`). Check whether those need a browser at all; if plain HTTP fetches work, drop browserless
-  rather than moving it, and close "Secure browserless" below with it. No hardware dependency. Needs a persistent
-  volume for the datastore.
 
 When a service migrates, delete its file from `manifests/lan-routes/` in the same PR.
 
@@ -117,29 +109,6 @@ pinned image tags, key-only SSH, protected `main`) and the gaps below. Each is i
 did *not* cover (UniFi's inter-VLAN firewall and any WAN port forwards, what Cloudflare exposes to the internet,
 Proxmox and TrueNAS/HexOS API exposure, and 2FA on the GitHub, 1Password, Cloudflare and UniFi accounts) still needs a
 separate look.
-
-### Secure browserless
-
-`browserless` (Compose, `network_mode: host`) listens on `0.0.0.0:3000` with **no `TOKEN`**, so anything that can reach
-`192.168.102.2:3000` can drive a remote Chromium: run arbitrary pages and scripts from the Pi's network position, and
-reach whatever the Pi can. `change-detection` also connects to it with `--disable-web-security`
-(`PLAYWRIGHT_DRIVER_URL` in `docker-compose/docker-compose.yml`). Both containers run on the same host, so the usual fix
-is to stop exposing it. Check browserless v2's docs for a bind-address setting (`HOST`) to put it on `127.0.0.1` and
-change `PLAYWRIGHT_DRIVER_URL` to `ws://127.0.0.1:3000/...`. If that doesn't work, set a `TOKEN` (from 1Password, like the
-other secrets) and add `?token=` to the URL. Verify from another machine that `:3000` is closed. This is a stopgap:
-when browserless moves into the cluster (see "Compose workload migration"), it should get a ClusterIP Service that
-only `change-detection` can reach.
-
-### Secure ChangeDetection
-
-`change-detection` listens on `0.0.0.0:5000` on rpi5-1 (host networking, so the compose `ports: 9898:5000` mapping
-doesn't apply). Authelia's two-factor rule only covers `changedetection.jakerobb.org`; hitting `rpi5-1:5000` directly
-skips it and reaches an unauthenticated UI that can fetch arbitrary URLs. It can't bind to loopback, since the
-Gateway's Envoy proxies to it from the cluster nodes. Instead, restrict the port with a host firewall rule on rpi5-1
-that allows `:5000` only from the node IPs (`.11`-`.13`, `.31`, `.32`, `.34`; Envoy's upstream connections leave
-through the node's IP, see the "LAN routes" section of `argocd/README.md`). Host-network container ports are ordinary
-host sockets, so a normal INPUT rule applies, unlike Docker-published ports. Also set a password in ChangeDetection's
-own settings as a second layer. Like browserless, this is a stopgap until the workload moves into the cluster.
 
 ### Scope Headlamp's ServiceAccount
 

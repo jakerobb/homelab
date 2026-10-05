@@ -1,39 +1,13 @@
-# change-detection.io (Compose on rpi5-1).
-# Gated by Authelia forward-auth.
-apiVersion: v1
-kind: Service
-metadata:
-  name: change-detection
-  namespace: lan-routes
-spec:
-  ports:
-    - name: http
-      port: 5000
----
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
-metadata:
-  name: change-detection
-  namespace: lan-routes
-  labels:
-    kubernetes.io/service-name: change-detection
-    endpointslice.kubernetes.io/managed-by: argocd
-addressType: IPv4
-ports:
-  - name: http
-    port: 5000
-    protocol: TCP
-endpoints:
-  - addresses:
-      - 192.168.102.2
-    conditions:
-      ready: true
----
+# changedetection.io's web UI at changedetection.jakerobb.org. Gated by Authelia forward-auth
+# (the app also has its own password, as a second layer): its UI can fetch arbitrary URLs.
+#
+# Needs this namespace's entry in argocd/apps/authelia/referencegrant.yaml; the access_control
+# rule for changedetection.jakerobb.org in argocd/apps/authelia/application.yaml already exists.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: change-detection
-  namespace: lan-routes
+  namespace: change-detection
 spec:
   parentRefs:
     - name: homelab-gateway

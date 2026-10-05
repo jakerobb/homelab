@@ -52,9 +52,7 @@ and fix it, or postpone.
 - [ ] `docker ps` on rpi5-1 shows only `unbound`, `telegraf`, `vector` and
       `nut-upsd`. Home Assistant, Zigbee2MQTT, `zwave-js-ui`, matter-server,
       Scrypted, change-detection and browserless are all in the cluster and
-      verified. (As of 2026-10-01, `change-detection` and `browserless` were
-      still running here, with `manifests/lan-routes/change-detection.yaml`
-      routing to `.2`.)
+      verified. (change-detection and browserless moved on 2026-10-05.)
 - [ ] `manifests/lan-routes/` has no route whose backend is `192.168.102.2`.
 - [ ] Every cutover branch is merged. Nothing is half-migrated, and
       `docker-compose/` matches what's running.

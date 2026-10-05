@@ -34,13 +34,13 @@ moving to the cluster get ArgoCD's reconciliation instead.
    - **Drift protection:** the script records the hash of every file it
      writes. If a file in `~/docker` no longer matches the last thing it
      wrote — edited on the host, or rewritten by the app itself (a Home
-     Assistant UI edit to `automations.yaml`, a changedetection.io watch
-     added in its UI) — it doesn't overwrite it. It alerts until you either
+     Assistant UI edit to `automations.yaml`) — it doesn't overwrite it. It alerts until you either
      backfill the change into the repo (once the repo matches what's on the
      host, the alert clears by itself) or revert it on the host.
-   - `change-detection` rewrites its own
-     config at runtime or on shutdown, so it's stopped before its files
-     are written and started again by step 4.
+   - A service that rewrites its own config at runtime or on shutdown can be
+     listed in the script's `STOP_BEFORE_WRITE`: it's stopped before its files are
+     written and started again by step 4. The set is empty now (changedetection.io
+     was the only one, until it moved to the cluster).
 4. **`docker compose up -d --remove-orphans`**, every run, not just after a
    merge. That applies compose-file and `.env` changes, and also undoes
    drift in the other direction: a container stopped by hand comes back

@@ -1,0 +1,10 @@
+# Explicit Namespace, same as restock-radar/namespace.yaml. Both pods run
+# non-root with all capabilities dropped and the default seccomp profile, so
+# the namespace enforces the `restricted` Pod Security Standard. (Chromium's
+# sandbox is off in the browserless image, so it needs no extra privileges.)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: change-detection
+  labels:
+    pod-security.kubernetes.io/enforce: restricted

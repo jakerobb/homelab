@@ -377,6 +377,20 @@ Kustomize-generated ConfigMap, so editing one rolls the pod. Host networking was
 problem fixed on 2026-09-28; in the cluster, `modbus.lan` resolves through CoreDNS. The old `lan-routes` entry is gone.
 Details: [`../argocd/README.md`](../argocd/README.md#modbus-controller-migrated-from-docker-compose-2026-09-30).
 
+## change-detection and browserless (Compose workload migration)
+
+**Done (2026-10-05).** Moved to the cluster as two bare Deployments in one namespace
+([`../manifests/change-detection/`](../manifests/change-detection/)). It stays changedetection.io plus Browserless: three
+watches remain (the changedetection.io changelog, `ui.com/us/en/whats-new` and `smarthomeshop.io`'s UltimateSensor), two of
+which need the browser. The 30 UniFi store watches were dropped, since [restock-radar](../argocd/README.md#restock-radar-new-deployed-2026-10-05)
+replaced them. The datastore, with the three watches' snapshot history, was copied into a 2Gi `hexos-iscsi` PVC behind the
+restore-gate init container, released by `scripts/change-detection-cutover/restore.sh`; a nightly CronJob backs it up to
+`hexos-nfs`. Browserless, which had listened unauthenticated on `0.0.0.0:3000` on the Pi, is now reachable only from the
+app's pod (network policy) and can only reach public addresses; the app's port is no longer open on the Pi at all, and it's
+behind Authelia as before. That closed the "Secure browserless" and "Secure ChangeDetection" hardening items.
+Notifications go to ntfy via the in-cluster Service. Details and the cutover runbook:
+[`../argocd/README.md`](../argocd/README.md#change-detection-migrated-from-docker-compose-2026-10-05).
+
 ## Compose observability stack retired
 
 **Done (2026-10-01).** SigNoz replaced the Compose InfluxDB, Grafana and VictoriaLogs. Telegraf on rpi5-1 now sends

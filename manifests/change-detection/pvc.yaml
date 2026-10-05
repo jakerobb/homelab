@@ -1,0 +1,32 @@
+# changedetection.io's datastore: settings (including the UI password and
+# notification URLs), one directory per watch, each holding its snapshot history
+# and screenshots. 16Mi for 33 watches at migration time; the UniFi store watches
+# (most of it) were dropped, so 2Gi is generous. hexos-iscsi like every other
+# stateful app here, so the pod can float between nodes.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: change-detection-data
+  namespace: change-detection
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Nightly copies of the datastore (cronjob-backup.yaml). hexos-nfs, so they live
+# on a different dataset on the NAS from the iSCSI volume above, the same split
+# scrypted-backups uses. Any UID can write to an hexos-nfs volume
+# (docs/nfs-storage.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: change-detection-backups
+  namespace: change-detection
+spec:
+  storageClassName: hexos-nfs
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 2Gi

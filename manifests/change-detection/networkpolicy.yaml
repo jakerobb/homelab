@@ -1,0 +1,123 @@
+# changedetection.io and browserless.
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
+# entity when Envoy and the pod share a node, and as `remote-node` when they
+# don't; a standard NetworkPolicy can't match either, hence CiliumNetworkPolicy.
+# Kubelet probes come from the node (`host`), which Cilium always allows. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`).
+#
+# browserless is the sensitive one: an unauthenticated browser. It accepts connections from
+# the change-detection pod only, and may reach only public addresses on 80/443 (the private
+# ranges are excluded, so it can't be used to poke at the LAN or the cluster).
+# change-detection's own fetches are public-only for the same reason; none of the watched
+# pages are on the LAN.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: change-detection
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: change-detection
+  namespace: change-detection
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: change-detection
+  ingress:
+    - fromEntities:
+        - ingress
+        - remote-node
+        - host
+      toPorts:
+        - ports:
+            - port: '5000'
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: browserless
+      toPorts:
+        - ports:
+            - port: '3000'
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ntfy
+            app.kubernetes.io/name: ntfy
+      toPorts:
+        - ports:
+            - port: '8080'
+              protocol: TCP
+    - toCIDRSet:
+        - cidr: 0.0.0.0/0
+          except:
+            - 10.0.0.0/8
+            - 172.16.0.0/12
+            - 192.168.0.0/16
+      toPorts:
+        - ports:
+            - port: '80'
+              protocol: TCP
+            - port: '443'
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: browserless
+  namespace: change-detection
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: browserless
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: change-detection
+      toPorts:
+        - ports:
+            - port: '3000'
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toCIDRSet:
+        - cidr: 0.0.0.0/0
+          except:
+            - 10.0.0.0/8
+            - 172.16.0.0/12
+            - 192.168.0.0/16
+      toPorts:
+        - ports:
+            - port: '80'
+              protocol: TCP
+            - port: '443'
+              protocol: TCP
