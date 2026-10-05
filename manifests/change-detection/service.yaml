@@ -1,0 +1,33 @@
+# The web UI, reached through httproute.yaml (Authelia in front).
+apiVersion: v1
+kind: Service
+metadata:
+  name: change-detection
+  namespace: change-detection
+  labels:
+    app.kubernetes.io/name: change-detection
+spec:
+  selector:
+    app.kubernetes.io/name: change-detection
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+---
+# Browserless's CDP/Playwright endpoint. ClusterIP, and networkpolicy.yaml lets
+# only the change-detection pod connect: it has no token, and anything that
+# can reach it can drive a Chromium.
+apiVersion: v1
+kind: Service
+metadata:
+  name: browserless
+  namespace: change-detection
+  labels:
+    app.kubernetes.io/name: browserless
+spec:
+  selector:
+    app.kubernetes.io/name: browserless
+  ports:
+    - name: ws
+      port: 3000
+      targetPort: ws

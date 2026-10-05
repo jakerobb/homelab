@@ -32,47 +32,10 @@ services:
   # dashboard instead. compose-deploy's --remove-orphans stops the old
   # containers on merge.
 
-  change-detection:
-    <<: *dns
-    network_mode: host
-    image: dgtlmoon/changedetection.io:0.60.8
-    container_name: change-detection
-    environment:
-      - PLAYWRIGHT_DRIVER_URL=ws://192.168.102.2:3000/?stealth=1&--disable-web-security=true&blockAds=true
-    ports:
-      - 9898:5000
-    volumes:
-      - ./change-detection:/datastore
-      - ./resolv-host.conf:/etc/resolv.conf:ro
-    restart: unless-stopped
-    labels:
-      tsdproxy.enable: "true"
-      tsdproxy.name: "delta"
-      #tsdproxy.container_port: 9898
-    depends_on:
-      browserless:
-        condition: service_started
-
-  browserless:
-    <<: *dns
-    volumes:
-      - ./resolv-host.conf:/etc/resolv.conf:ro
-    network_mode: host
-    image: ghcr.io/browserless/chromium:v2.57.0
-    container_name: browserless
-    environment:
-      - SCREEN_WIDTH=1920
-      - SCREEN_HEIGHT=1024
-      - SCREEN_DEPTH=16
-      - ENABLE_DEBUGGER=false
-      - TIMEOUT=60000
-      - CONCURRENT=10
-      - NO_COLOR=1
-      - FORCE_COLOR=0
-      - DEBUG_COLORS=no
-    ports:
-      - 3000:3000
-    restart: unless-stopped
+  # change-detection and browserless moved to the cluster on 2026-10-05
+  # (manifests/change-detection/). The old datastore stays on rpi5-1 as the
+  # rollback until it's deleted (see todo/FUTURE.md). compose-deploy's
+  # --remove-orphans stops the old containers on merge.
 
   # optimizer + network-optimizer-speedtest migrated to the k8s cluster
   # 2026-09-28 (one pod, both containers) — see manifests/network-optimizer/

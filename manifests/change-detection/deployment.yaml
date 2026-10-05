@@ -1,0 +1,102 @@
+# changedetection.io, migrated from the docker-compose `change-detection` service on rpi5-1.
+# State is a directory of JSON files and snapshots on a PVC that the app rewrites, so: one
+# replica, Recreate (never two pods on the datastore), and the config is seeded once rather
+# than mounted from git (the app owns it afterward, so UI edits survive; git isn't
+# authoritative). The seed is a copy of the old datastore, which includes the UI password and
+# the ntfy notification URL, so none of it is in the repo. See argocd/README.md's
+# change-detection section.
+#
+# Pages that need a real browser go through the `browserless` Deployment next to it
+# (browserless.yaml); the rest are plain HTTP fetches.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: change-detection
+  namespace: change-detection
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: change-detection
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: change-detection
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Holds the pod until scripts/change-detection-cutover/restore.sh has copied the old
+        # datastore in. Starting on an empty volume would create a fresh, password-less
+        # instance with no watches.
+        - name: restore
+          image: busybox:1.38.0
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -e /datastore/.restored ]; then
+                echo "Waiting for the old datastore to be restored (see argocd/README.md, change-detection cutover)..."
+                until [ -e /datastore/.restored ]; do sleep 5; done
+              fi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /datastore
+              name: data
+      containers:
+        - name: change-detection
+          image: dgtlmoon/changedetection.io:0.60.8
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TZ
+              value: America/Detroit
+            - name: PLAYWRIGHT_DRIVER_URL
+              value: ws://browserless:3000/?stealth=1&--disable-web-security=true&blockAds=true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 5000
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 20m
+              memory: 192Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - mountPath: /datastore
+              name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: change-detection-data

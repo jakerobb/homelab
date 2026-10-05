@@ -43,7 +43,7 @@ test broke Home Assistant** (config unreadable inside the container within
 seconds of creating the symlink, caught and fixed before anything actually
 restarted and failed on it): `homeassistant/{configuration,automations,
 scenes,scripts}.yaml`, `homeassistant/blueprints/`,
-`homeassistant/lutron_caseta-*.pem`, `change-detection/url-watches.json`,
+`homeassistant/lutron_caseta-*.pem`,
 `unbound/custom.conf.d/local.conf`.
 
 **Why those specifically fail** — two distinct Docker bind-mount behaviors,
@@ -57,8 +57,7 @@ confirmed live against this stack, not just theory:
    `cat` inside the container returned `No such file or directory` even
    though the symlink itself was intact and pointed somewhere real).
    Similarly, a symlink for a single file *nested inside* an
-   already-real, whole-directory bind mount (`./homeassistant:/config`,
-   `./change-detection:/datastore`) is invisible from inside the
+   already-real, whole-directory bind mount (`./homeassistant:/config`) is invisible from inside the
    container — its mount namespace only has whatever was actually mounted,
    not arbitrary other host paths a symlink happens to point at.
 
@@ -101,8 +100,9 @@ and database files are **not** committed:
 - `scrypted/` — just plugin binaries + a LevelDB database, no meaningful config file. (Moved to the cluster
   2026-10-01; the directory on rpi5-1 is the rollback until deleted, see `todo/FUTURE.md`.)
 - `matter-server/data/` — Matter fabric/commissioning state.
-- `change-detection/` — only `url-watches.json` (the watch list) is
-  captured; per-watch history, screenshots, and snapshot archives are not.
+- `change-detection/` — moved to the cluster 2026-10-05 together with its history (the
+  datastore was copied into the PVC, minus the UniFi store watches); the directory on rpi5-1 is the
+  rollback until deleted, see `todo/FUTURE.md`.
 - `ntfy/cache/`.
 - `nut-conf/` — genuinely empty (confirmed 2026-09-20, permissions had
   drifted to unreadable — fixed to `u+x`), and unreferenced by anything: the
@@ -127,7 +127,6 @@ sops -d --input-type dotenv --output-type dotenv docker-compose/.env.sops.env > 
 sops -d docker-compose/homeassistant/secrets.sops.yaml > homeassistant/secrets.yaml
 sops -d --output-type binary docker-compose/homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml > homeassistant/lutron_caseta-0512b4cc-key.pem
 sops -d --output-type binary docker-compose/secrets/nut-upsd-password.sops.yaml > secrets/nut-upsd-password
-sops -d --output-type binary docker-compose/change-detection/secret.txt.sops.yaml > change-detection/secret.txt
 ```
 
 Encrypted files (all under `docker-compose/`, matched by the
@@ -139,7 +138,6 @@ Encrypted files (all under `docker-compose/`, matched by the
 | `homeassistant/secrets.sops.yaml` | NUT UPS password used by the HA UPS integration |
 | `homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml` | Lutron Caséta bridge mTLS private key (the paired `-ca.pem`/`-cert.pem` are public certs, committed in the clear) |
 | `secrets/nut-upsd-password.sops.yaml` | NUT UPS daemon password (mounted into `nut-upsd` as a Docker secret) |
-| `change-detection/secret.txt.sops.yaml` | changedetection.io API key |
 
 `.env` is `--input-type dotenv --output-type dotenv` (encrypted line-by-line,
 keeping the `KEY=value` shape); `*.pem.sops.yaml`, `nut-upsd-password.sops.yaml`,

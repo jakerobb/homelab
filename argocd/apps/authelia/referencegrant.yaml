@@ -64,6 +64,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: restock-radar
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: change-detection
   to:
     - group: ""
       kind: Service

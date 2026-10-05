@@ -1278,8 +1278,8 @@ Stock and price alerts for UniFi store products, from
 [restock-radar](https://github.com/jakerobb/restock-radar). Deployed as
 [`apps/restock-radar/`](apps/restock-radar/application.yaml) →
 [`manifests/restock-radar/`](../manifests/restock-radar/). It replaces
-ChangeDetection's and Browserless's store watches; ChangeDetection itself is
-still on Compose until it's retired.
+ChangeDetection's and Browserless's store watches (ChangeDetection itself moved to the cluster the same day, see
+[change-detection](#change-detection-migrated-from-docker-compose-2026-10-05)).
 
 - **No browser.** It reads the JSON the store's Next.js frontend serves at
   `/_next/data/{buildId}/us/en/products/{slug}.json` (status, price and
@@ -1920,6 +1920,70 @@ ready, probably 5 minutes. The UniFi cameras themselves keep recording to Protec
 5. After a week of stable behavior, delete `~/docker/scrypted/` on rpi5-1 (see `todo/FUTURE.md`). Until then it's the
    rollback: revert the PR and restore the Compose service (the restore script never modifies the old directory). Anything
    changed in the new instance since the cutover is lost on rollback.
+
+## change-detection (migrated from Docker Compose, 2026-10-05)
+
+changedetection.io plus the headless Chromium it uses for pages that need JavaScript. Deployed as
+[`apps/change-detection/`](apps/change-detection/application.yaml) →
+[`manifests/change-detection/`](../manifests/change-detection/). Two Deployments in one namespace
+(`change-detection`, Pod Security `restricted`): `change-detection` (the app, 0.60.8) and `browserless`
+(`ghcr.io/browserless/chromium`, v2.57.0).
+
+- **Watches.** Three: the changedetection.io changelog (plain HTTP), `ui.com/us/en/whats-new` and
+  `smarthomeshop.io`'s UltimateSensor (both through the browser). The 30 UniFi store watches were not migrated;
+  [restock-radar](#restock-radar-new-deployed-2026-10-05) replaced them.
+- **Browserless is locked down.** It has no token, so the network is the control: a ClusterIP Service, ingress from the
+  `change-detection` pod only, and egress to public addresses on 80/443 only (private ranges excluded, so it can't be
+  used to reach the LAN or the cluster). This closes the old "Secure browserless" item, where it listened on
+  `0.0.0.0:3000` on the Pi. Concurrency is 3 (it was 10, for the store watches), `/dev/shm` is a 512Mi memory-backed
+  emptyDir, and the memory limit is 2Gi. Add a `TOKEN` (ExternalSecret) if anything else ever needs to reach it.
+- **Auth.** Forward-auth through Authelia (the `changedetection.jakerobb.org` rule already existed for the `lan-routes`
+  version; the namespace was added to the ReferenceGrant). The app's own UI password stays on as a second layer, which
+  closes "Secure ChangeDetection": nothing listens on the Pi any more.
+- **Data is a PVC (`hexos-iscsi`, 2Gi), seeded once** from the Pi's `~/docker/change-detection`: the settings file (UI
+  password, API key, notification URL), and the three remaining watches' directories with their snapshot history and
+  screenshots (the rest of the 16Mi was the store watches). So the app owns its config afterward and UI edits survive;
+  git isn't authoritative, and nothing secret is in the repo. The `restore` init container holds the pod until
+  `scripts/change-detection-cutover/restore.sh` has copied it in, because an empty volume would start a fresh,
+  password-less instance. `docker-compose/change-detection/` (the stale watch list, which held a Home Assistant token
+  for a notification target that no longer exists, and the SOPS copy of the API key) is gone from the repo.
+- **Notifications** go to ntfy (global notification URL). The cutover script repoints it from
+  `https://ntfy.jakerobb.org` to the in-cluster Service, `ntfy.ntfy.svc:8080`, which is what the network policy allows.
+- **Backups.** A nightly CronJob (03:27) tars the datastore to a `hexos-nfs` PVC and keeps 14 days. It runs on the same
+  node as the pod, because the data volume is ReadWriteOnce. Nothing alerts if the job fails yet. To restore: scale the
+  Deployment to 0, extract a backup over `/datastore` from a throwaway pod, scale back up.
+- **Network policy.** Default-deny, plus: the Gateway to :5000; app to DNS, browserless:3000, ntfy:8080 and public
+  80/443; browserless to DNS and public 80/443.
+
+### Cutover
+
+The three watches are paused from the moment the old container is removed until the new pod is ready, a few minutes.
+Nothing else depends on it.
+
+1. Merge. ArgoCD syncs and the pod sits at `Init:0/1`. `changedetection.jakerobb.org` returns 503 from now until it's
+   ready.
+2. compose-deploy removes both Compose containers within about 5 minutes. On rpi5-1, dry-run the checks, then run it for
+   real. `--wait` polls (up to 10 minutes) until the old container is gone and the pod is waiting. The marker that
+   releases the pod is created last:
+
+   ```bash
+   ~/dev/homelab/scripts/change-detection-cutover/restore.sh --check
+   ```
+
+   ```bash
+   ~/dev/homelab/scripts/change-detection-cutover/restore.sh --wait
+   ```
+
+3. Verify:
+   - `https://changedetection.jakerobb.org` loads behind Authelia and the app's own password still works.
+   - Three watches, each with its old history.
+   - Recheck all three. The two browser watches should fetch through `browserless` without errors.
+   - Send a test notification (Settings, Notifications) and confirm it arrives in the ntfy `changedetection` topic.
+   - `nc -zv 192.168.102.2 3000` from another machine is refused, and so is `:5000`.
+   - Run the backup once: `kubectl -n change-detection create job --from=cronjob/change-detection-backup change-detection-backup-test`.
+4. After a week of stable behavior, delete `~/docker/change-detection/` on rpi5-1 (see `todo/FUTURE.md`). Until then it's
+   the rollback: revert the PR and restore the Compose services (the restore script never modifies the old directory).
+   Anything changed in the new instance since the cutover is lost on rollback.
 
 ## Unbound (in-cluster copy, deployed 2026-09-29)
 
