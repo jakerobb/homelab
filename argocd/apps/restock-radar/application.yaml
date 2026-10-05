@@ -1,0 +1,26 @@
+# Own Application rather than raw manifests under root, same as nut-exporter's.
+# See argocd/README.md's restock-radar section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: restock-radar
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/restock-radar
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: restock-radar
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

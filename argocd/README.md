@@ -1255,6 +1255,38 @@ InfluxDB) and `nut-webui` (webnut).
   Homepage and Glance tiles, and the relay's InfluxDB token from
   `docker-compose/.env.sops.env`.
 
+## restock-radar (new, deployed 2026-10-05)
+
+Stock and price alerts for UniFi store products, from
+[restock-radar](https://github.com/jakerobb/restock-radar). Deployed as
+[`apps/restock-radar/`](apps/restock-radar/application.yaml) →
+[`manifests/restock-radar/`](../manifests/restock-radar/). It replaces
+ChangeDetection's and Browserless's store watches; ChangeDetection itself is
+still on Compose until it's retired.
+
+- **No browser.** It reads the JSON the store's Next.js frontend serves at
+  `/_next/data/{buildId}/us/en/products/{slug}.json` (status, price and
+  restock ETA per variant), one small request per product every 20 minutes
+  with jitter. It backs off if the store returns 403/429/503. See the app's
+  DESIGN.md.
+- **Watch list** is `config.yaml`, seeded from the 26 store products in
+  ChangeDetection (the three non-store watches were dropped). Every variant of
+  a product is watched. Add a product by adding its slug and merging.
+- **Alerts** go to the `restock-radar` topic on the in-cluster ntfy, which has
+  no auth, so there's no token. The first poll of a variant is a silent
+  baseline; after that, each stock status change and each price change
+  notifies. An item that fails three checks in a row raises one alert, and
+  one more when it recovers.
+- **State** is a SQLite file on a 1Gi `hexos-iscsi` PVC. One replica with
+  `Recreate`. After a HexOS outage iSCSI volumes can go silently read-only;
+  delete the pod to recover. Losing the volume only costs history: the next
+  start re-baselines silently.
+- **API** (`/v1/variants`, `/v1/events`, `/health`) is cluster-internal with
+  no auth; use a port-forward. There's no `/metrics` yet, so nothing
+  scrapes it.
+- **Image** is `docker.io/jakerobb/restock-radar:<date>`, pinned by hand like
+  nut-exporter's; Renovate can bump it.
+
 ## NetworkOptimizer (migrated from Docker Compose, 2026-09-28)
 
 [NetworkOptimizer](https://github.com/Ozark-Connect/NetworkOptimizer) (UniFi
