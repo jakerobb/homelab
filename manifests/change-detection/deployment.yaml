@@ -2,7 +2,7 @@
 # State is a directory of JSON files and snapshots on a PVC that the app rewrites, so: one
 # replica, Recreate (never two pods on the datastore), and the config is seeded once rather
 # than mounted from git (the app owns it afterward, so UI edits survive; git isn't
-# authoritative). The seed is a copy of the old datastore, which includes the UI password and
+# authoritative). The seed is a copy of the old datastore, which includes the API key and
 # the ntfy notification URL, so none of it is in the repo. See argocd/README.md's
 # change-detection section.
 #
@@ -36,8 +36,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         # Holds the pod until scripts/change-detection-cutover/restore.sh has copied the old
-        # datastore in. Starting on an empty volume would create a fresh, password-less
-        # instance with no watches.
+        # datastore in. Starting on an empty volume would create a fresh instance with no watches.
         - name: restore
           image: busybox:1.38.0
           command:

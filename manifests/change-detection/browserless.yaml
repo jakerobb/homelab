@@ -23,8 +23,12 @@ spec:
         app.kubernetes.io/name: browserless
     spec:
       automountServiceAccountToken: false
+      # Numeric, because the image's USER is the name `blessuser` (999) and the kubelet can't
+      # verify a name is non-root, so runAsNonRoot alone fails with CreateContainerConfigError.
       securityContext:
         runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
         seccompProfile:
           type: RuntimeDefault
       containers:

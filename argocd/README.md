@@ -1938,14 +1938,15 @@ changedetection.io plus the headless Chromium it uses for pages that need JavaSc
   `0.0.0.0:3000` on the Pi. Concurrency is 3 (it was 10, for the store watches), `/dev/shm` is a 512Mi memory-backed
   emptyDir, and the memory limit is 2Gi. Add a `TOKEN` (ExternalSecret) if anything else ever needs to reach it.
 - **Auth.** Forward-auth through Authelia (the `changedetection.jakerobb.org` rule already existed for the `lan-routes`
-  version; the namespace was added to the ReferenceGrant). The app's own UI password stays on as a second layer, which
-  closes "Secure ChangeDetection": nothing listens on the Pi any more.
-- **Data is a PVC (`hexos-iscsi`, 2Gi), seeded once** from the Pi's `~/docker/change-detection`: the settings file (UI
-  password, API key, notification URL), and the three remaining watches' directories with their snapshot history and
+  version; the namespace was added to the ReferenceGrant). Nothing listens on the Pi any more, which closes "Secure
+  ChangeDetection". The app has no password of its own (it never did on Compose); set one in Settings if you want a
+  second layer.
+- **Data is a PVC (`hexos-iscsi`, 2Gi), seeded once** from the Pi's `~/docker/change-detection`: the settings file (API key,
+  notification URL), and the three remaining watches' directories with their snapshot history and
   screenshots (the rest of the 16Mi was the store watches). So the app owns its config afterward and UI edits survive;
   git isn't authoritative, and nothing secret is in the repo. The `restore` init container holds the pod until
-  `scripts/change-detection-cutover/restore.sh` has copied it in, because an empty volume would start a fresh,
-  password-less instance. `docker-compose/change-detection/` (the stale watch list, which held a Home Assistant token
+  `scripts/change-detection-cutover/restore.sh` has copied it in, because an empty volume would start a fresh instance with no watches.
+  `docker-compose/change-detection/` (the stale watch list, which held a Home Assistant token
   for a notification target that no longer exists, and the SOPS copy of the API key) is gone from the repo.
 - **Notifications** go to ntfy (global notification URL). The cutover script repoints it from
   `https://ntfy.jakerobb.org` to the in-cluster Service, `ntfy.ntfy.svc:8080`, which is what the network policy allows.
@@ -1975,7 +1976,7 @@ Nothing else depends on it.
    ```
 
 3. Verify:
-   - `https://changedetection.jakerobb.org` loads behind Authelia and the app's own password still works.
+   - `https://changedetection.jakerobb.org` loads behind Authelia.
    - Three watches, each with its old history.
    - Recheck all three. The two browser watches should fetch through `browserless` without errors.
    - Send a test notification (Settings, Notifications) and confirm it arrives in the ntfy `changedetection` topic.

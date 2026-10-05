@@ -7,8 +7,10 @@
 #
 # Same node as the change-detection pod (required podAffinity) because the data volume is
 # ReadWriteOnce: a second pod can mount it only from the node that already has it attached.
-# The job mounts it read-only. Root, because the files belong to the app's UID and the NFS
-# export has maproot=root (docs/nfs-storage.md).
+# The job mounts it read-only, and runs as the app's own UID (1000) with no added capabilities,
+# which the namespace's `restricted` Pod Security level requires: the datastore is readable by
+# that UID, and any UID can write to an hexos-nfs volume (docs/nfs-storage.md), with fsGroup
+# applied.
 #
 # To restore: scale change-detection to 0, extract a backup over /datastore from a throwaway
 # pod, scale back up.
@@ -30,6 +32,13 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
           affinity:
             podAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
@@ -55,11 +64,7 @@ spec:
                 allowPrivilegeEscalation: false
                 capabilities:
                   drop: [ALL]
-                  add: [DAC_OVERRIDE]
                 readOnlyRootFilesystem: true
-                runAsUser: 0
-                seccompProfile:
-                  type: RuntimeDefault
               resources:
                 requests:
                   cpu: 50m
