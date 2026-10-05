@@ -1,36 +1,7 @@
 # READY
 
 Cluster-readiness backlog — each of these is its own effort, meant to be tackled separately rather than all at once.
-This list is in roughly priority order. "Compose workload migration" is deliberately last; we want a stable, robust,
-observable cluster before we bring in critical workloads.
-
-## Compose workload migration
-
-**In progress (since 2026-09-28).** Migrated services move to [`DONE.md`](DONE.md) as they land.
-Move each service off the RPi5 16GB's Docker Compose stack into the cluster, one at a time, in separate sessions. For
-each, consider whether a more K8s-appropriate or K8s-native alternative exists. Each application should be a separate
-ArgoCD Application resource. Put each application behind Authelia -- using OIDC if possible; ExternalAuth filtering
-otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
-
-### Do not migrate
-
-- **Observability stack** (`telegraf`, `vector`) - Stay on rpi5-1 as collectors only: both ship to SigNoz, and
-  `influxdb`, `grafana` and `victorialogs` were retired on 2026-10-01 (see [`DONE.md`](DONE.md)). History was not
-  migrated. NetworkOptimizer's buckets moved to the app's own in-cluster InfluxDB on 2026-09-29.
-- **`nut-upsd`** — needs USB access to the CyberPower UPS, so it stays on rpi5-1 until the hardware plan in
-  [`HARDWARE.md`](HARDWARE.md) moves that Pi into the cluster. Its relay and web UI were replaced by nut-exporter
-  (see [`DONE.md`](DONE.md)).
-
-### To be migrated
-
-- **Decide config ownership per service before moving each one.** An app that rewrites its own config files can't save
-  UI changes to a read-only ConfigMap/Secret mount. Pick one: seed the file into the PVC once (the app owns it
-  afterward, so UI edits survive but git isn't authoritative), or overwrite it on every start (git wins, UI edits are
-  lost). `change-detection`, `zwave-js-ui`, `zigbee2mqtt` and `homeassistant` all took the seed-once route (Zigbee2MQTT's
-  and Home Assistant's config come from the old data directory rather than a ConfigMap). Secrets go in an ExternalSecret,
-  as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env overrides into the PVC).
-
-When a service migrates, delete its file from `manifests/lan-routes/` in the same PR.
+This list is in roughly priority order.
 
 ## Dual-stack cluster (IPv4 + IPv6)
 
@@ -182,17 +153,6 @@ and prune them. That touches the storage path every PVC shares, so it's a projec
 backup today do it themselves onto `hexos-nfs` (Home Assistant, Scrypted and restock-radar all do), which keeps
 working whatever happens to snapshots. Worth doing if a service turns up that can't copy its own data, or for
 Prometheus and ClickHouse, whose volumes are too big to copy.
-
-## Prometheus PVC steady-state usage
-
-**Was waiting on:** the 10-day retention window to fill. The PVC was expanded from 10Gi to 20Gi on 2026-09-30 after it hit
-~85% (8.8 GB) while still growing ~0.4 GB per 12 hours, so its steady-state size is unknown. **Check on or after
-2026-10-03**: look at `kubelet_volume_stats_used_bytes` for the `prometheus-...-db` PVC. If growth has flattened well
-under 20Gi, nothing to do; if it's still climbing toward the limit, set `retentionSize` (a bit under the PVC size) on
-the Prometheus spec in `argocd/apps/kube-prometheus-stack/application.yaml`, and/or cut series cardinality (~240k
-series at last count).
-
-**Update 2026-10-03:** window has elapsed. PVC is at ~10.1 GB of 21 GB (48%), up from 8.8 GB on 09-30, so growth has slowed but is worth one more look before deciding on `retentionSize`.
 
 ## Let ArgoCD manage its own Helm chart
 
