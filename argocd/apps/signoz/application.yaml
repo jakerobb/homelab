@@ -190,6 +190,10 @@ spec:
                           # Both UPSes (manifests/nut-exporter/), which used
                           # to live in InfluxDB long-term too. ~100 series.
                           - '{job="nut-exporter"}'
+                          # restock-radar's poller health and counters
+                          # (manifests/restock-radar/), for the "Restock
+                          # Radar stalled" alert in SigNoz. ~15 series.
+                          - '{job="restock-radar"}'
                           - 'up'
                       static_configs:
                         - targets:

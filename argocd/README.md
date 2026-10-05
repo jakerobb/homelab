@@ -1290,9 +1290,18 @@ still on Compose until it's retired.
   the database next to the ones from `config.yaml`; config entries are
   authoritative for themselves (removing one unwatches it), UI additions
   persist. The JSON API (`/v1/products`, `/v1/events`, `/health`) is served on
-  the same host. There's no `/metrics` yet, so nothing scrapes it.
-- **Image** is `docker.io/jakerobb/restock-radar:<date>`, pinned by hand like
-  nut-exporter's; Renovate can bump it.
+  the same host.
+- **Metrics and alert.** `/metrics` is scraped by a ServiceMonitor, federated
+  into SigNoz (`{job="restock-radar"}` in `apps/signoz/application.yaml`), and
+  [`../terraform/signoz/alert-restock-radar.tf`](../terraform/signoz/alert-restock-radar.tf)
+  raises "Restock Radar stalled" through the ntfy-alertmanager channel when no
+  fetch has succeeded for an hour, or the metric has been missing for 30
+  minutes. `restock_radar_fetches_total{result}` says whether it was the store
+  blocking us (`blocked`), its JSON changing (`schema`), or something else.
+- **Image** is `docker.io/jakerobb/restock-radar:<date>@sha256:<digest>`,
+  pinned by hand like nut-exporter's; Renovate can bump it. The digest is there
+  because the date tag can be re-published the same day (see READY.md's "Unique
+  image tags").
 
 ## NetworkOptimizer (migrated from Docker Compose, 2026-09-28)
 
