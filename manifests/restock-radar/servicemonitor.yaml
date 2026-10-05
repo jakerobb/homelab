@@ -1,0 +1,22 @@
+# Picked up by kube-prometheus-stack's Prometheus without label matching,
+# same as nut-exporter's. The scrape job is named "restock-radar" after the
+# Service, which is what SigNoz's federation selector matches on, and the
+# "Restock Radar stalled" alert (terraform/signoz/alert-restock-radar.tf)
+# reads restock_radar_last_success_timestamp_seconds from there.
+#
+# A scrape reads in-memory counters and three small SQLite counts; it never
+# waits on the UniFi store.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: restock-radar
+  namespace: restock-radar
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: restock-radar
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

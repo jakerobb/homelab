@@ -29,9 +29,14 @@ otherwise. Persistent storage moves from the Pi to democratic-csi PVC.
   wins, UI edits are lost). `zwave-js-ui`, `zigbee2mqtt` and `homeassistant` all took the seed-once route (Zigbee2MQTT's
   and Home Assistant's config come from the old data directory rather than a ConfigMap). Secrets go in an ExternalSecret,
   as env vars (Z-Wave) or a `!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env overrides into the PVC).
-- **change-detection.io** (`change-detection` + its `browserless` dependency) — **deliberately last; don't suggest it
-  as the next migration.** browserless (headless Chromium) is heavy, and Jake has ideas for relying on it less, so it
-  waits until everything else has moved. No hardware dependency. Needs a persistent volume for the datastore.
+- **change-detection.io** (`change-detection` + its `browserless` dependency) — **ready to migrate.** It was held back
+  because browserless (headless Chromium) is heavy and Jake wanted to rely on it less. The UniFi store watches were
+  what drove that, and [restock-radar](https://github.com/jakerobb/restock-radar) replaced them on 2026-10-05
+  (`argocd/README.md`'s restock-radar section), so **retire the 26 UniFi store entries instead of migrating them.**
+  The rest are three non-store pages (the changedetection.io changelog, `smarthomeshop.io`'s UltimateSensor, and
+  `ui.com/us/en/whats-new`). Check whether those need a browser at all; if plain HTTP fetches work, drop browserless
+  rather than moving it, and close "Secure browserless" below with it. No hardware dependency. Needs a persistent
+  volume for the datastore.
 
 When a service migrates, delete its file from `manifests/lan-routes/` in the same PR.
 
@@ -195,6 +200,22 @@ from a branch in this repo. Renovate's token now has the Workflows permission, s
 that changes a workflow and runs on that runner. Putting those jobs behind a GitHub Environment with you as a required
 reviewer closes that, at the cost of approving each Terraform PR (including Renovate's provider bumps) before it runs.
 Revisit if the token's scope widens, a second person gets write access, or the jump box gains more access.
+
+## Unique image tags for the Go apps
+
+The Go apps' images are tagged with the UTC date (`YYYYMMDD`), so a second publish on the same day moves the tag.
+restock-radar hit this on 2026-10-05: the re-published image kept the tag the running pod already used, so a tag bump
+would have changed nothing in git or on the node, and the Deployment is pinned by digest as a workaround. Change each
+workflow's tag step to include the time: `date -u +%Y%m%d%H%M%S` (`YYYYMMDDHHMMSS`). That's still one integer, so
+Renovate's docker versioning sorts it, and it's greater than every existing 8-digit tag, so the first bump PR after
+the switch is an ordinary update. Don't use a separator (`20261005-021530`): Renovate reads what follows a dash as a
+variant suffix and only proposes tags with the same one, so it would never see a newer image. That's from Renovate's
+docs, not tested here, so check that the first bump PR appears. Leave `latest` as it is.
+
+Apps (each repo's `.github/workflows/docker-publish.y*ml`; the `date` step differs slightly between them):
+`restock-radar`, `nut-relay`, `truenas-exporter` and `modbus-eth-controller`, whose pins are in
+`manifests/restock-radar/`, `nut-exporter/`, `truenas-exporter/` and `modbus-controller/`. Once restock-radar has a
+unique tag, its digest pin is optional; keep it if "Pin container images by digest" below goes ahead.
 
 ## Prometheus PVC steady-state usage
 

@@ -12,6 +12,9 @@ Manages SigNoz dashboards and alerts. SigNoz itself is deployed by ArgoCD (`argo
 - `alert-packet-loss.tf` — the packet-loss alert on rpi5-1's interfaces (ported from the
   old Compose Grafana), and the `ntfy-alertmanager` webhook channel it notifies through.
   New alerts can reuse that channel.
+- `alert-restock-radar.tf` — "Restock Radar stalled": no successful UniFi store fetch for an
+  hour (or the metric vanishing for 30 minutes), from restock-radar's
+  `restock_radar_last_success_timestamp_seconds`. Same ntfy channel.
 - `unifi-dashboards.tf` plus one `dashboard-unifi-*.tf` per dashboard: seven UniFi
   dashboards (Network, Gateway, Switches, Access Points, Clients, Client DPI, Power)
   built from unpoller's metrics. They're ports of unpoller's stock Grafana dashboards,
