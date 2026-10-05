@@ -2132,9 +2132,13 @@ app built from what each one actually talks to.
   IPs and the LAN are Cilium *entities* (`ingress`, `kube-apiserver`,
   `host`/`remote-node`, `world`), not pods. Cilium unions the two.
 - **Gateway traffic** reaches backends as the `ingress` entity (Hubble shows
-  it as `reserved:ingress`). Every Gateway-fronted app allows that on its
-  port; Authelia's forward-auth is also called by the Gateway, so Authelia
-  allows it too.
+  it as `reserved:ingress`) when Envoy runs on the pod's node, but as
+  `remote-node` when Envoy is on another node, since the tunnel carries the
+  source node's identity. Every Gateway-fronted app allows `ingress`,
+  `remote-node` and `host` on its port; Authelia's forward-auth is also called
+  by Envoy, so Authelia allows it too. Allowing only `ingress` (the first
+  version, 2026-10-05) made Envoy's ext-auth call fail across nodes, and Envoy
+  answers a failed ext-auth with a bare 403 on every gated host.
 - **Kubelet probes** come from `host`, which Cilium always allows; nothing
   needs a rule for them.
 - **LoadBalancer apps** (Mosquitto, Unbound, NetworkOptimizer's speed test,
