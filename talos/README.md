@@ -650,6 +650,22 @@ reference is `factory.talos.dev/installer/<schematic-id>:v1.14.1`, not
 `ghcr.io/siderolabs/installer:v1.14.1`, which doesn't exist for recent
 releases).
 
+## After a rolling node change, run the descheduler by hand
+
+Any time nodes are rebooted or drained one after another (a Talos or Kubernetes upgrade, a schematic change like the
+2026-10-05 kernel-log one, a Proxmox or MBP host reboot), pods pile onto whichever workers stay up and never move
+back on their own. Don't wait for the 03:30 run. Once every node is Ready and the pods have settled, trigger it:
+
+```bash
+kubectl create job -n descheduler --from=cronjob/descheduler descheduler-manual-$(date +%s)
+kubectl logs -n descheduler job/descheduler-manual-<timestamp>   # which pods it evicted, and why it stopped
+```
+
+Each run evicts at most 3 pods (2 per node), so after a big shuffle it can take a few runs; check
+`kubectl top nodes` and the workers' memory requests (`kubectl describe node`), and repeat until the workers are
+roughly level. Details and tuning are in [`../todo/DONE.md`](../todo/DONE.md#descheduler). Run it on the jump box
+(`rpi5-1`), where `kubectl` already works. Delete old `descheduler-manual-*` Jobs when you're done, or let them age out.
+
 ## Talos v1.14.2 upgrade (2026-10-01)
 
 All 6 nodes moved from v1.14.1 to v1.14.2, one at a time, taking an etcd snapshot first.
