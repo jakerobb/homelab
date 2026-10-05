@@ -24,7 +24,7 @@
 #
 # No ServiceMonitor: the chart's metrics endpoint lives only for the few
 # seconds the Job runs, so Prometheus would never scrape it. Evictions show
-# up as Kubernetes Events (reason `Descheduled`) and in the last few Jobs'
+# up as Kubernetes Events (reason `LowNodeUtilization`) and in the last few Jobs'
 # pod logs (`kubectl -n descheduler logs job/<name>`).
 apiVersion: argoproj.io/v1alpha1
 kind: Application

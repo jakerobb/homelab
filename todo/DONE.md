@@ -522,7 +522,12 @@ reasoning. The main decisions:
 - **No new PDBs.** For a single replica, `minAvailable: 1` would block both descheduler and `kubectl drain`. The existing
   ClickHouse PDB (`maxUnavailable: 1` on one replica) never blocks anything and was left as is.
 - **No ServiceMonitor.** The Job only runs for a few seconds, so Prometheus would never scrape it. To see what it did,
-  look for Events with reason `Descheduled`, or read the pod logs from the last few Jobs in the `descheduler` namespace.
+  look for Events with reason `LowNodeUtilization` on the evicted pods (not `Descheduled`; that was wrong here before
+  2026-10-05), or read the pod logs from the last few Jobs in the `descheduler` namespace.
+- **ntfy on eviction (added 2026-10-05).** A SigNoz alert, "Descheduler evicted pods"
+  ([`../terraform/signoz/alert-descheduler.tf`](../terraform/signoz/alert-descheduler.tf)), counts the `Evicted pod`
+  lines in the Job's log and pushes to `homelab-alerts` at the lowest priority, for scheduled and manual runs. It says
+  how many pods moved, not which; the Job's log has the names. Each run gives two pushes (fired, then resolved).
 
 Checked before merge by building v0.36.0 and running it with `--dry-run` from rpi5-1 against the live cluster, using
 the exact policy. With today's usage (workers ~57%, `-mbp` ~25%) it correctly decided there was nothing to do. With
