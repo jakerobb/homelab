@@ -510,7 +510,7 @@ reasoning. The main decisions:
   math the scheduler uses, and it's what caused the problem: the workers were 12-38% *requested* but 78-80% *used*.
   Here it reads real usage from metrics-server instead (`metricsUtilization.source: KubernetesMetrics`).
 - **Conservative settings.** It runs as a CronJob at 03:30 America/Detroit, only against worker nodes, with only
-  `LowNodeUtilization` and `RemoveDuplicates`. Each run evicts at most 2 pods per node and 3 in total. A node originally
+  `LowNodeUtilization` and `RemoveDuplicates`. Each run evicts at most 3 pods per node and 5 in total (raised from 2 and 3 on 2026-10-05). A node originally
   counted as underused below 35% on both CPU and memory, and as overloaded above 70% on either one. On 2026-09-27 that
   changed to deviation from the worker average (`useDeviationThresholds`, ±5 points on memory and pod count, no CPU),
   because once the workers went to 8 GiB no node ever passed 70%, and a nearly empty worker-2 never got pods.
