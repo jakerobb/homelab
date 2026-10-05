@@ -16,7 +16,8 @@ machine:
   # than left to the shared worker.yaml template because the disk device
   # name is hypervisor-specific: UTM's imported qcow2 shows up as /dev/sda
   # (SATA/AHCI emulation), not /dev/nvme0n1 like the Proxmox-based workers.
-  # Schematic includes extraKernelArgs: [tsc=reliable] on top of the usual
+  # Schematic includes extraKernelArgs: [tsc=reliable] (plus the kernel-log
+  # one, see talos/README.md's "Talos kernel logs") on top of the usual
   # iscsi-tools/util-linux-tools extensions — added 2026-09-22 to fix
   # recurring NodeClockNotSynchronising alerts. Root cause: under QEMU/UTM,
   # the hypervisor briefly pausing/scheduling the vCPU makes the kernel's
@@ -34,7 +35,7 @@ machine:
   # hardware host, no hypervisor scheduling jitter to misread).
   install:
     disk: /dev/sda
-    image: factory.talos.dev/installer/0b0257c7d2fd5e4693af3859e726ce2216f60d8456d330009efb1ac249789386:v1.14.2
+    image: factory.talos.dev/installer/fc5e78730c2f3ed1f1939294d5cf2340c160d940f03994daf3ca4fbaf022f203:v1.14.2
   # Needed for democratic-csi's iSCSI node driver, same as worker-1/worker-2
   # — see talos/README.md#iscsi-tools-extension-added-2026-09-15.
   kernel:

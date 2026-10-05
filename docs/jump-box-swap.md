@@ -231,6 +231,17 @@ node with:
       schematic that the shared `worker.yaml` template now points at. This
       is the same trap that caught `talos-worker-mbp` in reverse.
     - `install.disk` stays `/dev/nvme0n1`, the same as the template.
+    - **Kernel logs.** The other workers send theirs to Vector on `.2` with the
+      `talos.logging.kernel=udp://192.168.102.2:5140/` kernel arg, baked into
+      their Image Factory schematics (see "Talos kernel logs" in
+      [`talos/README.md`](../talos/README.md)). This node boots the Pi 5
+      installer, not a Factory schematic, and `machine.install.extraKernelArgs`
+      is ignored under SDBoot, so there is no obvious way to add the arg. Work
+      out one before the window (patching the custom installer image, or an
+      alternative like a DaemonSet that tails `/dev/kmsg`), or decide to run
+      without it. The control planes have the same gap and were left out on
+      purpose. Whatever you pick, the new rpi5-1 must keep `.2` and Vector's
+      `5140/udp` mapping, or the workers' arg needs another upgrade each.
     - the iSCSI kernel module and kubelet `extraMounts`, *if* this node will
       run workloads with iSCSI volumes (democratic-csi). That also needs the
       `iscsi-tools` and `util-linux-tools` extensions. Look at how the
@@ -455,6 +466,7 @@ it. Note the end time.
 | etcd backup | `~/bin/etcd-snapshot-backup.sh` | success, B2 copy appears |
 | Email relay | send a test through `msmtpq`, and check `~/.msmtp.queue/` is empty | mail arrives, queue empty |
 | Telegraf and Vector | SigNoz | host metrics and logs flowing again, no more "no data" |
+| Talos kernel logs | SigNoz logs, filter `source_type = 'talos-kernel'` | new lines from every worker after Vector is back (nodes buffer nothing: logs sent during the window are lost) |
 | Proxmox backup | next 03:00 run, or run `proxmox-config-backup.sh` on the Proxmox host | files land under `~pve-backup/backups/proxmox/` |
 | Hubble CLI, helm, kubeconfig | `hubble status`, `helm list -A`, `kubectl get ns` | all work, no new credentials needed |
 
