@@ -15,7 +15,9 @@
 #   (corrected 2026-09-24, see todo/DONE.md "Audit app memory requests
 #   against real usage"). Real usage is still the better signal.
 # - Worker nodes only; control planes are tainted and run only system pods.
-# - Hard caps: at most 2 evictions per node, 3 total, per run.
+# - Hard caps: at most 3 evictions per node, 5 total, per run (raised from
+#   2/3 on 2026-10-05: after a rolling node change one run only moved 3 pods,
+#   and the workers stayed lopsided for several runs).
 # - No new PDBs for single-replica pods: `minAvailable: 1` on a singleton
 #   would block this *and* `kubectl drain`. The existing ClickHouse PDB
 #   (maxUnavailable: 1 on one replica) never blocks anything.
@@ -45,6 +47,14 @@ spec:
         # (the chart already hardcodes concurrencyPolicy: Forbid).
         activeDeadlineSeconds: 600
 
+        # The chart's container securityContext already meets the "restricted"
+        # Pod Security Standard except for this. Talos warns at that level
+        # cluster-wide, so without it every `kubectl create job --from=cronjob/descheduler`
+        # prints a seccompProfile warning.
+        podSecurityContext:
+          seccompProfile:
+            type: RuntimeDefault
+
         # Chart default is 500m/256Mi guaranteed — oversized for a job that
         # runs for seconds once a day on 4GB workers.
         resources:
@@ -57,8 +67,8 @@ spec:
         deschedulerPolicy:
           # labels.Parse syntax: every node without the control-plane label.
           nodeSelector: "!node-role.kubernetes.io/control-plane"
-          maxNoOfPodsToEvictPerNode: 2
-          maxNoOfPodsToEvictTotal: 3
+          maxNoOfPodsToEvictPerNode: 3
+          maxNoOfPodsToEvictTotal: 5
           metricsProviders:
             - source: KubernetesMetrics
           # Replaces the chart's default profile entirely (Helm doesn't merge
@@ -96,7 +106,7 @@ spec:
                     # CPU is deliberately left out: mbp's ~20% (vs ~2% on the
                     # workers) is mostly ClickHouse, and a CPU band would
                     # keep flagging mbp and moving pods off it every night.
-                    # maxNoOfPodsToEvict* above keeps any night's churn to 3.
+                    # maxNoOfPodsToEvict* above keeps any night's churn to 5.
                     useDeviationThresholds: true
                     thresholds:
                       memory: 5
