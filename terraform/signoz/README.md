@@ -15,6 +15,11 @@ Manages SigNoz dashboards and alerts. SigNoz itself is deployed by ArgoCD (`argo
 - `alert-restock-radar.tf` — "Restock Radar stalled": no successful UniFi store fetch for an
   hour (or the metric vanishing for 30 minutes), from restock-radar's
   `restock_radar_last_success_timestamp_seconds`. Same ntfy channel.
+- `alert-kernel-storage.tf` — "Kernel storage error": a worker's kernel logged a disk I/O
+  timeout or error, from the Talos kernel logs Vector forwards (see "Talos kernel logs" in
+  `talos/README.md`). Same ntfy channel.
+- `alert-descheduler.tf` — "Descheduler evicted pods": an informational push whenever the
+  descheduler evicts a pod, counted from its pod log. Same ntfy channel.
 - `unifi-dashboards.tf` plus one `dashboard-unifi-*.tf` per dashboard: seven UniFi
   dashboards (Network, Gateway, Switches, Access Points, Clients, Client DPI, Power)
   built from unpoller's metrics. They're ports of unpoller's stock Grafana dashboards,
