@@ -52,10 +52,14 @@ data:
   # One line per alert — the most specific identifier available, then the
   # summary (falling back to description/message) — capped at 10 alerts so
   # the body stays far below ntfy's 4 KB limit however large the group gets.
-  # The title already carries status, count, alertname and namespace.
+  # `url` is the label SigNoz's packet-loss alert groups by; an alert with none
+  # of these labels (SigNoz rules that aggregate everything away) needs a
+  # `name` label of its own, or the line starts with "?". The title already
+  # carries status, count, alertname and namespace for Prometheus alerts; for
+  # SigNoz's it's the webhook's group label values (the rule's UUID).
   body.tmpl: |
     {{- range $i, $a := .Alerts }}{{ if lt $i 10 }}
-    - {{ or $a.Labels.name $a.Labels.pod $a.Labels.persistentvolumeclaim $a.Labels.node $a.Labels.instance $a.Labels.namespace "?" }}: {{ or $a.Annotations.summary $a.Annotations.description $a.Annotations.message }}
+    - {{ or $a.Labels.name $a.Labels.pod $a.Labels.persistentvolumeclaim $a.Labels.node $a.Labels.instance $a.Labels.url $a.Labels.namespace "?" }}: {{ or $a.Annotations.summary $a.Annotations.description $a.Annotations.message }}
     {{- end }}{{ end }}
     {{ if gt (len .Alerts) 10 }}
     (showing 10 of {{ len .Alerts }})

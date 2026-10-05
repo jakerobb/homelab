@@ -29,6 +29,11 @@ resource "signoz_rule" "restock_radar_stalled" {
 
   labels = {
     severity = "warning"
+    # The query aggregates away every label, and ntfy-alertmanager's body line
+    # (manifests/ntfy-alertmanager/configmap.yaml) leads with the first of
+    # name/pod/node/instance/url/namespace it finds, falling back to "?". This
+    # is what shows there.
+    name = "restock-radar"
   }
 
   condition = {
