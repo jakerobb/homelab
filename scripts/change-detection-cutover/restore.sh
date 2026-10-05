@@ -4,7 +4,7 @@
 # new pod is waiting at Init:0/1. Runbook: argocd/README.md, "change-detection (migrated from
 # Docker Compose, 2026-10-05)".
 #
-# What it copies: changedetection.json (settings: UI password, API key, notification URL),
+# What it copies: changedetection.json (settings: API key, notification URL),
 # secret.txt, and the directory of every watch that is NOT a store.ui.com page, with its snapshot
 # history and screenshots. The UniFi store watches are left behind on purpose (restock-radar
 # replaced them). Also left behind: url-watches*.json, a legacy file changedetection.io would

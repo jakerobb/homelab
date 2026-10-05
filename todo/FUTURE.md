@@ -216,7 +216,7 @@ Runbook: [`../argocd/README.md`](../argocd/README.md#matter-server-migrated-from
 **Waiting on:** the in-cluster change-detection behaving for a stretch, since `~/docker/change-detection/` on rpi5-1 is the
 rollback (revert the migration PR and restore the Compose services). **Consider it safe to delete on or after 2026-10-12**
 (one week after the 2026-10-05 cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/change-detection` (partly root-owned). It
-holds the old snapshot history (including the dropped UniFi store watches), the app's UI password hash and API key, and a
+holds the old snapshot history (including the dropped UniFi store watches), the app's API key, and a
 stale notification URL carrying a Home Assistant access token; revoke that token in Home Assistant too if it still exists.
 Make sure the in-cluster copy is the one you want to keep first (and that a nightly backup has landed in the
 `change-detection-backups` PVC). Runbook: [`../argocd/README.md`](../argocd/README.md#change-detection-migrated-from-docker-compose-2026-10-05), step 4.
