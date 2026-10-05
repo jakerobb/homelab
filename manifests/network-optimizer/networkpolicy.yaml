@@ -1,11 +1,14 @@
 # NetworkOptimizer, its OpenSpeedTest sidecar and InfluxDB. It audits the UniFi network and
-# speed-tests, so it needs the whole LAN (SNMP 161, SSH, the UniFi API, iperf3) but nothing in the cluster
-# or on the internet. If a feature needing the internet (update check, WAN test) stops working, add an
-# `internet()` rule here.
+# speed-tests, so it needs the whole LAN (SNMP 161, SSH, the UniFi API, iperf3) and, for path analysis, ICMP
+# echo to the internet (ping and traceroute; 2026-10-05 Hubble drops). Replies come back as echo reply, and
+# as time-exceeded/unreachable from the hops. Nothing else leaves the pod. If a feature needing TCP to the
+# internet (update check, WAN test) stops working, add an `internet()` rule here.
+# The speed-test LB's service port is 3005 but policy sees the pod port, 3000.
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
-# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# entity when Envoy and the pod share a node, and as `remote-node` when they
+# don't; a standard NetworkPolicy can't match either, hence CiliumNetworkPolicy.
 # Kubelet probes come from the node (`host`), which Cilium always allows. See
 # argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
 # debug a drop (`hubble observe --verdict DROPPED`).
@@ -30,6 +33,8 @@ spec:
   ingress:
     - fromEntities:
         - ingress
+        - remote-node
+        - host
       toPorts:
         - ports:
             - port: '8042'
@@ -42,7 +47,7 @@ spec:
         - host
       toPorts:
         - ports:
-            - port: '3005'
+            - port: '3000'
               protocol: TCP
     - fromEntities:
         - world
@@ -54,6 +59,16 @@ spec:
               protocol: TCP
             - port: '5201'
               protocol: UDP
+    - fromEntities:
+        - world
+      icmps:
+        - fields:
+            - type: 0
+              family: IPv4
+            - type: 3
+              family: IPv4
+            - type: 11
+              family: IPv4
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: network-optimizer
@@ -73,3 +88,13 @@ spec:
             k8s:io.kubernetes.pod.namespace: network-optimizer
     - toCIDR:
         - 192.168.0.0/16
+    - toCIDRSet:
+        - cidr: 0.0.0.0/0
+          except:
+            - 10.0.0.0/8
+            - 172.16.0.0/12
+            - 192.168.0.0/16
+      icmps:
+        - fields:
+            - type: 8
+              family: IPv4

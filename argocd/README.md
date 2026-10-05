@@ -2132,9 +2132,13 @@ app built from what each one actually talks to.
   IPs and the LAN are Cilium *entities* (`ingress`, `kube-apiserver`,
   `host`/`remote-node`, `world`), not pods. Cilium unions the two.
 - **Gateway traffic** reaches backends as the `ingress` entity (Hubble shows
-  it as `reserved:ingress`). Every Gateway-fronted app allows that on its
-  port; Authelia's forward-auth is also called by the Gateway, so Authelia
-  allows it too.
+  it as `reserved:ingress`) when Envoy runs on the pod's node, but as
+  `remote-node` when Envoy is on another node, since the tunnel carries the
+  source node's identity. Every Gateway-fronted app allows `ingress`,
+  `remote-node` and `host` on its port; Authelia's forward-auth is also called
+  by Envoy, so Authelia allows it too. Allowing only `ingress` (the first
+  version, 2026-10-05) made Envoy's ext-auth call fail across nodes, and Envoy
+  answers a failed ext-auth with a bare 403 on every gated host.
 - **Kubelet probes** come from `host`, which Cilium always allows; nothing
   needs a rule for them.
 - **LoadBalancer apps** (Mosquitto, Unbound, NetworkOptimizer's speed test,
@@ -2162,6 +2166,9 @@ app built from what each one actually talks to.
   then `hubble observe -n <namespace> --verdict DROPPED --last 200`. The drop
   names the source, destination and port to add. Deleting the namespace's
   `default-deny` is the quick way to confirm a policy is the cause.
-- **Known guesses.** NetworkOptimizer has LAN-only egress; if its update check
-  or a WAN speed test needs the internet, add an `internet()` rule. The
+- **Port gotcha.** Policy sees the pod's port, after Service translation, not the Service port. The
+  NetworkOptimizer speed test is Service port 3005 but pod port 3000, and the first version of its policy allowed
+  3005. Check `kubectl get endpointslices` for the real port.
+- **Known guesses.** NetworkOptimizer may use TCP to the internet for an update check or WAN test; today it gets only
+  ICMP echo out (path analysis), found from Hubble drops. If a feature stops working, add an `internet()` rule. The
   democratic-csi controllers get TrueNAS on 80 and 443 only.

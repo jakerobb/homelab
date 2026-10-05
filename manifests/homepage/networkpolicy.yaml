@@ -3,7 +3,8 @@
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
-# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# entity when Envoy and the pod share a node, and as `remote-node` when they
+# don't; a standard NetworkPolicy can't match either, hence CiliumNetworkPolicy.
 # Kubelet probes come from the node (`host`), which Cilium always allows. See
 # argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
 # debug a drop (`hubble observe --verdict DROPPED`).
@@ -28,6 +29,8 @@ spec:
   ingress:
     - fromEntities:
         - ingress
+        - remote-node
+        - host
       toPorts:
         - ports:
             - port: '3000'
