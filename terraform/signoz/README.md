@@ -14,7 +14,9 @@ Manages SigNoz dashboards and alerts. SigNoz itself is deployed by ArgoCD (`argo
   New alerts can reuse that channel.
 - `alert-restock-radar.tf` — "Restock Radar stalled": no successful UniFi store fetch for an
   hour (or the metric vanishing for 30 minutes), from restock-radar's
-  `restock_radar_last_success_timestamp_seconds`. Same ntfy channel.
+  `restock_radar_last_success_timestamp_seconds`. Same ntfy channel. Three more rules in
+  the same file (notifications stuck, notification rejected, backup stale) share one
+  `for_each` resource.
 - `alert-kernel-storage.tf` — "Kernel storage error": a worker's kernel logged a disk I/O
   timeout or error, from the Talos kernel logs Vector forwards (see "Talos kernel logs" in
   `talos/README.md`). Same ntfy channel.
