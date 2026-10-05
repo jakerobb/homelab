@@ -1,5 +1,5 @@
-# Cluster-internal only (no HTTPRoute): the JSON API (/v1/variants,
-# /v1/events) has no auth yet, so it's reachable with a port-forward only.
+# The web UI and JSON API (no auth of their own) are reached through
+# httproute.yaml, which puts Authelia in front.
 apiVersion: v1
 kind: Service
 metadata:
