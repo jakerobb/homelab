@@ -146,6 +146,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'hubble.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'restock-radar.jakerobb.org'
+                policy: 'two_factor'
               # UniFi Protect rings the doorbell by calling this one URL, and
               # can't log in. Bypass only that exact method, path and query
               # (matched against path+query, hence the escaped `?`); every

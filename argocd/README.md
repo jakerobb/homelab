@@ -1281,9 +1281,16 @@ still on Compose until it's retired.
   `Recreate`. After a HexOS outage iSCSI volumes can go silently read-only;
   delete the pod to recover. Losing the volume only costs history: the next
   start re-baselines silently.
-- **API** (`/v1/variants`, `/v1/events`, `/health`) is cluster-internal with
-  no auth; use a port-forward. There's no `/metrics` yet, so nothing
-  scrapes it.
+- **Web UI** at `https://restock-radar.jakerobb.org`: every product with its
+  variants, status and price, the time of the last sync, and a form to add a
+  product by slug or store URL. The app has no login, so the route is gated by
+  Authelia (`two_factor`) like Homepage and SearXNG: an HTTPRoute with the
+  `ExternalAuth` filter, a rule in Authelia's `access_control`, and this
+  namespace in the `authelia` ReferenceGrant. Products added in the UI live in
+  the database next to the ones from `config.yaml`; config entries are
+  authoritative for themselves (removing one unwatches it), UI additions
+  persist. The JSON API (`/v1/products`, `/v1/events`, `/health`) is served on
+  the same host. There's no `/metrics` yet, so nothing scrapes it.
 - **Image** is `docker.io/jakerobb/restock-radar:<date>`, pinned by hand like
   nut-exporter's; Renovate can bump it.
 

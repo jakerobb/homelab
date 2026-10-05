@@ -1,0 +1,55 @@
+# restock-radar's web UI and API at restock-radar.jakerobb.org. Gated by
+# Authelia forward-auth, same pattern as searxng/httproute.yaml: the app has no
+# login of its own, and its UI can add products to the watch list, so it must
+# not be reachable unauthenticated (external-dns publishes a real public DNS
+# record for the host).
+#
+# Needs this namespace's entry in argocd/apps/authelia/referencegrant.yaml and
+# the access_control rule for restock-radar.jakerobb.org in
+# argocd/apps/authelia/application.yaml.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: restock-radar
+  namespace: restock-radar
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/name: Restock Radar
+    gethomepage.dev/description: UniFi store stock and price tracker
+    gethomepage.dev/icon: mdi-radar
+    gethomepage.dev/group: Apps
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - restock-radar.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: restock-radar
+          port: 8080
