@@ -1,0 +1,46 @@
+# restock-radar's config (github.com/jakerobb/restock-radar): which UniFi
+# store products to watch, and where to send notifications. Mounted via
+# kustomization.yaml's configMapGenerator.
+#
+# Every variant of a product is watched. Items are store slugs, the last
+# segment of a product URL; old slugs the store redirects also work.
+# Seeded 2026-10-05 from the 26 store products in ChangeDetection.
+poll_interval: 20m
+poll_jitter: 1m
+request_delay: 2s
+http_port: 8080
+db_path: /data/restock-radar.db
+
+# In-cluster ntfy, which has no auth configured (see argocd/README.md's ntfy
+# section), so there's no token.
+ntfy:
+  url: http://ntfy.ntfy.svc:8080
+  topic: restock-radar
+
+items:
+  - slug: uacc-pro-max-16-rm
+  - slug: uacc-rack-panel-ocd
+  - slug: uacc-hdd-e-16tb
+  - slug: uacc-hdd-e-24tb
+  - slug: uvc-ai-360
+  - slug: uvc-g6-180
+  - slug: ai-key
+  - slug: ufp-viewport
+  - slug: uvc-ai-ptz-precision
+  - slug: uacc-usl-ant-hg
+  - slug: usl-relay
+  - slug: udr-5g-max
+  - slug: uvc-g6-entry
+  - slug: uvc-g6-pro-entry
+  - slug: ups-2u-us
+  - slug: ups-tower-us
+  - slug: u5g-max
+  - slug: unas-2
+  - slug: unas-4
+  - slug: usw-pro-aggregation
+  - slug: eav-xg-24-poe
+  - slug: utr
+  - slug: usl-gateway
+  - slug: u5g-us
+  - slug: usl-environmental
+  - slug: uvc-g6-turret

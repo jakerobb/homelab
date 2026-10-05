@@ -1,0 +1,74 @@
+# restock-radar (github.com/jakerobb/restock-radar): polls the UniFi store's
+# own JSON endpoints for stock and price changes on the products in
+# config.yaml and pushes them to ntfy. Replaces ChangeDetection and
+# Browserless's store watches. State is one SQLite file on a PVC, so it must
+# stay at one replica with Recreate (never two pods on the database).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restock-radar
+  namespace: restock-radar
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: restock-radar
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: restock-radar
+    spec:
+      automountServiceAccountToken: false
+      # Matches the image's own USER; fsGroup makes the PVC writable by it.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: restock-radar
+          image: docker.io/jakerobb/restock-radar:20261005
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+          # /health only says the process is up; it doesn't depend on the
+          # store being reachable, so a blocked poller shows in ntfy alerts,
+          # not as pod restarts.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /etc/restock-radar
+              name: config
+              readOnly: true
+            - mountPath: /data
+              name: data
+      volumes:
+        # Generated from config.yaml by kustomization.yaml; the name gets a
+        # content-hash suffix, so a config change rolls the pod.
+        - name: config
+          configMap:
+            name: restock-radar-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: restock-radar-data

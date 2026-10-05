@@ -1,0 +1,16 @@
+# restock-radar's SQLite database: current state per variant plus the change
+# history. Tiny (about 36 variants, a few events a week); 1Gi is the floor
+# worth asking for. hexos-iscsi like every other stateful app here, so the pod
+# can float between nodes. Losing it isn't fatal: the next start just
+# re-baselines silently, but the history is gone.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: restock-radar-data
+  namespace: restock-radar
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

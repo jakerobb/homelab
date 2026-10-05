@@ -1,0 +1,16 @@
+# Cluster-internal only (no HTTPRoute): the JSON API (/v1/variants,
+# /v1/events) has no auth yet, so it's reachable with a port-forward only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: restock-radar
+  namespace: restock-radar
+  labels:
+    app.kubernetes.io/name: restock-radar
+spec:
+  selector:
+    app.kubernetes.io/name: restock-radar
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
