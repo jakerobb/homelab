@@ -1,0 +1,75 @@
+# NetworkOptimizer, its OpenSpeedTest sidecar and InfluxDB. It audits the UniFi network and
+# speed-tests, so it needs the whole LAN (SNMP 161, SSH, the UniFi API, iperf3) but nothing in the cluster
+# or on the internet. If a feature needing the internet (update check, WAN test) stops working, add an
+# `internet()` rule here.
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
+# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# Kubelet probes come from the node (`host`), which Cilium always allows. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: network-optimizer
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: network-optimizer
+  namespace: network-optimizer
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: '8042'
+              protocol: TCP
+            - port: '8086'
+              protocol: TCP
+    - fromEntities:
+        - world
+        - remote-node
+        - host
+      toPorts:
+        - ports:
+            - port: '3005'
+              protocol: TCP
+    - fromEntities:
+        - world
+        - remote-node
+        - host
+      toPorts:
+        - ports:
+            - port: '5201'
+              protocol: TCP
+            - port: '5201'
+              protocol: UDP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: network-optimizer
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: network-optimizer
+    - toCIDR:
+        - 192.168.0.0/16

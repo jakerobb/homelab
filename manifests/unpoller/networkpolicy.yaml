@@ -1,0 +1,52 @@
+# unpoller: polls the UniFi controller (gateway.lan, 192.168.0.1) and serves Prometheus metrics.
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
+# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# Kubelet probes come from the node (`host`), which Cilium always allows. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: unpoller
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: unpoller
+  namespace: unpoller
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: prometheus
+      toPorts:
+        - ports:
+            - port: '9130'
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toCIDR:
+        - 192.168.0.1/32
+      toPorts:
+        - ports:
+            - port: '443'
+              protocol: TCP

@@ -1,0 +1,113 @@
+# kube-prometheus-stack (Prometheus, Alertmanager, operator, kube-state-metrics) and ntfy-alertmanager.
+# Node-exporter is hostNetwork, so no pod policy applies to it.
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
+# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# Kubelet probes come from the node (`host`), which Cilium always allows. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Everything in the namespace: talk to each other and to the API server (the operator, kube-state-metrics
+# and the config reloaders), receive the API server's admission-webhook calls, and receive the Gateway on
+# Prometheus (9090) and Alertmanager (9093). SigNoz federates Prometheus (9090) and sends alerts to
+# ntfy-alertmanager (8080). ntfy-alertmanager pushes to ntfy.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: monitoring
+  namespace: monitoring
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+    - fromEntities:
+        - kube-apiserver
+        - remote-node
+        - host
+      toPorts:
+        - ports:
+            - port: '10250'
+              protocol: TCP
+    - fromEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: '9090'
+              protocol: TCP
+            - port: '9093'
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: signoz
+      toPorts:
+        - ports:
+            - port: '9090'
+              protocol: TCP
+            - port: '8080'
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toEntities:
+        - kube-apiserver
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ntfy
+            app.kubernetes.io/name: ntfy
+      toPorts:
+        - ports:
+            - port: '8080'
+              protocol: TCP
+---
+# Prometheus scrapes every ServiceMonitor target in the cluster, the kubelets, node-exporters (hostNetwork),
+# the API server and etcd, so it may reach anything in-cluster. Outside the cluster it gets only the two static
+# scrape targets in the chart values: Telegraf on the MBP (192.168.102.9:9273) and the Proxmox host's
+# node-exporter (192.168.102.21:9100).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: prometheus-scrape
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  egress:
+    - toEntities:
+        - cluster
+    - toCIDR:
+        - 192.168.102.9/32
+      toPorts:
+        - ports:
+            - port: '9273'
+              protocol: TCP
+    - toCIDR:
+        - 192.168.102.21/32
+      toPorts:
+        - ports:
+            - port: '9100'
+              protocol: TCP

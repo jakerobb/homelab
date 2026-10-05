@@ -2110,3 +2110,58 @@ kubectl -n arc-runners get autoscalingrunnerset,ephemeralrunners
 ```
 
 The scale set also appears under the repo's Settings → Actions → Runners.
+
+## NetworkPolicies (added 2026-10-05)
+
+Before this, only ArgoCD's own chart policies and the ARC runners' egress
+policy existed, so any pod could reach any other pod and the LAN. Now every
+app namespace is **default-deny in both directions**, with an allow-list per
+app built from what each one actually talks to.
+
+- **Where they live.** Hand-written apps carry
+  `manifests/<app>/networkpolicy.yaml`. Namespaces whose workloads come from
+  Helm charts (Authelia, cert-manager, External Secrets, external-dns,
+  metrics-server, descheduler, ARC controller, local-path-provisioner,
+  democratic-csi, `monitoring`, SigNoz) are in
+  [`manifests/network-policies/`](../manifests/network-policies/), one file per
+  namespace, owned by the `network-policies` Application so a chart upgrade
+  can't prune them.
+- **Two kinds of object.** A standard `NetworkPolicy` named `default-deny`
+  does the deny. Allows are `CiliumNetworkPolicy`, because the standard kind
+  can't express what this cluster needs: the Gateway, the API server, node
+  IPs and the LAN are Cilium *entities* (`ingress`, `kube-apiserver`,
+  `host`/`remote-node`, `world`), not pods. Cilium unions the two.
+- **Gateway traffic** reaches backends as the `ingress` entity (Hubble shows
+  it as `reserved:ingress`). Every Gateway-fronted app allows that on its
+  port; Authelia's forward-auth is also called by the Gateway, so Authelia
+  allows it too.
+- **Kubelet probes** come from `host`, which Cilium always allows; nothing
+  needs a rule for them.
+- **LoadBalancer apps** (Mosquitto, Unbound, NetworkOptimizer's speed test,
+  Z-Wave JS UI's WebSocket) allow `world` (the LAN) plus `remote-node` and
+  `host`, since a LAN client may arrive SNAT'd through another node and Home
+  Assistant arrives from its node's IP.
+- **Egress** is by destination: DNS (kube-dns), the API server where a
+  ServiceAccount is used, in-cluster peers by namespace and label, LAN hosts
+  by `/32` and port, and "the internet" as `0.0.0.0/0` minus RFC1918 on 443
+  (80 for SearXNG, 53 for cert-manager's DNS-01 checks). The RFC1918 exclusion
+  is what keeps a compromised pod off the LAN and the cluster.
+- **Not covered.** `hostNetwork` pods ignore pod policy: Home Assistant,
+  Matter Server, Scrypted, node-exporter, the CSI node pods, node-tuning and
+  Cilium itself. `kube-system`, `argocd` (its chart ships its own policies) and
+  `arc-runners` (its own, see the ARC section) are unchanged. The two
+  CronJob backup pods in `homeassistant` and `scrypted` are unrestricted too,
+  since those namespaces have no default-deny (their main pods are
+  `hostNetwork`).
+- **Prometheus** may reach anything in-cluster (it scrapes everything) plus its
+  two static LAN targets (Telegraf on the MBP, the Proxmox node-exporter); if
+  you add a static scrape target, add it to `prometheus-scrape` in
+  [`monitoring.yaml`](../manifests/network-policies/monitoring.yaml).
+- **Debugging.** A new or changed flow that stops working is a drop. On
+  rpi5-1, `kubectl -n kube-system port-forward svc/hubble-relay 4245:80 &`,
+  then `hubble observe -n <namespace> --verdict DROPPED --last 200`. The drop
+  names the source, destination and port to add. Deleting the namespace's
+  `default-deny` is the quick way to confirm a policy is the cause.
+- **Known guesses.** NetworkOptimizer has LAN-only egress; if its update check
+  or a WAN speed test needs the internet, add an `internet()` rule. The
+  democratic-csi controllers get TrueNAS on 80 and 443 only.

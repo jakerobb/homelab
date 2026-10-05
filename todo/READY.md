@@ -154,15 +154,6 @@ role) and check that Headlamp still works for you, including writes, since those
 `oidc-admin` identity. If writes break, Headlamp is still using the SA's token, and the answer is a smaller custom role
 instead of `view`. Update the "RBAC" bullet in the Headlamp section of `argocd/README.md` either way.
 
-### Default-deny NetworkPolicies
-
-Only `argocd` and `arc-runners` have NetworkPolicies, and there are no Cilium policies. The pod network is flat, so any
-compromised pod can reach ESO, Prometheus, the Kubernetes API and everything else. Start with the namespaces whose
-compromise would cost the most (`external-secrets`, `monitoring`, `headlamp`) and add a default-deny ingress policy
-plus the specific allows each needs (the Gateway's Envoy for web UIs, Prometheus scrapes, DNS and the Kubernetes API for
-egress). Cilium enforces standard NetworkPolicies, so no new CRDs are needed. Test one namespace at a time, because a
-missing allow rule fails quietly.
-
 ### Harden SSH and the host firewall on rpi5-1
 
 `sshd` is already key-only. Still to do: `PermitRootLogin` is `without-password`, so set it to `no`, and set
@@ -171,14 +162,6 @@ read-only data, but consider limiting it to the hosts that need it. A first look
 Docker's NAT chains, so confirm what, if anything, filters INPUT, and settle on a default-deny baseline (SSH from the
 LAN, DNS on `:53`, `:3493` from where it's needed, and whatever the two entries above leave open) so that new
 host-network containers aren't exposed by default. Jump-box OS upgrade (Debian 12 to 13) is tracked in `FUTURE.md`.
-
-### Pin GitHub Actions to commit SHAs
-
-The workflows use tags (`actions/checkout@v7`, `docker/build-push-action@v7`, ...), so a retagged or compromised action
-would run in our jobs, one of which (`runner-image`) has `packages: write`. Add `helpers:pinGitHubActionDigests` to the
-`extends` list in `renovate.json` so Renovate rewrites tags to SHAs (keeping the version in a comment) and keeps them
-current. Once everything is pinned, turn on "Require actions to be pinned to a full-length commit SHA" in Settings,
-Actions, General. Turning that on first breaks every workflow.
 
 ### Turn on the remaining free GitHub security features
 

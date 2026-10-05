@@ -1,0 +1,43 @@
+# Mosquitto. Reached from the LAN (IoT devices, via the LB VIP 192.168.102.131), from Home Assistant
+# (hostNetwork, so it arrives as `host`/`remote-node`) and from Zigbee2MQTT. It makes no outbound calls.
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
+# entity, which a standard NetworkPolicy can't match, hence CiliumNetworkPolicy.
+# Kubelet probes come from the node (`host`), which Cilium always allows. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: mosquitto
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: mosquitto
+  namespace: mosquitto
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - world
+        - remote-node
+        - host
+      toPorts:
+        - ports:
+            - port: '1883'
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: zigbee2mqtt
+      toPorts:
+        - ports:
+            - port: '1883'
+              protocol: TCP

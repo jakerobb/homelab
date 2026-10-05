@@ -259,6 +259,18 @@ case-by-case judgment call — see the `external-snapshotter` note there.)
 Vendor the CRD manifests under `manifests/<name>/` if there's no chart to
 `helm pull` them from.
 
+## 8. NetworkPolicy: default-deny, then list what the app needs
+
+Every app namespace is default-deny in both directions (see
+[`argocd/README.md`](../argocd/README.md#networkpolicies-added-2026-10-05)),
+so a new app can't talk to anything until its `networkpolicy.yaml` says so.
+Copy a neighbor's (restock-radar's is a good template) and list only the
+real flows: the Gateway as `fromEntities: [ingress]`, Prometheus if there's a
+ServiceMonitor, DNS, the API server if it uses a ServiceAccount, and each
+outbound destination by IP and port. Apps on `hostNetwork` can't be
+restricted by pod policy, so don't bother. After it syncs, watch
+`hubble observe -n <name> --verdict DROPPED` for anything you missed.
+
 ## Checklist
 
 1. `argocd/apps/<name>/application.yaml` — thin `Application`, pointing
@@ -272,13 +284,15 @@ Vendor the CRD manifests under `manifests/<name>/` if there's no chart to
 5. Decide OIDC vs. forward-auth; wire up
    `argocd/apps/authelia/application.yaml` (`access_control` rule, plus
    an OIDC client if applicable) and any needed `ReferenceGrant`.
-6. Any secret the app needs: a Secure Note in the `homelab-k8s`
+6. `manifests/<name>/networkpolicy.yaml` — default-deny plus the app's
+   allowed flows (section 8).
+7. Any secret the app needs: a Secure Note in the `homelab-k8s`
    1Password vault plus an `ExternalSecret` in
    `manifests/external-secrets-config/<name>.yaml` (section 5).
-7. Add a dated section to `argocd/README.md` documenting what was
+8. Add a dated section to `argocd/README.md` documenting what was
    decided and why (chart vs. bare manifests, auth choice, RBAC scope,
    anything non-obvious) — that file is the durable record; this doc is
    just the checklist.
-8. `git add` the new files (`apps/<name>/`, `manifests/<name>/`) —
+9. `git add` the new files (`apps/<name>/`, `manifests/<name>/`) —
    leave modified shared files (`authelia/application.yaml`,
    `argocd/README.md`) unstaged for review.

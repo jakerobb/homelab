@@ -1,0 +1,19 @@
+# NetworkPolicies for namespaces whose workloads come from Helm charts or are
+# otherwise shared (Authelia, cert-manager, External Secrets, monitoring,
+# SigNoz, ...). Each file holds one namespace's default-deny plus its allows.
+# Hand-written apps keep theirs in their own manifests/<app>/networkpolicy.yaml.
+# See argocd/README.md's "NetworkPolicies" section.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - arc-systems.yaml
+  - authelia.yaml
+  - cert-manager.yaml
+  - democratic-csi.yaml
+  - descheduler.yaml
+  - external-dns.yaml
+  - external-secrets.yaml
+  - local-path-storage.yaml
+  - metrics-server.yaml
+  - monitoring.yaml
+  - signoz.yaml

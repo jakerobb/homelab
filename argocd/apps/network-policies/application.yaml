@@ -1,0 +1,29 @@
+# Default-deny plus allow-lists for the chart-managed namespaces (see
+# manifests/network-policies/kustomization.yaml). Its own Application rather
+# than part of each chart's, so a chart upgrade can't prune them. The
+# namespaces are named in each resource, so destination.namespace is only the
+# default. Apps with hand-written manifests carry their own networkpolicy.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: network-policies
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/network-policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
