@@ -247,7 +247,7 @@ time; those get added to Authelia's `access_control` as they land, not now.
 Replaced the Docker Compose stack's Watchtower (removed 2026-09-28; every
 image in `docker-compose/docker-compose.yml` is now pinned and bumped by
 Renovate PRs like everything else) — see the
-[`READY.md`](../todo/READY.md#compose-workload-migration) note this replaces.
+[`DONE.md`](../todo/DONE.md#compose-workload-migration) note this replaces.
 
 - **PR-based, not in-place patching.** Watchtower silently swaps running
   containers; that model fights GitOps (git is supposed to be the source of
@@ -361,7 +361,7 @@ chart `kube-prometheus-stack` from `prometheus-community`.
 - **Grafana still disabled.** Today's actual goal is just feeding OpenLens,
   and the existing Compose-stack Grafana on the 16GB Pi already covers
   dashboarding until that workload migrates in (see
-  [`READY.md`](../todo/READY.md#compose-workload-migration)).
+  [`DONE.md`](../todo/DONE.md#compose-workload-migration)).
 - **Alertmanager enabled 2026-09-20** (was disabled at initial deploy — no
   notification receiver was wired up yet, see git history for this section's
   original wording). Surfaced by a scheduled health check: Prometheus had

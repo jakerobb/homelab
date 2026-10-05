@@ -1,10 +1,10 @@
 # Adding a new app to the cluster
 
 Checklist/standards doc for onboarding a new workload into the Talos/ArgoCD
-cluster — whether that's a brand-new app or a migration off `rpi5-1`'s
-Docker Compose stack (see [`todo/READY.md`](../todo/READY.md#compose-workload-migration)
-for that list). Each numbered section below is a decision this repo has
-already made once; don't re-litigate it per app, just follow it. The
+cluster. Each numbered section below is a decision this repo has
+already made once; don't re-litigate it per app, just follow it. (The
+apps that used to run on `rpi5-1`'s Docker Compose stack were all moved
+this way; see [`todo/DONE.md`](../todo/DONE.md#compose-workload-migration).) The
 worked example throughout is Headlamp
 ([`argocd/apps/headlamp/`](../argocd/apps/headlamp/application.yaml),
 [`manifests/headlamp/`](../manifests/headlamp/)) — added 2026-09-21, and
@@ -141,12 +141,12 @@ Traefik/nginx, no `IngressRoute` CRDs.
 - **DNS is automatic:** `external-dns` (Cloudflare provider) watches
   `HTTPRoute`s cluster-wide and creates/updates the `A` record itself —
   no manual DNS step for a genuinely new hostname.
-  - **Gotcha:** if the hostname already existed as a Cloudflare record
-    from the old Caddy setup (a CNAME to `caddy.lan`),
-    external-dns won't adopt/overwrite it (no TXT ownership marker) —
-    delete that record by hand in the Cloudflare dashboard once the new
-    `HTTPRoute` has synced. Check this on every Compose→cluster
-    migration; it's bitten before (`ntfy.jakerobb.org`).
+  - **Gotcha:** if the hostname already exists as a Cloudflare record
+    that external-dns didn't create (e.g. a CNAME to `caddy.lan` from the
+    old Caddy setup), it won't adopt/overwrite it (no TXT ownership
+    marker) — delete that record by hand in the Cloudflare dashboard once
+    the new `HTTPRoute` has synced. It's bitten before
+    (`ntfy.jakerobb.org`).
   - **Gotcha:** the LAN's Unbound resolver strips DNS answers that
     resolve an unrecognized hostname to a private IP
     (rebinding-protection default). `jakerobb.org` is already

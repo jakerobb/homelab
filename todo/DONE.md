@@ -803,3 +803,32 @@ carry `manifests/<app>/networkpolicy.yaml`; chart-managed namespaces are in `man
 **Done (2026-10-05).** All workflow actions are pinned to full-length commit SHAs (#165), and "Require actions to be
 pinned to a full-length commit SHA" is on in Settings, Actions, General. `renovate.json` extends `helpers:pinGitHubActionDigests`, so Renovate pins any newly added tag and keeps the pins
 current.
+
+## Compose workload migration
+
+**Done (2026-10-05).** Every workload that could leave rpi5-1's Docker Compose stack has. Each service has its own entry
+above. Each is a separate ArgoCD Application behind Authelia (OIDC where the app supports it, ExternalAuth otherwise),
+with persistent storage on a democratic-csi PVC, and its file in `manifests/lan-routes/` deleted when it moved. Four
+containers remain on rpi5-1 on purpose:
+
+- **`telegraf` and `vector`** stay as collectors only; both ship to SigNoz (see
+  [Compose observability stack retired](#compose-observability-stack-retired)).
+- **`nut-upsd`** needs USB access to the CyberPower UPS, so it stays until the hardware plan in
+  [`HARDWARE.md`](HARDWARE.md) moves that Pi into the cluster. Its relay and web UI were replaced by nut-exporter.
+- **`unbound`** runs in both places by design (see [`HARDWARE.md`](HARDWARE.md)); the in-cluster copy has been live since
+  2026-09-29.
+
+Config ownership was decided per service before each move: an app that rewrites its own config can't save UI changes to
+a read-only ConfigMap/Secret mount, so either seed the file into the PVC once (the app owns it afterward, UI edits
+survive, git isn't authoritative) or overwrite it on every start (git wins, UI edits are lost). `change-detection`,
+`zwave-js-ui`, `zigbee2mqtt` and `homeassistant` all took the seed-once route (Zigbee2MQTT's and Home Assistant's config
+come from the old data directory rather than a ConfigMap). Secrets go in an ExternalSecret, as env vars (Z-Wave) or a
+`!secret` file (Zigbee2MQTT, whose `write()` would otherwise copy env overrides into the PVC). rpi5-1 now uses about
+1.4 GB of its 16 GB, with Docker's four containers adding up to about 170 MB.
+
+## Prometheus PVC steady-state usage
+
+**Done (2026-10-05).** The PVC was expanded from 10Gi to 20Gi on 2026-09-30 after hitting about 85% while still growing
+about 0.4 GB per 12 hours. Once the 10-day retention window filled, growth flattened: 9.1 GB on 09-30, 10.1 GB on 10-03
+and 10.4 GB on 10-05 (about 48% of 20Gi, about 250k head series). That headroom is enough, so no `retentionSize` or
+cardinality cut was needed.
