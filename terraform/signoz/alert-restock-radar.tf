@@ -111,8 +111,12 @@ resource "signoz_rule" "restock_radar_stalled" {
 #    The metric only exists once the app is configured with backup_dir, so this
 #    stays quiet until then, and the "stalled" rule above covers the app dying.
 #
-# alert_on_absent is off for all three: they ask about a metric the app emits
+# None of the three alerts on absent data: they ask about a metric the app emits
 # only in some states, and a missing series is already the "stalled" rule's job.
+# That's the default, so alert_on_absent is left unset below, not set to false:
+# the provider stores false as null, and Terraform fails the apply with "Provider
+# produced inconsistent result after apply" (it did, 2026-10-05, and re-running
+# just destroyed and recreated the tainted rules to fail the same way).
 locals {
   restock_radar_rules = {
     notifications_stuck = {
@@ -183,7 +187,6 @@ resource "signoz_rule" "restock_radar" {
     }
 
     selected_query_name = "A"
-    alert_on_absent     = false
 
     thresholds = {
       basic = {
