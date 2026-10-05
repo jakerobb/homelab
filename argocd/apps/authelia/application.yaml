@@ -150,11 +150,13 @@ spec:
                 policy: 'two_factor'
               # UniFi Protect rings the doorbell by calling this one URL, and
               # can't log in. Bypass only that exact method, path and query
-              # (matched against path+query, hence the escaped `?`); every
+              # (matched against path+query, hence the escaped `?`). Protect
+              # sends POST, not GET (found 2026-10-05); GET is kept so the URL
+              # also works from a browser or curl. Every
               # other request to the host falls through to the two_factor
               # rule below. Must stay above it: first match wins.
               - domain: 'modbus.jakerobb.org'
-                methods: ['GET']
+                methods: ['GET', 'POST']
                 resources:
                   - '^/run\?program=doorbell&ignoreBody=true$'
                 policy: 'bypass'

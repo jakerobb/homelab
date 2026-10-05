@@ -1525,8 +1525,9 @@ programs against the Waveshare board at `modbus.lan:4196`. Deployed as
   already existed for the `lan-routes` version; the `modbus-controller` namespace was added to the Authelia
   `ReferenceGrant`.
 - **Doorbell webhook bypass (2026-10-01).** UniFi Protect rings the doorbell with
-  `GET https://modbus.jakerobb.org/run?program=doorbell&ignoreBody=true` and can't log in, so Authelia has a `bypass`
-  rule for exactly that method, path and query, above the host's `two_factor` rule. Anything else on the host,
+  `POST https://modbus.jakerobb.org/run?program=doorbell&ignoreBody=true` and can't log in, so Authelia has a
+  `bypass` rule for `POST` (and `GET`, for browsers and curl) on exactly that path and query, above the host's
+  `two_factor` rule. The first version allowed only `GET` and missed Protect's `POST` (2026-10-05). Anything else on the host,
   including a different program or an extra query parameter, still needs a login. Checked offline with
   `authelia access-control check-policy` against a patched copy of the live config. If Protect's URL changes, the rule's
   regex in `apps/authelia/application.yaml` has to change with it.
