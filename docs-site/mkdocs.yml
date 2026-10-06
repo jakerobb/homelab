@@ -126,7 +126,9 @@ nav:
           - OS updates: docs/proxmox-os-updates.md
           - Config backup: docs/proxmox-config-backup.md
           - Host metrics: docs/proxmox-host-metrics.md
-      - HexOS: docs/hexos-install.md
+      - HexOS:
+          - Installing HexOS: docs/hexos-install.md
+          - TrueNAS ops access: docs/truenas-ops-access.md
       - MacBook Pro worker:
           - UTM Talos worker: docs/utm-talos-worker.md
           - Host metrics: docs/mac-host-metrics.md

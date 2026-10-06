@@ -15,6 +15,11 @@ Use it for host-level checks — disk space, UTM state, Telegraf — see
 [`docs/utm-talos-worker.md`](docs/utm-talos-worker.md) and
 [`docs/mac-host-metrics.md`](docs/mac-host-metrics.md).
 
+Claude has scoped SSH access to the TrueNAS/HexOS VM as `ssh truenas-ops`
+(user `claude-ops`; passwordless sudo only for `zfs list`, `zfs snapshot` and
+`e2fsck`; no `zfs destroy`). It's for NAS-side checks on Kubernetes volumes;
+see [`docs/truenas-ops-access.md`](docs/truenas-ops-access.md).
+
 ## Making changes
 
 Before making any change:
