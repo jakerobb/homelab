@@ -1,4 +1,5 @@
-# Packet loss on rpi5-1's own two interfaces (wired .2, Wi-Fi .3), pinged by
+# Packet loss on rpi5-1's wired interface (.2; the Wi-Fi interface and its .3
+# were retired in the 2026-10 jump box swap), pinged by
 # its Compose Telegraf (docker-compose/telegraf/telegraf.conf; `ping_percent_packet_loss`
 # by `url`, over OTLP). Ported from the old Compose Grafana's "Packet Loss"
 # rule: over 50% loss for 2 minutes, and no data counts as alerting too.
@@ -32,7 +33,7 @@ resource "signoz_rule" "packet_loss" {
   alert_type     = "METRIC_BASED_ALERT"
   rule_type      = "promql_rule"
   schema_version = "v2alpha1"
-  description    = "Telegraf on rpi5-1 pings its own wired and Wi-Fi interfaces; over 50% loss for 3 minutes."
+  description    = "Telegraf on rpi5-1 pings its own wired interface; over 50% loss for 3 minutes."
 
   annotations = {
     summary     = "Packet loss detected"
@@ -55,7 +56,7 @@ resource "signoz_rule" "packet_loss" {
             spec = {
               name = "A"
               # [.] instead of \. so no escaping is needed through HCL and PromQL.
-              query = "max by (url) (ping_percent_packet_loss{url=~\"192[.]168[.]102[.][23]\"})"
+              query = "max by (url) (ping_percent_packet_loss{url=~\"192[.]168[.]102[.]2\"})"
             }
           }
         }
