@@ -2021,8 +2021,8 @@ Deployed as [`apps/unbound/`](apps/unbound/application.yaml) →
   (Permission denied)`, because `/var/unbound` belongs to the `unbound` user
   and root can't write there without it.
 - **Not done yet:** the Talos nodes' own resolvers must stay off this IP
-  (they need DNS to pull the Unbound image), per the jump box swap checklist
-  in [`../todo/HARDWARE.md`](../todo/HARDWARE.md).
+  (they need DNS to pull the Unbound image); see
+  [`../talos/patches/nameservers.yaml`](../talos/patches/nameservers.yaml).
 
 ## Docs site (added 2026-09-28)
 

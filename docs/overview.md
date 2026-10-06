@@ -11,6 +11,7 @@ flowchart TB
     subgraph rack["Rack"]
         rpi["rpi5-1 (.2)<br/>jump box + Docker Compose"]
         cp["Talos control plane<br/>talos-cp-1/2/3 (.11-.13), VIP .10"]
+        wpi["talos-worker-3 (.35)<br/>Raspberry Pi 5 16GB"]
         subgraph msa2["MS-A2 (.21), Proxmox VE"]
             w1["talos-worker-1 (.31)"]
             w2["talos-worker-2 (.32)"]
@@ -24,8 +25,8 @@ flowchart TB
     end
 
     rpi -- "talosctl / kubectl / terraform" --> cp
-    cp --- w1 & w2 & w3
-    w1 & w2 & w3 -- "iSCSI + NFS volumes" --> hexos
+    cp --- w1 & w2 & w3 & wpi
+    w1 & w2 & w3 & wpi -- "iSCSI + NFS volumes" --> hexos
     rpi -- "USB (NUT)" --- ups
 ```
 
@@ -36,8 +37,8 @@ flowchart TB
   credentials and the Terraform runner. It also hosts the cron jobs for backups
   and alert emails.
 - **The Kubernetes cluster** runs [Talos Linux](../talos/README.md): three
-  Raspberry Pi 5 control-plane nodes and three workers. Two workers are VMs on
-  the MS-A2 and one is a VM on the MacBook Pro. Workloads are moving off
+  Raspberry Pi 5 control-plane nodes and four workers. Two workers are VMs on
+  the MS-A2, one is a VM on the MacBook Pro and one is a 16GB Raspberry Pi 5. Workloads are moving off
   rpi5-1's Compose stack into the cluster one at a time
   (see [the plan](../todo/READY.md)).
 - **HexOS** (TrueNAS underneath) is a VM on the MS-A2 with the two big NVMe

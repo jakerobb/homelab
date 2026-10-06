@@ -102,12 +102,22 @@ apt list --upgradable 2>/dev/null | grep -c security
 Expect 0, or a handful that are less than a day old. The run log is
 `/var/log/unattended-upgrades/unattended-upgrades.log`.
 
+## Boot order
+
+rpi5-1's EEPROM boot order is `BOOT_ORDER=0xf641`: SD card, then USB, then NVMe (digits read right to left, `f`
+repeats). That lets a bootable SD card or USB stick override the SSD for recovery or for writing disks, without
+touching the EEPROM config. The flip side: **an SD card left in the Pi boots instead of the SSD.** The full config is
+`BOOT_UART=1`, `BOOT_ORDER=0xf641`, `NET_INSTALL_AT_POWER_ON=1`, `PCIE_PROBE=1`; check it with
+`sudo rpi-eeprom-config`. The same order was set on the Pi that became `talos-worker-3`. See
+[the jump box swap](jump-box-swap.md#1-prepare-the-new-pi-from-an-sd-card) for how it was set (upgrade the `rpi-eeprom`
+package first, then `rpi-eeprom-config --apply`).
+
 ## Future: Debian 13 (trixie)
 
 Raspberry Pi OS moved to trixie in late 2025, so bookworm is now
 `oldstable`. Upgrading in place is possible but not officially supported by
 Raspberry Pi. The supported path is a fresh image and a restore of the
 Compose stack and jump-box tooling. Not urgent while bookworm LTS still gets
-security fixes. Deferred to the replacement 4GB jump box rather than done
-here, since rpi5-1 becomes a Talos worker once the Compose migration empties
-it out. Tracked in [`../todo/FUTURE.md`](../todo/FUTURE.md).
+security fixes. Not done in the 2026-10-06 jump box swap, which moved the
+existing bookworm SSD onto the replacement 4GB Pi unchanged (the old 16GB Pi
+became a Talos worker). Tracked in [`../todo/FUTURE.md`](../todo/FUTURE.md).

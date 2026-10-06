@@ -87,7 +87,8 @@ actually rebooted with `uptime`, and that both workers are `Ready` in
 
 HexOS is `truenas.lan`, the democratic-csi `hexos-iscsi` backend, so a
 Proxmox reboot also cuts storage to every PVC. Any volume that was mounted
-on a node that stayed up (talos-worker-mbp, in practice) and got written to
+on a node that stayed up (talos-worker-mbp or talos-worker-3, in practice, since the
+MS-A2 workers go down with Proxmox) and got written to
 during the outage aborts its ext4 journal and turns read-only. It doesn't
 recover when HexOS comes back. Some pods crash-loop on it (Prometheus:
 `read-only file system`), but others keep running and just fail every write
@@ -95,7 +96,7 @@ recover when HexOS comes back. Some pods crash-loop on it (Prometheus:
 "all pods Running" is not enough. Check, on rpi5-1:
 
 ```bash
-talosctl -n 192.168.102.34 dmesg | grep -E "EXT4-fs.*(aborted journal|read-only)"
+for n in 34 35; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E "EXT4-fs.*(aborted journal|read-only)"; done
 ```
 
 The fix is to delete each affected pod. Once no pod on the node uses the

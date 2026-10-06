@@ -30,9 +30,12 @@ only). New here? Start with [How it fits together](docs/overview.md), [Getting a
           Connected via 1GbE to the Living Room AV Switch (USW-Flex); uses GRE tunneling to form a virtual WAN link to
           the CGFiber.
     - **Servers**
-        - `rpi5-1` - .2 on the Server VLAN. Docker Compose host and Jump box for Talos, Terraform, and Kubectl. Also has
-          a USB connection to the CyberPower UPS. Security updates apply automatically; see
-          [`docs/rpi5-1-os-updates.md`](docs/rpi5-1-os-updates.md).
+        - `rpi5-1` - .2 on the Server VLAN. Raspberry Pi 5 4GB. Docker Compose host and Jump box for Talos, Terraform, and
+          Kubectl. Also has a USB connection to the CyberPower UPS. Security updates apply automatically; see
+          [`docs/rpi5-1-os-updates.md`](docs/rpi5-1-os-updates.md). (Swapped for a smaller Pi on 2026-10-06; see
+          [`docs/jump-box-swap.md`](docs/jump-box-swap.md).)
+        - `talos-worker-3` - `.35`. Raspberry Pi 5 16GB with a 256GB NVMe SSD; a Talos worker. It was rpi5-1 until the
+          jump box swap.
         - 3-node Talos control plane (`.11`-`.13`, Raspberry Pi 5 4GB with PoE+NVMe HATs and 256G NVMe storage)
             - `.10` is the cluster virtual IP
         - MS-A2 (`.21`) running Proxmox VE, hosting:
@@ -104,7 +107,7 @@ simple spring-clips. The back can be removed as well, but this requires a #2 Phi
           more space. Maybe someday when HDD prices come down.
     - **2U Raspberry Pi mount:** `rpi5-1` (Talos jump box, holds `talosctl` + cluster secrets; also the Docker Compose
       host for hardware-pinned services like the UPS's NUT client), `talos-cp-1`/`talos-cp-2`/`talos-cp-3` (Talos
-      control plane, Pi 5 4GB). Room for six more Pis.
+      control plane, Pi 5 4GB) and `talos-worker-3` (Talos worker, Pi 5 16GB). Room for five more Pis.
     - **Ubiquiti brush panel** for power cable routing
     - **UniFi PDU Pro** — rack power distribution/monitoring.
         - Everything in the rack gets power from this
@@ -362,8 +365,9 @@ None of these are strictly necessary, but we use them all regularly.
 
 ## Plans
 
-In general, I plan to move as much as I can from the Pi to Kubernetes, and when that's done, probably convert the Pi
-into a Talos worker node. I would at that point get another Pi (with less RAM) to act as the jump box.
+I moved nearly everything from the Pi to Kubernetes. Only the hardware-pinned and bootstrap-critical pieces (Unbound, the
+UPS's NUT server, Telegraf and Vector) are left in Compose. On 2026-10-06 the old 16GB Pi became a Talos worker
+(`talos-worker-3`) and a new 4GB Pi took over as the jump box; see [`docs/jump-box-swap.md`](docs/jump-box-swap.md).
 
 I keep a todo list in the repo where it's easy to manage. There are four documents:
 

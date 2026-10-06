@@ -65,7 +65,7 @@ Rough inventory, to be checked against the repo, 1Password and each provider bef
 
 Suggested approach:
 
-1. Finish the Compose migration first, so the list shrinks (e.g. `UNIFI_TOKEN` and the NUT passwords may go with it).
+1. The Compose migration is finished (only Unbound, Telegraf, Vector and `nut-upsd` remain), so the list is as short as it will get; check whether `UNIFI_TOKEN` and the NUT passwords are still needed.
 2. Write a runbook under `docs/` (and add it to `docs-site/mkdocs.yml`'s `nav:`): for each credential, which provider
    issued it, its scopes, where it's stored, and how to rotate it. Note any that are over-privileged and replace them
    with narrower or per-consumer credentials as you go, which is the bigger win than the rotation itself.

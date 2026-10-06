@@ -7,54 +7,24 @@ This document enumerates my hardware plans.
 ### Additional K8s nodes
 
 * I have an M5 Ultra Mac Studio with 96GB of RAM on order; it should arrive in November. I plan to run a Talos worker in
-  a VM on this machine.
-* Once all Compose workloads have been migrated off, rpi5-1 (a 16GB Raspberry Pi 5) will be converted into a Talos
-  worker node.
-    * Before I can do this, I'll need to designate a new "jump box." My current thought is that I should get another 4GB
-      Raspberry Pi 5, like the ones I'm using for the control plane. Then I can just move rpi5-1's SSD over, and it can
-      mostly just work -- it wouldn't even need a new hostname. The 16GB Pi then gets a new (256GB is plenty) SSD for
-      Talos; its EPHEMERAL partition only holds images, logs and emptyDirs, since PVs live on iSCSI/NFS.
-    * The new jump box's role: jump box (talosctl/kubectl/helm/terraform + secrets), the GHA runner for Terraform, host
-      cron jobs, and a secondary Unbound. Current usage is ~55G of real disk and well under 4GB RAM once Compose is gone.
+  a VM on this machine. It becomes `talos-worker-4`.
 
-#### Jump box swap checklist
+### Left over from the jump box swap (done 2026-10-06)
 
-Prerequisite: every Compose workload is migrated to k8s, except Unbound (see below).
+The swap itself is finished; see [`../docs/jump-box-swap.md`](../docs/jump-box-swap.md) and [`DONE.md`](DONE.md).
 
-* **Before the swap**
-    * DNS: Unbound runs in both places. In k8s, multiple replicas behind a cluster VIP (UDP _and_ TCP 53, via Cilium LB
-      IPAM/L2 announcements or hostNetwork). On the jump box, it stays in Compose. DHCP hands out the cluster VIP first
-      and the jump box second.
-        * Clients don't reliably fail over in list order (many query both, or rotate), so both must serve identical
-          answers. Generate `local.conf` from a single source rather than maintaining two copies.
-        * Talos nodes' own `machine.network.nameservers` should be the jump box + an upstream resolver, **not** the
-          cluster VIP. Nodes need DNS to pull images before the Unbound pods exist.
-    * UPS: the CyberPower PR1500's USB cable moves to the 16GB Pi (as a Talos worker). Run `nut-upsd` in k8s, pinned to
-      that node, with USB device access. The worker needs a NUT client (Talos system extension) for its own clean
-      shutdown, and the jump box's `nut-monitor.service` becomes a network client of the in-cluster `nut-upsd`.
-    * Decide how the jump box's own logs/metrics get shipped once Compose's Vector/telegraf are gone (currently Vector
-      ships rpi5-1's host logs to SigNoz via OTLP).
-* **Hardware swap**
-    * Set the new Pi's EEPROM boot order to NVMe before moving the SSD over.
-    * Move the UniFi DHCP reservation for `.2` (and the `fd3d:b17d:9f8e:102::2` IPv6 address) to the new Pi's MAC.
-    * Give the 16GB Pi a new hostname and IP for its life as a Talos worker.
-* **Host cleanup on the jump box**
-    * Drop the wlan0 interface (`.3`) and `wlan0-watchdog.{service,timer}`. They were only a DNS-reliability fallback
-      for a flaky wired link; dual-homed Unbound makes them unnecessary.
-    * Remove Bluetooth (`bluez`, `pi-bluetooth`) and avahi. Home Assistant and matter-server are both off Compose now
-      (2026-10-01), so only check that nothing else on the jump box needs them.
-    * Remove the `compose-deploy.py` cron entry once no Compose services remain other than Unbound (or keep it, if
-      Unbound's Compose config should still auto-deploy).
-    * Clean out one-off files in `~` (`from-bwmbp`, `Weirdness.zip`, `.MOV`s, `nvme-test.tmp`; ~31G).
-* **Verify these still work after the swap** (they come along on the SSD, but are easy to forget)
-    * Cron: `etcd-snapshot-backup.sh` (daily), `unifi-gc-report.py` (hourly + daily), `msmtpq` queue flush (sendmail
-      relay for all cron alert email), `unattended-upgrades/check.sh` for this host and Proxmox (via SSH).
-    * GHA runner: `actions.runner.jakerobb-homelab.rpi5-1.service`.
-    * Proxmox config backups still land in `~pve-backup/backups/proxmox/`
-      ([`../docs/proxmox-config-backup.md`](../docs/proxmox-config-backup.md)).
-    * kubeconfig, talosconfig, `~/bin/secrets`, msmtp config, SSH key to Proxmox.
-    * Brevo and the Cloudflare Access filter allowlist the public IP. It's the same WAN, so there's nothing to change
-      unless jump box egress is ever routed differently.
+* Remove the `compose-deploy.py` cron entry once no Compose services remain other than Unbound (or keep it, if
+  Unbound's Compose config should still auto-deploy).
+* Confirm the Proxmox config backup lands on the new rpi5-1 at its next 03:00 run
+  (`~pve-backup/backups/proxmox/`, [`../docs/proxmox-config-backup.md`](../docs/proxmox-config-backup.md)). Delete this
+  item once it has.
+* Reconnect the Comet X KVM's USB cable to the new rpi5-1 (the old one had two USB cables, the UPS and the KVM; only
+  the UPS was moved). Without it the KVM has no keyboard/mouse path to the jump box. Or decide you don't need it.
+* Optional: the UPS plan from the swap checklist was to move its USB cable to the worker and run `nut-upsd` in the
+  cluster pinned to that node, with the jump box's `nut-monitor.service` as a network client. The swap kept the UPS on
+  the jump box with Compose's `nut-upsd` instead, and there are no UPS-triggered shutdowns planned
+  (the generator and solid-state storage cover outages), so this is only worth doing if the jump box's Compose stack
+  goes away.
 
 ## Todo items
 

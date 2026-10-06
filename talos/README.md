@@ -4,7 +4,7 @@
 
 _(as of 2026-10-01)_
 
-- **Talos v1.14.2** on all 6 nodes (3 control planes, 3 workers; upgraded from v1.14.1 on 2026-10-01 — see "Talos v1.14.2 upgrade (2026-10-01)" below), **Kubernetes v1.37.1** (upgraded from v1.37.0 2026-09-24 via `talosctl upgrade-k8s --to 1.37.1`).
+- **Talos v1.14.2** on all 7 nodes (3 control planes, 4 workers, including `talos-worker-3`, added 2026-10-06; upgraded from v1.14.1 on 2026-10-01 — see "Talos v1.14.2 upgrade (2026-10-01)" below), **Kubernetes v1.37.1** (upgraded from v1.37.0 2026-09-24 via `talosctl upgrade-k8s --to 1.37.1`).
   Both already fully upgraded — see "Talos control-plane upgrade" and "Talos v1.14.1 upgrade
   blocked by Pi5 EFI-variable firmware bug" below for how the control planes got there.
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
@@ -893,9 +893,9 @@ talosctl -n <node-ip> get resolvers   # expect exactly .2 and 1.1.1.1
 
 The patch appends to the list, so apply it once per node. Applied live to
 all 6 nodes the same day, with no reboot, and to the `controlplane.yaml` and
-`worker.yaml` templates on rpi5-1. When Compose's Unbound retires with the
-jump box swap, revisit this pair (see
-[`../todo/HARDWARE.md`](../todo/HARDWARE.md)).
+`worker.yaml` templates on rpi5-1. The 2026-10-06 jump box swap kept Compose's
+Unbound on `.2`, so this pair is still valid. Revisit it if Compose's Unbound
+ever retires.
 
 ## Node NIC-speed labels (added 2026-09-28)
 
@@ -1037,9 +1037,10 @@ recurrence since. Worth capturing here if/when that's dug up.
   `node-tuning-namespace.yaml`/
   `nic-watchdog-mitigation.yaml` are plain Kubernetes manifests applied via
   `kubectl`, not Talos machine-config patches).
-- `patches/workers/` — per-node patches for the two MS-A2 worker VMs
-  (hostname plus the iSCSI kernel-module/extraMounts settings — see
-  "iscsi-tools extension" below).
+- `patches/workers/` — per-node patches for the workers: the two MS-A2 worker VMs and
+  the MBP (hostname plus the iSCSI kernel-module/extraMounts settings — see
+  "iscsi-tools extension" below), and `worker-3.yaml` for the Pi 5 (see "Additional
+  worker: talos-worker-3" below).
 - `discovery-registry-fix.yaml`, `kubelet-log-limits.yaml`,
   `kubelet-parallel-image-pulls.yaml`, `nameservers.yaml`, `security-profile.yaml` — shared Talos machine-config patches
   applied to every node (control planes and workers alike).
@@ -1352,9 +1353,40 @@ updated to match. **Likely worth baking into the Mac Studio's schematic
 from the start** rather than waiting to hit the same alert again — real
 hardware (the Proxmox workers) isn't affected, only UTM/QEMU VMs are.
 
+## Additional worker: talos-worker-3 (added 2026-10-06)
+
+The fourth Raspberry Pi 5 node in the cluster, and the fourth worker. It's the 16GB Pi that was rpi5-1 until the jump box swap
+([`../docs/jump-box-swap.md`](../docs/jump-box-swap.md)), now with a fresh 256GB NVMe SSD (2230). A smaller 4GB Pi
+took over as rpi5-1 using the original 1TB SSD. This node is permanent, unlike `talos-worker-mbp`, so it has a normal
+decoupled name (the Mac Studio's worker will be `talos-worker-4`).
+
+- **Address:** `192.168.102.35`, MAC `88:a2:9e:2b:0c:2d` (UniFi DHCP reservation). `.33` is TrueNAS, so the next
+  free `.3x` slot was used rather than the `.21`-`.29` "physical host" range, matching `talos-worker-mbp` (`.34`).
+- **Image:** the control planes' Pi 5 image, `ghcr.io/yama6a/talos-raspberry-pi5` `v1.14.2-1`, written as a raw disk
+  image (`metal-arm64-rpi5.raw.xz`, `dd` from the new Pi booted from SD) with `/u-boot.bin` on the EFI
+  partition swapped for the `hive.2` build from "Talos v1.14.1 upgrade blocked by Pi5 EFI-variable firmware bug". So it
+  starts with the fixed U-Boot and doesn't need that tooling before its first upgrade. The image already contains
+  `iscsi-tools` and `util-linux-tools`. Its kernel has `iscsi_tcp` built in (`CONFIG_ISCSI_TCP=y`), so unlike the
+  other workers the patch has no `kernel.modules` entry.
+- **Config:** [`patches/workers/worker-3.yaml`](patches/workers/worker-3.yaml) (hostname, `nic-speed-mbps: "1000"`,
+  install image/disk and the iSCSI `extraMounts`), applied on top of the shared `worker.yaml` template, which already
+  has the shared patches folded in: `talosctl machineconfig patch worker.yaml -p @talos/patches/workers/worker-3.yaml
+  -o worker-3.yaml`, then `talosctl apply-config --insecure -n 192.168.102.35 --file worker-3.yaml`. (The shared JSON6902
+  patches can't be re-applied to the multi-document template.)
+- **Upgrades need a combined image,** same as the control planes: `--image` with the stock tag plus the patched
+  `u-boot.bin`, never the plain tag. The `install.image` in its config is the plain tag only so the config renders
+  and applies. See "Full sequence per node" above.
+- **NIC watchdog:** `nic-watchdog-mitigation.yaml` now selects `kubernetes.io/arch: arm64`, so it covers this node (same
+  onboard NIC) as well as the control planes.
+- **Cilium L2:** it matches the generic `homelab-l2-announce` policy but not the 10G one (1GbE), like the MBP.
+- **Kubelet** is v1.37.0 (the pin in the shared `worker.yaml` template), one patch behind the others; harmless.
+- **Provisioning log:** built and test-booted in maintenance mode from the new Pi before the window, joined at
+  15:08 on 2026-10-06, cordoned on registration, audited (all 74 cluster images have arm64 builds) and uncordoned the same day.
+
 ## Talos kernel logs (added 2026-10-05)
 
-The three workers send their kernel logs to SigNoz. Each worker's Image Factory schematic carries
+The three Image Factory workers (`talos-worker-1`, `-2` and `-mbp`) send their kernel logs to SigNoz. Each one's
+Image Factory schematic carries
 `talos.logging.kernel=udp://192.168.102.2:5140/`, which makes Talos push every kernel message (and the
 `user`-facility Talos messages that share the ring buffer), one JSON object per UDP datagram. The Compose
 Vector on rpi5-1 listens on `5140/udp` (`talos_kernel` source in
@@ -1382,13 +1414,14 @@ effect through a schematic, not `machine.install.extraKernelArgs`; see the `tsc=
 rebuild should use one of these IDs.
 
 - **Volume:** a reboot re-sends about 1,000 lines (60-125KB); steady state is a trickle.
-- **Control planes don't send kernel logs.** They boot the custom Pi 5 image, which doesn't take a schematic,
-  and they use local NVMe rather than iSCSI. Revisit if something makes us want them.
+- **Control planes and `talos-worker-3` don't send kernel logs.** They boot the custom Pi 5 image, which doesn't
+  take a schematic, and the control planes use local NVMe rather than iSCSI. `talos-worker-3` does have iSCSI
+  volumes, so it's the one most worth revisiting.
 - **New nodes:** bake the arg into their schematics, and add their IP to the `nodes` map in the Vector
-  transform so `k8s.node.name` is right (an unmapped node shows up under its IP). The Pi 5 worker from the
-  jump-box swap is the open problem; see [`../docs/jump-box-swap.md`](../docs/jump-box-swap.md).
+  transform so `k8s.node.name` is right (an unmapped node shows up under its IP). The Pi 5 worker
+  (`talos-worker-3`) can't take a schematic, so it's the open problem; see "Additional worker: talos-worker-3".
 - **Receiver address:** the arg is baked into each node's boot entry, so changing `.2` or the port means
-  another upgrade per node. The swapped jump box keeps `.2`.
+  another upgrade per node. The swapped jump box kept `.2`.
 
 ## kube-apiserver OIDC trust for Authelia (added 2026-09-21)
 
