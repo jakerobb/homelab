@@ -15,12 +15,13 @@ Names used below:
 
 | | Hardware | Before | After |
 |---|---|---|---|
-| **Old Pi** | 16GB Pi 5 | rpi5-1, `192.168.102.2` | `talos-worker-3`, `<WORKER-IP>` |
+| **Old Pi** | 16GB Pi 5 | rpi5-1, `192.168.102.2` | `talos-worker-3`, `192.168.102.35` |
 | **New Pi** | 4GB Pi 5 | spare | rpi5-1, `192.168.102.2` |
 
-`<WORKER-IP>` is a free address in `.21`–`.29` (the physical-host range; see
-"MS-A2 workers" in [`talos/README.md`](../talos/README.md)). Pick it, and
-check it's free, before the window. `talos-worker-3` follows the normal
+The worker's address is `192.168.102.35`: workers live in the `.3x` range (`.31`/`.32`
+the MS-A2 VMs, `.34` the MBP). `.33` is TrueNAS, so it's skipped. Confirm
+`.35` has no static device or DHCP reservation in UniFi before the window.
+`talos-worker-3` follows the normal
 decoupled `talos-worker-N` naming (`-3` is the first free number, since the
 MBP worker took a hardware-identified name instead); this node is permanent,
 unlike `talos-worker-mbp`. The Mac Studio's worker becomes `talos-worker-4`.
@@ -125,11 +126,11 @@ and fix it, or postpone.
 
 ### Hardware
 
-- [ ] New Pi passed the SD-card test below, so none of its setup happens in
-      the window.
+- [ ] The SD card boots the new Pi and you can SSH in (step 1 below), and its
+      EEPROM is set, so none of its setup happens in the window.
 - [ ] The new Pi has the same kind of NVMe HAT as the old one, a proper 5V/5A
       supply, and cooling.
-- [ ] The 256GB SSD is flashed and verified (below).
+- [ ] The 256GB SSD is flashed, checksum-verified and test-booted (step 2 below).
 - [ ] You know which switch port and cable each Pi uses, and that the new
       Pi's port is on the Server VLAN.
 - [ ] Both Pis' EEPROMs have `BOOT_ORDER=0xf641` (SD, USB, NVMe) and neither
@@ -157,9 +158,35 @@ downtime.
 
 ### 1. Prepare the new Pi from an SD card
 
-Boot the new Pi from a Raspberry Pi OS Lite SD card, not from the SSD.
+The new Pi's setup (EEPROM, and writing the worker's image) happens from a
+Raspberry Pi OS SD card, not from the SSD.
 
-Update the EEPROM and set the boot order to SD, USB, NVMe:
+**First, check the SD card has a working OS.** It may be left over from
+bootstrapping the control-plane Pis, but nothing in this repo records that,
+so don't assume. Put it in the new Pi with no SSD installed and power it on
+(the Ethernet cable on the Server VLAN). Give it a couple of minutes, then
+find its address in UniFi's client list. Don't use `rpi5-1.lan`, which is
+still the old Pi.
+
+```bash
+ssh <user>@<new-pi-address> 'uname -a; cat /etc/os-release | head -2; lsblk -o NAME,SIZE,MODEL'
+```
+
+If you can SSH in, the card is fine and you can skip the rest of this
+paragraph. If it doesn't appear in UniFi or won't accept SSH, write a fresh
+card on a machine that's allowed to mount it (the MBP, say) with Raspberry Pi
+Imager: device "Raspberry Pi 5", OS "Raspberry Pi OS Lite (64-bit)", and in
+the customisation settings set a hostname that **isn't `rpi5-1`** (for
+example `rpi5-new`), a username (`jakerobb`), your SSH public key with
+password login off, and enable SSH. Skip Wi-Fi; use the Ethernet cable. Then
+boot it and run the check above. Any current Pi OS release is fine; this card
+is a scratch environment, not the jump box.
+
+Also confirm here that the new Pi's Ethernet link comes up at 1Gb/s on the
+cable it will use (`ethtool eth0 | grep Speed`; the interface may be `end0`
+on some images).
+
+Then update the EEPROM and set the boot order to SD, USB, NVMe:
 
 ```bash
 sudo rpi-eeprom-update -a
@@ -188,69 +215,125 @@ EEPROM (the old Pi, which becomes the worker) was set to this order on
 2026-10-02, replacing `0xf146`. It's written to flash but only shows in
 `sudo rpi-eeprom-config` after its next boot. Confirm then that it reads
 `0xf641`.
-Reboot, then check `lsblk` sees an NVMe device if you've temporarily put any
-SSD in its HAT. Then shut down and take the SD card out, but keep it for
-rollback.
 
-Also confirm here that the new Pi's Ethernet link comes up at 1Gb/s on the
-cable it will use.
+Reboot the new Pi, SSH back in, and confirm with `sudo rpi-eeprom-config`
+that `BOOT_ORDER` reads `0xf641`. Leave it running for step 2.
 
 ### 2. Prepare the 256GB SSD for the worker
 
-Work out how the three control-plane Pis got their disks. That isn't
-recorded in [`talos/README.md`](../talos/README.md), which only covers
-upgrades. The `yama6a/talos-raspberry-pi5` project documents how to produce
-a bootable image for a Pi 5 with NVMe boot; use the same release as the
-control planes (currently `v1.14.2-1`).
+The patched image is already built and written on your Mac (`~/talos-worker-3-image/`).
+The Mac you're working from blocks external storage, so write the image from
+the new Pi, booted from the SD card, with the 256GB SSD in its HAT. (The
+Imager, the MBP with a TB3 enclosure, or the MS-A2 would all need the same
+file copy plus extra hardware, and the MS-A2 is the Proxmox host.)
 
-Write that image to the 256GB SSD from your Mac with a USB-to-NVMe
-enclosure. A fresh disk install doesn't hit the EFI-variable bug from the
-[U-Boot fix](../talos/tools/uboot-fix/README.md) (that bug blocks
-*upgrades*), but this node will have the same unpatched `u-boot.bin` as a
-plain `v1.14.2-1` and will be un-upgradable the same way. Plan to apply the
-U-Boot fix to it before its first Talos upgrade, or build the image with the
-patched `u-boot.bin` swapped in from the start (the "combined image" pattern
-in that README).
+**Built 2026-10-05:** `metal-arm64-rpi5-uboot-patched.raw`
+(sha256 `3727a1ef07c1cac25a75606c83754052106eded143d085c38a0d484738f06370`, also in the
+`.sha256` file beside it). It is the `yama6a/talos-raspberry-pi5` `v1.14.2-1`
+`metal-arm64-rpi5.raw.xz` release asset (sha256 `c1d39f6e…2120399`, verified
+against the release's `sha256sums.txt`) with `/u-boot.bin` on the EFI
+partition replaced by the `hive.2` build (`9aa3c44a…de311265`, verified against the
+upstream `SHA256SUMS`), so this node has the same fixed U-Boot as the combined
+image in the [U-Boot fix](../talos/tools/uboot-fix/README.md) and can be
+upgraded. Re-verify the file on your Mac first:
+
+```bash
+shasum -a 256 -c ~/talos-worker-3-image/metal-arm64-rpi5-uboot-patched.raw.sha256
+```
+
+1. Power the new Pi off, install the **256GB** SSD in its HAT (the 1TB SSD
+   stays out of this Pi until the window), and boot from the SD card again.
+   Confirm there's exactly one NVMe device, ~238G, plus the SD card, before
+   writing anything:
+
+   **On the new Pi:**
+
+```bash
+lsblk -o NAME,SIZE,MODEL
+```
+
+2. **From your Mac**, stream the image to the SSD, with no intermediate file
+   (the image is mostly zeros and compresses to ~110MB). This assumes the Pi's
+   user has passwordless sudo, the Raspberry Pi OS default:
+
+```bash
+xz -T0 -c ~/talos-worker-3-image/metal-arm64-rpi5-uboot-patched.raw | ssh <user>@<new-pi-address> 'xz -dc | sudo dd of=/dev/nvme0n1 bs=4M conv=fsync status=progress'
+```
+
+   If sudo asks for a password, the pipe fails. Instead `scp` the file
+   `xz -T0 -k ~/talos-worker-3-image/metal-arm64-rpi5-uboot-patched.raw` to the Pi, and on the Pi run
+   `xz -dc <file>.xz | sudo dd of=/dev/nvme0n1 bs=4M conv=fsync status=progress`.
+
+3. Verify the write. **On the new Pi** the output should be the checksum from
+   the `.sha256` file (`3727a1ef…8f06370`):
+
+```bash
+sudo head -c 2355101696 /dev/nvme0n1 | sha256sum
+```
+
+4. Optional but recommended: **test-boot the image on real Pi 5 hardware**
+   before the window. Run `sudo shutdown -h now` on the new Pi, take the SD
+   card **out**, and power it on. With no SD card it falls through to the
+   NVMe and Talos should come up in maintenance mode on a DHCP address (find
+   it in UniFi). From rpi5-1:
+
+```bash
+talosctl -n <its-address> get disks --insecure
+```
+
+   **Don't apply a config.** Maintenance mode writes nothing to the disk, so
+   the SSD stays ready; reflash it if you want a pristine disk.
+5. Power the Pi off and take the 256GB SSD out; it goes into the old Pi
+   during the window. Keep the SD card for the new Pi's rollback, but make
+   sure it's out of the Pi before the window (see the boot-order note above).
+
+If you ever rebuild the image for a newer release: download the release's
+`metal-arm64-rpi5.raw.xz`, `xz -d` it, attach it with
+`hdiutil attach -imagekey diskimage-class=CRawDiskImage -nomount`, mount the
+first (EFI) partition, copy the verified `u-boot.bin` over `u-boot.bin`, then
+delete the `._u-boot.bin` file macOS leaves behind before detaching.
+
+The image has the `iscsi-tools` and `util-linux-tools` extensions built in,
+like the control planes. This node's `machine.install.image` is the plain
+`v1.14.2-1` tag only so the config applies; every future `talosctl upgrade`
+of it needs `--image` with a combined image, per the
+[U-Boot fix](../talos/tools/uboot-fix/README.md) "Full sequence per node".
 
 ### 3. Write the worker's Talos config
 
-Following "Talos config: fully reproducible from committed inputs" in
-[`talos/README.md`](../talos/README.md), render `worker.yaml` for the new
-node with:
+`talos/patches/workers/worker-3.yaml` (committed) holds this node's
+hostname, NIC-speed label, install image and the iSCSI `extraMounts`; see its
+comments. Render the per-node config **on rpi5-1**, before the window:
 
-- the shared patches: `kubelet-log-limits.yaml`,
-  `kubelet-parallel-image-pulls.yaml`, `nameservers.yaml`
-  (`discovery-registry-fix.yaml` is control-plane-only; check the
-  README section if unsure)
-- a new `talos/patches/workers/worker-3.yaml` with:
-    - `machine.network.hostname: talos-worker-3`
-    - `machine.nodeLabels` `homelab.jakerobb.org/nic-speed-mbps: "1000"`
-    - `machine.install.image`: the **Pi 5 installer**, not the Factory amd64
-      schematic that the shared `worker.yaml` template now points at. This
-      is the same trap that caught `talos-worker-mbp` in reverse.
-    - `install.disk` stays `/dev/nvme0n1`, the same as the template.
-    - **Kernel logs.** The other workers send theirs to Vector on `.2` with the
-      `talos.logging.kernel=udp://192.168.102.2:5140/` kernel arg, baked into
-      their Image Factory schematics (see "Talos kernel logs" in
-      [`talos/README.md`](../talos/README.md)). This node boots the Pi 5
-      installer, not a Factory schematic, and `machine.install.extraKernelArgs`
-      is ignored under SDBoot, so there is no obvious way to add the arg. Work
-      out one before the window (patching the custom installer image, or an
-      alternative like a DaemonSet that tails `/dev/kmsg`), or decide to run
-      without it. The control planes have the same gap and were left out on
-      purpose. Whatever you pick, the new rpi5-1 must keep `.2` and Vector's
-      `5140/udp` mapping, or the workers' arg needs another upgrade each.
-    - the iSCSI kernel module and kubelet `extraMounts`, *if* this node will
-      run workloads with iSCSI volumes (democratic-csi). That also needs the
-      `iscsi-tools` and `util-linux-tools` extensions. Look at how the
-      control-plane Pis got them (`talosctl -n 192.168.102.11 get extensions`
-      and their machine config) before deciding. If the node won't host
-      PVC-backed pods, skip it and keep it cordoned off from them with a
-      taint.
+```bash
+cd ~/talos/homelab && talosctl machineconfig patch worker.yaml -p @$HOME/dev/homelab/talos/patches/workers/worker-3.yaml -o worker-3.yaml && talosctl validate -c worker-3.yaml -m metal
+```
 
-Commit `worker-3.yaml` in a PR and merge it before the window, so nothing
-needs committing while the jump box is off. Only the rendered `worker.yaml`
-stays on the jump box.
+Don't re-apply the shared patches here: `worker.yaml` already has
+`kubelet-log-limits`, `kubelet-parallel-image-pulls`, `nameservers` and the
+security profile folded in, and the JSON6902 ones can't be applied to a
+multi-document config anyway. (Rendered and validated 2026-10-05: hostname,
+label, Pi 5 install image, iSCSI mounts, nameservers and the security
+profile all present.) Two choices worth knowing about:
+
+- **iSCSI:** the patch has no `kernel.modules: iscsi_tcp`, unlike the other
+  workers, because the yama6a kernel builds it in (`CONFIG_ISCSI_TCP=y`) and
+  the control planes run the same image without it. After the node joins,
+  check `talosctl -n 192.168.102.35 get extensions` shows both extensions; if
+  a PVC-backed pod can't attach, add the module entry.
+- **Kernel logs.** The other workers send theirs to Vector on `.2` with the
+  `talos.logging.kernel=udp://192.168.102.2:5140/` kernel arg, baked into
+  their Image Factory schematics (see "Talos kernel logs" in
+  [`talos/README.md`](../talos/README.md)). This node boots the Pi 5
+  installer, not a Factory schematic, and `machine.install.extraKernelArgs`
+  is ignored under SDBoot, so there is no obvious way to add the arg. The
+  control planes have the same gap and were left out on purpose; leave this
+  node out too unless you decide otherwise. If you do add it later, the new
+  rpi5-1 must keep `.2` and Vector's `5140/udp` mapping.
+
+`worker-3.yaml` (the patch) is committed in the same PR as these runbook
+changes, so nothing needs committing while the jump box is off. Only the
+rendered per-node `worker-3.yaml` in `~/talos/homelab` stays on the jump box.
 
 ### 4. Audit images for arm64
 
@@ -288,7 +371,7 @@ kubectl apply -f ~/dev/homelab/talos/patches/control-plane/nic-watchdog-mitigati
   straggler renews soon after.
 - Open UniFi on a second device and have the reservation edits ready: new Pi
   MAC → `.2` (and `fd3d:b17d:9f8e:102::2` if that's a reservation rather than
-  a static address on the Pi), old Pi MAC → `<WORKER-IP>`.
+  a static address on the Pi), old Pi MAC → `192.168.102.35`.
 
 ### 7. Tell yourself what you've paused
 
@@ -356,7 +439,7 @@ worker has been stable for a while (see "After the swap").
 
 **In UniFi**, in this order, so the two Pis never hold `.2` at once:
 
-1. Old Pi's MAC → `<WORKER-IP>`.
+1. Old Pi's MAC → `192.168.102.35`.
 2. New Pi's MAC → `192.168.102.2` (and the IPv6 address, if reserved).
 
 ### 5. Power on the new Pi and verify it is rpi5-1
@@ -384,21 +467,21 @@ below. UPS, Unbound and the runner matter most; do those first.
 Do this only once the jump box checks out.
 
 **On the old Pi:** just power it on. It boots Talos from the 256GB SSD, takes
-`<WORKER-IP>` from DHCP and sits in maintenance mode.
+`192.168.102.35` from DHCP and sits in maintenance mode.
 
 **On rpi5-1:**
 
 ```bash
-talosctl -n <WORKER-IP> get disks --insecure
+talosctl -n 192.168.102.35 get disks --insecure
 ```
 
 If that shows the NVMe disk, apply the config:
 
 ```bash
-cd ~/talos/homelab && talosctl apply-config --insecure -n <WORKER-IP> --file worker.yaml
+cd ~/talos/homelab && talosctl apply-config --insecure -n 192.168.102.35 --file worker-3.yaml
 ```
 
-Use the per-node rendered file you made in step 3 of "Before the window".
+`worker-3.yaml` is the per-node file you rendered in step 3 of "Before the window".
 The node should reboot into a configured state and register.
 
 ```bash
@@ -426,7 +509,7 @@ Expect the Cilium agent, node-exporter, the NIC watchdog and democratic-csi's
 node plugin (if you gave it iSCSI) all `Running`. Then:
 
 ```bash
-talosctl -n <WORKER-IP> get machinestatus,extensions,resolvers
+talosctl -n 192.168.102.35 get machinestatus,extensions,resolvers
 ```
 
 ```bash
@@ -512,5 +595,4 @@ then power the Pi off.
   cluster pinned to that node with USB access, add the NUT client extension
   for the worker's own clean shutdown, and point the jump box's
   `nut-monitor.service` at it.
-- Apply the U-Boot fix to `talos-worker-3` before its first Talos upgrade, if
-  you didn't build it in from the start.
+- The U-Boot fix is already built into `talos-worker-3`'s disk image. Its first Talos upgrade still needs `--image` with a combined image, not the plain tag.

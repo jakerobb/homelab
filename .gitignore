@@ -54,3 +54,6 @@ override.tf.json
 # MkDocs output and local venv (docs-site/README.md)
 /site/
 /.venv/
+
+# Python bytecode (e.g. docs-site/hooks/ when mkdocs runs on the jump box)
+__pycache__/
