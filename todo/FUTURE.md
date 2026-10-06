@@ -265,3 +265,18 @@ Tick the rebase checkbox on an open Renovate PR to force a rewrite instead of wa
 set `all-branches` to **Active**, and watch the next 04:17 Renovate run to confirm it can still push. If the commits are
 still unsigned, don't enable it as is. Add `refs/heads/renovate/**` to the ruleset's exclude list first; those commits
 get squash-merged into signed `main` commits anyway. No target date; this depends on that check, not on elapsed time.
+
+## Confirm the Proxmox config backup lands on the new rpi5-1
+
+**Waiting on:** the next daily 03:00 run on the Proxmox host (2026-10-07), the first since the jump box swap moved
+rpi5-1's SSD to a new Pi. The backup pushes over SSH to `pve-backup@rpi5-1.lan`, and that user, its authorized key
+and the host key all live on the SSD that moved, so it should just work, but it hasn't run since. **Consider it
+confirmed once a `2026-10-07` archive appears** (and the run before the swap is still there):
+
+```bash
+ssh pve-backup@rpi5-1.lan ls -la backups/proxmox/   # from the Proxmox host
+```
+
+or, on rpi5-1, `ls -la ~pve-backup/backups/proxmox/`. If nothing new landed, check the cron job on the Proxmox host
+(`/etc/cron.d/proxmox-config-backup`) and try `/usr/local/sbin/proxmox-config-backup.sh` by hand. See
+[`../docs/proxmox-config-backup.md`](../docs/proxmox-config-backup.md). Delete this item once confirmed.

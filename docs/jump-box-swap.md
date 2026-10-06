@@ -628,9 +628,5 @@ Still open:
 
 - Descheduler: run by hand 2026-10-06 after the uncordon; it moved 10 pods in two runs and the third run evicted
   nothing (see "After a rolling node change" in [`talos/README.md`](../talos/README.md)).
-- Reconnect the Comet X KVM's USB cable, or decide you don't need it (tracked in [`todo/HARDWARE.md`](../todo/HARDWARE.md)).
-- Remove the `compose-deploy` cron entry only if no Compose services remain (Unbound is still there, so it stays).
-- Moving the UPS to the worker is optional, and not wanted for clean shutdown (no UPS-triggered shutdowns are planned);
-  see [`todo/HARDWARE.md`](../todo/HARDWARE.md).
 - The U-Boot fix is already built into `talos-worker-3`'s disk image. Its first Talos upgrade still needs `--image` with
   a combined image, not the plain tag.
