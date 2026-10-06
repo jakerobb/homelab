@@ -1,0 +1,48 @@
+machine:
+  network:
+    hostname: talos-worker-3
+  # Host NIC link speed in Mbps (Raspberry Pi 5 onboard NIC, 1GbE). An integer rather than
+  # "1GbE" so pods can use nodeAffinity's Gt/Lt operators: NetworkOptimizer
+  # prefers the fastest node, and talos/cilium/l2-announcement-policy-10g.yaml
+  # selects on it. Applied live, no reboot; see talos/README.md's
+  # "Node NIC-speed labels".
+  nodeLabels:
+    homelab.jakerobb.org/nic-speed-mbps: "1000"
+  # The 16GB Raspberry Pi 5 that used to be rpi5-1 (see docs/jump-box-swap.md),
+  # so it boots the Pi 5 installer like the control planes, not the Image
+  # Factory amd64 schematic the shared worker.yaml template points at.
+  # install.disk matches the template (the Pi's NVMe SSD).
+  #
+  # Caveat, same as the control planes (talos/README.md, "Talos v1.14.1
+  # upgrade blocked by Pi5 EFI-variable firmware bug"): this node's disk was
+  # written from the v1.14.2-1 raw image with the patched hive u-boot.bin
+  # swapped in. The plain tag below would overwrite that u-boot.bin with the
+  # broken one on any install or upgrade, so every `talosctl upgrade` of this
+  # node must pass --image with a combined image (the plain tag plus the
+  # patched u-boot.bin), never fall back to this value. This is the stock
+  # tag only so the config renders and applies.
+  install:
+    disk: /dev/nvme0n1
+    image: ghcr.io/yama6a/talos-raspberry-pi5:v1.14.2-1
+  # Needed for democratic-csi's iSCSI node driver, same as the other workers
+  # — see talos/README.md#iscsi-tools-extension-added-2026-09-15. The
+  # iscsi-tools and util-linux-tools extensions are already baked into the
+  # yama6a Pi 5 image (same as the control planes), and its kernel has
+  # iscsi_tcp built in (CONFIG_ISCSI_TCP=y), so unlike worker-1/2/mbp this
+  # patch has no `kernel.modules` entry to load it.
+  kubelet:
+    extraMounts:
+      - destination: /etc/iscsi
+        type: bind
+        source: /etc/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
+      - destination: /var/lib/iscsi
+        type: bind
+        source: /var/lib/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
