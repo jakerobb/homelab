@@ -32,7 +32,7 @@ spec:
               # Pinned, not :latest — this tag is itself now tracked by the
               # kubernetes manager (see renovate.json), so Renovate will open
               # a PR against itself when a new version ships.
-              image: renovate/renovate:44.134.3
+              image: renovate/renovate:44.138.0
               args:
                 - jakerobb/homelab
                 # The app behind manifests/restock-radar/: its Go and npm
