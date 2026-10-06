@@ -54,14 +54,15 @@ After any reboot or power cycle, check that the node really restarted
 ## Apps fail after Proxmox or HexOS went down
 
 HexOS provides every persistent volume. If it goes away (a Proxmox reboot
-takes it down too), volumes on the workers that stayed up can turn read-only
+takes it down too), volumes on the workers that stayed up (`talos-worker-mbp` and
+`talos-worker-3`; the MS-A2 workers go down with Proxmox) can turn read-only
 and stay that way after HexOS comes back. Some pods crash-loop, but others
 (ClickHouse, SigNoz) stay Running and silently fail every write.
 
 Look for aborted journals, then delete each affected pod, one at a time:
 
 ```bash
-talosctl -n 192.168.102.34 dmesg | grep -E "EXT4-fs.*(aborted journal|read-only)"
+for n in 34 35; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E "EXT4-fs.*(aborted journal|read-only)"; done
 ```
 
 Full procedure: [After a reboot: read-only iSCSI volumes](proxmox-os-updates.md#after-a-reboot-read-only-iscsi-volumes).

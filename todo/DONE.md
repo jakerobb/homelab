@@ -17,6 +17,37 @@ the T500 ending up as a dedicated ZFS log device rather than striped capacity) w
 rather than as part of this entry:
 restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queue gap found along the way (done, 2026-09-25; see below).
 
+## Jump box swap (4GB Pi becomes rpi5-1; the 16GB Pi becomes talos-worker-3)
+
+**Done (2026-10-06).** The 1TB SSD that holds rpi5-1's OS and data moved to a new 4GB Raspberry Pi 5, which kept the name
+`rpi5-1`, the SSH host keys, `.2`, the cron jobs and the secrets. The old 16GB Pi got a fresh 256GB NVMe and joined as
+`talos-worker-3` (`.35`). Runbook, with the real timeline and gotchas folded in: [
+`../docs/jump-box-swap.md`](../docs/jump-box-swap.md). Worker details:
+[`../talos/README.md`](../talos/README.md#additional-worker-talos-worker-3-added-2026-10-06).
+
+- **Prep (2026-10-01 to 10-05):** the last Compose workloads (Home Assistant, change-detection and browserless and the
+  rest) moved to the cluster, leaving `unbound`, `telegraf`, `vector` and `nut-upsd`. Every VLAN but Guest got the
+  in-cluster Unbound (`.130`) first and `.2` second; a three-minute `docker stop unbound` rehearsal showed no impact.
+  `validate.sh` now TCP-probes LoadBalancer ports instead of assuming HTTP, and the NIC watchdog DaemonSet selects on
+  `kubernetes.io/arch: arm64`. All 74 cluster images were checked for arm64 builds.
+- **The worker image:** the yama6a Pi 5 `v1.14.2-1` raw image with the fixed U-Boot (`hive.2`) already swapped in on
+  its EFI partition, written from the new Pi booted from an SD card (the Mac in use blocks external storage), and
+  test-booted in Talos maintenance mode before the window. It doesn't need the U-Boot fix tooling before its first
+  upgrade, though upgrades still need `--image` with a combined image.
+- **EEPROM boot order on all the Pis involved:** `0xf641` (SD, USB, NVMe), so a bootable SD card or USB stick can
+  override the SSD.
+- **The window:** shut down 11:38, worker joined 15:08 (about 3.5 hours, mostly rebuilding the two Pis; the HATs,
+  standoffs, headers and coolers all had to move, since the 1TB is a 2280 and the new Pi's HAT only takes 2242).
+  Gotchas: UniFi won't assign an IP that's in use, so the old Pi went to a temporary `.5` first; a MAC filter on the new
+  Pi's switch port; `rpi5-1.lan` follows the reservation, so use IPs until both Pis are on their final addresses.
+- **Verified after:** UPS data via USB and NUT, a Terraform plan and apply on the GitHub runner, a delivered test email
+  through the Brevo relay, Telegraf and Vector flowing into SigNoz, etcd snapshot and B2 copy, and all 7 nodes Ready.
+- **Host cleanup:** the Wi-Fi interface (`wlan0`, `.3`) and its watchdog are gone, along with Bluetooth and avahi, and
+  about 31G of old files were moved to TrueNAS (`/mnt/data/shared/bw-mbp/from-rpi5-1/`, verified by hash) or deleted,
+  taking the Pi's SSD from 52G to 22G used. The
+  SigNoz packet-loss alert and Telegraf now watch only `.2`. Unbound query logging, switched on temporarily to find
+  stragglers, reset to off with the restart.
+
 ## rpi5-1 mail-alert reliability (msmtpq)
 
 **Done (2026-09-25).** rpi5-1's `sendmail` is now a thin wrapper around Debian's bundled `msmtpq`
@@ -45,7 +76,7 @@ still mount `resolv-host.conf`.
 rpi-connect (GUI access is through the hardware KVM now), gvfs, pipewire/wireplumber/pulseaudio, xdg-desktop-portal,
 rtkit, ModemManager and squeekboard, then ran `apt autoremove --purge`. That also removed the old 6.12.87 kernel; the Pi
 runs 6.12.109, with 6.12.93 kept as a fallback. The minimal desktop stays (labwc, pcmanfm, wf-panel-pi, lightdm).
-Bluetooth and avahi also stay while Home Assistant and matter-server are still on Compose. The default target is now
+Bluetooth and avahi stayed until the 2026-10-06 jump box swap, then went too. The default target is now
 `multi-user.target`, which frees roughly 550MB. For the GUI, run `sudo systemctl start lightdm`. tty1 autologins as
 `jakerobb` (`getty@tty1.service.d/autologin.conf`), so the KVM console goes straight to a shell with passwordless sudo.
 

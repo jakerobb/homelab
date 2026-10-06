@@ -4,9 +4,9 @@
 # image, so they must never depend on Unbound running in the cluster.
 #
 # 192.168.102.2 is Compose's Unbound on rpi5-1; 1.1.1.1 is the fallback if it's
-# down (it can't resolve .lan names, but nodes rarely need those). Not .3: that's
-# the Pi's wlan0, which todo/HARDWARE.md plans to drop. When the jump box is
-# swapped, .2 moves with the address, so this stays valid.
+# down (it can't resolve .lan names, but nodes rarely need those). Not .3: that
+# was the old Pi's Wi-Fi interface, retired in the 2026-10-06 jump box swap. The
+# swap moved .2 to a new Pi, so this stays valid.
 #
 # Strategic merge. `talosctl patch machineconfig` appends to list fields, so
 # re-applying this to a node that already has it would duplicate the entries

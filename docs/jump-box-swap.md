@@ -1,5 +1,10 @@
 # Jump box swap runbook (4GB Pi replaces rpi5-1; the 16GB Pi becomes a Talos worker)
 
+**Status: done 2026-10-06** (shut down 11:38, worker joined 15:08; see [`todo/DONE.md`](../todo/DONE.md) for the
+summary). This page is kept as the record and as a template for any future jump box or Pi worker swap. The notes
+added while doing it (the temporary-address swap, the MAC filter, the HAT swap, the SD card's size) are folded into the
+steps below.
+
 This is the execution plan for the swap described in
 [`todo/HARDWARE.md`](../todo/HARDWARE.md). The idea: the 1TB SSD that holds
 rpi5-1's OS and data moves to a new 4GB Raspberry Pi 5, which then *is* rpi5-1
@@ -615,23 +620,17 @@ then power the Pi off.
 
 ## After the swap: follow-ups
 
-- After the worker joins and the cluster settles, run the descheduler by hand to spread pods onto the new
-  node (see "After a rolling node change" in [`talos/README.md`](../talos/README.md)).
+Done 2026-10-06: the docs that named the old arrangement, the host cleanup on rpi5-1 (`wlan0` and its watchdog,
+Bluetooth and avahi, and about 31G of old files moved to TrueNAS or deleted), the SigNoz packet-loss alert and Telegraf no longer pinging `.3`, and uncordoning
+`talos-worker-3` after the arm64 audit.
 
-- Update the docs that name the old arrangement: the rpi5-1 sections of
-  [`todo/HARDWARE.md`](../todo/HARDWARE.md) (delete the finished checklist
-  items), `README.md`, `talos/README.md` (a new "talos-worker-3" section and
-  the node counts), [`talos/patches/nameservers.yaml`](../talos/patches/nameservers.yaml)'s
-  comment, the overview, and [`todo/DONE.md`](../todo/DONE.md).
-- Host cleanup on the new rpi5-1, from `todo/HARDWARE.md`: drop `wlan0` (`.3`)
-  and `wlan0-watchdog.{service,timer}`, remove Bluetooth and avahi packages,
-  and clear the ~31G of one-off files in `~`.
-- Remove the `compose-deploy` cron entry only if no Compose services remain
-  (Unbound is still there, so it stays for now).
-- Uncordon `talos-worker-3` once the arm64 audit is done, then watch it for a
-  few days before moving the UPS.
-- Move the UPS to the worker as its own change: deploy `nut-upsd` in the
-  cluster pinned to that node with USB access, add the NUT client extension
-  for the worker's own clean shutdown, and point the jump box's
-  `nut-monitor.service` at it.
-- The U-Boot fix is already built into `talos-worker-3`'s disk image. Its first Talos upgrade still needs `--image` with a combined image, not the plain tag.
+Still open:
+
+- Descheduler: run by hand 2026-10-06 after the uncordon; it moved 10 pods in two runs and the third run evicted
+  nothing (see "After a rolling node change" in [`talos/README.md`](../talos/README.md)).
+- Reconnect the Comet X KVM's USB cable, or decide you don't need it (tracked in [`todo/HARDWARE.md`](../todo/HARDWARE.md)).
+- Remove the `compose-deploy` cron entry only if no Compose services remain (Unbound is still there, so it stays).
+- Moving the UPS to the worker is optional, and not wanted for clean shutdown (no UPS-triggered shutdowns are planned);
+  see [`todo/HARDWARE.md`](../todo/HARDWARE.md).
+- The U-Boot fix is already built into `talos-worker-3`'s disk image. Its first Talos upgrade still needs `--image` with
+  a combined image, not the plain tag.

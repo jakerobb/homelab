@@ -1,6 +1,6 @@
 # Docker Compose stack (rpi5-1)
 
-This is the Docker Compose stack that runs on the RPi5 16GB (`rpi5-1.lan`,
+This is the Docker Compose stack that runs on the 4GB Raspberry Pi 5 (`rpi5-1.lan`,
 `192.168.102.2`) — the box that stays outside the Talos cluster for
 hardware-pinned duties (e.g. UPS NUT client) plus the LAN's Unbound
 resolver and metrics/logging stack. Its web UIs are reached through the
