@@ -116,20 +116,31 @@ and fix it, or postpone.
 - [ ] Both Unbounds give identical answers. Compare a handful of `*.lan`
       names with `dig @192.168.102.2` and `dig @192.168.102.130`, and diff
       the config the pods and the Compose container actually load.
-- [ ] Decide what IPv6 DNS does. The Server and Trusted VLANs advertise only
-      `fd3d:b17d:9f8e:102::2`, and the cluster Unbound has no IPv6. Either
-      remove it from RA for the window (and put it back after), or accept
-      slow lookups on dual-stack clients.
+- [x] IPv6 DNS: **decided 2026-10-06 to accept the risk, and leave RA
+      alone.** The Server and Trusted VLANs advertise only
+      `fd3d:b17d:9f8e:102::2`, and the cluster Unbound has no IPv6, so during
+      the window any dual-stack client that prefers the IPv6 resolver may see
+      slow lookups (a timeout, then fallback to IPv4 DNS). The evidence for
+      accepting: none of the 447,487 queries in the previous 72 hours of
+      Unbound's query log came from an IPv6 client address. Giving the
+      cluster Unbound an IPv6 address is a separate future item (see
+      [`todo/READY.md`](../todo/READY.md)).
 - [ ] A rehearsal succeeded: at a quiet time, `docker stop unbound` on
-      rpi5-1 for five minutes, confirm clients and the cluster keep
-      resolving, then `docker start unbound`.
+      rpi5-1 for three minutes, confirm clients and the cluster keep
+      resolving, then `docker start unbound`. Keep it under five minutes and
+      start it just after a `compose-deploy` run (minutes ending in 0 or 5):
+      `compose-deploy` runs `docker compose up -d` every five minutes, which
+      restarts anything stopped by hand. Done 2026-10-06: no DNS problems.
 
 ### Hardware
 
 - [ ] The SD card boots the new Pi and you can SSH in (step 1 below), and its
       EEPROM is set, so none of its setup happens in the window.
-- [ ] The new Pi has the same kind of NVMe HAT as the old one, a proper 5V/5A
-      supply, and cooling.
+- [ ] The new Pi has a proper 5V/5A supply and cooling. The two Pis have
+      **different NVMe HATs**: the new Pi's takes only up to a 2242 SSD (the
+      256GB is a 2230), and rpi5-1's takes the 1TB 2280. So in the window each
+      SSD travels on its own HAT (see "Swap the hardware"). Check that each
+      HAT's cable, standoffs and cooler fit the Pi it's moving to.
 - [ ] The 256GB SSD is flashed, checksum-verified and test-booted (step 2 below).
 - [ ] You know which switch port and cable each Pi uses, and that the new
       Pi's port is on the Server VLAN.
@@ -186,17 +197,27 @@ Also confirm here that the new Pi's Ethernet link comes up at 1Gb/s on the
 cable it will use (`ethtool eth0 | grep Speed`; the interface may be `end0`
 on some images).
 
-Then update the EEPROM and set the boot order to SD, USB, NVMe:
+Then update the EEPROM package and set the boot order to SD, USB, NVMe.
+Upgrade the `rpi-eeprom` package first: on an older Pi OS card its packaged
+bootloader can be *older* than what's already flashed, and applying a config
+would flash that older one.
 
 ```bash
-sudo rpi-eeprom-update -a
+sudo apt update && sudo apt install --only-upgrade -y rpi-eeprom
 ```
 
 ```bash
 sudo rpi-eeprom-config --edit
 ```
 
-In the editor, use this (the old Pi's config, with `BOOT_ORDER` changed):
+(Non-interactively: write the config below to a file and run
+`sudo rpi-eeprom-config --apply <file>`. When booted from SD it only *stages*
+the update, and the next reboot flashes it. Done this way on 2026-10-06; the
+Pi came back with `BOOT_ORDER=0xf641` and bootloader `2026-09-25`.)
+The new Pi's EEPROM, checked 2026-10-06, had `BOOT_ORDER=0xf461` (SD, NVMe,
+USB) and no `PCIE_PROBE`; the bootloader is already newer than the packaged
+release, so `rpi-eeprom-update -a` is a no-op there. In the editor, use this
+(the old Pi's config, with `BOOT_ORDER` changed):
 
 ```ini
 [all]
@@ -243,8 +264,10 @@ shasum -a 256 -c ~/talos-worker-3-image/metal-arm64-rpi5-uboot-patched.raw.sha25
 
 1. Power the new Pi off, install the **256GB** SSD in its HAT (the 1TB SSD
    stays out of this Pi until the window), and boot from the SD card again.
-   Confirm there's exactly one NVMe device, ~238G, plus the SD card, before
-   writing anything:
+   Confirm there's exactly one NVMe device, `nvme0n1`, before writing
+   anything. **The SD card is also ~238G** (`mmcblk0`), so size alone won't
+   tell them apart: the target is `/dev/nvme0n1`, never `/dev/mmcblk0`, which
+   is the OS you're running from.
 
    **On the new Pi:**
 
@@ -283,8 +306,8 @@ talosctl -n <its-address> get disks --insecure
 
    **Don't apply a config.** Maintenance mode writes nothing to the disk, so
    the SSD stays ready; reflash it if you want a pristine disk.
-5. Power the Pi off and take the 256GB SSD out; it goes into the old Pi
-   during the window. Keep the SD card for the new Pi's rollback, but make
+5. Power the Pi off and take the 256GB SSD out, along with its HAT; it goes
+   into the old Pi during the window. Keep the SD card for the new Pi's rollback, but make
    sure it's out of the Pi before the window (see the boot-order note above).
 
 If you ever rebuild the image for a newer release: download the release's
@@ -422,8 +445,10 @@ entirely on the cluster Unbound and whatever the clients cached.
 
 ### 3. Swap the hardware
 
-1. Move the **1TB SSD** from the old Pi to the new Pi.
-2. Fit the **256GB SSD** into the old Pi.
+1. Move the **1TB SSD, on its 2280-capable HAT**, from the old Pi to the new
+   Pi.
+2. Fit the **256GB SSD, on the new Pi's 2230/2242 HAT**, into the old Pi.
+   (Each SSD stays on its HAT; the HAT is what moves.)
 3. Move the **UPS USB cable** from the old Pi to the new Pi. The UPS keeps
    running; only monitoring stops until `nut-upsd` is back up on the new Pi.
 4. Put each Pi's Ethernet cable where it should be. Don't power either on
@@ -437,14 +462,28 @@ worker has been stable for a while (see "After the swap").
 
 ### 4. Move the DHCP reservations
 
-**In UniFi**, in this order, so the two Pis never hold `.2` at once:
+MACs: old Pi `88:a2:9e:2b:0c:2d`, new Pi `98:fe:54:51:5e:4a`.
+
+UniFi refuses to assign an IP that another client is using, and a Pi keeps its
+lease until it renews. Free `.2` and `.35` ahead of time by moving the old
+Pi's reservation to a temporary spare address (done 2026-10-06: `.5`),
+rebooting it so it renews onto that address, and then shutting it down. Note
+that a reservation's name goes with its address, so `rpi5-1.lan` follows it
+(it resolved to `.5` for a while); use IPs until both Pis are on their final
+ones.
+
+**In UniFi**, first remove any temporary reservation on the new Pi's MAC (it
+was given `.35` during preparation, which is the worker's address and would
+block step 1). Then, in this order, so the two Pis never hold `.2` at once:
 
 1. Old Pi's MAC → `192.168.102.35`.
 2. New Pi's MAC → `192.168.102.2` (and the IPv6 address, if reserved).
 
 ### 5. Power on the new Pi and verify it is rpi5-1
 
-Power it on and wait a minute or two.
+Power it on and wait a minute or two. If it doesn't answer on `.2`, check the
+switch port for a MAC address filter (the new Pi's MAC differs from the old
+Pi's); that cost 2026-10-06's window an extra while.
 
 **On your Mac:**
 
@@ -524,10 +563,10 @@ the `nic-10g` Services are still announced only by 10GbE nodes.
 Leave it cordoned until the arm64 audit from "Before the window" is done
 and you're happy. Then `kubectl uncordon talos-worker-3`.
 
-### 8. Put DHCP and RA back
+### 8. Put DHCP back
 
-Restore normal lease times, and re-add the IPv6 resolver to RA if you removed
-it. Note the end time.
+Restore normal lease times. RA wasn't changed (see the IPv6 precondition).
+Note the end time.
 
 ## After the swap: verify the new rpi5-1
 
@@ -549,7 +588,7 @@ it. Note the end time.
 | Telegraf and Vector | SigNoz | host metrics and logs flowing again, no more "no data" |
 | Talos kernel logs | SigNoz logs, filter `source_type = 'talos-kernel'` | new lines from every worker after Vector is back (nodes buffer nothing: logs sent during the window are lost) |
 | Proxmox backup | next 03:00 run, or run `proxmox-config-backup.sh` on the Proxmox host | files land under `~pve-backup/backups/proxmox/` |
-| Hubble CLI, helm, kubeconfig | `hubble status`, `helm list -A`, `kubectl get ns` | all work, no new credentials needed |
+| Hubble CLI, helm, kubeconfig | `hubble status -P` (needs the port-forward flag), `helm list -A`, `kubectl get ns` | all work, no new credentials needed |
 
 Also check what you can't see from here: that the Brevo relay and the
 Cloudflare Access allowlist are still fine (same WAN, so nothing to change
@@ -562,7 +601,7 @@ The old SSD is never written to by anything except normal use, so rolling
 back is a swap in reverse.
 
 **If the new Pi won't come up as rpi5-1** (at step 5): power it off, put the
-1TB SSD back in the old Pi, move the UPS cable and reservation back (old
+1TB SSD (with its HAT) back in the old Pi, move the UPS cable and reservation back (old
 Pi's MAC → `.2`), and power on. The old Pi comes back exactly as it was. Move
 the Talos SSD out of it afterwards if you want to try again.
 
