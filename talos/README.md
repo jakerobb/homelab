@@ -1379,7 +1379,11 @@ decoupled name (the Mac Studio's worker will be `talos-worker-4`).
 - **NIC watchdog:** `nic-watchdog-mitigation.yaml` now selects `kubernetes.io/arch: arm64`, so it covers this node (same
   onboard NIC) as well as the control planes.
 - **Cilium L2:** it matches the generic `homelab-l2-announce` policy but not the 10G one (1GbE), like the MBP.
-- **Kubelet** is v1.37.0 (the pin in the shared `worker.yaml` template), one patch behind the others; harmless.
+- **Kubelet** was v1.37.0 (the pin in the shared `worker.yaml` template on the jump box) until 2026-10-07, when it was
+  brought to v1.37.1 with a cordon, drain, `talosctl patch machineconfig --mode=no-reboot` of `machine.kubelet.image`
+  (a strategic-merge patch; JSON6902 isn't supported on multi-document configs), uncordon and a manual descheduler run.
+  The pins in the jump box's `worker.yaml`, `worker-3.yaml` and `controlplane.yaml` were bumped to v1.37.1 too
+  (backups `*.bak-20261007`); `upgrade-k8s` doesn't touch those files, so bump them by hand after each Kubernetes upgrade.
 - **Provisioning log:** built and test-booted in maintenance mode from the new Pi before the window, joined at
   15:08 on 2026-10-06, cordoned on registration, audited (all 74 cluster images have arm64 builds) and uncordoned the same day.
 
