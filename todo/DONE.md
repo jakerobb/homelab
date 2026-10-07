@@ -42,6 +42,12 @@ restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queu
   Pi's switch port; `rpi5-1.lan` follows the reservation, so use IPs until both Pis are on their final addresses.
 - **Verified after:** UPS data via USB and NUT, a Terraform plan and apply on the GitHub runner, a delivered test email
   through the Brevo relay, Telegraf and Vector flowing into SigNoz, etcd snapshot and B2 copy, and all 7 nodes Ready.
+- **`KubeMemoryOvercommit` mute removed:** `talos-worker-3` adds ~15GiB allocatable, so `mbp` is no longer the
+  dominant node. Total requests sit ~9.5GiB under what's left after losing the largest node, and the alert is inactive
+  in Prometheus. The `null`-receiver route (added 2026-09-25) is gone, so it notifies again.
+- **In-cluster Unbound on the Server VLAN (2026-10-05):** `192.168.102.130` added to the Server VLAN's DHCP next to
+  `.2`, after it ran on the Trusted VLAN since 2026-09-30. Working well. Talos nodes still ignore DHCP DNS (pinned to
+  `.2` and `1.1.1.1`).
 - **Host cleanup:** the Wi-Fi interface (`wlan0`, `.3`) and its watchdog are gone, along with Bluetooth and avahi, and
   about 31G of old files were moved to TrueNAS (`/mnt/data/shared/bw-mbp/from-rpi5-1/`, verified by hash) or deleted,
   taking the Pi's SSD from 52G to 22G used. The
@@ -622,7 +628,7 @@ Consequences worth knowing:
 - `KubeMemoryOvercommit` started firing (and did daily): total requests (21.9GiB) exceed what's left if the largest
   node is lost (39.4 - 23.0 = 16.4GiB). That's true, not a bad rule: mbp holds ~58% of cluster memory, and even
   perfectly sized requests (~13.8GiB real usage) would sit just under the line. Routed to Alertmanager's `null`
-  receiver on 2026-09-25 until the Mac Studio joins (see `FUTURE.md`).
+  receiver on 2026-09-25 until a second large node joined (removed 2026-10-06; see "Jump box swap" above).
 - In hindsight, sizing requests at the 7-day *peak* overshot. p95 is the usual basis, with limits or headroom
   covering spikes. The biggest overshoots are per-node DaemonSets sized for mbp (otel-agent 384Mi and cilium-envoy
   128Mi on every node) and the apiserver at 1536Mi. Trimming them is deferred (see `FUTURE.md`).
