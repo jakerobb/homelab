@@ -1,0 +1,6 @@
+# Explicit Namespace, same as pv-janitor/namespace.yaml. No PodSecurity
+# override: the job runs non-root with all capabilities dropped.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eso-restarter

@@ -1,0 +1,16 @@
+# Kustomize for configMapGenerator, same as pv-janitor: eso-restarter.py lives
+# here as a real file, and the generated ConfigMap's hash suffix means an edit
+# to it is picked up on sync. Old hash-suffixed ConfigMaps are pruned by the
+# Application.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: eso-restarter
+resources:
+  - networkpolicy.yaml
+  - namespace.yaml
+  - rbac.yaml
+  - cronjob.yaml
+configMapGenerator:
+  - name: eso-restarter-script
+    files:
+      - eso-restarter.py

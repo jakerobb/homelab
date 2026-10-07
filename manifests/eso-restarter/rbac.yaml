@@ -1,0 +1,63 @@
+# Least privilege, split by scope:
+# - Cluster-wide, read-only: Events (that's where ESO writes the provider
+#   error text) and ExternalSecrets (to report how many are Ready afterwards).
+# - In the external-secrets namespace only: read pods (to find the controller's
+#   start time) and get/patch the one Deployment it restarts.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eso-restarter
+  namespace: eso-restarter
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eso-restarter
+rules:
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [list]
+  - apiGroups: [external-secrets.io]
+    resources: [externalsecrets]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eso-restarter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: eso-restarter
+subjects:
+  - kind: ServiceAccount
+    name: eso-restarter
+    namespace: eso-restarter
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eso-restarter
+  namespace: external-secrets
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [list]
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [external-secrets]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eso-restarter
+  namespace: external-secrets
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eso-restarter
+subjects:
+  - kind: ServiceAccount
+    name: eso-restarter
+    namespace: eso-restarter
