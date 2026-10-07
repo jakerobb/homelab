@@ -255,33 +255,3 @@ don't leave it around indefinitely. Make sure a nightly backup has landed in the
 Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`.
 Also add an alert for a failed `scrypted-backup` Job.
 Runbook: [`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01), step 5.
-
-## Confirm Renovate can push under the `all-branches` ruleset
-
-**Waiting on:** the next 04:17 Renovate run (2026-10-07). The `all-branches` ruleset (Settings → Rules → Rulesets)
-matches every branch and requires signed commits. It was switched to **Active** on 2026-10-06, after Renovate's branch
-commits on PRs #183-#185 verified (`verified=true, reason=valid`; Renovate signs with its own SSH key, see the Renovate
-section of [`../argocd/README.md`](../argocd/README.md)). **Consider it confirmed** once that run creates or updates a
-branch without a push rejection (check the CronJob's logs, or that the PR's head commit is verified):
-
-```bash
-gh api repos/jakerobb/homelab/commits/<head-sha> --jq '.commit.verification'
-```
-
-If pushes are rejected, add `refs/heads/renovate/**` to the ruleset's exclude list; those commits get squash-merged
-into signed `main` commits anyway. Delete this item once confirmed.
-
-## Confirm the Proxmox config backup lands on the new rpi5-1
-
-**Waiting on:** the next daily 03:00 run on the Proxmox host (2026-10-07), the first since the jump box swap moved
-rpi5-1's SSD to a new Pi. The backup pushes over SSH to `pve-backup@rpi5-1.lan`, and that user, its authorized key
-and the host key all live on the SSD that moved, so it should just work, but it hasn't run since. **Consider it
-confirmed once a `2026-10-07` archive appears** (and the run before the swap is still there):
-
-```bash
-ssh pve-backup@rpi5-1.lan ls -la backups/proxmox/   # from the Proxmox host
-```
-
-or, on rpi5-1, `ls -la ~pve-backup/backups/proxmox/`. If nothing new landed, check the cron job on the Proxmox host
-(`/etc/cron.d/proxmox-config-backup`) and try `/usr/local/sbin/proxmox-config-backup.sh` by hand. See
-[`../docs/proxmox-config-backup.md`](../docs/proxmox-config-backup.md). Delete this item once confirmed.
