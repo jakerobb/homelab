@@ -73,18 +73,6 @@ app makes is Flux (all in `MonitoringInfluxClient.cs`), and InfluxDB 3 dropped F
 moves to SQL or InfluxQL, remove that rule and plan the 2.x → 3.x data migration; 3.x doesn't read 2.x's storage
 directly.
 
-## Re-enable `KubeMemoryOvercommit` alert notifications
-
-**Waiting on:** the Mac Studio being onboarded as a Talos worker. On 2026-09-25 this alert was routed to Alertmanager's
-`null` receiver in
-[`../argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml) (search
-for `KubeMemoryOvercommit`). It fires when total memory requests exceed what the cluster could still hand out after
-losing its largest node. That's accurate, not a false positive: `talos-worker-mbp` holds ~58% of cluster memory, so no
-realistic set of requests passes (see [`DONE.md`](DONE.md#audit-app-memory-requests-against-real-usage)). It fired
-daily, with nothing to act on until a second large node exists. Once the Studio is a worker, delete that route and
-check the alert in the Prometheus UI: it should be inactive. If it's still firing, revisit requests (see the next item)
-before re-enabling notifications.
-
 ## Trim over-sized memory requests
 
 **Waiting on:** a clean month of usage history. **Revisit on or after 2026-10-25.** The 2026-09-24 audit set memory
@@ -162,16 +150,6 @@ temperatures that way (step 5 of the runbook already warns about this). If it pr
 for Apple Silicon's temperature sensors, and keep the metric name `smc_temperature_value` with `sensor=cpu_die` /
 `gpu_die` so the dashboard picks it up.
 
-## Add the in-cluster Unbound to the Server VLAN's DHCP
-
-**Waiting on:** time to trust the in-cluster Unbound ([`../argocd/README.md`](../argocd/README.md#unbound-in-cluster-copy-deployed-2026-09-29))
-on the Trusted VLAN, where `192.168.102.130` was added to DHCP on 2026-09-30 (alongside the Pi's `.2`). **On or after
-2026-10-07**, if nothing has gone wrong there, add `192.168.102.130` as a DNS server on the Server VLAN too, next to
-`.2`. Things to check first: no name-resolution problems or firewall gaps seen from the Trusted VLAN's clients (a Mac
-and an iPhone), and both replicas Ready on different workers. Don't touch the Talos nodes' resolvers; they're pinned to
-`.2` and `1.1.1.1` by [`../talos/patches/nameservers.yaml`](../talos/patches/nameservers.yaml), so they ignore what
-DHCP hands out. The IPv6 side is separate; see "Dual-stack cluster" in [`READY.md`](READY.md).
-
 ## ESO 1Password wedged-client fix
 
 **Waiting on:** an upstream fix for [external-secrets/external-secrets#6941](https://github.com/external-secrets/external-secrets/issues/6941)
@@ -181,6 +159,33 @@ in turn depends on the SDK bug 1Password/onepassword-sdk-go#288. It hit us on 20
 eventually bump the chart, but won't flag that the fix is in it, so check the issue's status. Once it's closed and the
 running ESO version contains the fix, remove the `wasm error` restart hint from the `ExternalSecretNotSynced` alert in
 `manifests/external-secrets-config/prometheusrule.yaml`. No target date; this depends on upstream, not elapsed time.
+
+## Follow up on the 1Password SDK stack-leak reports
+
+**Waiting on:** maintainer feedback, from either repo. No target date. We found the root cause of the ESO wedge above
+(2026-10-06) and reported it twice:
+[1Password/onepassword-sdk-go#288](https://github.com/1Password/onepassword-sdk-go/issues/288) (a comment with a repro
+and the cause, plus a follow-up pointing at go-sdk) and
+[extism/go-sdk#102](https://github.com/extism/go-sdk/issues/102) (the root fix). In short: when a request fails inside
+Extism go-sdk's `http_request` host function (a network error, or a context deadline or cancellation), it calls
+`panic(err)`, and the guest's wasm stack pointer is never restored. Each failure leaks ~51KiB of the core's 1MiB shadow
+stack, so after 20 failures every call on that process-wide instance fails with `wasm error: out of bounds memory
+access`, permanently. Not a heap leak: guest memory, Go heap and RSS stay flat, and our own ESO's memory stayed flat
+through an 8-hour wedge. The `dyegoe` memory growth reported in #288 is unexplained. A four-line experiment (return an
+empty response with status 0 instead of panicking) fixed it, including the deadline and cancellation path.
+
+When either repo answers:
+- **extism/go-sdk#102:** if the maintainers pick a direction, write the PR with a regression test. Surface the real
+  error to the guest (the experiment discards it), and check what other PDKs do with a status-0 response. go-sdk's last
+  commit and release were spring 2025, so don't expect a quick merge.
+- **onepassword-sdk-go#288:** if they'd take it, propose treating a wasm trap as fatal for the instance (rebuild the
+  plugin and re-init live clients from their saved configs). The `runtime.SetFinalizer` release of a client ID needs a
+  generation counter, or a finalizer firing after a rebuild would release another client's ID. Weaker case now that the
+  panic fix also covers deadlines; it's belt and braces for traps we haven't seen.
+- **Either lands in a release:** then do what the ESO item above says (confirm the running ESO version has it, then
+  drop the `wasm error` restart hint from the alert), and delete this item.
+- **Nothing by 2026-12-01:** decide whether an automatic ESO restart when `ExternalSecretNotSynced` stays firing is worth
+  building here.
 
 ## Delete the old Z-Wave JS UI store on rpi5-1
 
@@ -247,24 +252,20 @@ Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`
 Also add an alert for a failed `scrypted-backup` Job.
 Runbook: [`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01), step 5.
 
-## Enable the `all-branches` signed-commits ruleset
+## Confirm Renovate can push under the `all-branches` ruleset
 
-**Waiting on:** Renovate successfully pushing a signed branch. The `all-branches` ruleset (Settings → Rules → Rulesets)
-already exists, matches every branch, and requires signed commits, but it's set to **Disabled**. Enforcing it now would
-reject Renovate's pushes, because Renovate used to commit over plain git with its personal token and every one of those
-commits was unsigned (checked 2026-10-03 on PRs #145-#155). `"platformCommit": "enabled"` in `renovate.json` is meant to
-fix that by making Renovate commit through GitHub's API, which GitHub signs (see the Renovate section of
-[`../argocd/README.md`](../argocd/README.md)). **The gate:** after that change has merged, a Renovate PR whose branch was
-created or rewritten since then has a head commit with `verified=true`:
+**Waiting on:** the next 04:17 Renovate run (2026-10-07). The `all-branches` ruleset (Settings → Rules → Rulesets)
+matches every branch and requires signed commits. It was switched to **Active** on 2026-10-06, after Renovate's branch
+commits on PRs #183-#185 verified (`verified=true, reason=valid`; Renovate signs with its own SSH key, see the Renovate
+section of [`../argocd/README.md`](../argocd/README.md)). **Consider it confirmed** once that run creates or updates a
+branch without a push rejection (check the CronJob's logs, or that the PR's head commit is verified):
 
 ```bash
 gh api repos/jakerobb/homelab/commits/<head-sha> --jq '.commit.verification'
 ```
 
-Tick the rebase checkbox on an open Renovate PR to force a rewrite instead of waiting for one. Once it shows verified,
-set `all-branches` to **Active**, and watch the next 04:17 Renovate run to confirm it can still push. If the commits are
-still unsigned, don't enable it as is. Add `refs/heads/renovate/**` to the ruleset's exclude list first; those commits
-get squash-merged into signed `main` commits anyway. No target date; this depends on that check, not on elapsed time.
+If pushes are rejected, add `refs/heads/renovate/**` to the ruleset's exclude list; those commits get squash-merged
+into signed `main` commits anyway. Delete this item once confirmed.
 
 ## Confirm the Proxmox config backup lands on the new rpi5-1
 
