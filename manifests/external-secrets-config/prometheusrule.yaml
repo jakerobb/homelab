@@ -32,7 +32,14 @@ spec:
               (see the 2026-10-02 incident in argocd/README.md).
               If the error says `wasm error: out of bounds memory access`, the
               1Password SDK client is wedged for every ExternalSecret and
-              never recovers on its own: run
-              `kubectl -n external-secrets rollout restart deploy/external-secrets`.
+              never recovers on its own. eso-restarter
+              (manifests/eso-restarter/) restarts ESO automatically within
+              about 5 minutes of the first such error, and an ntfy notice
+              ("ESO's 1Password client is wedged; restarting it") says so, then
+              updates to "ESO is back" once the ExternalSecrets resync. So if
+              this alert fires on that error anyway, the automatic restart
+              didn't happen or didn't help: check
+              `kubectl -n eso-restarter logs job/<latest>`, or restart by hand
+              with `kubectl -n external-secrets rollout restart deploy/external-secrets`.
               A DNS blip triggered this on 2026-09-30 (upstream:
               external-secrets/external-secrets#6941).

@@ -54,6 +54,14 @@ restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queu
   SigNoz packet-loss alert and Telegraf now watch only `.2`. Unbound query logging, switched on temporarily to find
   stragglers, reset to off with the restart.
 
+## ESO auto-restart on a wedged 1Password client
+
+**Done (2026-10-07).** [`../manifests/eso-restarter/`](../manifests/eso-restarter/README.md), a CronJob every 5
+minutes, restarts ESO when its 1Password client is wedged (`wasm error: out of bounds memory access` in ExternalSecret
+events; root cause in `FUTURE.md`). It publishes a "restarting" ntfy notice, then replaces it (same sequence id) with
+"ESO is back" once the ExternalSecrets resync. The `ExternalSecretNotSynced` alert text now says so. Not yet exercised
+by a real wedge, so check the first one (see `FUTURE.md`).
+
 ## rpi5-1 mail-alert reliability (msmtpq)
 
 **Done (2026-09-25).** rpi5-1's `sendmail` is now a thin wrapper around Debian's bundled `msmtpq`

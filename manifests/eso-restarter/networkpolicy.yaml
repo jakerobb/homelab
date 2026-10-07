@@ -1,0 +1,46 @@
+# eso-restarter CronJob: reads Events and ExternalSecrets, patches the ESO
+# Deployment through the API server, and pushes notices to ntfy.
+#
+# Default-deny both directions, then only the flows below. See
+# argocd/README.md's "NetworkPolicies" section for the whole scheme and how to
+# debug a drop (`hubble observe --verdict DROPPED`). The ntfy side is allowed
+# in manifests/ntfy/networkpolicy.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: eso-restarter
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: eso-restarter
+  namespace: eso-restarter
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toEntities:
+        - kube-apiserver
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ntfy
+            app.kubernetes.io/name: ntfy
+      toPorts:
+        - ports:
+            - port: '8080'
+              protocol: TCP

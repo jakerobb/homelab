@@ -1,0 +1,64 @@
+# Restarts ESO when its 1Password client is wedged; see README.md. Every 5
+# minutes: a quiet run is a few hundred ms of API calls. A run that restarts
+# ESO takes ~2-7 minutes (rollout + settle), hence Forbid and the 15-minute
+# deadline. A run that restarts ESO but finds it still unhealthy exits 1, so
+# kube-prometheus-stack's KubeJobFailed alert also fires.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: eso-restarter
+  namespace: eso-restarter
+spec:
+  schedule: "*/5 * * * *"
+  timeZone: America/Detroit
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: eso-restarter
+          containers:
+            - name: eso-restarter
+              image: docker.io/library/python:3.14.8-alpine3.24
+              command: [python3, /app/eso-restarter.py]
+              env:
+                # "true" logs what it would do without restarting or notifying.
+                - name: DRY_RUN
+                  value: "false"
+                # In-cluster Service, not the public hostname, same as
+                # pv-janitor. Same topic as alerts; the script appends a
+                # per-incident sequence id so the "restarting" notice is
+                # replaced by the "back" notice.
+                - name: NTFY_URL
+                  value: http://ntfy.ntfy.svc.cluster.local:8080/homelab-alerts
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+              volumeMounts:
+                - name: script
+                  mountPath: /app
+                  readOnly: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 65534
+                runAsGroup: 65534
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 96Mi
+          volumes:
+            - name: script
+              configMap:
+                name: eso-restarter-script

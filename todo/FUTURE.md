@@ -157,8 +157,10 @@ for Apple Silicon's temperature sensors, and keep the metric name `smc_temperatu
 instance, so every ExternalSecret fails with `wasm error: out of bounds memory access` until the pod restarts), which
 in turn depends on the SDK bug 1Password/onepassword-sdk-go#288. It hit us on 2026-09-30 after a DNS blip. Renovate will
 eventually bump the chart, but won't flag that the fix is in it, so check the issue's status. Once it's closed and the
-running ESO version contains the fix, remove the `wasm error` restart hint from the `ExternalSecretNotSynced` alert in
-`manifests/external-secrets-config/prometheusrule.yaml`. No target date; this depends on upstream, not elapsed time.
+running ESO version contains the fix, remove `manifests/eso-restarter/` (and its Application, and its entry in
+`manifests/ntfy/networkpolicy.yaml` and `docs-site/mkdocs.yml`) and the `wasm error` text from the
+`ExternalSecretNotSynced` alert in `manifests/external-secrets-config/prometheusrule.yaml`. No target date; this depends
+on upstream, not elapsed time.
 
 ## Follow up on the 1Password SDK stack-leak reports
 
@@ -183,9 +185,11 @@ When either repo answers:
   generation counter, or a finalizer firing after a rebuild would release another client's ID. Weaker case now that the
   panic fix also covers deadlines; it's belt and braces for traps we haven't seen.
 - **Either lands in a release:** then do what the ESO item above says (confirm the running ESO version has it, then
-  drop the `wasm error` restart hint from the alert), and delete this item.
-- **Nothing by 2026-12-01:** decide whether an automatic ESO restart when `ExternalSecretNotSynced` stays firing is worth
-  building here.
+  remove `manifests/eso-restarter/` and the alert text), and delete this item.
+- **Meanwhile:** `manifests/eso-restarter/` restarts ESO automatically on the wedge signature (added 2026-10-07). After
+  the first real wedge, read the job's log and the ntfy notifications to check the detection and the "ESO is back"
+  update behaved, and note the outcome in [`DONE.md`](DONE.md).
+- **Nothing by 2026-12-01:** revisit forking go-sdk and the 1Password SDK. Weigh it against the restart job covering it.
 
 ## Delete the old Z-Wave JS UI store on rpi5-1
 
