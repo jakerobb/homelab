@@ -877,3 +877,17 @@ come from the old data directory rather than a ConfigMap). Secrets go in an Exte
 about 0.4 GB per 12 hours. Once the 10-day retention window filled, growth flattened: 9.1 GB on 09-30, 10.1 GB on 10-03
 and 10.4 GB on 10-05 (about 48% of 20Gi, about 250k head series). That headroom is enough, so no `retentionSize` or
 cardinality cut was needed.
+
+## Renovate under the `all-branches` ruleset
+
+**Done (2026-10-07).** The `all-branches` ruleset (matches every branch, requires signed commits) went Active on
+2026-10-06. The 04:17 Renovate run on 2026-10-07 then pushed branches for PRs #192-#196 with no push rejection, and each
+head commit verifies (`verified=true`; Renovate signs with its own SSH key, see the Renovate section of
+[`../argocd/README.md`](../argocd/README.md)). No ruleset exclusion for `refs/heads/renovate/**` is needed.
+
+## Proxmox config backup after the jump box swap
+
+**Done (2026-10-07).** The first daily 03:00 backup after the swap moved rpi5-1's SSD to the new Pi landed:
+`~pve-backup/backups/proxmox/proxmox-config-20261007-030001.tar.gz` sits alongside the earlier daily archives, so the
+`pve-backup` user, its authorized key and the host key all carried over. See
+[`../docs/proxmox-config-backup.md`](../docs/proxmox-config-backup.md).
