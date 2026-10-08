@@ -222,3 +222,21 @@ schema for ClusterSecretStore", so [`../.github/workflows/lint.yml`](../.github/
 previous commit (`f3e4382`). Check now and then by running kubeconform against
 `manifests/external-secrets-config/clustersecretstore.yaml` with only the `main` catalog location; once it validates,
 remove the pinned `-schema-location` line and its comment. No target date: this depends on upstream.
+
+## Watch the HexOS iSCSI target logs after the memory bump
+
+**Waiting on:** a week of normal use after the HexOS VM went from 8GB to 10GB (applied and restarted 2026-10-08). The
+Prometheus volume stalls of 2026-09-29, 10-05 and 10-07 were SCST (the iSCSI target) failing to allocate 8 MiB command
+buffers: `Allocation of sgv_pool_obj failed (size 8388608)` in `/var/log/scst.log`, answered BUSY/QUEUE FULL, until the
+worker's write timed out after 180s. **Check on or after 2026-10-15:**
+- `ssh truenas-ops 'sudo /usr/bin/cat /var/log/scst.log' | grep -c 'Allocation of sgv_pool_obj failed'` (plus
+  `scst.log.1`; the older `.gz` files need `zcat` entries in `claude-ops`'s sudo list). Before the bump there were bursts of
+  thousands a minute on most days.
+- No "Kernel storage error" ntfy alert from SigNoz, and no Prometheus restart with `persist head block ... input/output error`.
+- `MemTotal` on the NAS is about 10GB, and `/proc/meminfo` shows how much is free and in slab.
+
+If the failures continue: shrink the initiators' maximum write size (Talos nodes' `max_sectors_kb`, from 8 MiB down to about
+1 MiB, matching the negotiated `MaxBurstLength`; it needs a persistent udev or machine-config setting and some research), or
+raise `scst_max_cmd_mem` / `scst_max_dev_cmd_mem` (currently 1985 and 794 MB). The Proxmox host has about 1GB left after
+this bump, so another RAM increase means shrinking a worker first. If it's quiet, delete this item and the SCST notes can
+stay in `DONE.md`.
