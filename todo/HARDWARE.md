@@ -13,8 +13,10 @@ This document enumerates my hardware plans.
 
 * Run two CAT6 cables from the rack switch to the living room AV cupboard, replacing existing uplinks from the Pro XG 8
   PoE to the Living Room AV switch (USW-Flex) and the Living Room AP (U7 Pro XGS).
-* Choose locations outside the rack to mount the Zigbee and Z-Wave gateways, and run CAT6 cables from the rack to those
-  locations. (Freeing up space on the crowded rack shelf!)
+* Choose locations outside the rack to mount the Zigbee and Z-Wave gateways as well as the AI Port (it came with a wall 
+  mount adapter) and run CAT6 cables from the rack to those locations. (Freeing up space on the crowded rack shelf!). 
+  * Once the shelf has been cleared, rack-mount the KVM (it came with brackets).
+* Replace the CAT6 cable from the rack to the ONT with a longer one.
 * Move the RPi mount to the back rail to free up space in the rack
 * Move the PDU Pro to the back rail to free up space in the rack.
     * This will require cutting power to _everything_. Need to figure out how to prep for that.
@@ -28,7 +30,10 @@ This document enumerates my hardware plans.
   the host should show about 1.5 GiB more total memory.
 * Figure out why the WLED controller is offline. Did a power connection from the Meanwell PSU come loose?
 * Learn how to connect multiple LED strips together (have to solder _under_ the clear rubber diffusion cover somehow)
-  and then connect all the strips
+  and then connect all the strips.
+* Get the KVM properly connected to the MS-A2
+* Get the KVM properly connected to the Macbook Pro
+* Get the KVM properly connected to rpi5-1 (the jump box).
 
 ## Future acquisitions
 

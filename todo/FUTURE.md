@@ -186,9 +186,9 @@ When either repo answers:
   panic fix also covers deadlines; it's belt and braces for traps we haven't seen.
 - **Either lands in a release:** then do what the ESO item above says (confirm the running ESO version has it, then
   remove `manifests/eso-restarter/` and the alert text), and delete this item.
-- **Meanwhile:** `manifests/eso-restarter/` restarts ESO automatically on the wedge signature (added 2026-10-07). After
-  the first real wedge, read the job's log and the ntfy notifications to check the detection and the "ESO is back"
-  update behaved, and note the outcome in [`DONE.md`](DONE.md).
+- **Meanwhile:** `manifests/eso-restarter/` restarts ESO automatically on the wedge signature, and the daily check in
+  [`WATCHING.md`](WATCHING.md) tells us when it fires. After the first real wedge, review how the detection and notices behaved and
+  note the outcome in [`DONE.md`](DONE.md).
 - **Nothing by 2026-12-01:** revisit forking go-sdk and the 1Password SDK. Weigh it against the restart job covering it.
 
 ## Delete the old change-detection datastore on rpi5-1
