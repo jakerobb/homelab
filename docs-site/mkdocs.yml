@@ -143,5 +143,6 @@ nav:
   - Plans:
       - Ready: todo/READY.md
       - Future: todo/FUTURE.md
+      - Watching: todo/WATCHING.md
       - Hardware: todo/HARDWARE.md
       - Done: todo/DONE.md

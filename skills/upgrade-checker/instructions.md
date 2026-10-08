@@ -65,4 +65,16 @@ Finally, review todo/FUTURE.md. Every item gets a real look; do not triage by he
 Move unblocked items to todo/READY.md (done items to DONE.md), and tell me exactly what you moved and why. Separately,
 list any upstream activity worth my attention on items that stay in FUTURE.md.
 
-In your report, be brief. I don't need to hear about all the things you checked that were fine. Focus on issues and opportunities, but do include the FUTURE.md review summary (items reviewed, moved, and upstream activity). For the four sections above, exclude them entirely if there's nothing to do.
+Then run todo/WATCHING.md, the list of fixed problems we're watching for a recurrence. Every `## ` entry gets its check
+run, every time, with no sampling and no skipping entries that were fine yesterday.
+
+- **Read the whole file** with the Read tool in chunks (`offset`/`limit`) until you've seen every entry's body, as for
+  FUTURE.md. Count the entries.
+- **Run each entry's Check** exactly as written, then compare against its Healthy and Trouble criteria. If a check can't be
+  run (SSH fails, a command is refused, the output is empty in a way that doesn't mean "healthy"), that is itself
+  something to report; don't assume healthy.
+- **Entries in trouble** go at the top of the report, with the evidence the entry asks for. If the cause or the next step
+  is in the entry, say so.
+- **Retire when:** if an entry's retirement condition is met, say so, but leave the entry for me to retire.
+
+In your report, be brief. I don't need to hear about all the things you checked that were fine. Focus on issues and opportunities, but do include the FUTURE.md review summary (items reviewed, moved, and upstream activity) and a one-line WATCHING.md summary (entries checked, and which were in trouble). For the four sections above, exclude them entirely if there's nothing to do.
