@@ -81,3 +81,41 @@ spec:
         - ports:
             - port: '8080'
               protocol: TCP
+---
+# ClickHouse's `signoz-clickhouse-udf-init` init container downloads the histogram-quantile binary from GitHub
+# on every pod start (wget from github.com, which redirects to release-assets.githubusercontent.com). Under
+# default-deny that fails, and the pod sits in Init:Error until it's allowed: it bit on 2026-10-08, the first
+# time the pod restarted after the policies landed. So the ClickHouse pods may reach just those hosts on 443.
+# toFQDNs only works when Cilium's DNS proxy sees the lookups, hence the `rules.dns` on the DNS rule. That makes the
+# lookups from these pods go through the proxy; the pattern allows every name, so it filters nothing itself.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: signoz-clickhouse-init-egress
+  namespace: signoz
+spec:
+  endpointSelector:
+    matchLabels:
+      clickhouse.altinity.com/chi: signoz-clickhouse
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: '*'
+    - toFQDNs:
+        - matchName: github.com
+        - matchName: release-assets.githubusercontent.com
+        - matchName: objects.githubusercontent.com
+      toPorts:
+        - ports:
+            - port: '443'
+              protocol: TCP

@@ -2279,6 +2279,13 @@ app built from what each one actually talks to.
   by `/32` and port, and "the internet" as `0.0.0.0/0` minus RFC1918 on 443
   (80 for SearXNG, 53 for cert-manager's DNS-01 checks). The RFC1918 exclusion
   is what keeps a compromised pod off the LAN and the cluster.
+- **FQDN egress (ClickHouse).** SigNoz's ClickHouse `udf-init` init container downloads a binary from GitHub on every
+  pod start, so a restart fails under default-deny (it did on 2026-10-08: ClickHouse sat in `Init:Error` for about six
+  hours before anyone noticed). `signoz-clickhouse-init-egress` in
+  [`signoz.yaml`](../manifests/network-policies/signoz.yaml) allows just `github.com` and GitHub's release-asset hosts on
+  443 using `toFQDNs`, the one place the cluster uses it. It only works with the `rules.dns` on the DNS rule beside it,
+  which sends those pods' lookups through Cilium's DNS proxy. If the init container fails again, check where the
+  download redirects now (`curl -sIL <url>`) and add that host.
 - **Not covered.** `hostNetwork` pods ignore pod policy: Home Assistant,
   Matter Server, Scrypted, node-exporter, the CSI node pods, node-tuning and
   Cilium itself. `kube-system`, `argocd` (its chart ships its own policies) and
