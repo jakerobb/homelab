@@ -50,9 +50,6 @@ SOPS = "/usr/local/bin/sops"
 # Mirrors the decrypt commands in docker-compose/README.md.
 DECRYPTED = {
     ".env": (".env.sops.env", ["--input-type", "dotenv", "--output-type", "dotenv"]),
-    "homeassistant/secrets.yaml": ("homeassistant/secrets.sops.yaml", []),
-    "homeassistant/lutron_caseta-0512b4cc-key.pem": (
-        "homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml", ["--output-type", "binary"]),
     "secrets/nut-upsd-password": ("secrets/nut-upsd-password.sops.yaml", ["--output-type", "binary"]),
 }
 
@@ -63,10 +60,7 @@ STOP_BEFORE_WRITE = set()
 # Config checks run before restarting a service; on failure the running
 # container keeps its old config and we alert instead of restarting into a
 # broken one.
-VALIDATORS = {
-    "homeassistant": ["exec", "-T", "homeassistant", "python", "-m", "homeassistant",
-                      "--script", "check_config", "--config", "/config"],
-}
+VALIDATORS = {}
 
 args = None
 
