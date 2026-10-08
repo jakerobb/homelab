@@ -891,3 +891,33 @@ head commit verifies (`verified=true`; Renovate signs with its own SSH key, see 
 `~pve-backup/backups/proxmox/proxmox-config-20261007-030001.tar.gz` sits alongside the earlier daily archives, so the
 `pve-backup` user, its authorized key and the host key all carried over. See
 [`../docs/proxmox-config-backup.md`](../docs/proxmox-config-backup.md).
+
+## Old Compose data removed from rpi5-1
+
+**Done (2026-10-08).** One week after the 2026-10-01 cutovers, the in-cluster Z-Wave JS UI, Zigbee2MQTT, matter-server,
+Home Assistant and Scrypted were all Running with 0 restarts, and the nightly `homeassistant-backup` and
+`scrypted-backup` Jobs had completed. Deleted `~/docker/{zwave-js-ui,zigbee2mqtt,matter-server,homeassistant,scrypted}`
+on rpi5-1 (`sudo rm -rf`), which also removed the plaintext Z-Wave and Zigbee keys, the Matter fabric keys, the HomeKit
+pairing identities and `core.config_entries.pre-matter-url`. The in-cluster PVCs are now the only copies. The repo-side
+cleanup is in the next entry.
+
+## Repo cleanup after the Home Assistant and Scrypted moves
+
+**Done (2026-10-08).** Deleted `docker-compose/homeassistant/` (config, blueprints, the two SOPS-encrypted files and the
+public Lutron certs), the `homeassistant/*` entries in `DECRYPTED` and `VALIDATORS` in
+`scripts/compose-deploy/compose-deploy.py`, the `.gitignore` lines for Home Assistant and Scrypted, and the Home Assistant
+mentions in `docker-compose/README.md` and `docs/compose-deploy.md`. The Lutron key and the NUT password now live only in the
+in-cluster config, covered by the nightly `homeassistant-backup`. Two items from the original list needed no work: a failed
+`homeassistant-backup` or `scrypted-backup` Job is already caught by kube-prometheus-stack's default `KubeJobFailed`
+alert (default rules are on, only `kubeProxy` is off), and Bluetooth and avahi on rpi5-1 were removed in the 2026-10-06 jump
+box swap. Repointing Home Assistant at in-cluster addresses is the next entry.
+
+## Home Assistant pointed at in-cluster addresses
+
+**Done (2026-10-08).** Home Assistant's MQTT, Z-Wave JS and Matter integrations now use the in-cluster Service names
+instead of the LAN VIP hostnames. MQTT and Z-Wave were changed in the UI. The Matter integration has no reconfigure option,
+so its URL was edited in `.storage/core.config_entries` on the `homeassistant-config` PVC with Home Assistant scaled to 0
+(ArgoCD auto-sync paused on `root` and `homeassistant`, restored afterwards), through a throwaway busybox pod; the original is
+kept as `core.config_entries.pre-matter-svc` there. The thermostat, Z-Wave and Zigbee devices all work. The VIPs themselves
+come off in two days, see [`FUTURE.md`](FUTURE.md).
+

@@ -1811,7 +1811,7 @@ Home Assistant Core, 2026.9.4 (the version Compose ran; bump it after the move, 
   `.storage/core.config_entries`, and nothing in the YAML reads it.
 - **Config is a PVC (`hexos-iscsi`, 5Gi), seeded once** from the Pi's `~/docker/homeassistant`, like Z-Wave JS UI and
   Zigbee2MQTT. Home Assistant owns `automations.yaml`, `scenes.yaml`, `scripts.yaml` and `.storage` from then on, so git is
-  no longer authoritative for them (`docker-compose/homeassistant/` goes stale; see `todo/FUTURE.md`). The seed includes
+  no longer authoritative for them (`docker-compose/homeassistant/` went stale and was deleted on 2026-10-08). The seed includes
   the recorder database (~225Mi), `custom_components/` (HACS), and the Lutron key. The `restore` init container holds the
   pod until `scripts/homeassistant-cutover/restore.sh` has copied everything in, because starting on an empty `/config`
   would onboard a brand-new instance and mint new HomeKit bridge identities.

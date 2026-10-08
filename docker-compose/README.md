@@ -41,9 +41,7 @@ impossible instead of just easy to avoid.
 **NOT symlinked — reverted to real (manually re-copied) files after a live
 test broke Home Assistant** (config unreadable inside the container within
 seconds of creating the symlink, caught and fixed before anything actually
-restarted and failed on it): `homeassistant/{configuration,automations,
-scenes,scripts}.yaml`, `homeassistant/blueprints/`,
-`homeassistant/lutron_caseta-*.pem`,
+restarted and failed on it; Home Assistant has since moved to the cluster):
 `unbound/custom.conf.d/local.conf`.
 
 **Why those specifically fail** — two distinct Docker bind-mount behaviors,
@@ -57,14 +55,13 @@ confirmed live against this stack, not just theory:
    `cat` inside the container returned `No such file or directory` even
    though the symlink itself was intact and pointed somewhere real).
    Similarly, a symlink for a single file *nested inside* an
-   already-real, whole-directory bind mount (`./homeassistant:/config`) is invisible from inside the
+   already-real, whole-directory bind mount is invisible from inside the
    container — its mount namespace only has whatever was actually mounted,
    not arbitrary other host paths a symlink happens to point at.
 
 Fixing these properly needs Docker's actual supported mechanism for this —
 an explicit extra bind-mount line per file, layered on top of the existing
-directory mount (e.g. `./homeassistant/configuration.yaml:/config/configuration.yaml`
-*in addition to* `./homeassistant:/config`) — which is a real edit to
+directory mount — which is a real edit to
 `docker-compose.yml`'s volumes, not just a host-side symlink, and wasn't
 made without discussing it first given the Home Assistant near-miss above.
 Until that's decided, these files stay as copies. They're no longer copied
@@ -88,18 +85,10 @@ for `mosquitto` and `unbound`.
 Only hand-authored configuration is captured. Runtime state, caches, logs,
 and database files are **not** committed:
 
-- `homeassistant/.storage/`, `.cloud/`, `.cache/`, `core/`, `deps/`, `tts/`,
-  `*.log*`, `home-assistant_v2.db*` — Home Assistant's internal state
-  (entity/device registries, auth, HomeKit pairing state, restore state,
-  UI-managed integration configs). **Note:** integrations added via the UI
-  "Add Integration" flow live only in `.storage/core.config_entries` and are
-  *not* reproducible from the YAML files here — if HA needs to be rebuilt
-  from scratch, those integrations must be re-added manually.
-- `homeassistant/custom_components/` (53MB, HACS-managed: `hacs` itself and
-  `ac_infinity`) — reinstall via HACS rather than vendoring the code.
-- `scrypted/` — just plugin binaries + a LevelDB database, no meaningful config file. (Moved to the cluster
-  2026-10-01; the directory on rpi5-1 is the rollback until deleted, see `todo/FUTURE.md`.)
-- `matter-server/data/` — Matter fabric/commissioning state.
+- Home Assistant, Scrypted, matter-server, Zigbee2MQTT and Z-Wave JS UI — moved to the cluster on 2026-10-01
+  (see `argocd/README.md`). Their Compose data on rpi5-1 was deleted on 2026-10-08, and Home Assistant's config
+  was removed from this directory. Their state now lives in PVCs, with nightly backups for Home Assistant and
+  Scrypted.
 - `change-detection/` — moved to the cluster 2026-10-05 together with its history (the
   datastore was copied into the PVC, minus the UniFi store watches); the directory on rpi5-1 is the
   rollback until deleted, see `todo/FUTURE.md`.
@@ -124,8 +113,6 @@ the Talos jump box already have it):
 
 ```bash
 sops -d --input-type dotenv --output-type dotenv docker-compose/.env.sops.env > .env
-sops -d docker-compose/homeassistant/secrets.sops.yaml > homeassistant/secrets.yaml
-sops -d --output-type binary docker-compose/homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml > homeassistant/lutron_caseta-0512b4cc-key.pem
 sops -d --output-type binary docker-compose/secrets/nut-upsd-password.sops.yaml > secrets/nut-upsd-password
 ```
 
@@ -135,8 +122,6 @@ Encrypted files (all under `docker-compose/`, matched by the
 | File | Contains |
 |---|---|
 | `.env.sops.env` | Cloudflare API token, NUT/UniFi credentials and tokens, app passwords |
-| `homeassistant/secrets.sops.yaml` | NUT UPS password used by the HA UPS integration |
-| `homeassistant/lutron_caseta-0512b4cc-key.pem.sops.yaml` | Lutron Caséta bridge mTLS private key (the paired `-ca.pem`/`-cert.pem` are public certs, committed in the clear) |
 | `secrets/nut-upsd-password.sops.yaml` | NUT UPS daemon password (mounted into `nut-upsd` as a Docker secret) |
 
 `.env` is `--input-type dotenv --output-type dotenv` (encrypted line-by-line,

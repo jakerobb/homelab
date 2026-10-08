@@ -103,14 +103,13 @@ Preview what it would do. This doesn't pull, write, restart, or notify.
 python3 ~/dev/homelab/scripts/compose-deploy/compose-deploy.py --dry-run
 ```
 
-As of 2026-09-24, the dry run reports drift on three decrypted files:
-`.env`, `homeassistant/secrets.yaml`, and `zwave-js-ui/settings.json`. That
-was checked (values compared by hash, not printed), and the differences are
-formatting only: blank lines, and SOPS's normalized YAML/JSON. Accept the
-current copies as the baseline:
+As of 2026-09-24, the dry run reported drift on the decrypted `.env` (along
+with two files since moved to the cluster). That was checked (values compared
+by hash, not printed), and the difference is formatting only: blank lines, and
+SOPS's normalized dotenv. Accept the current copy as the baseline:
 
 ```bash
-python3 ~/dev/homelab/scripts/compose-deploy/compose-deploy.py --adopt .env homeassistant/secrets.yaml zwave-js-ui/settings.json -v
+python3 ~/dev/homelab/scripts/compose-deploy/compose-deploy.py --adopt .env -v
 ```
 
 That first real run also does a normal deploy. Expect it to recreate

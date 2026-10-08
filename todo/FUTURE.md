@@ -191,34 +191,6 @@ When either repo answers:
   update behaved, and note the outcome in [`DONE.md`](DONE.md).
 - **Nothing by 2026-12-01:** revisit forking go-sdk and the 1Password SDK. Weigh it against the restart job covering it.
 
-## Delete the old Z-Wave JS UI store on rpi5-1
-
-**Waiting on:** a stretch of the in-cluster zwave-js-ui behaving, since `~/docker/zwave-js-ui/` on rpi5-1 is the
-rollback (revert the migration PR and restore the Compose service). Cut over 2026-10-01; Home Assistant toggling a
-Z-Wave outlet through the new server is confirmed. **Consider it safe to delete on or after 2026-10-08.** Then, on
-rpi5-1, `sudo rm -rf ~/docker/zwave-js-ui` (root-owned). Besides the node cache, it still holds the old
-`settings.json` with the Z-Wave security keys in plaintext, and `users.json`, so don't leave it around indefinitely.
-Runbook: [`../argocd/README.md`](../argocd/README.md#zwave-js-ui-migrated-from-docker-compose-2026-10-01), step 6.
-
-## Delete the old Zigbee2MQTT data on rpi5-1
-
-**Waiting on:** the in-cluster Zigbee2MQTT behaving for a stretch, since `~/docker/zigbee2mqtt/` on rpi5-1 is the rollback
-(revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08** (one week after the 2026-10-01 cutover).
-Then, on rpi5-1, `sudo rm -rf ~/docker/zigbee2mqtt` (partly root-owned). It holds the device database, the coordinator
-backup, and `configuration.yaml` with the Zigbee network key in plaintext, so don't leave it around indefinitely. Make
-sure the in-cluster copy is the one you want to keep first: it's now the only live copy of the device names.
-Runbook: [`../argocd/README.md`](../argocd/README.md#zigbee2mqtt-migrated-from-docker-compose-2026-10-01), step 5.
-
-## Delete the old matter-server data on rpi5-1
-
-**Waiting on:** the in-cluster matter-server behaving for a stretch, since `~/docker/matter-server/` on rpi5-1 is the
-rollback (revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08**
-(one week after the 2026-10-01 cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/matter-server` (root-owned). It holds the
-Matter fabric and its signing keys, so don't leave it around indefinitely. The in-cluster PVC is now the only live copy.
-Also delete `~/docker/homeassistant/.storage/core.config_entries.pre-matter-url`, which still points Home Assistant at
-the old `ws://localhost:5580/ws`.
-Runbook: [`../argocd/README.md`](../argocd/README.md#matter-server-migrated-from-docker-compose-2026-10-01), step 5.
-
 ## Delete the old change-detection datastore on rpi5-1
 
 **Waiting on:** the in-cluster change-detection behaving for a stretch, since `~/docker/change-detection/` on rpi5-1 is the
@@ -229,29 +201,24 @@ stale notification URL carrying a Home Assistant access token; revoke that token
 Make sure the in-cluster copy is the one you want to keep first (and that a nightly backup has landed in the
 `change-detection-backups` PVC). Runbook: [`../argocd/README.md`](../argocd/README.md#change-detection-migrated-from-docker-compose-2026-10-05), step 4.
 
-## Delete the old Home Assistant config on rpi5-1, and clean up after the move
+## Drop the matter-server and zwave-js-ui-ws LoadBalancer VIPs
 
-**Waiting on:** the in-cluster Home Assistant behaving for a stretch, since `~/docker/homeassistant/` on rpi5-1 is the
-rollback (revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08**
-(one week after the cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/homeassistant`. It holds the HomeKit pairing
-identities, so don't leave it around indefinitely. Make sure the in-cluster copy is the one you want to keep first (and
-that a nightly backup has landed in the `homeassistant-backups` PVC).
-Then, in the repo:
-- Delete `docker-compose/homeassistant/` (it goes stale as soon as Home Assistant edits its own files), the
-  `homeassistant/*` entries in `DECRYPTED` and `VALIDATORS` in `scripts/compose-deploy/compose-deploy.py`, the
-  `.gitignore` lines for it, and the Home Assistant mentions in `docker-compose/README.md` and `docs/compose-deploy.md`.
-- Point Home Assistant at in-cluster addresses instead of the LAN VIPs (`matter.jakerobb.org`, `zwave-ws.jakerobb.org`,
-  `mqtt.jakerobb.org`), then drop the LoadBalancer VIPs where nothing else needs them.
-- Add an alert for a failed `homeassistant-backup` Job.
-- Bluetooth and avahi on rpi5-1 can go (see `HARDWARE.md`).
-Runbook: [`../argocd/README.md`](../argocd/README.md#homeassistant-migrated-from-docker-compose-2026-10-01), step 5.
+**Waiting on:** Home Assistant behaving on the in-cluster addresses for a couple of days. It was repointed on 2026-10-08
+(MQTT to `mosquitto.mosquitto.svc.cluster.local:1883`, Z-Wave JS to `ws://zwave-js-ui-ws.zwave-js-ui.svc.cluster.local:3000`,
+Matter to `ws://matter-server.matter-server.svc.cluster.local:5580/ws`), and Matter, Z-Wave and Zigbee devices all checked
+out. **Consider it safe on or after 2026-10-10.** Then change `manifests/matter-server/service.yaml` and
+`manifests/zwave-js-ui/service-ws.yaml` to `type: ClusterIP`, removing the `lbipam.cilium.io/ips` (`192.168.102.133` and
+`.132`) and `external-dns` annotations, and check that external-dns drops the `matter` and `zwave-ws` records. The comments
+at the top of both files describe the VIPs, so update them too, plus the matching notes in `argocd/README.md`. Rollback
+is the saved `.storage/core.config_entries.pre-matter-svc` on the `homeassistant-config` volume, or reverting the Service
+edits. Keep the MQTT VIP (`192.168.102.131`) unless you've confirmed nothing on the LAN uses `mqtt.jakerobb.org`.
 
-## Delete the old Scrypted data on rpi5-1, and clean up after the move
 
-**Waiting on:** the in-cluster Scrypted behaving for a stretch, since `~/docker/scrypted/` on rpi5-1 is the rollback
-(revert the migration PR and restore the Compose service). **Consider it safe to delete on or after 2026-10-08** (one
-week after the cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/scrypted`. It holds the HomeKit pairing identities, so
-don't leave it around indefinitely. Make sure a nightly backup has landed in the `scrypted-backups` PVC first.
-Then, in the repo: delete the `docker-compose/scrypted/*` line from `.gitignore`.
-Also add an alert for a failed `scrypted-backup` Job.
-Runbook: [`../argocd/README.md`](../argocd/README.md#scrypted-migrated-from-docker-compose-2026-10-01), step 5.
+## Drop the kubeconform external-secrets.io schema pin
+
+**Waiting on:** the community CRD catalog fixing `external-secrets.io/clustersecretstore_v1.json`. Its 2026-10-08 update
+([datreeio/CRDs-catalog#988](https://github.com/datreeio/CRDs-catalog/pull/988)) made kubeconform fail with "could not find
+schema for ClusterSecretStore", so [`../.github/workflows/lint.yml`](../.github/workflows/lint.yml) pins that group to the
+previous commit (`f3e4382`). Check now and then by running kubeconform against
+`manifests/external-secrets-config/clustersecretstore.yaml` with only the `main` catalog location; once it validates,
+remove the pinned `-schema-location` line and its comment. No target date: this depends on upstream.
