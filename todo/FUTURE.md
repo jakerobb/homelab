@@ -213,3 +213,12 @@ at the top of both files describe the VIPs, so update them too, plus the matchin
 is the saved `.storage/core.config_entries.pre-matter-svc` on the `homeassistant-config` volume, or reverting the Service
 edits. Keep the MQTT VIP (`192.168.102.131`) unless you've confirmed nothing on the LAN uses `mqtt.jakerobb.org`.
 
+
+## Drop the kubeconform external-secrets.io schema pin
+
+**Waiting on:** the community CRD catalog fixing `external-secrets.io/clustersecretstore_v1.json`. Its 2026-10-08 update
+([datreeio/CRDs-catalog#988](https://github.com/datreeio/CRDs-catalog/pull/988)) made kubeconform fail with "could not find
+schema for ClusterSecretStore", so [`../.github/workflows/lint.yml`](../.github/workflows/lint.yml) pins that group to the
+previous commit (`f3e4382`). Check now and then by running kubeconform against
+`manifests/external-secrets-config/clustersecretstore.yaml` with only the `main` catalog location; once it validates,
+remove the pinned `-schema-location` line and its comment. No target date: this depends on upstream.

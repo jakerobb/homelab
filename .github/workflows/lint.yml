@@ -75,12 +75,20 @@ jobs:
       # chart-vendored anyway. AutoscalingRunnerSet (ARC) is skipped too: the
       # catalog's schema lags the chart (it rejects `listenerConfig`, which
       # chart 0.15.0 sets by default).
+      #
+      # The external-secrets.io schemas are pinned to a catalog commit from
+      # 2026-10-08, listed before `main` so it wins for that group (other
+      # groups 404 there and fall through). The catalog's
+      # clustersecretstore_v1.json changed that day and kubeconform can no
+      # longer load it ("could not find schema for ClusterSecretStore"). Drop
+      # the pin once `main` validates again (try the command below without it).
       - name: Validate Kubernetes manifests
         if: ${{ !cancelled() && steps.render.outcome == 'success' }}
         run: |
           kubeconform -strict -summary -output text \
             -skip CustomResourceDefinition,AutoscalingRunnerSet \
             -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/f3e4382095909ac60000da025f323ba44d4c738a/external-secrets.io/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             "$RUNNER_TEMP/rendered"
 
