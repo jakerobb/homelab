@@ -237,7 +237,7 @@ The earlier idea of moving InfluxDB's datastore onto `hexos-iscsi` is now moot â
 U-Boot EFI-variable bug that blocked every normal `talosctl upgrade`, fixed with a custom `/bin/installer` image
 that swaps the patched `u-boot.bin` directly rather than going through Talos's own (blocked) EFI-variable write
 path. Full rationale, the dead ends ruled out first, and the reusable tooling for the next Talos bump are in
-[`../talos/README.md`](../talos/README.md#talos-v1141-upgrade-blocked-by-pi5-efi-variable-firmware-bug-2026-09-18) and
+[`../talos/README.md`](../talos/README.md#pi-5-u-boot-fix) and
 [`../talos/tools/uboot-fix/`](../talos/tools/uboot-fix/).
 
 ## Talos cluster reliability fixes

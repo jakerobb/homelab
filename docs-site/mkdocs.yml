@@ -114,6 +114,7 @@ nav:
       - pv-janitor: manifests/pv-janitor/README.md
       - eso-restarter: manifests/eso-restarter/README.md
       - Upgrade checker routine: skills/upgrade-checker/instructions.md
+      - Rolling node change: skills/rolling-node-change/instructions.md
       - Pi 5 U-Boot fix: talos/tools/uboot-fix/README.md
   - Hosts:
       - rpi5-1:

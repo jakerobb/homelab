@@ -10,7 +10,7 @@ resource "proxmox_download_file" "talos_worker_image" {
   # running workers are upgraded in place via `talosctl upgrade`, not
   # rebuilt from this image, so this pin can silently drift behind what's
   # actually running (it has before — see talos/README.md's "Machine-config
-  # install.image drift" section). Before rebuilding a worker from scratch,
+  # install.image" section). Before rebuilding a worker from scratch,
   # check talos/README.md's "Current state" for the schematic/version
   # actually in use and update this URL to match first.
   # TODO: pin checksum/checksum_algorithm once we can fetch a checksum alongside the image.
