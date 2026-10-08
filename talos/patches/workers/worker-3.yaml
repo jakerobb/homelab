@@ -13,8 +13,8 @@ machine:
   # Factory amd64 schematic the shared worker.yaml template points at.
   # install.disk matches the template (the Pi's NVMe SSD).
   #
-  # Caveat, same as the control planes (talos/README.md, "Talos v1.14.1
-  # upgrade blocked by Pi5 EFI-variable firmware bug"): this node's disk was
+  # Caveat, same as the control planes (talos/README.md, "Pi 5 U-Boot
+  # fix"): this node's disk was
   # written from the v1.14.2-1 raw image with the patched hive u-boot.bin
   # swapped in. The plain tag below would overwrite that u-boot.bin with the
   # broken one on any install or upgrade, so every `talosctl upgrade` of this
