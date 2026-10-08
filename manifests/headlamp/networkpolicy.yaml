@@ -1,5 +1,11 @@
 # Headlamp. Talks to the API server as the logged-in user, and to Authelia for OIDC by its public
 # hostname, which resolves to the Gateway VIP (hairpin through the Gateway).
+# The hairpin needs two egress rules, not one: the Gateway VIP itself (`ingress`
+# entity / VIP CIDR) and the Authelia pods behind it. Cilium's Gateway Envoy
+# enforces the *client's* egress policy against the backend it routes to, so
+# without the Authelia rule it answers a bare `403 Access denied` and Headlamp's
+# login fails with "failed to get provider" (found 2026-10-08; Hubble showed
+# `http-request DROPPED` on the Gateway).
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
@@ -59,4 +65,11 @@ spec:
       toPorts:
         - ports:
             - port: '443'
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: authelia
+      toPorts:
+        - ports:
+            - port: '9091'
               protocol: TCP

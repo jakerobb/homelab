@@ -22,7 +22,7 @@ spec:
 # Everything in the namespace: talk to each other and to the API server (the operator, kube-state-metrics
 # and the config reloaders), receive the API server's admission-webhook calls, and receive the Gateway on
 # Prometheus (9090) and Alertmanager (9093). SigNoz federates Prometheus (9090) and sends alerts to
-# ntfy-alertmanager (8080). ntfy-alertmanager pushes to ntfy.
+# ntfy-alertmanager (8080). Glance queries Prometheus (9090) for its Kubernetes widget. ntfy-alertmanager pushes to ntfy.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -60,6 +60,13 @@ spec:
             - port: '9090'
               protocol: TCP
             - port: '8080'
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: glance
+      toPorts:
+        - ports:
+            - port: '9090'
               protocol: TCP
   egress:
     - toEndpoints:

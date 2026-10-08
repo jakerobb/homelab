@@ -2268,6 +2268,11 @@ app built from what each one actually talks to.
   by Envoy, so Authelia allows it too. Allowing only `ingress` (the first
   version, 2026-10-05) made Envoy's ext-auth call fail across nodes, and Envoy
   answers a failed ext-auth with a bare 403 on every gated host.
+- **Calling the Gateway from inside the cluster** (e.g. Headlamp's OIDC discovery against `auth.jakerobb.org`) needs
+  an egress rule for the Gateway *and* one for the backend pods behind it (Authelia on 9091). Cilium's Gateway Envoy
+  enforces the client's egress policy against the backend it routes to, and answers a bare `403 Access denied` when
+  that's missing; Hubble shows `http-request DROPPED` on `cilium-gateway-homelab-gateway`. Found 2026-10-08, when
+  Headlamp login broke with "failed to get provider".
 - **Kubelet probes** come from `host`, which Cilium always allows; nothing
   needs a rule for them.
 - **LoadBalancer apps** (Mosquitto, Unbound, NetworkOptimizer's speed test,

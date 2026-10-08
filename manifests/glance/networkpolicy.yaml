@@ -1,4 +1,6 @@
-# Glance dashboard. Its only outbound call is the open-meteo weather API.
+# Glance dashboard. Outbound calls: the open-meteo weather API, and Prometheus (in-cluster) for the
+# Kubernetes widget. The Prometheus flow needs a matching ingress rule in
+# manifests/network-policies/monitoring.yaml.
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
@@ -54,4 +56,12 @@ spec:
       toPorts:
         - ports:
             - port: '443'
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: prometheus
+      toPorts:
+        - ports:
+            - port: '9090'
               protocol: TCP
