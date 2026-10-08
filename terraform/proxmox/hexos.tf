@@ -91,7 +91,14 @@ resource "proxmox_virtual_environment_vm" "hexos" {
   }
 
   memory {
-    dedicated = 8192
+    # 10GB, up from 8GB (2026-10-08). With 8GB, SCST (the iSCSI target) failed
+    # to allocate 8 MiB command buffers in bursts ("Allocation of sgv_pool_obj
+    # failed (size 8388608)" in /var/log/scst.log), answered BUSY/QUEUE FULL,
+    # and a worker's write timed out after 180s: the Prometheus volume stalls
+    # of 2026-09-29, 10-05 and 10-07. The Proxmox host has 32GB: two 8GB Talos
+    # workers + this VM + ~2.5GB for Proxmox itself leaves no room for more
+    # than ~10GB here.
+    dedicated = 10240
     # No `floating` set — ballooning disabled. ZFS wants to size its ARC
     # against a stable amount of RAM; Proxmox reclaiming memory out from
     # under it fights that.

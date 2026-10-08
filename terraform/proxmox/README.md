@@ -49,7 +49,7 @@ terraform plan   # not ./tf.sh, since the wrapper would override this with the s
   Talos upgrade doesn't leave the cluster with zero schedulable capacity — see
   `../../talos/README.md` for that rationale and the version/installer-image
   gotcha.
-- `hexos` VM (`hexos.tf`) — q35, UEFI (OVMF), 6 vCPU / 8GB RAM (ballooning
+- `hexos` VM (`hexos.tf`) — q35, UEFI (OVMF), 6 vCPU / 10GB RAM (ballooning
   disabled — ZFS ARC wants stable RAM), boots from the TrueNAS SCALE-based
   HexOS ISO (`hexos_iso` resource, downloaded directly by Proxmox) on first
   apply. `hostpci0`/`hostpci1` pass through the P3 Plus and T500 individually
