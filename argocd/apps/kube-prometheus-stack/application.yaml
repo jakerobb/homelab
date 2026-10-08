@@ -260,6 +260,12 @@ spec:
           # nothing wrong and nothing to fix: moving pods between the guests
           # doesn't free host memory. Swap is unused, and the real danger
           # (the host OOM-killing a VM) is well below 5% available.
+          #
+          # 2026-10-08: hexos went from 8GiB to 10GiB, so the VMs now hold
+          # 26 of the ~29GiB and the host idles at ~1.25GiB available (~4%,
+          # 95.7% used), which tripped the 95% rule. Nothing grows (all three
+          # VMs are fixed-size, ARC is unused, swap is untouched), so the
+          # threshold moved to 98% (~600MiB available).
           node-memory:
             groups:
               - name: node-memory
@@ -285,7 +291,7 @@ spec:
                       100 - (node_memory_MemAvailable_bytes{job="node-exporter",
                       instance="192.168.102.21:9100"} /
                       node_memory_MemTotal_bytes{job="node-exporter",
-                      instance="192.168.102.21:9100"} * 100) > 95
+                      instance="192.168.102.21:9100"} * 100) > 98
                     for: 15m
                     labels:
                       severity: warning
@@ -293,9 +299,9 @@ spec:
                       summary: The MS-A2 Proxmox host is running out of memory.
                       description: >-
                         The Proxmox host {{ $labels.instance }} has been above
-                        95% memory used for 15 minutes, currently
+                        98% memory used for 15 minutes, currently
                         {{ printf "%.2f" $value }}%. Its three VMs hold about
-                        24GiB of the 29GiB and it normally idles near 89%, so
+                        26GiB of the 29GiB and it normally idles near 96%, so
                         this is a real change: check for a host process
                         (backups, a stuck qm task) or a VM that grew.
         kubeProxy:
