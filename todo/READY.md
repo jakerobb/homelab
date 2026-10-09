@@ -111,7 +111,8 @@ alerts are already on). A `SECURITY.md`, plus private vulnerability reporting if
 
 ### Pin container images by digest
 
-Images are pinned by tag, which a registry can repoint. Add `docker:pinDigests` to Renovate's `extends` so it adds
+Images are pinned by tag, which a registry can repoint (only restock-radar is pinned by digest today, by hand; the
+GitHub "require SHA pinning" setting covers Actions, not container images). Add `docker:pinDigests` to Renovate's `extends` so it adds
 `@sha256:` digests and updates them with the tag. Expect a one-time PR touching most manifests, and review it as you
 would a bulk change; the `# renovate:` annotated pins in custom managers may need their regexes widened to cope with a
 digest after the tag.
@@ -135,10 +136,12 @@ the switch is an ordinary update. Don't use a separator (`20261005-021530`): Ren
 variant suffix and only proposes tags with the same one, so it would never see a newer image. That's from Renovate's
 docs, not tested here, so check that the first bump PR appears. Leave `latest` as it is.
 
-Apps (each repo's `.github/workflows/docker-publish.y*ml`; the `date` step differs slightly between them):
-`restock-radar`, `nut-relay`, `truenas-exporter` and `modbus-eth-controller`, whose pins are in
-`manifests/restock-radar/`, `nut-exporter/`, `truenas-exporter/` and `modbus-controller/`. Once restock-radar has a
-unique tag, its digest pin is optional; keep it if "Pin container images by digest" below goes ahead.
+**Status (2026-10-08):** the workflow change is made in all four apps (each repo's
+`.github/workflows/docker-publish.y*ml`: `restock-radar`, `nut-relay`, `truenas-exporter` and `modbus-eth-controller`),
+including restock-radar, which still had the date-only tag until now. What's left is merging them and confirming that
+Renovate opens a bump PR for the first timestamped tag in each of `manifests/restock-radar/`, `nut-exporter/`,
+`truenas-exporter/` and `modbus-controller/`. Once restock-radar has a unique tag, its digest pin is optional; keep it
+if "Pin container images by digest" above goes ahead.
 
 ## VolumeSnapshots for the iSCSI volumes
 
