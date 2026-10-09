@@ -219,9 +219,15 @@ edits. Keep the MQTT VIP (`192.168.102.131`) unless you've confirmed nothing on 
 **Waiting on:** the community CRD catalog fixing `external-secrets.io/clustersecretstore_v1.json`. Its 2026-10-08 update
 ([datreeio/CRDs-catalog#988](https://github.com/datreeio/CRDs-catalog/pull/988)) made kubeconform fail with "could not find
 schema for ClusterSecretStore", so [`../.github/workflows/lint.yml`](../.github/workflows/lint.yml) pins that group to the
-previous commit (`f3e4382`). Check now and then by running kubeconform against
-`manifests/external-secrets-config/clustersecretstore.yaml` with only the `main` catalog location; once it validates,
-remove the pinned `-schema-location` line and its comment. No target date: this depends on upstream.
+previous commit (`f3e4382`). The cause is tracked upstream in
+[datreeio/CRDs-catalog#991](https://github.com/datreeio/CRDs-catalog/issues/991): ESO added a field named `properties`
+under `spec.provider.crd.whitelist.rules[]`, and the catalog's converter wrongly adds a stray `additionalProperties: false`
+entry inside that field map, which kubeconform can't load. The converter fix is
+[datreeio/CRDs-catalog#964](https://github.com/datreeio/CRDs-catalog/pull/964) (open since 2026-08-31, awaiting review);
+the catalog's schemas also need regenerating after it merges. Check now and then (start with whether #964 has merged) by
+running kubeconform against `manifests/external-secrets-config/clustersecretstore.yaml` with only the `main` catalog
+location; once it validates, remove the pinned `-schema-location` line and its comment. No target date: this depends on
+upstream.
 
 ## Watch the HexOS iSCSI target logs after the memory bump
 
