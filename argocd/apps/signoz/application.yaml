@@ -136,14 +136,16 @@ spec:
         otelCollector:
           # Raised 2026-09-24: OOM-killed that week at the old 1Gi limit
           # (peak 1016Mi), and still peaking ~680Mi after the batch tuning
-          # below.
+          # below. Raised again 2026-10-09 (2Gi -> 3Gi): OOM-killed at 2Gi on
+          # 2026-10-08 while ClickHouse's disk stalled and exports backed up
+          # in memory. Normal hourly peaks are ~1.0-1.2Gi (p50 ~840Mi).
           resources:
             requests:
               cpu: 100m
               memory: 768Mi
             limits:
               cpu: "1"
-              memory: 2Gi
+              memory: 3Gi
           config:
             processors:
               # Chart default is timeout: 1s with send_batch_size: 50000.
