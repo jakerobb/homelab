@@ -297,9 +297,11 @@ Renovate PRs like everything else) — see the
 - **GitHub token (one-time, manual):** Renovate needs a token that can push
   branches and open PRs against this repo. Create a **fine-grained personal
   access token** at GitHub → Settings → Developer settings → Fine-grained
-  tokens, scoped to just `jakerobb/homelab`, with **Contents: Read and
-  write** and **Pull requests: Read and write** repository permissions (add
-  **Workflows: Read and write** too if `.github/workflows/` ever shows up).
+  tokens, scoped to `jakerobb/homelab` plus the four Go app repos the CronJob
+  also scans (`restock-radar`, `nut-relay`, `truenas-exporter`,
+  `modbus-eth-controller`), with **Contents: Read and write** and **Pull
+  requests: Read and write** repository permissions, plus **Workflows: Read
+  and write** (the repos' workflows pin Actions by SHA, which Renovate updates).
   Save it as the `token` field of the `renovate-github-token` item in the
   `homelab-k8s` 1Password vault; ESO syncs it (see "External Secrets
   Operator").
@@ -1378,7 +1380,8 @@ kubectl -n restock-radar scale deploy/restock-radar --replicas=1
   caps the watch list, sets a strict Content-Security-Policy, and stops
   retrying a notification ntfy permanently rejects instead of letting it block
   the queue (see the app's DESIGN.md). Renovate also covers the
-  `jakerobb/restock-radar` repo now (its token needs access to it).
+  `jakerobb/restock-radar` repo now (its token needs access to it), along with
+  the other three Go apps.
 - **Image** is `docker.io/jakerobb/restock-radar:<date>@sha256:<digest>`,
   pinned by hand like nut-exporter's; Renovate can bump it. The digest is there
   because the date tag can be re-published the same day (see READY.md's "Unique
