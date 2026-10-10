@@ -1382,10 +1382,11 @@ kubectl -n restock-radar scale deploy/restock-radar --replicas=1
   the queue (see the app's DESIGN.md). Renovate also covers the
   `jakerobb/restock-radar` repo now (its token needs access to it), along with
   the other three Go apps.
-- **Image** is `docker.io/jakerobb/restock-radar:<date>@sha256:<digest>`,
-  pinned by hand like nut-exporter's; Renovate can bump it. The digest is there
-  because the date tag can be re-published the same day (see READY.md's "Unique
-  image tags").
+- **Image** is `docker.io/jakerobb/restock-radar:<timestamp>@sha256:<digest>`
+  (`YYYYMMDDHHMMSS`, so every publish gets a new tag), and Renovate bumps both
+  the tag and the digest. It needs `maxMajorIncrement: 0` for `jakerobb/*`
+  images in `renovate.json`, or it skips the timestamp tags as implausibly large
+  version jumps.
 
 ## NetworkOptimizer (migrated from Docker Compose, 2026-09-28)
 

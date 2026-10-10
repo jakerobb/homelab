@@ -125,25 +125,58 @@ that changes a workflow and runs on that runner. Putting those jobs behind a Git
 reviewer closes that, at the cost of approving each Terraform PR (including Renovate's provider bumps) before it runs.
 Revisit if the token's scope widens, a second person gets write access, or the jump box gains more access.
 
-## Unique image tags for the Go apps
+## Go apps: loose ends from the 2026-10-09 CI and Renovate work
 
-The Go apps' images are tagged with the UTC date (`YYYYMMDD`), so a second publish on the same day moves the tag.
-restock-radar hit this on 2026-10-05: the re-published image kept the tag the running pod already used, so a tag bump
-would have changed nothing in git or on the node, and the Deployment is pinned by digest as a workaround. Change each
-workflow's tag step to include the time: `date -u +%Y%m%d%H%M%S` (`YYYYMMDDHHMMSS`). That's still one integer, so
-Renovate's docker versioning sorts it, and it's greater than every existing 8-digit tag, so the first bump PR after
-the switch is an ordinary update. Don't use a separator (`20261005-021530`): Renovate reads what follows a dash as a
-variant suffix and only proposes tags with the same one, so it would never see a newer image. That's from Renovate's
-docs, not tested here, so check that the first bump PR appears. Leave `latest` as it is.
+The four Go apps (`restock-radar`, `nut-relay`, `truenas-exporter`, `modbus-eth-controller`) now share the same `ci.yml`
+and `docker-publish.yml`, have required PR checks and signed commits, and are covered by this repo's Renovate CronJob
+(see [`DONE.md`](DONE.md#go-apps-shared-ci-required-checks-and-renovate-coverage)). Each item below is small and
+independent.
 
-**Status (2026-10-10):** the workflow change is merged in all four apps (each repo's
-`.github/workflows/docker-publish.y*ml`: `restock-radar`, `nut-relay`, `truenas-exporter` and `modbus-eth-controller`).
-The "first bump PR appears" check failed: Renovate skipped every new tag, because it reads the whole tag as one major
-version and the default `maxMajorIncrement` (500) rejects a jump from `20260930` to `20261010012303`, or even from one
-day's timestamp to the next. `renovate.json` now sets `maxMajorIncrement: 0` for `jakerobb/*` images. What's left is
-confirming that Renovate opens a bump PR for each of `manifests/restock-radar/`, `nut-exporter/`, `truenas-exporter/`
-and `modbus-controller/`; then delete this item. Once restock-radar has a unique tag, its digest pin is optional; keep
-it if "Pin container images by digest" above goes ahead.
+### Prove modbus's signed Swagger commit
+
+The publish workflow regenerates Swagger docs and commits them back to `main` with the `jakerobb-apps-bot` GitHub App's
+token, through the GraphQL `createCommitOnBranch` call, so GitHub signs it. The app bypasses `main pr` and not
+`main integrity`. Every publish so far found no docs changes, so that path has never actually pushed. Next time a PR
+changes the API annotations, check the publish run after merge: "Commit and push changes" should succeed, and a new
+`chore: auto-update swagger docs` commit should appear on `main` as verified, authored by the app. If it's rejected, the
+error names the rule that blocked it.
+
+### Make the four repos' rulesets agree
+
+They drifted while being set up. restock-radar, nut-relay and truenas-exporter each have one `main` ruleset (deletion,
+force-push, signatures, PR and checks, no bypass). modbus has two: `main integrity` (no bypass) and `main pr` (the app
+can bypass). "Require branches to be up to date" is on for nut-relay and truenas-exporter and off for restock-radar and
+modbus. restock-radar also requires `ui`, which the others don't have. Pick the settings you want, apply them everywhere
+and write them down. Only modbus needs the split form, because it's the only one with a bot that pushes to `main`.
+
+### A read-only Docker Hub token for CI
+
+CI's `docker` job logs in with the same `DOCKERHUB_TOKEN` that publishes images, and any branch in these repos can read
+it during a CI run. Create a second, read-only (public repositories) token, store it as a separate secret, and use that
+one in `ci.yml`. Leave the write token to `docker-publish.yml`.
+
+### Let Renovate read vulnerability alerts
+
+Renovate logs "Cannot access vulnerability alerts" for homelab and restock-radar. Add **Dependabot alerts: Read-only**
+to its token, so security-driven updates can be flagged as such. Optional.
+
+### Clean up merged branches
+
+The app repos have a pile of merged branches on the remote (`unique-image-tags`, `go-1.27.2-and-ci`, `ci-docker-login`,
+`renovate-git-author` and so on, plus restock-radar's old `renovate/golang-1.27.1`). Delete them, and turn on
+"Automatically delete head branches" in the three repos that don't have it (nut-relay already does).
+
+### Quote `$GITHUB_OUTPUT`
+
+`actionlint` flags `echo "tag=$(date ...)" >> $GITHUB_OUTPUT` (SC2086, info level) in all four `docker-publish.yml`
+files. Quote it, in all four at once so they stay identical.
+
+### Stop copying the workflows
+
+`ci.yml` and `docker-publish.yml` are now copies in four repos, kept in sync by hand, and the last round showed how easily
+they drift. A reusable workflow in one repo (called with the image name and whether there's a UI) would turn the
+next change into one PR. The catch is that every repo then depends on one repo, and modbus's Swagger step is a special
+case. Worth it if a fifth Go app turns up, or the next shared change is as big as this one was.
 
 ## VolumeSnapshots for the iSCSI volumes
 
