@@ -64,9 +64,9 @@ spec:
             limits:
               memory: 128Mi
           volumeMounts:
-            # Whole-directory mounts, not subPath — see
-            # manifests/homepage/deployment.yaml for that lesson. ConfigMap
-            # names are hash-suffixed by kustomization.yaml's generator.
+            # Whole-directory mounts, not subPath (subPath mounts never see
+            # ConfigMap updates). ConfigMap names are hash-suffixed by
+            # kustomization.yaml's generator.
             - mountPath: /app/config
               name: config
               readOnly: true

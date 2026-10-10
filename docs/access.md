@@ -43,7 +43,7 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 
 | App | URL | What it is |
 | --- | --- | --- |
-| Homepage | <https://home.jakerobb.org> | Start page with a tile for every app |
+| Glance | <https://home.jakerobb.org> | Start page with a link to every app, plus cluster and storage status |
 | Docs | <https://docs.jakerobb.org> | This site |
 | ArgoCD | <https://argocd.jakerobb.org> | Deploys the cluster's apps from this repo |
 | Headlamp | <https://headlamp.jakerobb.org> | Web UI for the Kubernetes cluster |
@@ -54,7 +54,6 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | ntfy | <https://ntfy.jakerobb.org> | Push notifications and alerts. No login |
 | Speed test | <http://speedtest.jakerobb.org:3005> | LAN speed test (Network Optimizer). LAN only, no login |
 | SearXNG | <https://search.jakerobb.org> | Private web search |
-| Glance | <https://glance.jakerobb.org> | Dashboard (trial) |
 
 The Compose apps on rpi5-1 (Home Assistant, Zigbee2MQTT, Z-Wave JS and
 others) and some LAN devices go through the same Gateway. Home Assistant,

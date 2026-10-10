@@ -116,9 +116,8 @@ spec:
                 default_redirection_url: 'https://argocd.jakerobb.org'
 
           # Deny-by-default. ArgoCD uses native OIDC (its own client below);
-          # home.jakerobb.org (Homepage, argocd/apps/homepage/) is the first
-          # app gated via the Gateway-level ExternalAuth filter instead —
-          # this rule is what it's actually checking against. Add a rule per
+          # Apps gated via the Gateway-level ExternalAuth filter instead
+          # (e.g. home.jakerobb.org, Glance) check against these rules. Add a rule per
           # app as each one moves off Compose and gets its own HTTPRoute (see
           # todo/READY.md).
           access_control:
@@ -135,8 +134,6 @@ spec:
               - domain: 'headlamp.jakerobb.org'
                 policy: 'two_factor'
               - domain: 'signoz.jakerobb.org'
-                policy: 'two_factor'
-              - domain: 'glance.jakerobb.org'
                 policy: 'two_factor'
               - domain: 'docs.jakerobb.org'
                 policy: 'two_factor'

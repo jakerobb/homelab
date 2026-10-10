@@ -49,11 +49,11 @@ Rough inventory, to be checked against the repo, 1Password and each provider bef
 
 - **Cloudflare:** the cluster's API token (cert-manager and external-dns, from the `homelab-k8s` vault) and Terraform's
   separate token (`terraform/cloudflare/secrets/`).
-- **TrueNAS:** API keys for democratic-csi (two drivers), `truenas-exporter` and Homepage. democratic-csi's key is
+- **TrueNAS:** API keys for democratic-csi (two drivers), and `truenas-exporter`. democratic-csi's key is
   already due for replacement with a least-privilege user; see [`FUTURE.md`](FUTURE.md#democratic-csi-on-truenass-json-rpc-api-hold-hexostruenas-below-26x),
   and rotate it as part of that.
-- **UniFi:** Homepage's API key, Unpoller's login, and `UNIFI_TOKEN` in the Compose `.env`.
-- **Proxmox:** the token Homepage uses and Terraform's token (`terraform/proxmox/secrets/`).
+- **UniFi:** Unpoller's login, and `UNIFI_TOKEN` in the Compose `.env`.
+- **Proxmox:** Terraform's token (`terraform/proxmox/secrets/`).
 - **GitHub:** the Renovate token, and the self-hosted runner's registration.
 - **Backblaze B2:** the Terraform state key, the etcd-backup key, and the P3 Plus backup key. All three should already
   be scoped to one bucket each; confirm that, and that none is the master key.

@@ -4,7 +4,7 @@
 # pointing it at ntfy directly doesn't work (ntfy would try to parse
 # Alertmanager's JSON as its own publish schema and reject it). No official
 # Helm chart, single Deployment — same "bare manifest" call as
-# homepage/ntfy.
+# glance/ntfy.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -1,5 +1,5 @@
 # Own Application rather than raw manifests under root — isolates
-# modbus-controller's sync/health status, same reasoning as homepage's own
+# modbus-controller's sync/health status, same reasoning as glance's own
 # Application. See argocd/README.md's app-of-apps section.
 #
 # `manifests/modbus-controller` is a Kustomize directory (kustomization.yaml),

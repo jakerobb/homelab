@@ -114,9 +114,9 @@ spec:
             limits:
               memory: 64Mi
           volumeMounts:
-            # Whole-directory mount, not subPath (see
-            # manifests/homepage/deployment.yaml for why). This replaces the
-            # image's stock default.conf.
+            # Whole-directory mount, not subPath (subPath mounts never see
+            # ConfigMap updates). This replaces the image's stock
+            # default.conf.
             - mountPath: /etc/nginx/conf.d
               name: nginx-config
               readOnly: true

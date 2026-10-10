@@ -2,7 +2,7 @@
 # web search claimed https://charts.searxng.org existed; that domain doesn't
 # resolve, and github.com/searxng/searxng-helm-chart 404s, so it was a dead
 # end/hallucination, not a real option). No per-environment variation either,
-# so plain manifests match homepage's precedent (see manifests/homepage/deployment.yaml).
+# so plain manifests match the cluster's precedent for simple apps (see manifests/glance/deployment.yaml).
 #
 # Image tag is a pinned date-stamped build, not `latest` — SearXNG doesn't do
 # semver releases, just a rolling stream of `YYYY.M.D-<sha>` tags (confirmed

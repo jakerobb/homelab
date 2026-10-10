@@ -1,5 +1,5 @@
 # Own Application rather than raw manifests under root — isolates
-# headlamp's sync/health status, same reasoning as searxng/homepage's own
+# headlamp's sync/health status, same reasoning as searxng/glance's own
 # Applications. See argocd/README.md's app-of-apps section.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

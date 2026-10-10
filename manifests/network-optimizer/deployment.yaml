@@ -1,5 +1,5 @@
 # Bare Deployment, no Helm chart (upstream ships none), same call as
-# homepage/ntfy.
+# glance/ntfy.
 #
 # Migrated from the docker-compose `optimizer` + `network-optimizer-speedtest`
 # services on rpi5-1 (2026-09-28). See argocd/README.md's NetworkOptimizer

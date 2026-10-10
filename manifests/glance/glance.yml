@@ -1,5 +1,4 @@
-# Glance config — trial dashboard running alongside Homepage
-# (manifests/homepage/). Docs: https://github.com/glanceapp/glance/blob/main/docs/configuration.md
+# Glance config — the homelab dashboard at home.jakerobb.org. Docs: https://github.com/glanceapp/glance/blob/main/docs/configuration.md
 #
 # Edits here roll the pod automatically on sync (see kustomization.yaml's
 # configMapGenerator); Glance's own file-watch auto-reload doesn't survive
@@ -82,24 +81,21 @@ pages:
       # ---- Middle: search + app links ----------------------------------------
       - size: full
         widgets:
-          # Same SearXNG instance Homepage's search box uses; the Authelia
+          # The cluster's SearXNG instance; the Authelia
           # SSO cookie covers the navigation, no extra login.
           - type: search
             search-engine: https://search.jakerobb.org/search?q={QUERY}
             new-tab: true
 
-          # Every app on Homepage, both its manual services.yaml entries
-          # and its annotation-discovered HTTPRoutes (Headlamp, SearXNG,
-          # ntfy, SigNoz), in the same four groups, alphabetical within
-          # each. This is a static list — unlike Homepage, Glance has no
-          # Kubernetes discovery, so a new app needs a line here too.
+          # Every app, in four groups, alphabetical within each. This is a
+          # static list — Glance has no Kubernetes discovery, so a new app
+          # needs a line here too.
           #
           # Icons: `di:` = homarr-labs/dashboard-icons, `sh:` = selfh.st,
           # `mdi:` = Material Design (all loaded by the browser from
           # jsDelivr). Modbus Controller, Modbus Relay, and Network
-          # Optimizer have no entry in either icon set; Homepage uses
-          # custom PNGs for those (manifests/homepage/icons-configmap.yaml),
-          # stand-in MDI glyphs here for now.
+          # Optimizer have no entry in either icon set, so they use
+          # stand-in MDI glyphs.
           - type: bookmarks
             groups:
               - title: Apps
@@ -181,9 +177,6 @@ pages:
                   - title: HexOS/TrueNAS
                     url: https://deck.hexos.com/dash
                     icon: di:truenas-scale
-                  - title: Homepage
-                    url: https://home.jakerobb.org
-                    icon: sh:homepage
                   - title: Proxmox
                     url: https://proxmox.lan:8006
                     icon: di:proxmox
@@ -198,14 +191,13 @@ pages:
           # widget over kube-prometheus-stack's Prometheus (in-cluster,
           # unauthenticated) — node-exporter for CPU/memory, kube-state-metrics
           # for node/pod counts. Chosen over the Kubernetes Metrics API
-          # (what Homepage's widget reads) because metrics-server returns
+          # because metrics-server returns
           # quantity strings like "123456789n"/"1234Ki", and Glance's
           # template language has no string-to-number parsing; Prometheus
           # returns plain decimal strings, which `.Float` parses directly.
           #
           # Main request = per-node CPU; everything else is a subrequest
-          # (fetched concurrently). Title links to Headlamp, same as
-          # Homepage's widget.
+          # (fetched concurrently). Title links to Headlamp.
           - type: custom-api
             title: Kubernetes
             title-url: https://headlamp.jakerobb.org
@@ -292,7 +284,7 @@ pages:
           # the TrueNAS UI shows), not raw vdev capacity. One query returns
           # both per pool as a single series each, labelled by `metric`;
           # `or` keeps the pool listed (as unhealthy) if TrueNAS is down.
-          # Title links to the HexOS dashboard, same as Homepage's tile.
+          # Title links to the HexOS dashboard.
           - type: custom-api
             title: Storage
             title-url: https://deck.hexos.com/dash

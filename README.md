@@ -410,7 +410,7 @@ Operations
 Applications
 * Home Assistant
 * Scrypted
-* homepage
+* Glance
 * searxng
 * docs
 

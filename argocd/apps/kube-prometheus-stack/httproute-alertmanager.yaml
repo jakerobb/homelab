@@ -10,12 +10,6 @@ kind: HTTPRoute
 metadata:
   name: alertmanager
   namespace: monitoring
-  annotations:
-    gethomepage.dev/enabled: "true"
-    gethomepage.dev/name: Alertmanager
-    gethomepage.dev/description: Active alerts and silences
-    gethomepage.dev/icon: alertmanager.png
-    gethomepage.dev/group: Monitoring
 spec:
   parentRefs:
     - name: homelab-gateway

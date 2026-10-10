@@ -5,8 +5,8 @@
 # refuses to program the route at all.
 #
 # One `from` entry per namespace that has an HTTPRoute referencing Authelia
-# this way. homepage/httproute.yaml was the first, searxng/httproute.yaml
-# the second, argocd/apps/signoz/httproute.yaml the third,
+# this way. searxng/httproute.yaml was the first (the original, homepage's,
+# was retired 2026-10-10 and its entry removed), argocd/apps/signoz/httproute.yaml the third,
 # manifests/glance/httproute.yaml the fourth, manifests/docs/httproute.yaml
 # the fifth, argocd/apps/kube-prometheus-stack/httproute.yaml (and its
 # httproute-alertmanager.yaml) the sixth, argocd/apps/cilium/httproute-hubble-ui.yaml
@@ -25,9 +25,6 @@ metadata:
   namespace: authelia
 spec:
   from:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      namespace: homepage
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: searxng

@@ -8,7 +8,7 @@
 # secret to git. Setting the documented
 # HEADLAMP_CONFIG_OIDC_* env vars directly (https://headlamp.dev/docs/latest/installation/in-cluster/oidc/)
 # sidesteps the chart entirely and matches this repo's existing "bare
-# Deployment for a simple app" precedent (searxng, ntfy, homepage).
+# Deployment for a simple app" precedent (searxng, ntfy, glance).
 #
 # Image/port/probe/securityContext defaults below are lifted straight from
 # the official chart's own values.yaml so this behaves the same as an
