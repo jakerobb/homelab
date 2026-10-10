@@ -921,3 +921,24 @@ so its URL was edited in `.storage/core.config_entries` on the `homeassistant-co
 kept as `core.config_entries.pre-matter-svc` there. The thermostat, Z-Wave and Zigbee devices all work. The VIPs themselves
 come off in two days, see [`FUTURE.md`](FUTURE.md).
 
+## Go apps: shared CI, required checks and Renovate coverage
+
+**Done (2026-10-10).** `restock-radar`, `nut-relay`, `truenas-exporter` and `modbus-eth-controller` got the same
+`ci.yml` (build, vet, test, `govulncheck` weekly and on PRs, Docker build, plus restock-radar's `ui` job) and
+`docker-publish.yml` (test job gating the publish, SHA-pinned actions, a timestamp tag and the full image reference in the
+run summary), all on Go 1.27.2. Their `main` branches require a PR, passing `go` and `docker` checks, signed commits and
+squash merges. Renovate runs over all four from this repo's CronJob
+([`../manifests/renovate/cronjob.yaml`](../manifests/renovate/cronjob.yaml)) and its commits verify, which took
+`gitAuthor` set to the noreply address and `platformCommit: disabled` in each repo's `renovate.json`.
+
+- **Unique image tags:** images are tagged `YYYYMMDDHHMMSS`, so a second publish on the same day gets a new tag. Renovate
+  skipped every one of them at first, because it reads the tag as one big major version and rejects a jump over
+  `maxMajorIncrement` (500). `renovate.json` sets that to 0 for `jakerobb/*` images, and the first bump PRs for all four
+  appeared and merged the same day.
+- **modbus's Swagger commit** goes through the `jakerobb-apps-bot` GitHub App: the Actions app can't be a ruleset bypass
+  actor on a personal repository, and an app you own and install can. The ruleset is split so that signatures still
+  apply to the app. See the READY.md item for the part that hasn't been exercised.
+- **Pitfalls hit on the way:** `go mod tidy` removed the `go.sum` lines for the `swag` CLI and broke every modbus publish
+  for about a day (the workflow now installs the binary at go.mod's version instead of `go run`); the arm64 build ran
+  under QEMU and made modbus's check take five minutes (the Dockerfile cross-compiles now); and Docker Hub's 429s and
+  auth timeouts failed CI (the login step uses `continue-on-error`).
