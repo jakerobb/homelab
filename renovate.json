@@ -51,6 +51,12 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["influxdb", "docker.io/influxdb", "docker.io/library/influxdb"],
       "allowedVersions": "<3"
+    },
+    {
+      "description": "The Go apps' images are tagged with a UTC timestamp (YYYYMMDDHHMMSS). Renovate reads the whole tag as one major version, so even the next day's tag is a jump of ~1,000,000 and is skipped as implausible under the default maxMajorIncrement of 500. 0 disables the limit.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["docker.io/jakerobb/*", "jakerobb/*"],
+      "maxMajorIncrement": 0
     }
   ],
   "customManagers": [
