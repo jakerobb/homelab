@@ -9,7 +9,7 @@ worked example throughout is Headlamp
 ([`argocd/apps/headlamp/`](../argocd/apps/headlamp/application.yaml),
 [`manifests/headlamp/`](../manifests/headlamp/)) — added 2026-09-21, and
 about as representative a case as exists (bare manifests, native OIDC,
-custom RBAC, Homepage discovery, a secret).
+custom RBAC, a secret).
 
 For the deeper "why" behind any of this, see
 [`argocd/README.md`](../argocd/README.md) — that file is the per-app
@@ -86,7 +86,7 @@ and is trustworthy:
   metrics-server, kube-prometheus-stack, local-path-provisioner): set
   `source.chart` + `source.repoURL` to the chart repo, `targetRevision` to
   a pinned chart version, and `helm.valuesObject` inline for overrides.
-- **Bare manifests** (searxng, ntfy, homepage, Headlamp): write the
+- **Bare manifests** (searxng, ntfy, Glance, Headlamp): write the
   Deployment/Service/etc. by hand under `manifests/<name>/`. Use this
   when there's no official chart, or when the official chart has real
   problems for your use case — Headlamp's chart has open upstream bugs in
@@ -176,8 +176,7 @@ two ways to actually gate it:
   *plaintext* secret (see "Secrets" below) — Authelia's config only ever
   holds the one-way pbkdf2-sha512 hash, safe to commit.
 - **Gateway-level forward-auth (`ExternalAuth` HTTPRoute filter):** for
-  apps with no OIDC support of their own (searxng, and — before it moved
-  to annotation-based Homepage discovery — homepage). Requires:
+  apps with no OIDC support of their own (searxng, Glance). Requires:
   - The filter block on the app's own `HTTPRoute` (copy
     `manifests/searxng/httproute.yaml`'s `filters` section).
   - A `ReferenceGrant` in the `authelia` namespace if one doesn't already
@@ -215,37 +214,19 @@ Generate secret values in a real terminal or in 1Password's own generator.
 is safe to share, like the pbkdf2 OIDC client-secret hash that goes into
 Authelia's config.
 
-## 6. Homepage discovery
+## 6. Dashboard link
 
-Prefer **annotation-based discovery** over hand-editing
-`manifests/homepage/configmap.yaml`'s `services.yaml` — it's
-self-maintaining (the tile lives and dies with the `HTTPRoute`, no
-separate file to keep in sync). Add to the app's own `HTTPRoute`:
+The dashboard is [Glance](../manifests/glance/glance.yml) at
+`home.jakerobb.org`, and it has no Kubernetes discovery: add the new app
+as a line in the `bookmarks` widget's group in `manifests/glance/glance.yml`
+(`title`, `url`, `icon`). The Deployment rolls automatically on sync.
 
-```yaml
-metadata:
-  annotations:
-    gethomepage.dev/enabled: "true"
-    gethomepage.dev/name: <Display Name>
-    gethomepage.dev/description: <short description>
-    gethomepage.dev/icon: <icon>.png
-    gethomepage.dev/group: <Apps|Services|Monitoring|Infrastructure>
-```
-
-- `group` must be one of the four existing tabs defined in
-  `settings.yaml` (`kubernetes.yaml`'s `mode: cluster` + `gateway: true`
-  is what turns this on cluster-wide — already configured, nothing to
-  touch there).
-- Icon: check
-  [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons)
-  first (`icon: <slug>.png`). If the app isn't in that set, add a real
-  icon (sourced from the app's own project) to
-  [`manifests/homepage/icons-configmap.yaml`](../manifests/homepage/icons-configmap.yaml)
-  and reference it as `icon: /icons/<name>.png`.
-- **Fall back to a manual `services.yaml` entry only if the tile needs a
-  live `widget:`** (API-polling stat tiles like the HexOS/Proxmox/UniFi
-  ones in the `Infrastructure` group) — annotation-based discovery
-  doesn't support widgets today.
+- Icons: `di:<slug>` for
+  [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons),
+  `sh:<slug>` for selfh.st, `mdi:<name>` for Material Design. They're
+  loaded by the browser from jsDelivr.
+- A live stat tile (API-polling) is a `custom-api` widget instead; see the
+  Kubernetes and Storage widgets in the same file for the pattern.
 
 ## 7. CRDs stay out of ArgoCD's hands
 
@@ -281,7 +262,7 @@ from `kubectl get endpointslices`. After it syncs, watch
    (ServiceAccount + ClusterRole/ClusterRoleBinding if the app needs
    cluster access).
 4. `manifests/<name>/httproute.yaml` — `homelab-gateway` parentRef,
-   `<name>.jakerobb.org` hostname, `gethomepage.dev/*` annotations.
+   `<name>.jakerobb.org` hostname.
 5. Decide OIDC vs. forward-auth; wire up
    `argocd/apps/authelia/application.yaml` (`access_control` rule, plus
    an OIDC client if applicable) and any needed `ReferenceGrant`.

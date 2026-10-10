@@ -17,6 +17,14 @@ the T500 ending up as a dedicated ZFS log device rather than striped capacity) w
 rather than as part of this entry:
 restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queue gap found along the way (done, 2026-09-25; see below).
 
+## Homepage retired; Glance is the dashboard
+
+**Done (2026-10-10).** After more than a week of using Glance exclusively, Homepage was removed (Application,
+`manifests/homepage/`, the widget-credential ExternalSecrets, its Authelia `ReferenceGrant` entry, and the
+`gethomepage.dev/*` annotations on every other app's route) and Glance moved from `glance.jakerobb.org` to
+`home.jakerobb.org`. The old Glance hostname and its Authelia rule are gone. Details:
+[`../argocd/README.md`](../argocd/README.md#glance-deployed-2026-09-23-the-homelab-dashboard-since-2026-10-10).
+
 ## Jump box swap (4GB Pi becomes rpi5-1; the 16GB Pi becomes talos-worker-3)
 
 **Done (2026-10-06).** The 1TB SSD that holds rpi5-1's OS and data moved to a new 4GB Raspberry Pi 5, which kept the name

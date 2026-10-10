@@ -1,5 +1,5 @@
 # Own Application rather than raw manifests under root — isolates
-# ntfy-alertmanager's sync/health status, same reasoning as homepage's own
+# ntfy-alertmanager's sync/health status, same reasoning as glance's own
 # Application. See argocd/README.md's app-of-apps section.
 #
 # Targets the existing `monitoring` namespace (alongside kube-prometheus-stack

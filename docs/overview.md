@@ -69,7 +69,7 @@ flowchart LR
 3. **Login.** [Authelia](../argocd/README.md#authelia-sso-decided-2026-09-13)
    gates every app except ntfy, whose clients (phone apps, Alertmanager)
    can't do a browser login. Apps with their own OIDC login (ArgoCD, Headlamp) talk to
-   Authelia directly. Apps without one (Homepage, SearXNG, these docs) are
+   Authelia directly. Apps without one (Glance, SearXNG, these docs) are
    gated at the Gateway by an `ExternalAuth` filter. Either way, you sign in
    once with a password and a TOTP code.
 4. **The app.** The Gateway forwards the request to the app's Service.
@@ -108,8 +108,8 @@ docs build without broken links.
   (`ntfy.jakerobb.org`, topic `homelab-alerts`), which pushes to phones.
 - **Email:** cron jobs on rpi5-1 (etcd backups, the UniFi GC report) email
   on failure through Brevo. See [Email alerts](email-alerts.md).
-- **Dashboards:** [Homepage](https://home.jakerobb.org) is the front door,
-  with a tile for every app. Headlamp (`headlamp.jakerobb.org`) is a web UI
+- **Dashboards:** [Glance](https://home.jakerobb.org) is the front door,
+  with a link to every app. Headlamp (`headlamp.jakerobb.org`) is a web UI
   for the cluster itself.
 
 ## Backups

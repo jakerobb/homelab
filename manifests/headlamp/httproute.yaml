@@ -1,5 +1,5 @@
 # Not gated by Authelia's Gateway-level ExternalAuth filter (unlike
-# searxng/homepage) — Headlamp speaks OIDC natively (see deployment.yaml),
+# searxng/glance) — Headlamp speaks OIDC natively (see deployment.yaml),
 # same call already made for ArgoCD (see argocd/README.md's Authelia SSO
 # section): a real OIDC client is a single login, where stacking
 # ExternalAuth in front would mean logging into Authelia twice (once for
@@ -8,20 +8,11 @@
 # record automatically from this hostname (see argocd/README.md's "DNS +
 # TLS" section) — no manual step needed since headlamp.jakerobb.org never
 # existed under the old Caddy setup.
-#
-# gethomepage.dev/* annotations opt this into Homepage's Kubernetes
-# discovery (see manifests/homepage/configmap.yaml's kubernetes.yaml),
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: headlamp
   namespace: headlamp
-  annotations:
-    gethomepage.dev/enabled: "true"
-    gethomepage.dev/name: Headlamp
-    gethomepage.dev/description: Kubernetes cluster GUI
-    gethomepage.dev/icon: headlamp.png
-    gethomepage.dev/group: Apps
 spec:
   parentRefs:
     - name: homelab-gateway

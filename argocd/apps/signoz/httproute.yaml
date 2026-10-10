@@ -9,7 +9,7 @@
 # Gated by Authelia forward-auth (ExternalAuth), not native OIDC — SigNoz
 # Community Edition's OIDC support is enterprise/cloud-only (checked against
 # SigNoz's own docs/changelog before assuming otherwise). Same pattern as
-# searxng/homepage: requires the matching ReferenceGrant entry
+# searxng/glance: requires the matching ReferenceGrant entry
 # (argocd/apps/authelia/referencegrant.yaml) and access_control rule
 # (argocd/apps/authelia/application.yaml) for signoz.jakerobb.org.
 apiVersion: gateway.networking.k8s.io/v1
@@ -17,12 +17,6 @@ kind: HTTPRoute
 metadata:
   name: signoz
   namespace: signoz
-  annotations:
-    gethomepage.dev/enabled: "true"
-    gethomepage.dev/name: SigNoz
-    gethomepage.dev/description: Logs, metrics, and traces
-    gethomepage.dev/icon: signoz.png
-    gethomepage.dev/group: Monitoring
 spec:
   parentRefs:
     - name: homelab-gateway

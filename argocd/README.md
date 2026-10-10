@@ -29,10 +29,10 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   and last manual step. Add new apps by dropping an `Application` manifest
   anywhere under `apps/` — the root app recurses. See
   [`docs/adding-an-app.md`](../docs/adding-an-app.md) for the full
-  checklist (file layout, exposure, auth, secrets, Homepage discovery).
+  checklist (file layout, exposure, auth, secrets, dashboard link).
   - **Convention (settled 2026-09-17): `apps/` holds only `Application`
     manifests, never an app's actual resources.** Early on, a few simple
-    apps (`homepage`, `renovate`) were added as raw manifests directly under
+    apps (`homepage`, since retired, and `renovate`) were added as raw manifests directly under
     `apps/<name>/` instead of getting their own `Application` — meaning
     root owned their Deployments/CronJobs/etc. directly, alongside its
     real job of owning the `Application` objects themselves. Downside:
@@ -502,7 +502,7 @@ something like ntfy actually lands in the cluster") is what triggered this,
 not the other way around. Deployed as
 [`apps/ntfy/`](apps/ntfy/application.yaml), bare manifests (no official
 chart) at [`manifests/ntfy/`](../manifests/ntfy/), same "bare Deployment"
-call as homepage/searxng.
+call as searxng.
 
 - **Config carried over as-is** from the pre-migration
   `docker/ntfy/conf/server.yml` on rpi5-1 (`base-url`, `upstream-base-url`)
@@ -510,7 +510,7 @@ call as homepage/searxng.
   No `auth-file` was configured before, and none is configured now — this
   migration doesn't change ntfy's security posture, just where it runs (see
   the HTTPRoute's own comment for why it's deliberately *not* gated by
-  Authelia's `ExternalAuth` filter, unlike homepage/searxng).
+  Authelia's `ExternalAuth` filter, unlike searxng).
 - **1Gi PVC** (`hexos-iscsi`) for the message cache (`cache.db`) so recent
   notification history survives a pod restart — the pre-migration cache.db
   was 258KB, so this is generous headroom, not a tight budget. The old
@@ -538,10 +538,6 @@ call as homepage/searxng.
   Caddy) rather than `ntfy.jakerobb.org` needs to be repointed by hand;
   nothing in this repo can enumerate those (Home Assistant's own notify
   config, for one, isn't tracked here).
-- **Homepage entry converted to `gethomepage.dev/*` annotation-based
-  discovery** (on the new `HTTPRoute`), replacing the manual `services.yaml`
-  entry it had before — same pattern searxng's `httproute.yaml` established
-  first.
 
 ## Headlamp (decided and deployed 2026-09-21)
 
@@ -568,8 +564,7 @@ at [`manifests/headlamp/`](../manifests/headlamp/).
   gets an Authelia account.
 - **Exposure:** `HTTPRoute` on `homelab-gateway`
   ([`manifests/headlamp/httproute.yaml`](../manifests/headlamp/httproute.yaml)),
-  hostname `headlamp.jakerobb.org`, discovered by Homepage via
-  `gethomepage.dev/*` annotations into the Infrastructure tab.
+  hostname `headlamp.jakerobb.org`, linked from Glance's `bookmarks`.
 - **Secrets:** from 1Password via External Secrets Operator, like the rest.
   Two things need generating
   together — the plaintext client secret (goes in the k8s Secret Headlamp
@@ -1107,13 +1102,17 @@ real API key, and reporting back whether the plugin's UI actually
 round-trips correctly end-to-end. Only remove `kube-prometheus-stack` if
 that's a clean yes.
 
-## Glance (trial, deployed 2026-09-23)
+## Glance (deployed 2026-09-23; the homelab dashboard since 2026-10-10)
 
-A second dashboard running alongside Homepage (not replacing it), as a
-declarative trial of [Glance](https://github.com/glanceapp/glance). Homarr
-was ruled out because its config lives in a database rather than files.
+The dashboard, [Glance](https://github.com/glanceapp/glance). It started as a
+trial alongside Homepage; Homarr was ruled out because its config lives in a
+database rather than files. After more than a week of exclusive use Homepage
+was retired (its Application, manifests, widget-credential ExternalSecrets
+and Authelia/ReferenceGrant entries removed, along with the
+`gethomepage.dev/*` annotations on other apps' routes) and Glance moved from
+`glance.jakerobb.org` to `home.jakerobb.org`; the old hostname is gone.
 Deployed as [`apps/glance/`](apps/glance/application.yaml) →
-[`manifests/glance/`](../manifests/glance/), at `glance.jakerobb.org`.
+[`manifests/glance/`](../manifests/glance/).
 
 - **Kustomize, not a plain manifest directory** (the first app here to use
   it) — solely for `configMapGenerator`. Glance's file-watch auto-reload
@@ -1124,23 +1123,21 @@ Deployed as [`apps/glance/`](apps/glance/application.yaml) →
   files in that directory; any edit rolls the pod on sync. See the
   comment in [`kustomization.yaml`](../manifests/glance/kustomization.yaml).
 - **Auth: Gateway forward-auth** (same `ExternalAuth` filter as
-  homepage/searxng/signoz), Glance's own built-in login left off. Needed
+  searxng/signoz), Glance's own built-in login left off. Needed
   the `access_control` rule in [`apps/authelia/application.yaml`](apps/authelia/application.yaml)
   and a `glance` entry in [`apps/authelia/referencegrant.yaml`](apps/authelia/referencegrant.yaml).
 - **Kubernetes widget via Prometheus, not the Kubernetes API.** Glance has
   no native Kubernetes widget; it's a `custom-api` widget querying
   kube-prometheus-stack's Prometheus in-cluster (node-exporter +
-  kube-state-metrics). The Metrics API (what Homepage's widget uses)
-  returns quantity strings (`123456789n`, `1234Ki`) that Glance's template
+  kube-state-metrics). The Metrics API (the Kubernetes API's
+  metrics endpoint) returns quantity strings (`123456789n`, `1234Ki`) that Glance's template
   language can't parse into numbers. Upshot: no ServiceAccount/RBAC for
   this pod at all.
 - **Weather:** Glance's built-in `weather` widget (hourly bars) plus a
   `custom-api` widget over Open-Meteo's daily forecast for today's
   high/low and a 5-day view, which the built-in one lacks.
-- **App links are a static `bookmarks` list** mirroring Homepage's
-  (manual entries + annotation-discovered ones). Glance has no service
-  discovery, so a new app needs a line in `glance.yml` as well as its
-  `gethomepage.dev/*` annotations for as long as both dashboards run.
+- **App links are a static `bookmarks` list.** Glance has no service
+  discovery, so a new app needs a line in `glance.yml`.
 - **Font:** Helvetica via `custom.css`, with `tabular-nums` so changing
   numbers don't shift width (the stock JetBrains Mono gets that for free).
 
@@ -1176,8 +1173,7 @@ deployed as [`apps/truenas-exporter/`](apps/truenas-exporter/application.yaml) �
   `truenas_pool_raw_*_bytes` (vdev capacity including parity), plus
   `truenas_pool_healthy`, `truenas_pool_status`, `truenas_up`. See the
   exporter's README for the full list.
-- **Secret:** a dedicated API key (not Homepage's, so retiring Homepage
-  doesn't break this): the `truenas-exporter-api-key` item in the
+- **Secret:** a dedicated API key (its own, not shared with any dashboard): the `truenas-exporter-api-key` item in the
   `homelab-k8s` 1Password vault, synced by External Secrets Operator.
 
 ## unpoller (migrated from Docker Compose, 2026-09-28)
@@ -1211,7 +1207,7 @@ The first service moved under the "Compose workload migration" plan in
   Kept over a UniFi API key because those carry the creating admin's full
   permissions. The password is read with unpoller's `file://` prefix from
   the mounted Secret, so it doesn't show in `kubectl describe pod`.
-- **Controller URL** is `https://gateway.lan` (same as Homepage's widget),
+- **Controller URL** is `https://gateway.lan`,
   not the `47Net.lan` name Compose used, which also resolves to three IPv6
   addresses.
 - **Hardened pod.** The image is `distroless/static`, which defaults to
@@ -1271,7 +1267,7 @@ InfluxDB) and `nut-webui` (webnut).
   5m), in
   [`../manifests/nut-exporter/prometheusrule.yaml`](../manifests/nut-exporter/prometheusrule.yaml).
 - **Removed:** `nut.jakerobb.org` (its LAN route and Authelia rule), the
-  Homepage and Glance tiles, and the relay's InfluxDB token from
+  Glance tile, and the relay's InfluxDB token from
   `docker-compose/.env.sops.env`.
 
 ## restock-radar (new, deployed 2026-10-05)
@@ -1303,7 +1299,7 @@ ChangeDetection's and Browserless's store watches (ChangeDetection itself moved 
 - **Web UI** at `https://restock-radar.jakerobb.org`: every product with its
   variants, status and price, the time of the last sync, and a form to add a
   product by slug or store URL. The app has no login, so the route is gated by
-  Authelia (`two_factor`) like Homepage and SearXNG: an HTTPRoute with the
+  Authelia (`two_factor`) like Glance and SearXNG: an HTTPRoute with the
   `ExternalAuth` filter, a rule in Authelia's `access_control`, and this
   namespace in the `authelia` ReferenceGrant. Products added in the UI live in
   the database next to the ones from `config.yaml`; config entries are
@@ -1501,8 +1497,7 @@ Compose `optimizer` and `network-optimizer-speedtest` services. Deployed as
   drops to UID 1654 with `gosu`, and traceroute/ping rely on `NET_RAW`. The
   two TCP buffer sysctls from upstream's compose file are on Kubernetes'
   safe list; `tcp_mtu_probing` isn't, so it's omitted.
-- **Homepage:** discovered via `gethomepage.dev/*` annotations on the
-  HTTPRoute, replacing the manual `services.yaml` entry. No Cloudflare DNS
+- **Dashboard:** linked from Glance's `bookmarks`. No Cloudflare DNS
   cleanup is needed: `optimizer.jakerobb.org` only ever matched the
   `*.jakerobb.org → caddy.lan` wildcard CNAME, which the external-dns record
   overrides. The `optimizer.lan` UniFi DNS entry has been deleted, and so has

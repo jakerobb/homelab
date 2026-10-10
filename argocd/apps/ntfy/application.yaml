@@ -1,5 +1,5 @@
 # Own Application rather than raw manifests under root — isolates ntfy's
-# sync/health status, same reasoning as homepage's own Application. See
+# sync/health status, same reasoning as glance's own Application. See
 # argocd/README.md's app-of-apps section.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

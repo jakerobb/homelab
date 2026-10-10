@@ -6,7 +6,7 @@
 # renovate.json at the repo root for what it scans and how.
 #
 # Bare CronJob, no Helm chart — single container, no per-environment
-# variation (matches homepage/argocd-ingress precedent for plain manifests).
+# variation (matches glance/argocd-ingress precedent for plain manifests).
 apiVersion: batch/v1
 kind: CronJob
 metadata:

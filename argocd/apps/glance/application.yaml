@@ -1,6 +1,6 @@
 # Own Application rather than raw manifests under root — isolates glance's
-# sync/health status, same reasoning as homepage's own Application. See
-# argocd/README.md's app-of-apps section.
+# sync/health status so a problem here doesn't show up as root itself being
+# unhealthy. See argocd/README.md's app-of-apps section.
 #
 # `manifests/glance` is a Kustomize directory (kustomization.yaml), not
 # plain YAML — ArgoCD detects that automatically, no `source.kustomize`
