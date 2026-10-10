@@ -136,12 +136,14 @@ the switch is an ordinary update. Don't use a separator (`20261005-021530`): Ren
 variant suffix and only proposes tags with the same one, so it would never see a newer image. That's from Renovate's
 docs, not tested here, so check that the first bump PR appears. Leave `latest` as it is.
 
-**Status (2026-10-08):** the workflow change is made in all four apps (each repo's
-`.github/workflows/docker-publish.y*ml`: `restock-radar`, `nut-relay`, `truenas-exporter` and `modbus-eth-controller`),
-including restock-radar, which still had the date-only tag until now. What's left is merging them and confirming that
-Renovate opens a bump PR for the first timestamped tag in each of `manifests/restock-radar/`, `nut-exporter/`,
-`truenas-exporter/` and `modbus-controller/`. Once restock-radar has a unique tag, its digest pin is optional; keep it
-if "Pin container images by digest" above goes ahead.
+**Status (2026-10-10):** the workflow change is merged in all four apps (each repo's
+`.github/workflows/docker-publish.y*ml`: `restock-radar`, `nut-relay`, `truenas-exporter` and `modbus-eth-controller`).
+The "first bump PR appears" check failed: Renovate skipped every new tag, because it reads the whole tag as one major
+version and the default `maxMajorIncrement` (500) rejects a jump from `20260930` to `20261010012303`, or even from one
+day's timestamp to the next. `renovate.json` now sets `maxMajorIncrement: 0` for `jakerobb/*` images. What's left is
+confirming that Renovate opens a bump PR for each of `manifests/restock-radar/`, `nut-exporter/`, `truenas-exporter/`
+and `modbus-controller/`; then delete this item. Once restock-radar has a unique tag, its digest pin is optional; keep
+it if "Pin container images by digest" above goes ahead.
 
 ## VolumeSnapshots for the iSCSI volumes
 
