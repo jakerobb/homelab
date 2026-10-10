@@ -201,18 +201,23 @@ stale notification URL carrying a Home Assistant access token; revoke that token
 Make sure the in-cluster copy is the one you want to keep first (and that a nightly backup has landed in the
 `change-detection-backups` PVC). Runbook: [`../argocd/README.md`](../argocd/README.md#change-detection-migrated-from-docker-compose-2026-10-05), step 4.
 
-## Drop the matter-server and zwave-js-ui-ws LoadBalancer VIPs
+## Look for fallout from dropping the VIPs
 
-**Waiting on:** Home Assistant behaving on the in-cluster addresses for a couple of days. It was repointed on 2026-10-08
-(MQTT to `mosquitto.mosquitto.svc.cluster.local:1883`, Z-Wave JS to `ws://zwave-js-ui-ws.zwave-js-ui.svc.cluster.local:3000`,
-Matter to `ws://matter-server.matter-server.svc.cluster.local:5580/ws`), and Matter, Z-Wave and Zigbee devices all checked
-out. **Consider it safe on or after 2026-10-10.** Then change `manifests/matter-server/service.yaml` and
-`manifests/zwave-js-ui/service-ws.yaml` to `type: ClusterIP`, removing the `lbipam.cilium.io/ips` (`192.168.102.133` and
-`.132`) and `external-dns` annotations, and check that external-dns drops the `matter` and `zwave-ws` records. The comments
-at the top of both files describe the VIPs, so update them too, plus the matching notes in `argocd/README.md`. Rollback
-is the saved `.storage/core.config_entries.pre-matter-svc` on the `homeassistant-config` volume, or reverting the Service
-edits. Keep the MQTT VIP (`192.168.102.131`) unless you've confirmed nothing on the LAN uses `mqtt.jakerobb.org`.
+**Waiting on:** two days of the matter-server, Z-Wave JS and Mosquitto LoadBalancer VIPs being gone (dropped 2026-10-10).
+**Check on or after 2026-10-12.** The Mosquitto one is the real risk: it was dropped on a "nothing seen using it" basis
+(five days of broker logs showed only kubelet probes, Home Assistant and Zigbee2MQTT, and no LAN source address), not
+proof, so a LAN device that hardcoded `mqtt.jakerobb.org` or `192.168.102.131` would have gone quiet without anything
+failing loudly.
+- Look for something that stopped reporting: Home Assistant entities stuck `unavailable` or with a stale last-updated time
+  (especially anything MQTT-based that isn't Zigbee, such as Tasmota or ESPHome devices), and
+  `kubectl -n mosquitto logs deploy/mosquitto` for new `New connection from` addresses other than node IPs.
+- Matter and Z-Wave: devices still available in Home Assistant, and matter-server and zwave-js-ui logs free of new errors.
+- Confirm external-dns removed the `mqtt`, `matter` and `zwave-ws` records (`dig @192.168.102.130 mqtt.jakerobb.org`).
+- Alerts: nothing new on the `homelab-alerts` ntfy topic about those namespaces.
 
+If something did break, restore the Service (see the comment at the top of `manifests/mosquitto/service.yaml`, and the
+git history of the matter-server and zwave-js-ui Services) and point the client at the in-cluster name instead. If it's all
+quiet, delete this item.
 
 ## Drop the kubeconform external-secrets.io schema pin
 

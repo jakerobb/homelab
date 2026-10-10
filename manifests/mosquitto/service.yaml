@@ -1,20 +1,17 @@
-# MQTT is raw TCP, so it can't go through the HTTP Gateway; it gets its own
-# LoadBalancer VIP instead. Pinned (not pool-assigned) so it never changes
-# under the clients' configs. .128 is the Gateway, .129 NetworkOptimizer, .130
-# Unbound. No l2-announce label, so the catch-all policy applies.
-#
-# external-dns publishes mqtt.jakerobb.org -> the VIP. Clients should use that
-# name, not the IP.
+# Mosquitto's MQTT listener (1883), reached by Zigbee2MQTT and Home Assistant, both of which
+# run in the cluster, at mosquitto.mosquitto.svc.cluster.local:1883. It used to be a pinned
+# LoadBalancer VIP, 192.168.102.131, published as mqtt.jakerobb.org, for clients on the LAN;
+# nothing was seen using it, so it was dropped 2026-10-10. To bring it back, restore
+# `type: LoadBalancer` with `lbipam.cilium.io/ips: 192.168.102.131` and
+# `external-dns.kubernetes.io/hostname: mqtt.jakerobb.org` (no l2-announce label needed, the
+# catch-all policy applies), and add `world` back to the ingress rule in networkpolicy.yaml.
 apiVersion: v1
 kind: Service
 metadata:
   name: mosquitto
   namespace: mosquitto
-  annotations:
-    lbipam.cilium.io/ips: 192.168.102.131
-    external-dns.kubernetes.io/hostname: mqtt.jakerobb.org
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app.kubernetes.io/name: mosquitto
   ports:

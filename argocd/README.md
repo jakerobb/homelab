@@ -1626,8 +1626,8 @@ controller is a network radio at `tcp://192.168.102.20:6638`, so nothing is hard
   confirmed against the real controller, which is the first thing the cutover checks.
 - **Non-root.** Runs as uid 1000 with all capabilities dropped (the image defaults to root; tested working as 1000).
 - **Two Services.** `zwave-js-ui` (8091) sits behind the Gateway. The WebSocket server on 3000 is raw TCP and gets its
-  own LoadBalancer VIP, `192.168.102.132`, published as `zwave-ws.jakerobb.org`. It has no authentication, same as
-  before, and is LAN-only.
+  own Service (`zwave-js-ui-ws`). It was a LoadBalancer VIP, `192.168.102.132`, published as `zwave-ws.jakerobb.org`,
+  until Home Assistant moved into the cluster; since 2026-10-10 it's a ClusterIP. It has no authentication.
 - **Auth.** Forward-auth through Authelia. The `zwave.jakerobb.org` rule already existed for the `lan-routes` version;
   the `zwave-js-ui` namespace was added to the Authelia `ReferenceGrant`. The app's own login (`gateway.authEnabled`)
   was already off, so the old `users.json` isn't carried over.
@@ -1667,7 +1667,8 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
    check that the env-var keys were applied. If secure nodes don't respond, compare the 1Password values with the old
    file. A wrong key doesn't harm the controller.
 5. In Home Assistant, reconfigure the Z-Wave JS integration's server URL to `ws://zwave-ws.jakerobb.org:3000` (it was
-   the Pi's `:3010`).
+   the Pi's `:3010`). Later changed to `ws://zwave-js-ui-ws.zwave-js-ui.svc.cluster.local:3000` when Home Assistant
+   moved in-cluster and the VIP was dropped.
 6. After a few days of everything behaving, delete `~/docker/zwave-js-ui/` on rpi5-1. It holds the old store and the
    keys in `settings.json`, and is root-owned (`sudo rm -rf`). Until then it's the rollback: revert the PR and restore
    the Compose service.
@@ -1677,7 +1678,8 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
 Zigbee2MQTT, the Zigbee network's brain and web UI. The coordinator is a network radio at `tcp://192.168.102.4:6638`, so
 nothing is hardware-pinned. Deployed as [`apps/zigbee2mqtt/`](apps/zigbee2mqtt/application.yaml) →
 [`manifests/zigbee2mqtt/`](../manifests/zigbee2mqtt/). It talks to the in-cluster Mosquitto at
-`mosquitto.mosquitto.svc.cluster.local:1883`, not through the VIP.
+`mosquitto.mosquitto.svc.cluster.local:1883`. (Mosquitto's own LoadBalancer VIP, `192.168.102.131`, was dropped
+2026-10-10; it's a ClusterIP now.)
 
 - **State is a PVC (`hexos-iscsi`, 1Gi).** `database.db` (the paired devices) and `coordinator_backup.json` are the
   parts that matter: losing them means re-pairing every Zigbee device. `configuration.yaml` also lives only here now: it
@@ -1765,8 +1767,10 @@ python-matter-server, the Matter controller Home Assistant's Matter integration 
   `chip_*.ini`, and the PAA certificate cache. Losing the fabric means re-commissioning every Matter device. The
   `restore` init container holds the pod until `scripts/matter-server-cutover/restore.sh` has copied the old data in,
   because starting on an empty directory would create a second, empty fabric.
-- **Home Assistant** is still in Compose on rpi5-1, so it can't reach a ClusterIP. The Service is a LoadBalancer pinned to
-  `192.168.102.133`, published as `matter.jakerobb.org`. The server has no authentication, LAN only, like Z-Wave JS.
+- **Home Assistant** runs in the cluster, so the Service is a ClusterIP, reached at
+  `ws://matter-server.matter-server.svc.cluster.local:5580/ws`. It used to be a LoadBalancer pinned to `192.168.102.133`
+  and published as `matter.jakerobb.org`, while Home Assistant was still in Compose on rpi5-1 (dropped 2026-10-10). The
+  server has no authentication, like Z-Wave JS.
 - **No Bluetooth.** `/run/dbus` and `apparmor=unconfined` are gone. BLE commissioning isn't available from the pod; commission
   new devices from the Home Assistant phone app, or share them from another ecosystem with a multi-admin pairing code.
 
@@ -1791,7 +1795,8 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
    to start as non-root (a permissions error on `/data` or the mDNS socket), set `runAsUser: 0` on the container and
    note why here.
 4. In Home Assistant, open the Matter integration and change the server URL from `ws://localhost:5580/ws` to
-   `ws://matter.jakerobb.org:5580/ws`. The thermostat should come back as available. If it stays unavailable, check
+   `ws://matter.jakerobb.org:5580/ws` (since replaced by the in-cluster Service URL, see above). The thermostat should
+   come back as available. If it stays unavailable, check
    mDNS first: `kubectl -n matter-server logs deploy/matter-server`, and that the node holding the pod is on the
    Server VLAN's `ens18`/equivalent interface.
 5. After a few days of everything behaving, delete `~/docker/matter-server/` on rpi5-1. Until then it's the rollback:
@@ -2279,10 +2284,11 @@ app built from what each one actually talks to.
   Headlamp login broke with "failed to get provider".
 - **Kubelet probes** come from `host`, which Cilium always allows; nothing
   needs a rule for them.
-- **LoadBalancer apps** (Mosquitto, Unbound, NetworkOptimizer's speed test,
-  Z-Wave JS UI's WebSocket) allow `world` (the LAN) plus `remote-node` and
-  `host`, since a LAN client may arrive SNAT'd through another node and Home
-  Assistant arrives from its node's IP.
+- **LoadBalancer apps** (Unbound, NetworkOptimizer's speed test) allow
+  `world` (the LAN) plus `remote-node` and `host`, since a LAN client may
+  arrive SNAT'd through another node and Home Assistant arrives from its
+  node's IP. ClusterIP-only apps that Home Assistant reaches (Mosquitto,
+  Z-Wave JS UI's WebSocket, matter-server) allow just `remote-node` and `host`.
 - **Egress** is by destination: DNS (kube-dns), the API server where a
   ServiceAccount is used, in-cluster peers by namespace and label, LAN hosts
   by `/32` and port, and "the internet" as `0.0.0.0/0` minus RFC1918 on 443

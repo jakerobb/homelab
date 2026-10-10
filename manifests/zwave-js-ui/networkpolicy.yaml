@@ -1,4 +1,4 @@
-# Z-Wave JS UI. Web UI through the Gateway; the WebSocket server (LB VIP 192.168.102.132:3000) is
+# Z-Wave JS UI. Web UI through the Gateway; the WebSocket server (ClusterIP :3000) is
 # used by Home Assistant, which runs on hostNetwork; the controller is a network radio at 192.168.102.20:6638.
 #
 # Default-deny both directions, then only the flows below. Gateway traffic

@@ -1,22 +1,16 @@
 # Z-Wave JS server WebSocket (port 3000), which Home Assistant's Z-Wave integration
-# connects to. Raw TCP/WebSocket outside the Gateway, so it gets its own LoadBalancer
-# VIP, pinned so the integration's URL never changes. .128 is the Gateway, .129
-# NetworkOptimizer, .130 Unbound, .131 Mosquitto. No l2-announce label, so the catch-all
-# policy applies.
-#
-# external-dns publishes zwave-ws.jakerobb.org -> the VIP. Point Home Assistant at
-# ws://zwave-ws.jakerobb.org:3000. Like before the migration, the server has no
-# authentication and is reachable on the LAN only.
+# connects to. Home Assistant runs in the cluster, so this is a plain ClusterIP Service:
+# point it at ws://zwave-js-ui-ws.zwave-js-ui.svc.cluster.local:3000. (It used to be a
+# pinned LoadBalancer VIP, 192.168.102.132, published as zwave-ws.jakerobb.org, back when
+# Home Assistant was still in Compose on rpi5-1; dropped 2026-10-10.) The server has no
+# authentication.
 apiVersion: v1
 kind: Service
 metadata:
   name: zwave-js-ui-ws
   namespace: zwave-js-ui
-  annotations:
-    lbipam.cilium.io/ips: 192.168.102.132
-    external-dns.kubernetes.io/hostname: zwave-ws.jakerobb.org
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app.kubernetes.io/name: zwave-js-ui
   ports:

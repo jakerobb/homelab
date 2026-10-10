@@ -1,5 +1,5 @@
-# Mosquitto. Reached from the LAN (IoT devices, via the LB VIP 192.168.102.131), from Home Assistant
-# (hostNetwork, so it arrives as `host`/`remote-node`) and from Zigbee2MQTT. It makes no outbound calls.
+# Mosquitto. Reached from Home Assistant (hostNetwork, so it arrives as `host`/`remote-node`) and from
+# Zigbee2MQTT. Nothing on the LAN connects since the LB VIP was dropped (2026-10-10). It makes no outbound calls.
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
@@ -28,7 +28,6 @@ spec:
   endpointSelector: {}
   ingress:
     - fromEntities:
-        - world
         - remote-node
         - host
       toPorts:
