@@ -2,8 +2,8 @@
 # (docker-compose/mosquitto/config/mosquitto.conf), except logging goes to
 # stdout so Vector/SigNoz pick it up instead of a log file on the volume.
 #
-# allow_anonymous is unchanged from Compose: the broker is only reachable on
-# the LAN (Server VLAN VIP), and Zigbee2MQTT / Home Assistant connect without
+# allow_anonymous is unchanged from Compose: the broker is only reachable inside
+# the cluster (ClusterIP), and Zigbee2MQTT / Home Assistant connect without
 # credentials today. Adding auth means touching both clients, so it's a
 # separate change.
 apiVersion: v1

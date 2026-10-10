@@ -942,3 +942,10 @@ squash merges. Renovate runs over all four from this repo's CronJob
   for about a day (the workflow now installs the binary at go.mod's version instead of `go run`); the arm64 build ran
   under QEMU and made modbus's check take five minutes (the Dockerfile cross-compiles now); and Docker Hub's 429s and
   auth timeouts failed CI (the login step uses `continue-on-error`).
+
+## Dropped the matter-server and Z-Wave JS WebSocket VIPs
+
+**Done (2026-10-10).** Home Assistant moved into the cluster and was repointed on 2026-10-08 to the in-cluster Service
+names, so the `matter-server` and `zwave-js-ui-ws` Services went from pinned LoadBalancer VIPs (`192.168.102.133` and
+`.132`, with `matter.jakerobb.org` and `zwave-ws.jakerobb.org`) to ClusterIP. The Mosquitto VIP (`.131`, `mqtt.jakerobb.org`) went the same way later that day, after five days of broker logs
+showed no LAN clients. See the follow-up check in [`FUTURE.md`](FUTURE.md).
