@@ -519,7 +519,7 @@ filter to each other protected app's `HTTPRoute` as it migrates.
 **Done (confirmed 2026-09-23).** Was parked in FUTURE waiting for Homepage support for HexOS/TrueNAS's JSON-RPC 2.0 /
 WebSocket API, because the REST API is removed in HexOS v26.04. Homepage added that support in January 2026
 ([gethomepage/homepage#6161](https://github.com/gethomepage/homepage/pull/6161), widget `version: 2`). It ships in
-v2.4.0, which is what's deployed, and [`../manifests/homepage/configmap.yaml`](../manifests/homepage/configmap.yaml)
+v2.4.0, which is what's deployed, and `manifests/homepage/configmap.yaml` (since removed)
 already sets `version: 2` on the `truenas` widget. Homepage's logs showed no TrueNAS errors over 24h, so the widget is
 already on the new API and a HexOS upgrade past 26.04 won't break it.
 
