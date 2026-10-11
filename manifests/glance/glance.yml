@@ -106,6 +106,9 @@ pages:
                   - title: Headlamp
                     url: https://headlamp.jakerobb.org
                     icon: di:headlamp
+                  - title: Radar
+                    url: https://radar.jakerobb.org
+                    icon: mdi:radar
                   - title: Home Assistant
                     url: https://homeassistant.jakerobb.org
                     icon: di:home-assistant

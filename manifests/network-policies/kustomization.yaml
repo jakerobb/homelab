@@ -16,4 +16,5 @@ resources:
   - local-path-storage.yaml
   - metrics-server.yaml
   - monitoring.yaml
+  - radar.yaml
   - signoz.yaml

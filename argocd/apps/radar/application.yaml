@@ -1,0 +1,92 @@
+# Radar (radarhq.io, skyhook-io/radar): a cluster topology/events/Helm/GitOps
+# UI, deployed alongside Headlamp as a trial. Official Helm chart (verified
+# live against skyhook-io.github.io/helm-charts, 1.16.0 as of 2026-10-10), so
+# no bare manifests, unlike Headlamp — the chart's OIDC wiring takes an
+# existing Secret directly.
+#
+# Auth: Radar's own OIDC login against Authelia (not Gateway forward-auth).
+# Its authorization model differs from Headlamp's: Radar's ServiceAccount
+# only fills the shared cache, and every user-initiated call impersonates the
+# logged-in user, so real Kubernetes RBAC decides what they can do. The
+# username is the ID token's `email` claim, which is exactly what
+# kube-apiserver's own OIDC setup uses, so the existing `oidc-admin`
+# ClusterRoleBinding (manifests/headlamp/clusterrolebinding-oidc-user.yaml)
+# already covers it. No new RBAC needed. See argocd/README.md's Radar section.
+#
+# Secrets (radar-auth: `client-secret` and `auth-secret`) come from
+# manifests/external-secrets-config/radar.yaml. The namespace's
+# NetworkPolicies are in manifests/network-policies/radar.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: radar
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://skyhook-io.github.io/helm-charts
+    chart: radar
+    targetRevision: 1.16.0
+    helm:
+      releaseName: radar
+      valuesObject:
+        # Single replica by design: the informer cache, SSE streams and
+        # timeline buffer are per-pod (chart values.yaml says so).
+        replicaCount: 1
+        auth:
+          mode: oidc
+          # Session-cookie HMAC key. Without a stable one, every pod restart
+          # logs everyone out.
+          existingSecret: radar-auth
+          existingSecretKey: auth-secret
+          oidc:
+            issuerURL: https://auth.jakerobb.org
+            clientID: radar
+            existingSecret: radar-auth
+            clientSecretKey: client-secret
+            redirectURL: https://radar.jakerobb.org/auth/callback
+            # Matches the `radar` client's scopes in
+            # argocd/apps/authelia/application.yaml. The chart default adds
+            # `groups`, which nothing uses here (RBAC is per-user).
+            scopes:
+              - openid
+              - profile
+              - email
+        # Read-only except what's off by default: no exec, no port-forward,
+        # no Helm writes, no Secrets read-through. Flip these deliberately
+        # if the trial turns into a keeper.
+        rbac:
+          helm: false
+          podExec: false
+          portForward: false
+        httpRoute:
+          enabled: true
+          parentRefs:
+            - name: homelab-gateway
+              namespace: gateway-system
+          hostnames:
+            - radar.jakerobb.org
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            # Drop the chart's 2-CPU limit (cpu: null removes the key); no
+            # other app here sets CPU limits.
+            cpu: null
+            memory: 1Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: radar
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+    syncOptions:
+      - CreateNamespace=true

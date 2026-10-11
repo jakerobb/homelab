@@ -1,0 +1,82 @@
+# Radar. Watches the whole cluster through the API server (informers, plus
+# impersonated calls for user requests), reaches Hubble relay for the traffic
+# view, and talks to Authelia for OIDC by its public hostname, which resolves
+# to the Gateway VIP (hairpin through the Gateway). Same two-rule hairpin as
+# Headlamp: the Gateway VIP itself and the Authelia pods behind it, since
+# Cilium's Gateway Envoy enforces the client's egress policy against the
+# backend. See argocd/README.md's "NetworkPolicies" section.
+#
+# Default-deny both directions, then only the flows below. Gateway traffic
+# arrives as Cilium's `ingress` entity when Envoy and the pod share a node,
+# and as `remote-node` when they don't; a standard NetworkPolicy can't match
+# either, hence CiliumNetworkPolicy. Kubelet probes come from `host`, which
+# Cilium always allows.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: radar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: radar
+  namespace: radar
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - ingress
+        - remote-node
+        - host
+      toPorts:
+        - ports:
+            - port: '9280'
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+    - toEntities:
+        - kube-apiserver
+    - toEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: '443'
+              protocol: TCP
+    - toCIDR:
+        - 192.168.102.128/32
+      toPorts:
+        - ports:
+            - port: '443'
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: authelia
+      toPorts:
+        - ports:
+            - port: '9091'
+              protocol: TCP
+    # Hubble relay's gRPC port (the Service's :80 maps to it). Policy sees
+    # the pod's port, not the Service's.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: hubble-relay
+      toPorts:
+        - ports:
+            - port: '4245'
+              protocol: TCP

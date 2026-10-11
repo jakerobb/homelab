@@ -133,6 +133,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'headlamp.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'radar.jakerobb.org'
+                policy: 'two_factor'
               - domain: 'signoz.jakerobb.org'
                 policy: 'two_factor'
               - domain: 'docs.jakerobb.org'
@@ -252,6 +254,26 @@ spec:
                   public: false
                   redirect_uris:
                     - 'https://headlamp.jakerobb.org/oidc-callback'
+                  claims_policy: 'email_identity'
+                  scopes:
+                    - 'openid'
+                    - 'profile'
+                    - 'email'
+                  grant_types:
+                    - 'authorization_code'
+                  response_types:
+                    - 'code'
+                  token_endpoint_auth_method: 'client_secret_basic'
+                  authorization_policy: 'two_factor'
+                - client_id: 'radar'
+                  client_name: 'Radar'
+                  client_secret: '$pbkdf2-sha512$310000$mLeEN2LWi5.XIUzY7leihQ$Z4C4btTPJRDQF6K..BQXENdw2xlXFja6LNDwAVcYhixVptpUiAVxKuwDuFFhJWf.ujrM1rJfd0zo/fYor4467Q'
+                  public: false
+                  redirect_uris:
+                    - 'https://radar.jakerobb.org/auth/callback'
+                  # Radar prefers the `email` claim as the Kubernetes
+                  # username (falls back to `sub`), so it needs the ID token
+                  # to carry it; see claims_policies above.
                   claims_policy: 'email_identity'
                   scopes:
                     - 'openid'

@@ -1,0 +1,22 @@
+# Radar's OIDC client secret for Authelia and its session-cookie HMAC key
+# (argocd/apps/radar/). One Secret, two keys: the chart's `existingSecret`
+# fields both point at it.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: radar-auth
+  namespace: radar
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: radar-auth
+  data:
+    - secretKey: client-secret
+      remoteRef:
+        key: radar-auth/client-secret
+    - secretKey: auth-secret
+      remoteRef:
+        key: radar-auth/auth-secret
