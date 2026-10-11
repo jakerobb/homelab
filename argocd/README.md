@@ -584,6 +584,61 @@ at [`manifests/headlamp/`](../manifests/headlamp/).
   and nowhere else. Until both are done, Headlamp's pod runs fine but its
   OIDC login will fail (`invalid_client` from Authelia).
 
+## Radar (trial, added 2026-10-10)
+
+[Radar](https://radarhq.io) (skyhook-io/radar, Apache 2.0) is a second
+cluster UI beside Headlamp: topology, events, Helm releases, GitOps state,
+audit checks. Added to compare against Headlamp; delete
+[`apps/radar/`](apps/radar/application.yaml),
+[`external-secrets-config/radar.yaml`](../manifests/external-secrets-config/radar.yaml),
+[`network-policies/radar.yaml`](../manifests/network-policies/radar.yaml), the
+Authelia client and the Glance bookmark if it doesn't earn its keep.
+
+- **Official Helm chart, not bare manifests.** `skyhook-io.github.io/helm-charts`
+  exists and was verified (`helm search repo`, 1.16.0). Unlike Headlamp's
+  chart, `auth.oidc.existingSecret` is a documented, working path, so
+  ESO-synced Secrets plug straight in. It also generates the `HTTPRoute`
+  (`httpRoute.enabled`), so there's no `manifests/radar/` directory.
+  Namespace comes from `CreateNamespace=true` (as SigNoz does).
+- **Auth: native OIDC against Authelia**, `radar.jakerobb.org`, redirect
+  `/auth/callback`, no Gateway forward-auth (same single-login reasoning as
+  Headlamp and ArgoCD).
+- **RBAC: per-user via impersonation, unlike Headlamp.** Radar's
+  ServiceAccount only fills a shared informer cache; each user-initiated
+  call impersonates the OIDC identity, and reads are filtered by
+  `SubjectAccessReview`. The username is the ID token's `email` claim, the same
+  one kube-apiserver trusts, so the existing `oidc-admin` ClusterRoleBinding
+  ([`manifests/headlamp/clusterrolebinding-oidc-user.yaml`](../manifests/headlamp/clusterrolebinding-oidc-user.yaml))
+  gives `jakerobb@gmail.com` cluster-admin through Radar with no new binding.
+  The client uses the `email_identity` claims policy for that reason.
+  **Cost:** the chart gives Radar's ServiceAccount `impersonate` on users and
+  groups (it refuses `system:*` identities) and cluster-wide Secret read for
+  the cache. Treat that token as privileged. It's the same trust level as
+  Headlamp's cluster-admin ServiceAccount, just shaped differently.
+- **Left off:** pod exec, port-forward and Helm writes (chart defaults).
+  Turn them on under `rbac.*` in the Application if wanted.
+- **Hubble:** the chart reads `hubble-relay-client-certs` for the traffic
+  view, and the NetworkPolicy allows relay's 4245.
+
+**Secrets and the Authelia hash (manual, once).** The committed `radar`
+client carries a valid-format placeholder hash of a discarded random value, so
+Authelia starts but Radar's login fails with `invalid_client` until this is
+done. Generate both values in a real terminal, never in chat:
+
+```bash
+docker run --rm authelia/authelia:4.39.28 authelia crypto hash generate pbkdf2 --variant sha512 --random
+openssl rand -base64 32
+```
+
+1. Replace the `radar` client's `client_secret` in
+   [`apps/authelia/application.yaml`](apps/authelia/application.yaml) with the
+   `Digest:` value.
+2. In the `homelab-k8s` 1Password vault, create a Secure Note `radar-auth`
+   with concealed fields `client-secret` (the `Random Password:` value) and
+   `auth-secret` (the `openssl` output).
+3. After merge, ESO creates the Secret; restart the `radar` Deployment if it
+   started before the Secret existed.
+
 ## External Secrets Operator (decided and deployed 2026-09-24)
 
 Every Secret a cluster workload needs comes from 1Password through
@@ -2255,7 +2310,7 @@ app built from what each one actually talks to.
   `manifests/<app>/networkpolicy.yaml`. Namespaces whose workloads come from
   Helm charts (Authelia, cert-manager, External Secrets, external-dns,
   metrics-server, descheduler, ARC controller, local-path-provisioner,
-  democratic-csi, `monitoring`, SigNoz) are in
+  democratic-csi, `monitoring`, SigNoz, Radar) are in
   [`manifests/network-policies/`](../manifests/network-policies/), one file per
   namespace, owned by the `network-policies` Application so a chart upgrade
   can't prune them.
