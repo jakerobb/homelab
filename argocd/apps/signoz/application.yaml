@@ -185,6 +185,10 @@ spec:
                           - '{job="node-exporter"}'
                           - '{job="kube-scheduler"}'
                           - '{job="kube-controller-manager"}'
+                          # etcd health, for the "etcd" dashboard
+                          # (terraform/signoz/dashboard-etcd.tf). ~2,000
+                          # series per member.
+                          - '{job="kube-etcd"}'
                           # UniFi metrics (manifests/unpoller/). Prometheus
                           # keeps only 10 days, and these used to live in
                           # InfluxDB long-term, so SigNoz holds the history.

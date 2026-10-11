@@ -1,3 +1,9 @@
 machine:
   network:
     hostname: talos-cp-1
+cluster:
+  etcd:
+    extraArgs:
+      # Metrics on this node's own IP only, plain HTTP; see
+      # talos/README.md "etcd metrics".
+      listen-metrics-urls: http://192.168.102.11:2381

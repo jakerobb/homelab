@@ -306,6 +306,20 @@ spec:
                         (backups, a stuck qm task) or a VM that grew.
         kubeProxy:
           enabled: false
+        # etcd is a Talos host service, not a pod, so the chart's default
+        # selector (component=etcd) matches nothing. Point the Service at the
+        # control-plane node IPs instead; :2381 is the plain-HTTP metrics
+        # listener from talos/patches/control-plane/cp{1,2,3}.yaml.
+        kubeEtcd:
+          enabled: true
+          endpoints:
+            - 192.168.102.11
+            - 192.168.102.12
+            - 192.168.102.13
+          service:
+            enabled: true
+            port: 2381
+            targetPort: 2381
         prometheusOperator:
           # See revisionHistoryLimit policy in argocd/README.md. Prometheus
           # itself is an Operator-managed StatefulSet, not a Helm-templated

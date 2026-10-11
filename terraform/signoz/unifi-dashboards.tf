@@ -17,7 +17,8 @@
 # or labels from two metrics in one row).
 #
 # Each dashboard-unifi-*.tf file is one dashboard as plain data, rendered by
-# the single resource below:
+# the single resource below (dashboard-etcd.tf too; it adds `tags`, a list of
+# tag values, which default to unifi and network):
 #
 #   sections  collapsible groups, each a 12-column grid of rows
 #   rows      { h = height, panels = [...] }; panel widths in a row add up to 12
@@ -54,6 +55,10 @@ locals {
     unifi-clients       = local.unifi_clients
     unifi-client-dpi    = local.unifi_client_dpi
     unifi-power         = local.unifi_power
+    # Not a UniFi dashboard, but it's the same shape; see dashboard-etcd.tf.
+    # Its tags are its own, and renaming this resource would recreate every
+    # dashboard, so it lives under the unifi name.
+    etcd = local.etcd
   }
 
   # Grid positions, from the order of panels in each row and of rows in each
@@ -150,8 +155,7 @@ resource "signoz_dashboard" "unifi" {
   schema_version = "v6"
   name           = each.key
   tags = [
-    { key = "tag", value = "unifi" },
-    { key = "tag", value = "network" },
+    for t in try(each.value.tags, ["unifi", "network"]) : { key = "tag", value = t }
   ]
 
   spec = {
