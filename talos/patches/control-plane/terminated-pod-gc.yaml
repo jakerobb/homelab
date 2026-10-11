@@ -1,0 +1,10 @@
+# Garbage-collect terminated (Failed/Succeeded) pods once there are more than 100,
+# instead of the default 12500. When a control plane reboots, the ReplicaSet
+# controller can loop on pods the kubelet rejects with "node is shutting down"
+# (cilium-operator tolerates not-ready, so it hits this every time) and leave ~75
+# Failed pods behind. At 12500 those linger indefinitely. See talos/README.md,
+# "Terminated pod GC threshold".
+cluster:
+  controllerManager:
+    extraArgs:
+      terminated-pod-gc-threshold: "100"
