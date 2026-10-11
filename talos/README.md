@@ -804,7 +804,8 @@ recurrence since. Worth capturing here if/when that's dug up.
   control-plane nodes: per-node hostname patches (`cp1.yaml`/`cp2.yaml`/
   `cp3.yaml`) plus shared patches applied identically to all 3
   (`vip.yaml`, `oidc.yaml`, `metrics-bind-address.yaml`,
-  `disable-flannel-kubeproxy.yaml`, `control-plane-resources.yaml`;
+  `disable-flannel-kubeproxy.yaml`, `control-plane-resources.yaml`,
+  `terminated-pod-gc.yaml`;
   `node-tuning-namespace.yaml`/
   `nic-watchdog-mitigation.yaml` are plain Kubernetes manifests applied via
   `kubectl`, not Talos machine-config patches).
@@ -1339,3 +1340,29 @@ Unlike the scheduler/controller-manager ports, `:2381` is plain HTTP with no
 auth. It serves metrics only (no keys or data), and binding to each node's own
 IP keeps it off the VIP and loopback, but it is still reachable from the LAN;
 there is no Talos ingress firewall configured on the control planes.
+
+## Terminated pod GC threshold
+
+Observed 2026-10-11, after the etcd metrics rollout restarted each control plane. A `cilium-operator` replica
+scheduled to a node that was shutting down was rejected by the kubelet (`NodeShutdown`), and the ReplicaSet controller
+immediately recreated it, which was rejected again: 74 `Failed` pods in about 10 seconds on `talos-cp-2`. The operator
+tolerates `not-ready`, so it hits this on every control-plane reboot. Nothing was broken (the deployment stayed 2/2),
+but kube-controller-manager only collects terminated pods past `--terminated-pod-gc-threshold`, default 12500, so they
+would have stayed forever.
+
+[`patches/control-plane/terminated-pod-gc.yaml`](patches/control-plane/terminated-pod-gc.yaml) sets it to 100:
+
+```yaml
+cluster:
+  controllerManager:
+    extraArgs:
+      terminated-pod-gc-threshold: "100"
+```
+
+```bash
+talosctl patch machineconfig -n <cp-ip> -p @terminated-pod-gc.yaml --mode=no-reboot
+```
+
+This only restarts that node's kube-controller-manager static pod (no etcd restart, no reboot). Do the nodes one at a
+time anyway, and wait for the new pod to be Running. Also applied to the shared `~/talos/homelab/controlplane.yaml`
+template on rpi5-1.
