@@ -22,6 +22,10 @@ Manages SigNoz dashboards and alerts. SigNoz itself is deployed by ArgoCD (`argo
   `talos/README.md`). Same ntfy channel.
 - `alert-descheduler.tf` — "Descheduler evicted pods": an informational push whenever the
   descheduler evicts a pod, counted from its pod log. Same ntfy channel.
+- `dashboard-etcd.tf` — etcd health on the three control-plane members: leader and
+  quorum, WAL fsync and backend commit latency, peer RTT, DB size against quota, and
+  request load. The metrics come from etcd's `:2381` listener (`talos/README.md`, "etcd
+  metrics"). Rendered by `unifi-dashboards.tf`, like the UniFi dashboards.
 - `unifi-dashboards.tf` plus one `dashboard-unifi-*.tf` per dashboard: seven UniFi
   dashboards (Network, Gateway, Switches, Access Points, Clients, Client DPI, Power)
   built from unpoller's metrics. They're ports of unpoller's stock Grafana dashboards,

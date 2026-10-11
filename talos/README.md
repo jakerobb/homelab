@@ -1302,3 +1302,40 @@ binding `0.0.0.0` doesn't remove any auth. Verified via Prometheus's
 each pod restarted. Also applied to the shared
 `~/talos/homelab/controlplane.yaml` template on rpi5-1 so a future
 from-scratch control-plane node won't reintroduce this.
+
+## etcd metrics
+
+Talos runs etcd as a host service rather than a static pod, so
+kube-prometheus-stack's default etcd `Service` (selector `component=etcd`)
+matched nothing — Radar flagged it as "No endpoints", and the chart's etcd
+alerts and dashboard never had data. etcd also serves `/metrics` only on its
+TLS client port by default, which Prometheus can't scrape without a client
+cert.
+
+Fix: each node's per-node patch
+([`cp1.yaml`](patches/control-plane/cp1.yaml),
+[`cp2.yaml`](patches/control-plane/cp2.yaml),
+[`cp3.yaml`](patches/control-plane/cp3.yaml)) binds etcd's metrics listener
+to that node's own IP rather than `0.0.0.0`:
+
+```yaml
+cluster:
+  etcd:
+    extraArgs:
+      listen-metrics-urls: http://192.168.102.11:2381   # cp2 .12, cp3 .13
+```
+
+```bash
+talosctl patch machineconfig -n <cp-ip> -p @cpN.yaml --mode=no-reboot
+```
+
+Roll it one node at a time (etcd restarts on each; quorum needs 2 of 3), and
+confirm `talosctl etcd status` shows all members healthy before the next one.
+The kube-prometheus-stack side (`kubeEtcd.endpoints` pointing at the three
+node IPs, port 2381) lives in
+[`argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml).
+
+Unlike the scheduler/controller-manager ports, `:2381` is plain HTTP with no
+auth. It serves metrics only (no keys or data), and binding to each node's own
+IP keeps it off the VIP and loopback, but it is still reachable from the LAN;
+there is no Talos ingress firewall configured on the control planes.
