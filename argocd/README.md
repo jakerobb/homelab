@@ -584,11 +584,12 @@ at [`manifests/headlamp/`](../manifests/headlamp/).
   and nowhere else. Until both are done, Headlamp's pod runs fine but its
   OIDC login will fail (`invalid_client` from Authelia).
 
-## Radar (trial, added 2026-10-10)
+## Radar (deployed 2026-10-10)
 
 [Radar](https://radarhq.io) (skyhook-io/radar, Apache 2.0) is a second
 cluster UI beside Headlamp: topology, events, Helm releases, GitOps state,
-audit checks. Added to compare against Headlamp; delete
+audit checks. Added to compare against Headlamp; login confirmed working
+2026-10-10. If it doesn't earn its keep, delete
 [`apps/radar/`](apps/radar/application.yaml),
 [`external-secrets-config/radar.yaml`](../manifests/external-secrets-config/radar.yaml),
 [`network-policies/radar.yaml`](../manifests/network-policies/radar.yaml), the
@@ -620,10 +621,12 @@ Authelia client and the Glance bookmark if it doesn't earn its keep.
 - **Hubble:** the chart reads `hubble-relay-client-certs` for the traffic
   view, and the NetworkPolicy allows relay's 4245.
 
-**Secrets and the Authelia hash (manual, once).** The committed `radar`
-client carries a valid-format placeholder hash of a discarded random value, so
-Authelia starts but Radar's login fails with `invalid_client` until this is
-done. Generate both values in a real terminal, never in chat:
+**Secrets and the Authelia hash (done 2026-10-10; kept for rebuilds).** The
+`radar` client was first committed with a valid-format placeholder hash of a
+discarded random value, so Authelia started but Radar's login would have
+failed with `invalid_client` until the real hash replaced it. (An invalid
+digest string, unlike a valid one, can stop Authelia from starting at all.)
+Generate both values in a real terminal, never in chat:
 
 ```bash
 docker run --rm authelia/authelia:4.39.28 authelia crypto hash generate pbkdf2 --variant sha512 --random
@@ -636,8 +639,18 @@ openssl rand -base64 32
 2. In the `homelab-k8s` 1Password vault, create a Secure Note `radar-auth`
    with concealed fields `client-secret` (the `Random Password:` value) and
    `auth-secret` (the `openssl` output).
-3. After merge, ESO creates the Secret; restart the `radar` Deployment if it
-   started before the Secret existed.
+3. After merge, ESO creates the Secret. The pod sits in
+   `CreateContainerConfigError` until it exists (about two minutes on the first
+   deploy, since `external-secrets-config` syncs after the chart) and then
+   starts by itself, so no restart is needed.
+
+**Verifying a rollout.** Radar's `/api/health` going 200 only proves the pod
+is up. The real checks are the login itself (Authelia, then Radar, then
+cluster data under your own identity) and `hubble observe -n radar --verdict
+DROPPED` for anything the NetworkPolicy missed. An authorize request against
+`auth.jakerobb.org/api/oidc/authorization?client_id=radar...` that gets past
+client and redirect-URI validation confirms the Authelia client loaded
+without needing a browser.
 
 ## External Secrets Operator (decided and deployed 2026-09-24)
 

@@ -17,6 +17,14 @@ the T500 ending up as a dedicated ZFS log device rather than striped capacity) w
 rather than as part of this entry:
 restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queue gap found along the way (done, 2026-09-25; see below).
 
+## Radar added beside Headlamp
+
+**Done (2026-10-10).** [Radar](https://radarhq.io) runs at `radar.jakerobb.org` from its official Helm chart, with native
+OIDC against Authelia. It impersonates the logged-in user, so Kubernetes RBAC (the existing `oidc-admin` binding) decides
+what you can do, unlike Headlamp's shared cluster-admin ServiceAccount. Exec, port-forward and Helm writes are off.
+Details, including the privileged-ServiceAccount trade-off and the secrets steps:
+[`../argocd/README.md`](../argocd/README.md#radar-deployed-2026-10-10).
+
 ## Homepage retired; Glance is the dashboard
 
 **Done (2026-10-10).** After more than a week of using Glance exclusively, Homepage was removed (Application,
