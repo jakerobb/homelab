@@ -47,6 +47,7 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | Docs | <https://docs.jakerobb.org> | This site |
 | ArgoCD | <https://argocd.jakerobb.org> | Deploys the cluster's apps from this repo |
 | Headlamp | <https://headlamp.jakerobb.org> | Web UI for the Kubernetes cluster |
+| Radar | <https://radar.jakerobb.org> | A second cluster UI: topology, events, Helm releases, GitOps state. Runs as you, so Kubernetes RBAC applies |
 | SigNoz | <https://signoz.jakerobb.org> | Logs, metrics and dashboards |
 | Prometheus | <https://prometheus.jakerobb.org> | Cluster metrics and alert rules |
 | Alertmanager | <https://alertmanager.jakerobb.org> | Active alerts and silences |
@@ -67,7 +68,7 @@ behind Authelia. The hostnames are the files in `manifests/lan-routes/`; see
 | --- | --- |
 | UniFi network | <https://unifi.ui.com>, or the UniFi app |
 | rpi5-1 (jump box) | `ssh jakerobb@rpi5-1.lan` (`192.168.102.2`). Key-based login, passwordless `sudo` |
-| Kubernetes | From rpi5-1: `kubectl` works as-is (`~/.kube/config`). Or use Headlamp in a browser |
+| Kubernetes | From rpi5-1: `kubectl` works as-is (`~/.kube/config`). Or use Headlamp or Radar in a browser |
 | Talos nodes | From rpi5-1: `talosctl` with `~/talos/homelab/talosconfig`. Talos has no SSH |
 | Cilium flows | From rpi5-1: `hubble observe -P` (`-P` port-forwards to hubble-relay by itself). Or Hubble UI in a browser |
 | Proxmox (MS-A2) | <https://proxmox.lan:8006>, or `ssh proxmox` from rpi5-1 (logs in as root) |

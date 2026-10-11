@@ -86,6 +86,13 @@ and is trustworthy:
   metrics-server, kube-prometheus-stack, local-path-provisioner): set
   `source.chart` + `source.repoURL` to the chart repo, `targetRevision` to
   a pinned chart version, and `helm.valuesObject` inline for overrides.
+  Radar is the worked example for a chart that needs a Secret and a route:
+  [`argocd/apps/radar/`](../argocd/apps/radar/application.yaml) points the
+  chart's `existingSecret` fields at an ESO-synced Secret, turns on its
+  `httpRoute`, and uses `CreateNamespace=true`. Chart apps have no
+  `manifests/<name>/`, so their NetworkPolicy goes in
+  [`manifests/network-policies/`](../manifests/network-policies/) and their
+  ExternalSecret in `manifests/external-secrets-config/` as usual.
 - **Bare manifests** (searxng, ntfy, Glance, Headlamp): write the
   Deployment/Service/etc. by hand under `manifests/<name>/`. Use this
   when there's no official chart, or when the official chart has real
@@ -169,7 +176,7 @@ two ways to actually gate it:
 
 - **Native OIDC client (preferred whenever the app supports it):** one
   login, cleanest UX. Add an entry to `identity_providers.oidc.clients`
-  in the same file (copy the `argocd` or `headlamp` client as a
+  in the same file (copy the `argocd`, `headlamp` or `radar` client as a
   template — `client_id`, a fresh `client_secret` hash, `redirect_uris`
   pointed at the app's own callback path, `scopes`/`grant_types` matched
   to what the app actually requests). The app itself needs the
