@@ -14,27 +14,49 @@ Entry format: a `## ` heading, then **Why**, **Check**, **Healthy**, **Trouble**
 **Why:** the Prometheus volume stalls of 2026-09-29, 10-05 and 10-07 were the iSCSI target (SCST) on the HexOS VM failing to
 allocate 8 MiB command buffers. It answered BUSY/QUEUE FULL, and the worker's write timed out after 180s and failed with
 EIO. Before the VM went from 8GB to 10GB RAM (restarted 2026-10-08 13:17 EDT) there were bursts of thousands of failures
-a minute on most days. The follow-up in [`FUTURE.md`](FUTURE.md) ("Watch the HexOS iSCSI target logs after the memory
-bump") is the planned one-week review; this entry is the daily tripwire.
+a minute on most days. After the bump the failures stopped for about three days, then came back in small bursts: 13 at
+2026-10-11 13:00 EDT and 2 at 19:00 (both odd UTC hours, which fits Prometheus's two-hourly head compaction, but that is
+a guess). There was no initiator-visible impact. Separately, at 2026-10-08 17:15:36 EDT every iSCSI connection on all
+four workers logged `detected conn error (1020)` at once and stayed down for about 94 seconds; Prometheus failed
+its liveness probe and restarted, and SigNoz's ClickHouse restarted too. The NAS's SCST log has no lines at all for that
+window, and the cause is unknown. The follow-up in [`FUTURE.md`](FUTURE.md) ("Watch the HexOS iSCSI target logs after the
+memory bump") is the planned review; this entry is the daily tripwire.
 
-**Check:** count the allocation failures in the NAS's SCST log, from the last 24 hours only. `scst.log` is rotated
-around 23:00, so read both files and filter on the timestamp prefix (`Mon  D HH:MM:SS`, local time EDT/EST):
+**Check:** two parts. First, count the allocation failures in the NAS's SCST log, from the last 24 hours only. `scst.log`
+is rotated around 23:00, so read both files and filter on the timestamp prefix (`Mon  D HH:MM:SS`, local time EDT/EST):
 ```bash
 ssh truenas-ops 'sudo /usr/bin/cat /var/log/scst.log.1; sudo /usr/bin/cat /var/log/scst.log' \
   | grep 'Allocation of sgv_pool_obj failed' | awk '{print $1, $2, substr($3,1,5)}' | sort | uniq -c
 ```
-Count only the lines dated within the last 24 hours **and after the 2026-10-08 13:17 EDT restart** (the failures logged earlier that day, including 2,046 at 09:00, predate the fix), and group by minute to see bursts. Also read `MemAvailable` from
-`ssh truenas-ops 'grep -E "MemTotal|MemAvailable" /proc/meminfo'` and the NAS's `uptime` (a reboot resets the log's story).
+Count only the lines dated within the last 24 hours **and after the 2026-10-08 13:17 EDT restart** (the failures logged
+earlier that day, including 2,046 at 09:00, predate the bump), and group by minute to see bursts. Also read the NAS's
+memory and uptime (a reboot resets the log's story):
+```bash
+ssh truenas-ops 'grep -E "MemTotal|MemFree|MemAvailable|SUnreclaim" /proc/meminfo; grep -E "^(size|c_max) " /proc/spl/kstat/zfs/arcstats; uptime'
+```
+Second, look for iSCSI connection drops on the initiators, which the target's log can miss (2026-10-08 17:15). Timestamps
+are UTC:
+```bash
+ssh jakerobb@rpi5-1.lan 'for ip in 31 32 35 34; do echo "== .$ip"; talosctl -n 192.168.102.$ip dmesg | grep "detected conn error" | awk "{print substr(\$4,2,13)}" | sort | uniq -c | tail -5; done'
+```
+(`.31` and `.32` are workers 1 and 2, `.35` is worker-3, `.34` is the MacBook Pro worker.) Count only the entries in the
+last 24 hours. A node that was rebooted in that window logs some at boot; check `talosctl -n <ip> read /proc/uptime`
+before calling those trouble.
 
-**Healthy:** zero failures in the last 24 hours. `MemTotal` about 10GB, and `MemAvailable` comfortably above 2GB.
+**Healthy:** zero allocation failures in the last 24 hours, and zero `detected conn error` lines on any worker. `MemTotal`
+about 10GB. Don't judge `MemAvailable` against a fixed number: ZFS's ARC (about 5.5GB of a 9.3GB `c_max`) isn't counted
+in it, so it reads 1 to 1.5GB when things are fine. Report `MemFree`, `SUnreclaim` and ARC `size` for context, and flag
+a clear fall in `MemFree` (below roughly 200MB) or growth in `SUnreclaim` (over about 2GB) versus the previous run.
 
-**Trouble:** any failure at all. Report the count, the minutes it happened, and whether a "Kernel storage error" ntfy alert
-or a Prometheus restart (`kubectl -n monitoring get pod prometheus-... `, restart count) lines up with it. A burst of hundreds
-in a minute means a stall happened or nearly did. Next steps if it comes back: shrink the initiators' maximum write size
-(see the FUTURE.md item), or raise `scst_max_cmd_mem` and `scst_max_dev_cmd_mem` (1985 and 794 MB on 2026-10-08).
+**Trouble:** any allocation failure, or any `detected conn error` outside a node's boot. Report the count, the minutes it
+happened, and whether a "Kernel storage error" ntfy alert or a Prometheus restart (`kubectl -n monitoring get pod
+prometheus-... `, restart count) lines up with it. A burst of hundreds in a minute means a stall happened or nearly did.
+Connection errors on several workers in the same second mean the target or the path to it went away, whatever its log
+says. Next steps if it keeps coming back: shrink the initiators' maximum write size (see the FUTURE.md item), or raise
+`scst_max_cmd_mem` and `scst_max_dev_cmd_mem` (1985 and 794 MB on 2026-10-08).
 
-**Retire when:** the FUTURE.md review on or after 2026-10-15 finds it clean and Jake agrees; then delete this entry along
-with that one.
+**Retire when:** the FUTURE.md review on or after 2026-10-15 finds a clean week and Jake agrees; then delete this entry along
+with that one. A clean day or two doesn't count, since the failures came back after three quiet days.
 
 ## ESO 1Password wedged client (eso-restarter)
 

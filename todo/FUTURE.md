@@ -236,7 +236,10 @@ upstream.
 
 ## Watch the HexOS iSCSI target logs after the memory bump
 
-**Waiting on:** a week of normal use after the HexOS VM went from 8GB to 10GB (applied and restarted 2026-10-08). The
+**Waiting on:** a week of normal use after the HexOS VM went from 8GB to 10GB (applied and restarted 2026-10-08). This is
+**not** clean: the failures came back in small bursts on 2026-10-11 (13 at 13:00 EDT, 2 at 19:00), and an unexplained
+94-second iSCSI outage hit all four workers at 2026-10-08 17:15 (see [`WATCHING.md`](WATCHING.md)). So the review on or
+after 2026-10-15 should not retire this item unless there has been a clean week since the last failure. The
 Prometheus volume stalls of 2026-09-29, 10-05 and 10-07 were SCST (the iSCSI target) failing to allocate 8 MiB command
 buffers: `Allocation of sgv_pool_obj failed (size 8388608)` in `/var/log/scst.log`, answered BUSY/QUEUE FULL, until the
 worker's write timed out after 180s. **Check on or after 2026-10-15:**
@@ -244,6 +247,7 @@ worker's write timed out after 180s. **Check on or after 2026-10-15:**
   `scst.log.1`; the older `.gz` files need `zcat` entries in `claude-ops`'s sudo list). Before the bump there were bursts of
   thousands a minute on most days.
 - No "Kernel storage error" ntfy alert from SigNoz, and no Prometheus restart with `persist head block ... input/output error`.
+- No `detected conn error` lines in the workers' `talosctl dmesg` (the 2026-10-08 17:15 outage left nothing in the NAS's log).
 - `MemTotal` on the NAS is about 10GB, and `/proc/meminfo` shows how much is free and in slab.
 
 If the failures continue: shrink the initiators' maximum write size (Talos nodes' `max_sectors_kb`, from 8 MiB down to about
