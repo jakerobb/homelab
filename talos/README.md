@@ -1337,8 +1337,9 @@ node IPs, port 2381) lives in
 [`argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml),
 and the EndpointSlice that actually connects the Service to them in
 [`etcd-endpointslice.yaml`](../argocd/apps/kube-prometheus-stack/etcd-endpointslice.yaml)
-beside it (ArgoCD excludes the `Endpoints` object the chart renders, so the
-Service stayed empty until the slice was added).
+beside it. ArgoCD excludes the `Endpoints` object the chart renders, so the
+addresses go in as a slice, and Prometheus is set to discover targets through
+EndpointSlices (`prometheusSpec.serviceDiscoveryRole`) so it reads it.
 
 Unlike the scheduler/controller-manager ports, `:2381` is plain HTTP with no
 auth. It serves metrics only (no keys or data), and binding to each node's own
