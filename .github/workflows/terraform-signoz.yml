@@ -15,18 +15,22 @@
 #
 # Workflow logs on a public repo are public. Sensitive variables are redacted
 # by Terraform, but don't add outputs or debug logging that print secrets.
+# Markdown under terraform/signoz (its README) doesn't trigger a run: a docs
+# edit has no plan to show. Only `lint` is a required check, so skipping is safe.
 name: terraform-signoz
 
 on:
   pull_request:
     paths:
       - terraform/signoz/**
+      - "!terraform/signoz/**.md"
       - terraform/proxmox/secrets/b2-state-backend.sops.yaml
       - .github/workflows/terraform-signoz.yml
   push:
     branches: [main]
     paths:
       - terraform/signoz/**
+      - "!terraform/signoz/**.md"
       - terraform/proxmox/secrets/b2-state-backend.sops.yaml
       - .github/workflows/terraform-signoz.yml
   workflow_dispatch:
