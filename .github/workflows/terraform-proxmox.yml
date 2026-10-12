@@ -14,17 +14,21 @@
 #
 # Workflow logs on a public repo are public. Sensitive variables are redacted
 # by Terraform, but don't add outputs or debug logging that print secrets.
+# Markdown under terraform/proxmox (its README) doesn't trigger a run: a docs
+# edit has no plan to show. Only `lint` is a required check, so skipping is safe.
 name: terraform-proxmox
 
 on:
   pull_request:
     paths:
       - terraform/proxmox/**
+      - "!terraform/proxmox/**.md"
       - .github/workflows/terraform-proxmox.yml
   push:
     branches: [main]
     paths:
       - terraform/proxmox/**
+      - "!terraform/proxmox/**.md"
       - .github/workflows/terraform-proxmox.yml
   workflow_dispatch:
 
