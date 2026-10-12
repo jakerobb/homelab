@@ -421,6 +421,22 @@ chart `kube-prometheus-stack` from `prometheus-community`.
   the operator to its own bundled ServiceMonitors. Set `false` for
   cluster-wide discovery, so a future app's own ServiceMonitor gets picked
   up automatically instead of silently ignored.
+- **`serviceDiscoveryRole: EndpointSlice`** (added 2026-10-12, for etcd).
+  Prometheus defaults to discovering ServiceMonitor targets through the
+  `Endpoints` API, and ArgoCD's default `resource.exclusions` skip
+  `Endpoints` entirely. So a Service without a selector, whose addresses
+  come from a hand-written object, only works as an EndpointSlice, and
+  Prometheus has to be told to read slices. Selector-based Services are
+  unaffected (the core controllers write slices for them too). etcd is the
+  case: Talos runs it as a host service, so the chart's etcd Service has no
+  pods behind it. [`apps/kube-prometheus-stack/etcd-endpointslice.yaml`](apps/kube-prometheus-stack/etcd-endpointslice.yaml)
+  lists the three control-plane IPs, matching `kubeEtcd.endpoints` in the
+  Application. The chart renders an `Endpoints` object from that list too,
+  which is never applied; leave it. Keep `kubeEtcd.enabled: true`: the chart
+  only renders its etcd alert rules when it's on. How etcd exposes its
+  metrics is in [`talos/README.md`](../talos/README.md#etcd-metrics).
+  Symptom if this breaks: the Service shows no endpoints (Radar flags it)
+  and Prometheus has no `kube-etcd` targets, while ArgoCD says Synced.
 - **node-exporter tolerations:** the chart's default tolerations are empty,
   so its DaemonSet wouldn't otherwise run on the tainted control-plane
   nodes — added an explicit toleration for full-cluster host metrics
@@ -919,6 +935,19 @@ match[]:
   - '{job="kube-controller-manager"}'
   - 'up'
 ```
+**Label renaming (found 2026-10-12 building the etcd dashboard).**
+SigNoz's Prometheus receiver rewrites the federated series' labels into
+OpenTelemetry names: `job` becomes `service.name`, `instance` becomes
+`service.instance.id`, and the bare address and port become `server.address`
+and `server.port`. Other labels (`le`, `namespace`, `service`, `grpc_code`,
+and so on) keep their names. A PromQL panel written as `{job="..."}` or
+`by (instance)` matches nothing and shows "No data", even though the
+series are there. Dotted names need quoting in PromQL: `by ("server.address")`
+or `{"service.name"="kube-etcd"}`. Check a series' real labels with
+`SELECT DISTINCT labels FROM signoz_metrics.distributed_time_series_v4
+WHERE metric_name = '...'` in ClickHouse. `terraform/signoz/dashboard-etcd.tf`
+selects on the unrenamed `service` label to dodge this.
+
 Deliberately **excludes** `kubelet`/cadvisor and `apiserver` — confirmed
 live that including `kubelet` alone balloons a single scrape from 11.6MB to
 67MB, from per-container-per-node cardinality that isn't part of what was

@@ -66,6 +66,17 @@ guard against a broken backend). On the jump box, after pulling `main`:
 ./terraform/signoz/tf.sh apply
 ```
 
+## Writing PromQL against federated metrics
+
+Federation passes through SigNoz's Prometheus receiver, which renames labels:
+`job` becomes `service.name`, `instance` becomes `service.instance.id` (the
+bare IP is `server.address`). A panel filtering on `job=` or grouping by
+`instance` shows "No data". Quote dotted names (`by ("server.address")`), or
+select on a label that isn't renamed. Details and how to check a series'
+labels are in `argocd/README.md`, "Label renaming" under the SigNoz section.
+Panels also see each series as an untyped gauge, one sample a minute (see
+`unifi-dashboards.tf`'s header), so rates need a window of at least 5m.
+
 ## Editing a dashboard in the GUI
 
 Terraform doesn't lock the dashboards it creates, so they can be edited in SigNoz like

@@ -1330,8 +1330,29 @@ cluster:
 talosctl patch machineconfig -n <cp-ip> -p @cpN.yaml --mode=no-reboot
 ```
 
-Roll it one node at a time (etcd restarts on each; quorum needs 2 of 3), and
-confirm `talosctl etcd status` shows all members healthy before the next one.
+**The patch alone does nothing: etcd has to restart to read it, and on Talos
+that means rebooting the node.** The apply reports "without a reboot" and
+changes the machine config, but etcd keeps running with its old flags and
+`:2381` never starts listening. `talosctl service etcd restart` isn't an
+option either: the API refuses it ("doesn't support restart operation via
+API"). This applies to any `cluster.etcd.extraArgs` change.
+
+Roll it one node at a time, cp1 → cp2 → cp3 (rolled 2026-10-11; the VIP and
+the etcd leader each moved once, briefly). For each node:
+
+1. Patch it, then `talosctl -n <ip> reboot`.
+2. Wait for `kubectl get node` to show `Ready` (a minute or two), and confirm
+   the reboot with `talosctl -n <ip> read /proc/uptime`, which should be a
+   few seconds-to-minutes old. Don't trust the API answering as proof.
+3. `talosctl -n 192.168.102.11,192.168.102.12,192.168.102.13 etcd status`
+   shows 3 members, one leader, and matching raft indexes.
+4. `curl http://<ip>:2381/metrics` returns `etcd_*` series.
+
+Quorum needs 2 of 3, so never start the next node before the previous one is
+back. Expect a burst of `ContainerStatusUnknown` cilium-operator pods while a
+node shuts down; "Terminated pod GC threshold" below is why they now clean
+themselves up.
+
 The kube-prometheus-stack side (`kubeEtcd.endpoints` pointing at the three
 node IPs, port 2381) lives in
 [`argocd/apps/kube-prometheus-stack/application.yaml`](../argocd/apps/kube-prometheus-stack/application.yaml),
