@@ -312,7 +312,8 @@ spec:
         # listener from talos/patches/control-plane/cp{1,2,3}.yaml. The
         # endpoints list drops the selector, but the Endpoints object it
         # renders is never applied (ArgoCD excludes Endpoints), so the
-        # addresses actually reach the Service via etcd-endpointslice.yaml.
+        # addresses actually reach the Service via etcd-endpointslice.yaml,
+        # which Prometheus reads because of serviceDiscoveryRole below.
         kubeEtcd:
           enabled: true
           endpoints:
@@ -370,6 +371,13 @@ spec:
             # Cluster-wide discovery — without this, only the chart's own
             # bundled ServiceMonitors get scraped, and a future app's
             # ServiceMonitor would be silently ignored.
+            # Discover ServiceMonitor targets through EndpointSlices rather
+            # than the Endpoints API. ArgoCD excludes Endpoints, so the
+            # etcd Service's address list (etcd-endpointslice.yaml) can only
+            # exist as a slice, and under the default role Prometheus never
+            # sees it. Every selector-based Service gets a slice from the
+            # core controllers, so nothing else changes.
+            serviceDiscoveryRole: EndpointSlice
             serviceMonitorSelectorNilUsesHelmValues: false
             podMonitorSelectorNilUsesHelmValues: false
             ruleSelectorNilUsesHelmValues: false
