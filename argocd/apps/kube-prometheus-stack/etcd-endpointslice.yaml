@@ -1,0 +1,41 @@
+# The three control-plane nodes behind kube-prometheus-stack's etcd Service
+# (kube-system/kube-prometheus-stack-kube-etcd, which the chart creates
+# without a selector once kubeEtcd.endpoints is set). The chart also renders
+# an Endpoints object from that same list, but ArgoCD's default
+# resource.exclusions skip Endpoints, so it is never applied and the Service
+# sat empty. EndpointSlices aren't excluded here (argocd/README.md, "LAN
+# routes"). Sits alongside application.yaml for the same reason as
+# httproute.yaml: root's recursive scan over argocd/apps/ picks it up.
+#
+# Port 2381 is etcd's plain-HTTP metrics listener
+# (talos/patches/control-plane/cp*.yaml). Keep the addresses in step with the
+# kubeEtcd.endpoints list in application.yaml.
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: kube-prometheus-stack-kube-etcd-nodes
+  namespace: kube-system
+  labels:
+    kubernetes.io/service-name: kube-prometheus-stack-kube-etcd
+    endpointslice.kubernetes.io/managed-by: argocd
+addressType: IPv4
+ports:
+  - name: http-metrics
+    port: 2381
+    protocol: TCP
+endpoints:
+  - addresses:
+      - 192.168.102.11
+    conditions:
+      ready: true
+    nodeName: talos-cp-1
+  - addresses:
+      - 192.168.102.12
+    conditions:
+      ready: true
+    nodeName: talos-cp-2
+  - addresses:
+      - 192.168.102.13
+    conditions:
+      ready: true
+    nodeName: talos-cp-3

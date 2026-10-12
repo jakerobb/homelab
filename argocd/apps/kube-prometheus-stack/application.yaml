@@ -309,7 +309,10 @@ spec:
         # etcd is a Talos host service, not a pod, so the chart's default
         # selector (component=etcd) matches nothing. Point the Service at the
         # control-plane node IPs instead; :2381 is the plain-HTTP metrics
-        # listener from talos/patches/control-plane/cp{1,2,3}.yaml.
+        # listener from talos/patches/control-plane/cp{1,2,3}.yaml. The
+        # endpoints list drops the selector, but the Endpoints object it
+        # renders is never applied (ArgoCD excludes Endpoints), so the
+        # addresses actually reach the Service via etcd-endpointslice.yaml.
         kubeEtcd:
           enabled: true
           endpoints:
