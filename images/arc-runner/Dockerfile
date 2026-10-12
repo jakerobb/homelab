@@ -33,7 +33,7 @@ ARG ACTIONLINT_VERSION=v1.7.12
 # renovate: datasource=node-version depName=node
 ARG NODE_VERSION=24.21.0
 # renovate: datasource=npm depName=renovate
-ARG RENOVATE_VERSION=44.134.3
+ARG RENOVATE_VERSION=44.151.2
 
 USER root
 
