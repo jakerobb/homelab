@@ -250,6 +250,69 @@ spec:
                         command" or "I/O error, dev", find the pod that
                         mounts the device, and restart it if it logged write
                         errors. Then check HexOS for what stalled.
+                  # 2026-10-12: the volume under SigNoz's ClickHouse stalled
+                  # for 180s at 23:26 EDT on 10-11 (about 10,400 SCST
+                  # allocation failures in three minutes). ext4 aborted its
+                  # journal and remounted the volume read-only, and SigNoz
+                  # stored nothing for eight hours. Nothing alerted:
+                  # ISCSIVolumeIOStall never fired (a read-only volume has
+                  # no requests waiting), node-exporter can't see pod
+                  # volumes' filesystems on Talos (so no
+                  # node_filesystem_readonly), and the "Kernel storage
+                  # error" alert lives in SigNoz, the thing that was down.
+                  # What did change was the device itself: ClickHouse's
+                  # disk went from ~1.25 MB/s to exactly 0 for eight
+                  # hours. A steady writer (a write in more than half of the
+                  # last day's 5-minute windows; nightly backups and other
+                  # bursty volumes score far lower) that then has no writes
+                  # for 15 minutes is the signal. Because the score decays
+                  # as the silence grows, the alert stays up for up to ~12h
+                  # of silence. A device that disappears (pod moved, volume
+                  # detached) has no series, so it doesn't match.
+                  - alert: ISCSIVolumeWritesStopped
+                    expr: >-
+                      avg_over_time((rate(node_disk_written_bytes_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[5m]) > bool 0)[1d:5m]) > 0.5
+                      and
+                      rate(node_disk_written_bytes_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[15m]) == 0
+                    for: 5m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: Writes to an iSCSI volume on {{ $labels.instance }} stopped.
+                      description: >-
+                        Disk {{ $labels.device }} on {{ $labels.instance }} had
+                        steady writes for the previous two hours and has had none
+                        for 15 minutes. If the pod that mounts it is still
+                        running, the volume has most likely gone read-only after
+                        an I/O stall (ext4 aborts its journal and remounts ro,
+                        and the pod keeps running while every write fails).
+                        Find the pod, run `touch` in its data directory, and
+                        delete the pod if it fails (the same volume remounts
+                        read-write). Check the node's dmesg for "Remounting
+                        filesystem read-only", and HexOS's scst.log for
+                        "Allocation of sgv_pool_obj failed".
+                  # The same incident's other symptom: SigNoz's collector
+                  # was OOMKilled 16 times in 33 hours (every ~30 minutes,
+                  # so never in CrashLoopBackOff and never KubePodCrashLooping)
+                  # while it queued data it couldn't write.
+                  - alert: ContainerOOMKilledRepeatedly
+                    expr: >-
+                      increase(kube_pod_container_status_restarts_total[3h]) >= 3
+                      and on (namespace, pod, container)
+                      kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) keeps getting OOMKilled."
+                      description: >-
+                        Container {{ $labels.container }} restarted {{ $value | humanize }}
+                        times in 3 hours and its last termination was
+                        OOMKilled. Raising its memory limit may only delay
+                        it: look for what it is queueing (an exporter that
+                        can't reach its backend buffers until it dies).
           # NodeMemoryHighUtilization, split by host (2026-10-05). The chart's
           # rule fires above 90% used for 15m everywhere. That's right for the
           # Talos nodes, but the MS-A2 (192.168.102.21) is the Proxmox host
