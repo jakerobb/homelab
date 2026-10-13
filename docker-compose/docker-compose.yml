@@ -64,7 +64,7 @@ services:
   telegraf:
     <<: *dns
     container_name: telegraf
-    image: telegraf:1.40.1
+    image: telegraf:1.40.2
     restart: unless-stopped
     user: "telegraf:990"
     environment:
