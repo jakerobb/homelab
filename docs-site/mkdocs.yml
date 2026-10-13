@@ -145,4 +145,7 @@ nav:
       - Future: todo/FUTURE.md
       - Watching: todo/WATCHING.md
       - Hardware: todo/HARDWARE.md
+      - NAS purchase:
+          - Overview: todo/nas-purchase/README.md
+          - DIY build: todo/nas-purchase/DIY.md
       - Done: todo/DONE.md
