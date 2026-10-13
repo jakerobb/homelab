@@ -21,6 +21,10 @@ four workers logged `detected conn error (1020)` at once and stayed down for abo
 its liveness probe and restarted, and SigNoz's ClickHouse restarted too. The NAS's SCST log has no lines at all for that
 window, and the cause is unknown. The follow-up in [`FUTURE.md`](FUTURE.md) ("Watch the HexOS iSCSI target logs after the
 memory bump") is the planned review; this entry is the daily tripwire.
+On 2026-10-11 at 23:26 EDT a burst of about 10,400 failures stalled the SigNoz ClickHouse volume, which went
+read-only and silently dropped eight hours of telemetry. Two alerts were added for that case in
+`argocd/apps/kube-prometheus-stack/application.yaml`: `ISCSIVolumeWritesStopped` and `ContainerOOMKilledRepeatedly`.
+If either fires, treat it as this entry being in trouble.
 
 **Check:** two parts. First, count the allocation failures in the NAS's SCST log, from the last 24 hours only. `scst.log`
 is rotated around 23:00, so read both files and filter on the timestamp prefix (`Mon  D HH:MM:SS`, local time EDT/EST):
