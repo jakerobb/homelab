@@ -236,3 +236,31 @@ ServerSideDiff settings, and confirm `argocd-controller/Apply` shows up in the l
 prune risk before enabling: with `prune: true`, removing a CRD from the source deletes every custom resource of that
 kind. Adding `argocd.argoproj.io/sync-options: Prune=false` to each CRD, where the chart lets you, is the safeguard.
 When a set moves, delete its manual-apply section from the README in the same PR.
+
+## Delete the old change-detection datastore on rpi5-1
+
+**Waiting on:** the in-cluster change-detection behaving for a stretch, since `~/docker/change-detection/` on rpi5-1 is the
+rollback (revert the migration PR and restore the Compose services). **Consider it safe to delete on or after 2026-10-12**
+(one week after the 2026-10-05 cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/change-detection` (partly root-owned). It
+holds the old snapshot history (including the dropped UniFi store watches), the app's API key, and a
+stale notification URL carrying a Home Assistant access token; revoke that token in Home Assistant too if it still exists.
+Make sure the in-cluster copy is the one you want to keep first (and that a nightly backup has landed in the
+`change-detection-backups` PVC). Runbook: [`../argocd/README.md`](../argocd/README.md#change-detection-migrated-from-docker-compose-2026-10-05), step 4.
+
+## Look for fallout from dropping the VIPs
+
+**Waiting on:** two days of the matter-server, Z-Wave JS and Mosquitto LoadBalancer VIPs being gone (dropped 2026-10-10).
+**Check on or after 2026-10-12.** The Mosquitto one is the real risk: it was dropped on a "nothing seen using it" basis
+(five days of broker logs showed only kubelet probes, Home Assistant and Zigbee2MQTT, and no LAN source address), not
+proof, so a LAN device that hardcoded `mqtt.jakerobb.org` or `192.168.102.131` would have gone quiet without anything
+failing loudly.
+- Look for something that stopped reporting: Home Assistant entities stuck `unavailable` or with a stale last-updated time
+  (especially anything MQTT-based that isn't Zigbee, such as Tasmota or ESPHome devices), and
+  `kubectl -n mosquitto logs deploy/mosquitto` for new `New connection from` addresses other than node IPs.
+- Matter and Z-Wave: devices still available in Home Assistant, and matter-server and zwave-js-ui logs free of new errors.
+- Confirm external-dns removed the `mqtt`, `matter` and `zwave-ws` records (`dig @192.168.102.130 mqtt.jakerobb.org`).
+- Alerts: nothing new on the `homelab-alerts` ntfy topic about those namespaces.
+
+If something did break, restore the Service (see the comment at the top of `manifests/mosquitto/service.yaml`, and the
+git history of the matter-server and zwave-js-ui Services) and point the client at the in-cluster name instead. If it's all
+quiet, delete this item.

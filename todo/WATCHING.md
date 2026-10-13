@@ -53,9 +53,10 @@ happened, and whether a "Kernel storage error" ntfy alert or a Prometheus restar
 prometheus-... `, restart count) lines up with it. A burst of hundreds in a minute means a stall happened or nearly did.
 Connection errors on several workers in the same second mean the target or the path to it went away, whatever its log
 says. Next steps if it keeps coming back: shrink the initiators' maximum write size (see the FUTURE.md item), or raise
-`scst_max_cmd_mem` and `scst_max_dev_cmd_mem` (1985 and 794 MB on 2026-10-08).
+`scst_max_cmd_mem` and `scst_max_dev_cmd_mem` (2486 and 994 MB at 10GB of RAM; they scale to 25% of RAM, and
+need a module reload to change). A `max_sectors_kb` trial is running on talos-worker-mbp since 2026-10-12; see FUTURE.md.
 
-**Retire when:** the FUTURE.md review on or after 2026-10-15 finds a clean week and Jake agrees; then delete this entry along
+**Retire when:** the FUTURE.md review on or after 2026-10-19 finds a clean week and Jake agrees; then delete this entry along
 with that one. A clean day or two doesn't count, since the failures came back after three quiet days.
 
 ## ESO 1Password wedged client (eso-restarter)

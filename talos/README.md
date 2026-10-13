@@ -152,7 +152,8 @@ build artifact again.
    `talos/patches/kubelet-log-limits.yaml`,
    `talos/patches/kubelet-parallel-image-pulls.yaml` and
    `talos/patches/nameservers.yaml`, for `controlplane.yaml`;
-   just the two `kubelet-*.yaml` patches and `nameservers.yaml` for `worker.yaml` — the per-worker hostname
+   just the two `kubelet-*.yaml` patches, `nameservers.yaml` and `iscsi-max-sectors.yaml` (appended 2026-10-12) for
+   `worker.yaml` — the per-worker hostname
    *and* iSCSI kernel-module/extraMounts patches
    (`talos/patches/workers/worker-{1,2}.yaml`) are deliberately per-node,
    same as the control-plane hostname patches, and not folded into the

@@ -1,0 +1,26 @@
+# TRIAL: applied to talos-worker-mbp only (2026-10-12, --mode=no-reboot; Talos re-triggered udev live, the disks went
+# from 8192 to 1024 at once). Not yet on the other workers; it IS in the worker.yaml template on rpi5-1 (appended 2026-10-12). Caps the I/O size of the NAS's iSCSI disks at 1 MiB.
+#
+# Why: SCST (the iSCSI target on the HexOS VM) advertises an optimal transfer length of 8 MiB, so the
+# initiator's sd driver sets max_sectors_kb to 8192 on every `TrueNAS` disk. Each 8 MiB write needs an
+# 8 MiB buffer on the target, and when the target's buffer pool is exhausted ("Allocation of sgv_pool_obj
+# failed") it answers BUSY, the write times out after 180s and fails with EIO. That is what took
+# Prometheus's and ClickHouse's volumes down (2026-09-29 to 2026-10-11). The session's negotiated
+# MaxBurstLength is already 1 MiB, so nothing is gained by sending bigger commands. 1024 KiB cuts the
+# target's buffer demand per command by 8x. See todo/FUTURE.md ("Watch the HexOS iSCSI target logs").
+#
+# Standalone machine-config *document* (like security-profile.yaml), applied with
+# `talosctl patch machineconfig`. Trial on talos-worker-mbp (.34) first.
+#
+# Matching: `vendor` on the SCSI device is "TrueNAS " (padded to 8 chars), hence the glob. The node's
+# local disks (QEMU, ATA) are left alone. KERNEL=="sd*[!0-9]" skips partitions.
+#
+# Persistence: udev runs this on every add/change, so it survives a re-login or a rescan. The kernel
+# keeps a user-set max_sectors_kb across revalidation.
+#
+# Confirmed 2026-10-12: Talos re-triggers udev when this document changes, so no reboot is needed. Still to
+# confirm: that the disks come back at 1024 after a reconnect or reboot (see todo/FUTURE.md).
+apiVersion: v1alpha1
+kind: UdevRulesConfig
+rules:
+  - ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", KERNEL=="sd*[!0-9]", ATTRS{vendor}=="TrueNAS*", ATTR{queue/max_sectors_kb}="1024"

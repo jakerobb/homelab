@@ -191,34 +191,6 @@ When either repo answers:
   note the outcome in [`DONE.md`](DONE.md).
 - **Nothing by 2026-12-01:** revisit forking go-sdk and the 1Password SDK. Weigh it against the restart job covering it.
 
-## Delete the old change-detection datastore on rpi5-1
-
-**Waiting on:** the in-cluster change-detection behaving for a stretch, since `~/docker/change-detection/` on rpi5-1 is the
-rollback (revert the migration PR and restore the Compose services). **Consider it safe to delete on or after 2026-10-12**
-(one week after the 2026-10-05 cutover). Then, on rpi5-1, `sudo rm -rf ~/docker/change-detection` (partly root-owned). It
-holds the old snapshot history (including the dropped UniFi store watches), the app's API key, and a
-stale notification URL carrying a Home Assistant access token; revoke that token in Home Assistant too if it still exists.
-Make sure the in-cluster copy is the one you want to keep first (and that a nightly backup has landed in the
-`change-detection-backups` PVC). Runbook: [`../argocd/README.md`](../argocd/README.md#change-detection-migrated-from-docker-compose-2026-10-05), step 4.
-
-## Look for fallout from dropping the VIPs
-
-**Waiting on:** two days of the matter-server, Z-Wave JS and Mosquitto LoadBalancer VIPs being gone (dropped 2026-10-10).
-**Check on or after 2026-10-12.** The Mosquitto one is the real risk: it was dropped on a "nothing seen using it" basis
-(five days of broker logs showed only kubelet probes, Home Assistant and Zigbee2MQTT, and no LAN source address), not
-proof, so a LAN device that hardcoded `mqtt.jakerobb.org` or `192.168.102.131` would have gone quiet without anything
-failing loudly.
-- Look for something that stopped reporting: Home Assistant entities stuck `unavailable` or with a stale last-updated time
-  (especially anything MQTT-based that isn't Zigbee, such as Tasmota or ESPHome devices), and
-  `kubectl -n mosquitto logs deploy/mosquitto` for new `New connection from` addresses other than node IPs.
-- Matter and Z-Wave: devices still available in Home Assistant, and matter-server and zwave-js-ui logs free of new errors.
-- Confirm external-dns removed the `mqtt`, `matter` and `zwave-ws` records (`dig @192.168.102.130 mqtt.jakerobb.org`).
-- Alerts: nothing new on the `homelab-alerts` ntfy topic about those namespaces.
-
-If something did break, restore the Service (see the comment at the top of `manifests/mosquitto/service.yaml`, and the
-git history of the matter-server and zwave-js-ui Services) and point the client at the in-cluster name instead. If it's all
-quiet, delete this item.
-
 ## Drop the kubeconform external-secrets.io schema pin
 
 **Waiting on:** the community CRD catalog fixing `external-secrets.io/clustersecretstore_v1.json`. Its 2026-10-08 update
@@ -238,11 +210,15 @@ upstream.
 
 **Waiting on:** a week of normal use after the HexOS VM went from 8GB to 10GB (applied and restarted 2026-10-08). This is
 **not** clean: the failures came back in small bursts on 2026-10-11 (13 at 13:00 EDT, 2 at 19:00), and an unexplained
-94-second iSCSI outage hit all four workers at 2026-10-08 17:15 (see [`WATCHING.md`](WATCHING.md)). So the review on or
-after 2026-10-15 should not retire this item unless there has been a clean week since the last failure. The
-Prometheus volume stalls of 2026-09-29, 10-05 and 10-07 were SCST (the iSCSI target) failing to allocate 8 MiB command
+94-second iSCSI outage hit all four workers at 2026-10-08 17:15 (see [`WATCHING.md`](WATCHING.md)). Then, at 23:26 to
+23:28 EDT on 2026-10-11, about 10,400 allocation failures in three minutes stalled the SigNoz ClickHouse volume for 180s;
+ext4 aborted its journal and remounted it read-only, and SigNoz stored nothing from about 23:25 to 07:05 EDT until the
+pod was deleted on 2026-10-12. So the review on or after 2026-10-19 should not retire this item unless there has been a
+clean week since the last failure, and it should decide on a fix (shrinking `max_sectors_kb` or raising the SCST limits)
+rather than just keep watching.
+The Prometheus volume stalls of 2026-09-29, 10-05 and 10-07 were SCST (the iSCSI target) failing to allocate 8 MiB command
 buffers: `Allocation of sgv_pool_obj failed (size 8388608)` in `/var/log/scst.log`, answered BUSY/QUEUE FULL, until the
-worker's write timed out after 180s. **Check on or after 2026-10-15:**
+worker's write timed out after 180s. **Check on or after 2026-10-19:**
 - `ssh truenas-ops 'sudo /usr/bin/cat /var/log/scst.log' | grep -c 'Allocation of sgv_pool_obj failed'` (plus
   `scst.log.1`; the older `.gz` files need `zcat` entries in `claude-ops`'s sudo list). Before the bump there were bursts of
   thousands a minute on most days.
@@ -250,8 +226,29 @@ worker's write timed out after 180s. **Check on or after 2026-10-15:**
 - No `detected conn error` lines in the workers' `talosctl dmesg` (the 2026-10-08 17:15 outage left nothing in the NAS's log).
 - `MemTotal` on the NAS is about 10GB, and `/proc/meminfo` shows how much is free and in slab.
 
-If the failures continue: shrink the initiators' maximum write size (Talos nodes' `max_sectors_kb`, from 8 MiB down to about
-1 MiB, matching the negotiated `MaxBurstLength`; it needs a persistent udev or machine-config setting and some research), or
-raise `scst_max_cmd_mem` / `scst_max_dev_cmd_mem` (currently 1985 and 794 MB). The Proxmox host has about 1GB left after
-this bump, so another RAM increase means shrinking a worker first. If it's quiet, delete this item and the SCST notes can
-stay in `DONE.md`.
+**Trial in progress (started 2026-10-12 ~08:08 EDT):** the initiators' `max_sectors_kb` is capped at 1024 on
+`talos-worker-mbp` only, via [`../talos/patches/iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml)
+(a `UdevRulesConfig` document, applied with `--mode=no-reboot`; Talos re-triggered udev live). The target advertises an
+optimal transfer length of 8 MiB, which is why every `TrueNAS` disk sat at `max_sectors_kb=8192`; the session's
+negotiated `MaxBurstLength` is only 1 MiB. The other three workers are still at 8192. The `worker.yaml` template on rpi5-1 has the document
+(appended 2026-10-12, backup `worker.yaml.bak-20261012`), so a rebuilt node gets it by default. What to look at:
+- **First 48 hours:** no regression in ClickHouse or scrypted-backup throughput or in write latency on the mbp
+  (`node_disk_io_time_seconds_total`).
+- **Persistence:** after the next iSCSI reconnect or reboot of the mbp, confirm its iSCSI disks come back at 1024
+  (`talosctl -n 192.168.102.34 read /sys/block/sdb/queue/max_sectors_kb`, and the other TrueNAS disks).
+- **A burst:** the verdict. If SCST logs a burst (hundreds of allocation failures a minute or more) and the mbp's
+  `talosctl dmesg` shows no `timing out command` or ext4 errors, the trial passed. Compare against the other workers:
+  SCST's failures are global to the target, so one node's change shouldn't lower the NAS-side count much; judge it by
+  the node's own volumes.
+- **Stalls despite 1024:** the trial failed; fall back to raising the SCST limits.
+- **7 to 14 days with no burst:** inconclusive, so roll it out to all four workers anyway (low risk, easy to revert)
+  (the template already has it).
+  If the trial fails, remove the document from the template too.
+
+**If the failures continue after a rollout:** raise `scst_max_cmd_mem` / `scst_max_dev_cmd_mem`. They are auto-scaled
+to 25% of the NAS's RAM (and the per-device limit to 40% of that), so they are **2486 and 994 MB** at 10GB, not the
+1985 and 794 of the 8GB VM. They are read-only module parameters (`/sys/module/scst/parameters/`), so changing them
+means setting a module option and reloading SCST or rebooting the NAS, and a hand-edited modprobe file may not survive
+a TrueNAS update. The Proxmox host has about 1GB left, so another RAM increase means shrinking a worker first. Another
+possible lever is lowering the optimal transfer length at the target, so every initiator gets it for free; unchecked
+whether TrueNAS exposes that. If it's quiet, delete this item and the SCST notes can stay in `DONE.md`.
