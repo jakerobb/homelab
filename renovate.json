@@ -5,7 +5,7 @@
   "gitAuthor": "Jake Robb <jakerobb@users.noreply.github.com>",
   "platformCommit": "disabled",
   "prHourlyLimit": 0,
-  "prConcurrentLimit": 5,
+  "prConcurrentLimit": 10,
   "kubernetes": {
     "managerFilePatterns": [
       "/^argocd/apps/.+\\.ya?ml$/",

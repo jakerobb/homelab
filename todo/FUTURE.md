@@ -226,11 +226,10 @@ worker's write timed out after 180s. **Check on or after 2026-10-19:**
 - No `detected conn error` lines in the workers' `talosctl dmesg` (the 2026-10-08 17:15 outage left nothing in the NAS's log).
 - `MemTotal` on the NAS is about 10GB, and `/proc/meminfo` shows how much is free and in slab.
 
-**Trial in progress (started 2026-10-12 ~08:08 EDT):** the initiators' `max_sectors_kb` is capped at 1024 on
-`talos-worker-mbp` only, via [`../talos/patches/iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml)
+**Rolled out to all four workers (2026-10-16 ~08:11 EDT); trial began 2026-10-12 ~08:08 EDT on `talos-worker-mbp`.** The initiators' `max_sectors_kb` is capped at 1024, via [`../talos/patches/iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml)
 (a `UdevRulesConfig` document, applied with `--mode=no-reboot`; Talos re-triggered udev live). The target advertises an
 optimal transfer length of 8 MiB, which is why every `TrueNAS` disk sat at `max_sectors_kb=8192`; the session's
-negotiated `MaxBurstLength` is only 1 MiB. The other three workers are still at 8192. The `worker.yaml` template on rpi5-1 has the document
+negotiated `MaxBurstLength` is only 1 MiB. Workers 1, 2 and 3 got it live on 2026-10-16 (`--mode=no-reboot`), after the 2026-10-13 13:15 EDT burst (~8,300 failures) gave worker-1 `Buffer I/O error`s on `sdc` while the capped mbp logged nothing. The `worker.yaml` template on rpi5-1 has the document
 (appended 2026-10-12, backup `worker.yaml.bak-20261012`), so a rebuilt node gets it by default. What to look at:
 - **First 48 hours:** no regression in ClickHouse or scrypted-backup throughput or in write latency on the mbp
   (`node_disk_io_time_seconds_total`).
