@@ -84,7 +84,7 @@ spec:
             - mountPath: /tmp
               name: builder-tmp
         - name: nginx
-          image: docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine
+          image: docker.io/nginxinc/nginx-unprivileged:1.30.6-alpine
           imagePullPolicy: IfNotPresent
           securityContext:
             # The image's own nginx user.
