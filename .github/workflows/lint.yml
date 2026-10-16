@@ -27,7 +27,8 @@ jobs:
     name: lint
     runs-on: arc-runner
     # pull-requests: write is only for the render-diff step's sticky PR comment.
-    # A fork PR's token is read-only regardless, and that step tolerates it.
+    # A fork PR's token is read-only regardless, so that step (and lint) fails
+    # there, on purpose.
     permissions:
       contents: read
       pull-requests: write
@@ -131,12 +132,12 @@ jobs:
 
       # What the PR changes in the rendered manifests: added, removed (ArgoCD
       # prunes), immutable-field changes, and a field-level diff, as one sticky
-      # PR comment plus the job summary. Informational: continue-on-error, so a
-      # bug here never blocks a merge (Renovate's auto-merge included).
-      # See scripts/ci/diff-rendered.py.
+      # PR comment plus the job summary. A difference never fails the step, but
+      # not being able to post the comment does, and so does a bug in the script:
+      # a PR with no report shouldn't merge unnoticed (Renovate's auto-merge
+      # included). See scripts/ci/diff-rendered.py.
       - name: Rendered manifest diff
         if: ${{ !cancelled() && steps.base.outputs.rendered == 'true' }}
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/ci/diff-rendered.py "$RUNNER_TEMP/rendered-base" "$RUNNER_TEMP/rendered" --comment

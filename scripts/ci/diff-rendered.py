@@ -19,8 +19,10 @@ they came from. The report has four sections:
 
 The markdown goes to --out and, if set, $GITHUB_STEP_SUMMARY. With --comment it
 is also posted to the PR as one sticky comment, updated in place on later runs.
-That needs a token allowed to write PR comments; a fork PR's read-only token
-gets a warning, not a failure. No differences and no earlier comment: no comment.
+That needs a token allowed to write PR comments; without one (a fork PR's
+read-only token, say) the step fails, though the report is still in the job
+summary. The comment is posted even when nothing differs, so a PR with no
+comment means the step didn't run.
 
 Usage: scripts/ci/diff-rendered.py BASE_DIR HEAD_DIR [--out FILE] [--comment]
 Needs: PyYAML. --comment needs GITHUB_TOKEN, GITHUB_REPOSITORY and GITHUB_EVENT_PATH.
@@ -206,7 +208,7 @@ def report(base: dict, head: dict) -> tuple[str, int]:
 
     total = len(removed) + len(added) + len(changed)
     if not total:
-        return "", 0
+        return f"{MARKER}\n## Rendered manifest changes\n\nNo differences from the base branch in what ArgoCD would apply.", 0
 
     out = [
         MARKER,
@@ -263,17 +265,18 @@ def api(method: str, url: str, token: str, body: dict | None = None):
         return json.loads(r.read() or b"null")
 
 
-def post_comment(markdown: str) -> None:
+def post_comment(markdown: str) -> bool:
+    """Post or update the sticky comment; False (after an error annotation) if it can't."""
     token = os.environ.get("GITHUB_TOKEN")
     repo = os.environ.get("GITHUB_REPOSITORY")
     event = os.environ.get("GITHUB_EVENT_PATH")
     if not (token and repo and event):
-        print("::warning::--comment needs GITHUB_TOKEN, GITHUB_REPOSITORY and GITHUB_EVENT_PATH; skipping")
-        return
+        print("::error::--comment needs GITHUB_TOKEN, GITHUB_REPOSITORY and GITHUB_EVENT_PATH")
+        return False
     pr = json.loads(Path(event).read_text()).get("pull_request", {}).get("number")
     if not pr:
-        print("::warning::not a pull_request event; skipping the comment")
-        return
+        print("::error::--comment only works on a pull_request event")
+        return False
 
     base = f"https://api.github.com/repos/{repo}/issues"
     try:
@@ -285,11 +288,6 @@ def post_comment(markdown: str) -> None:
                 break
             existing = next((c for c in comments if MARKER in (c.get("body") or "")), None)
             page += 1
-        if not markdown:
-            if existing is None:
-                return
-            markdown = (f"{MARKER}\n## Rendered manifest changes\n\nNo differences from the base "
-                        "branch in what ArgoCD would apply.")
         if len(markdown) > COMMENT_LIMIT:
             markdown = (markdown[:COMMENT_LIMIT].rsplit("\n", 1)[0]
                         + "\n\n_…truncated; the full report is in this run's job summary._")
@@ -298,8 +296,10 @@ def post_comment(markdown: str) -> None:
         else:
             api("POST", f"{base}/{pr}/comments", token, {"body": markdown})
     except urllib.error.HTTPError as e:
-        # A fork PR's token is read-only; that's not worth failing over.
-        print(f"::warning::Couldn't post the PR comment (HTTP {e.code}); the job summary has the report")
+        print(f"::error::Couldn't post the PR comment (HTTP {e.code}): the token may be read-only "
+              "(fork PR, or the repo's default workflow permissions); the job summary has the report")
+        return False
+    return True
 
 
 def main() -> int:
@@ -314,16 +314,16 @@ def main() -> int:
             ap.error(f"{d} isn't a directory (a render that failed?)")
 
     markdown, total = report(load(args.base), load(args.head))
-    print(markdown if total else "No differences in what ArgoCD would apply.")
+    print(markdown)
 
     if args.out:
         args.out.write_text(markdown)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
-        if markdown:
-            with open(summary, "a") as f:
-                f.write(markdown + "\n")
+        with open(summary, "a") as f:
+            f.write(markdown + "\n")
     if args.comment:
-        post_comment(markdown)
+        if not post_comment(markdown):
+            return 1
     return 0
 
 
