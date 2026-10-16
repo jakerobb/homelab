@@ -339,9 +339,9 @@ fails with an ownership conflict on the auto-created `GatewayClass`
 (`cilium-preflight` can't own a resource the real `cilium` release already
 owns) unless you also pass `--set gatewayAPI.enabled=false` for the
 preflight release specifically — the preflight DaemonSet doesn't need
-Gateway API to pre-pull images anyway. See [`../todo/FUTURE.md`](../todo/FUTURE.md)
-for the still-open `upgradeCompatibility` flag cleanup left over from the
-1.19→1.20 migration.
+Gateway API to pre-pull images anyway. The one-time `upgradeCompatibility: "1.19"`
+flag from the 1.19→1.20 migration was removed on 2026-10-16, which lets
+`envoy-xds-mode` take 1.20+'s default of `"ads"`.
 
 Cilium was originally adopted into ArgoCD from resources that already
 existed from earlier manual `helm upgrade` CLI runs, not created by Argo —

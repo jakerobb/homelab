@@ -17,6 +17,15 @@ the T500 ending up as a dedicated ZFS log device rather than striped capacity) w
 rather than as part of this entry:
 restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queue gap found along the way (done, 2026-09-25; see below).
 
+## Cilium `upgradeCompatibility` flag removed
+
+**Done (2026-10-16), pending the ArgoCD sync (tracked in [`READY.md`](READY.md)).** The `upgradeCompatibility: "1.19"` key,
+set as a one-time flag during the 1.19→1.20 upgrade (2026-09-15), was removed from
+[`../talos/cilium/values.yaml`](../talos/cilium/values.yaml) after Cilium 1.20.2 ran from 2026-09-16 with zero restarts on any
+agent, envoy or operator pod (checked 2026-10-15). Its one effect was keeping `envoy-xds-mode` unset (the agent's legacy-safe
+default) instead of 1.20+'s `"ads"`, so that is what changes on the next sync. Background:
+[`../talos/README.md`](../talos/README.md#cilium-version-management).
+
 ## Radar added beside Headlamp
 
 **Done (2026-10-10).** [Radar](https://radarhq.io) runs at `radar.jakerobb.org` from its official Helm chart, with native
