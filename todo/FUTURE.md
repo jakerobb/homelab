@@ -12,16 +12,6 @@ B2 safety copy of the restored P3 Plus data. The restore itself is done and `rcl
 stable, and the bucket safe to delete, on or after 2026-10-20** (one month from the verified restore), assuming no
 issues surface before then.
 
-## Cilium `upgradeCompatibility` flag removal
-
-**Waiting on:** the Cilium 1.20 line (1.20.1 upgraded 2026-09-15, patch- bumped to the currently-running **1.20.2** on
-2026-09-16) running stable for a meaningful stretch before removing the `upgradeCompatibility: "1.19"` key from
-`talos/cilium/values.yaml` and syncing. That key currently keeps `envoy-xds-mode` on its legacy-safe default instead of
-1.20+'s new `"ads"` default — a low-risk, one-key change once the wait's over. See [
-`../talos/README.md`](../talos/README.md#cilium-version-management). **Consider 1.20.x stable, and the flag safe
-to remove, on or after 2026-10-15** (one month from the 1.20.1 upgrade — the 1.20.2 patch bump the next day doesn't
-reset this clock), assuming no issues surface before then.
-
 ## Authelia RBAC group/role mapping
 
 **Waiting on:** a second real Authelia user. Right now anyone who authenticates gets whatever ArgoCD's default policy
