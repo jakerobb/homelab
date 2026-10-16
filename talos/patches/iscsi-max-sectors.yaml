@@ -1,5 +1,5 @@
-# TRIAL: applied to talos-worker-mbp only (2026-10-12, --mode=no-reboot; Talos re-triggered udev live, the disks went
-# from 8192 to 1024 at once). Not yet on the other workers; it IS in the worker.yaml template on rpi5-1 (appended 2026-10-12). Caps the I/O size of the NAS's iSCSI disks at 1 MiB.
+# Applied to talos-worker-mbp 2026-10-12 and to workers 1-3 on 2026-10-16 (--mode=no-reboot; Talos re-triggered udev live, the disks went
+# from 8192 to 1024 at once). It is also in the worker.yaml template on rpi5-1 (appended 2026-10-12). Caps the I/O size of the NAS's iSCSI disks at 1 MiB.
 #
 # Why: SCST (the iSCSI target on the HexOS VM) advertises an optimal transfer length of 8 MiB, so the
 # initiator's sd driver sets max_sectors_kb to 8192 on every `TrueNAS` disk. Each 8 MiB write needs an
@@ -10,7 +10,7 @@
 # target's buffer demand per command by 8x. See todo/FUTURE.md ("Watch the HexOS iSCSI target logs").
 #
 # Standalone machine-config *document* (like security-profile.yaml), applied with
-# `talosctl patch machineconfig`. Trial on talos-worker-mbp (.34) first.
+# `talosctl patch machineconfig`. Trialled on talos-worker-mbp (.34) first.
 #
 # Matching: `vendor` on the SCSI device is "TrueNAS " (padded to 8 chars), hence the glob. The node's
 # local disks (QEMU, ATA) are left alone. KERNEL=="sd*[!0-9]" skips partitions.

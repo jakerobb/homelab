@@ -58,7 +58,7 @@ prometheus-... `, restart count) lines up with it. A burst of hundreds in a minu
 Connection errors on several workers in the same second mean the target or the path to it went away, whatever its log
 says. Next steps if it keeps coming back: shrink the initiators' maximum write size (see the FUTURE.md item), or raise
 `scst_max_cmd_mem` and `scst_max_dev_cmd_mem` (2486 and 994 MB at 10GB of RAM; they scale to 25% of RAM, and
-need a module reload to change). A `max_sectors_kb` trial is running on talos-worker-mbp since 2026-10-12; see FUTURE.md.
+need a module reload to change). The `max_sectors_kb` cap of 1024 is on all four workers (mbp since 2026-10-12, the rest since 2026-10-16); see FUTURE.md.
 
 **Retire when:** the FUTURE.md review on or after 2026-10-19 finds a clean week and Jake agrees; then delete this entry along
 with that one. A clean day or two doesn't count, since the failures came back after three quiet days.
