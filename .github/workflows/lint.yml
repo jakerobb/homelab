@@ -92,6 +92,28 @@ jobs:
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             "$RUNNER_TEMP/rendered"
 
+      # Every image the render references has to exist and be built for each
+      # architecture its pod can land on (both, unless the pod pins
+      # kubernetes.io/arch). A tag missing one is an ImagePullBackOff after
+      # ArgoCD syncs the merge. Only images new vs. the base branch are fetched
+      # from the registries, to stay under Docker Hub's anonymous pull limit,
+      # which the cluster's own pulls share; if the base can't be rendered, all
+      # of them are. See scripts/ci/check-image-arch.py.
+      - name: Image architectures
+        if: ${{ !cancelled() && steps.render.outcome == 'success' }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          baseline=()
+          if git fetch --quiet --depth=1 origin "$BASE_REF" \
+              && git worktree add --quiet "$RUNNER_TEMP/base" FETCH_HEAD \
+              && python3 "$RUNNER_TEMP/base/scripts/ci/render-manifests.py" "$RUNNER_TEMP/rendered-base" >/dev/null; then
+            baseline=(--baseline "$RUNNER_TEMP/rendered-base")
+          else
+            echo "::warning::Couldn't render $BASE_REF; checking every image instead of just the new ones"
+          fi
+          python3 scripts/ci/check-image-arch.py "$RUNNER_TEMP/rendered" "${baseline[@]}"
+
       # Picks up .github/actionlint.yaml (self-hosted runner labels), and
       # shellchecks workflow run: blocks too.
       - name: actionlint
