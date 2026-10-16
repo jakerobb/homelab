@@ -26,6 +26,12 @@ jobs:
   lint:
     name: lint
     runs-on: arc-runner
+    # pull-requests: write is only for the render-diff step's sticky PR comment.
+    # A fork PR's token is read-only regardless, so that step (and lint) fails
+    # there, on purpose.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -92,27 +98,49 @@ jobs:
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             "$RUNNER_TEMP/rendered"
 
+      # The base branch rendered the same way, for the two steps below that
+      # compare against it. Failing to render it only downgrades them (see each).
+      - name: Render base branch
+        id: base
+        if: ${{ !cancelled() && steps.render.outcome == 'success' }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if git fetch --quiet --depth=1 origin "$BASE_REF" \
+              && git worktree add --quiet "$RUNNER_TEMP/base" FETCH_HEAD \
+              && python3 "$RUNNER_TEMP/base/scripts/ci/render-manifests.py" "$RUNNER_TEMP/rendered-base" >/dev/null; then
+            echo "rendered=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Couldn't render $BASE_REF; the image check will cover every image and there will be no diff comment"
+          fi
+
       # Every image the render references has to exist and be built for each
       # architecture its pod can land on (both, unless the pod pins
       # kubernetes.io/arch). A tag missing one is an ImagePullBackOff after
       # ArgoCD syncs the merge. Only images new vs. the base branch are fetched
       # from the registries, to stay under Docker Hub's anonymous pull limit,
-      # which the cluster's own pulls share; if the base can't be rendered, all
-      # of them are. See scripts/ci/check-image-arch.py.
+      # which the cluster's own pulls share; without a base render, all of them
+      # are. See scripts/ci/check-image-arch.py.
       - name: Image architectures
         if: ${{ !cancelled() && steps.render.outcome == 'success' }}
-        env:
-          BASE_REF: ${{ github.base_ref }}
         run: |
           baseline=()
-          if git fetch --quiet --depth=1 origin "$BASE_REF" \
-              && git worktree add --quiet "$RUNNER_TEMP/base" FETCH_HEAD \
-              && python3 "$RUNNER_TEMP/base/scripts/ci/render-manifests.py" "$RUNNER_TEMP/rendered-base" >/dev/null; then
+          if [ "${{ steps.base.outputs.rendered }}" = true ]; then
             baseline=(--baseline "$RUNNER_TEMP/rendered-base")
-          else
-            echo "::warning::Couldn't render $BASE_REF; checking every image instead of just the new ones"
           fi
           python3 scripts/ci/check-image-arch.py "$RUNNER_TEMP/rendered" "${baseline[@]}"
+
+      # What the PR changes in the rendered manifests: added, removed (ArgoCD
+      # prunes), immutable-field changes, and a field-level diff, as one sticky
+      # PR comment plus the job summary. A difference never fails the step, but
+      # not being able to post the comment does, and so does a bug in the script:
+      # a PR with no report shouldn't merge unnoticed (Renovate's auto-merge
+      # included). See scripts/ci/diff-rendered.py.
+      - name: Rendered manifest diff
+        if: ${{ !cancelled() && steps.base.outputs.rendered == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/ci/diff-rendered.py "$RUNNER_TEMP/rendered-base" "$RUNNER_TEMP/rendered" --comment
 
       # Picks up .github/actionlint.yaml (self-hosted runner labels), and
       # shellchecks workflow run: blocks too.
