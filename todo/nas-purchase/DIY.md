@@ -51,6 +51,10 @@ The workable route is a short chassis plus hot-swap cages: the **Chenbro RM24200
 
 The six cage bays are for HDDs, which are not priced here.
 
+### Other case options
+
+SilverStone RM21-308
+
 ## Where the money goes
 
 * **ECC DDR5 is the swing factor.** 32GB UDIMMs were seen at $445 (Micron, undated), $880-930 (A-Tech) and about
