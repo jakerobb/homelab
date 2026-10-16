@@ -264,3 +264,11 @@ failing loudly.
 If something did break, restore the Service (see the comment at the top of `manifests/mosquitto/service.yaml`, and the
 git history of the matter-server and zwave-js-ui Services) and point the client at the in-cluster name instead. If it's all
 quiet, delete this item.
+
+## Remove the Cilium `upgradeCompatibility` flag
+
+Cilium 1.20.2 has run since 2026-09-16 with zero restarts on any agent, envoy or operator pod (checked 2026-10-15), so the
+one-month wait is over. Remove the `upgradeCompatibility: "1.19"` key from `talos/cilium/values.yaml` and sync Cilium in
+ArgoCD (manual sync). The key was holding `envoy-xds-mode` at its legacy-safe default instead of 1.20+'s `"ads"`, so afterward
+watch for envoy/xDS errors in `cilium-envoy` and `cilium-agent` logs and for any L7/Ingress traffic dropping. See
+[`../talos/README.md`](../talos/README.md#cilium-version-management).
