@@ -1,0 +1,33 @@
+# The stock rules for a pod that can't start wait a long time: KubePodNotReady
+# and KubePodCrashLooping 15m, KubeContainerWaiting 1h. After a merge that
+# points a pod at an image that won't pull, or at a Secret/ConfigMap that
+# doesn't exist, 5m is plenty. The stock rules still fire later, as the
+# backstop.
+#
+# The image-architecture check in lint catches a tag missing an architecture
+# before the merge; this is for everything it can't, such as a registry that
+# has since lost the tag, or a deleted private image.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pod-startup
+  namespace: monitoring
+spec:
+  groups:
+    - name: pod-startup
+      rules:
+        - alert: PodCantStart
+          expr: >-
+            kube_pod_container_status_waiting_reason{reason=~"ImagePullBackOff|ErrImagePull|InvalidImageName|CreateContainerConfigError|CreateContainerError"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Container {{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} can't start ({{ $labels.reason }}).
+            description: >-
+              ImagePullBackOff, ErrImagePull and InvalidImageName are a bad
+              image reference (a tag that doesn't exist, a registry problem, a
+              missing pull secret). CreateContainerConfigError is a missing
+              Secret or ConfigMap key. See which with
+              `kubectl -n {{ $labels.namespace }} describe pod {{ $labels.pod }}`.
+              If it started with a merge, revert it.

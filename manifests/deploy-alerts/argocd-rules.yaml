@@ -1,0 +1,155 @@
+# ArgoCD alerts, through Alertmanager to ntfy like the rest. The metrics come
+# from the controller (argocd_app_info, argocd_app_sync_total); see
+# argocd-podmonitor.yaml. Apps with `autosync_enabled="false"` (cilium) are
+# synced by hand, so OutOfSync is their normal state between upgrades and gets
+# its own, shorter, reminder-style alert.
+#
+# Don't start a line in an annotation with a {{ template }}: Renovate strips
+# templates before parsing, which breaks a folded block's indentation and
+# silently drops the whole file from its scan.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  groups:
+    - name: argocd-apps
+      rules:
+        # 10m: a Deployment that never becomes available is marked Degraded
+        # once its progress deadline (10m by default) passes.
+        - alert: ArgoAppDegraded
+          expr: argocd_app_info{health_status=~"Degraded|Missing"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ArgoCD app {{ $labels.name }} is {{ $labels.health_status }}.
+            description: >-
+              Something it deployed isn't healthy; the usual cause is the
+              last merge. See which resource with
+              `kubectl -n argocd get app {{ $labels.name }} -o jsonpath='{.status.resources}'`
+              or the ArgoCD UI, then `kubectl describe` it. To undo the
+              change, revert the merge on main.
+        # Rollouts of the big stacks (SigNoz, kube-prometheus-stack) take a
+        # while, so Progressing gets longer than Degraded.
+        - alert: ArgoAppProgressingTooLong
+          expr: argocd_app_info{health_status=~"Progressing|Unknown"} == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: ArgoCD app {{ $labels.name }} has been {{ $labels.health_status }} for 30 minutes.
+            description: >-
+              A rollout that neither finishes nor fails: a PVC that won't
+              bind, a pod stuck Pending, a hook Job that never completes.
+        # Unknown is what the controller reports when it can't compute the
+        # diff: a chart version that doesn't exist, a values file that breaks
+        # a template, the repo-server failing, or GitHub unreachable. The
+        # cluster keeps running the last good sync, so nothing breaks
+        # visibly, which is why it needs an alert.
+        - alert: ArgoAppSyncUnknown
+          expr: argocd_app_info{sync_status="Unknown"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ArgoCD can't compare app {{ $labels.name }} with Git.
+            description: >-
+              The app's comparison is failing, so new merges aren't being
+              applied. The reason is in its conditions:
+              `kubectl -n argocd get app {{ $labels.name }} -o jsonpath='{.status.conditions}'`.
+        # A sync operation that ended Failed or Error. The counter only exists
+        # from the first failure, and increase() reads a series that appears
+        # at 1 as no increase, so the `unless ... offset` half catches an
+        # app's first-ever failure. That half only counts once ArgoCD's
+        # metrics are 15m old (the `and on()`), so the first scrape after
+        # this rule ships doesn't report every past failure as new. Resolves
+        # 15m after the last failure; an app that keeps failing keeps it
+        # firing.
+        - alert: ArgoAppSyncFailed
+          expr: |
+            increase(argocd_app_sync_total{phase=~"Failed|Error", dry_run="false"}[15m]) > 0
+            or
+            (
+              (argocd_app_sync_total{phase=~"Failed|Error", dry_run="false"} unless argocd_app_sync_total{phase=~"Failed|Error", dry_run="false"} offset 15m)
+              and on() count(argocd_app_info offset 15m)
+            )
+          labels:
+            severity: warning
+          annotations:
+            summary: ArgoCD sync of {{ $labels.name }} ended {{ $labels.phase }}.
+            description: >-
+              The last sync didn't apply cleanly. Read why with
+              `kubectl -n argocd get app {{ $labels.name }} -o jsonpath='{.status.operationState.message}'`;
+              a failing resource (immutable field, webhook rejection, a
+              missing CRD) is listed under `.status.operationState.syncResult`.
+        # An auto-synced app that stays OutOfSync has a sync that isn't
+        # landing: selfHeal and retry are backing off, or a resource keeps
+        # being reverted by something else. 30m covers the retry backoff.
+        - alert: ArgoAppOutOfSync
+          expr: argocd_app_info{sync_status="OutOfSync", autosync_enabled="true"} == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: ArgoCD app {{ $labels.name }} has been OutOfSync for 30 minutes.
+            description: >-
+              It syncs automatically, so something is stopping the sync or
+              undoing it. Check `argocd app diff {{ $labels.name }}` for what
+              keeps differing, and the app's sync status for errors.
+        # Manual-sync apps (cilium) wait for a person. This is the reminder
+        # that a merged change hasn't been applied yet.
+        - alert: ArgoManualAppOutOfSync
+          expr: argocd_app_info{sync_status="OutOfSync", autosync_enabled="false"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: ArgoCD app {{ $labels.name }} is waiting for a manual sync.
+            description: >-
+              It has no automated sync, and Git has changes that aren't
+              applied. Sync it from the ArgoCD UI, or with
+              `argocd app sync {{ $labels.name }}`; for cilium, see
+              talos/README.md first.
+    - name: argocd-components
+      rules:
+        - alert: ArgoCDTargetDown
+          expr: up{job="argocd/argocd"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: ArgoCD component {{ $labels.app_kubernetes_io_name }} isn't answering scrapes.
+            description: >-
+              Pod {{ $labels.pod }} is up but its metrics endpoint isn't, or
+              it's crashing. Merges aren't deployed while the controller or
+              repo-server is down.
+        # absent() also catches a PodMonitor that stopped matching (or was
+        # never applied), which would otherwise leave every Argo alert above
+        # silent. Only the two components a deploy can't happen without.
+        - alert: ArgoCDComponentMissing
+          expr: |
+            absent(up{job="argocd/argocd", app_kubernetes_io_name="argocd-application-controller"})
+            or
+            absent(up{job="argocd/argocd", app_kubernetes_io_name="argocd-repo-server"})
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: No metrics from ArgoCD's {{ $labels.app_kubernetes_io_name }}.
+            description: >-
+              Either the pod is gone, or Prometheus isn't scraping it (check
+              the PodMonitor in manifests/deploy-alerts/). Until it's back,
+              merges to main aren't deployed and none of the ArgoCD alerts
+              can fire.
+        - alert: ArgoCDClusterDisconnected
+          expr: argocd_cluster_connection_status == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: ArgoCD can't reach cluster {{ $labels.server }}.
+            description: >-
+              The controller can't talk to the API server, so it can't read or
+              apply anything.

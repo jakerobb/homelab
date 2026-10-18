@@ -1,0 +1,26 @@
+# Scrapes every ArgoCD component that exposes a port named `metrics`: the
+# application controller (8082), repo-server (8084), server (8083),
+# applicationset controller (8080) and notifications controller (9001). Redis
+# has no such port, so it's skipped. A PodMonitor rather than ServiceMonitors
+# because the chart (installed by hand, see argocd/README.md) creates no
+# metrics Services; the pods expose the ports regardless, so this needs no
+# `helm upgrade`. Picked up by Prometheus without label matching.
+#
+# The scrape job is "argocd/argocd"; argocd-rules.yaml relies on that, and on
+# the app_kubernetes_io_name label copied from the pod.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: argocd
+  podTargetLabels:
+    - app.kubernetes.io/name
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
