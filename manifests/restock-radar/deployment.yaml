@@ -11,6 +11,13 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # The pod started in 15s after its last bump (measured 2026-10-18), which
+  # includes the volumes. 300s, longer than the stateless apps' 120s, leaves
+  # room for an iSCSI detach and attach when the pod lands on another node.
+  # With Recreate there's no old pod to fall back on, so a rollout that can't finish is an outage: this turns it
+  # into a Degraded app in 5 minutes instead of the default 10. Auto-merged by
+  # Renovate; see argocd/README.md.
+  progressDeadlineSeconds: 300
   strategy:
     type: Recreate
   selector:

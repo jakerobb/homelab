@@ -108,6 +108,17 @@ and is trustworthy:
   where the field is available (chart defaults are usually 10 — this
   repo intentionally keeps less history, just enough to roll back one
   step).
+- A readiness probe and a `progressDeadlineSeconds` on every
+  Deployment, especially one whose image Renovate auto-merges. Without a
+  readiness probe a pod counts as Ready the moment its container starts, so a
+  rolling update retires the old pod for a new one that may never serve.
+  Point it at an endpoint that says "the process is serving" and doesn't
+  depend on anything external (a NAS or UPS being down must not block a
+  rollout). The default deadline is 600s; set it to a few times the app's real
+  start time (measure it from the pod's `started` and `Ready` times, plus an
+  image pull), so a rollout that can't finish turns the app Degraded in
+  minutes. 120s fits a small stateless app, 300s one that attaches an iSCSI
+  volume. See `manifests/nut-exporter/deployment.yaml`.
 - Pin dependency versions explicitly (chart `targetRevision`, image
   tags) — never track `latest`, so Renovate's `kubernetes`/`argocd`
   managers (see [`renovate.json`](../renovate.json)) can detect and PR

@@ -300,6 +300,16 @@ Renovate PRs like everything else) — see the
     become eligible over a weekend wait until Monday and merge together.
     `internalChecksFilter: strict` keeps PRs with a release-age hold from being
     opened until the hold has passed.
+  - **Rollout guards on the auto-merged apps (added 2026-10-18).** A new pod
+    only replaces the old one once it's Ready, so `nut-exporter` and
+    `truenas-exporter` got readiness probes (on the same `/health` as their
+    liveness probes, which doesn't depend on the UPSes or TrueNAS).
+    `restock-radar` and `modbus-controller` use `Recreate` on purpose, so
+    there's no old pod to fall back on; for them the guard is speed.
+    All four set `progressDeadlineSeconds` (120s, or 300s for restock-radar's
+    iSCSI volume, against a measured start time of 2–15s), so a rollout that
+    can't finish turns the app Degraded in minutes, not the default ten. The
+    `ArgoAppDegraded` alert then adds its own 5 minutes before it fires.
   - **The safety net** is the rest of this README's tooling: the `lint` check
     (render, kubeconform, image architectures, the rendered-diff comment), the
     deploy alerts, and ArgoCD notifications to ntfy. A bad merge is reverted
@@ -928,7 +938,7 @@ Deployed as [`apps/deploy-alerts/`](apps/deploy-alerts/application.yaml) →
   creates no metrics Services; the pods expose the ports anyway, so enabling it
   needs no `helm upgrade`. The scrape job is `argocd/argocd`.
 - **App alerts** ([`argocd-rules.yaml`](../manifests/deploy-alerts/argocd-rules.yaml)):
-  `ArgoAppDegraded` (Degraded or Missing, 10m), `ArgoAppProgressingTooLong`
+  `ArgoAppDegraded` (Degraded or Missing, 5m), `ArgoAppProgressingTooLong`
   (30m), `ArgoAppSyncUnknown` (the controller can't compare the app with Git:
   a missing chart version, a values file that breaks a template, a repo-server
   or GitHub failure; 10m), `ArgoAppSyncFailed` (a sync ended Failed or Error),

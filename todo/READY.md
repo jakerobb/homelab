@@ -258,3 +258,12 @@ Then consider widening, one slice at a time, with the reasoning in [`../argocd/R
 Helm charts without CRDs, patch bumps of other apps, and charts with CRDs only after the remaining hand-applied CRDs are
 under ArgoCD (the item above) and the rendered diff covers them. Server-side dry-run in CI would be the extra gate for the
 riskier slices. The runner image and tool pins need a check that tests the new runner, not the old one.
+
+## Readiness probes and rollout deadlines on the remaining Deployments
+
+The four apps Renovate auto-merges got readiness probes and `progressDeadlineSeconds` (see [`DONE.md`](DONE.md)). These
+Deployments still have no readiness probe, so a pod is Ready the moment its container starts, and they use the 10 minute
+default deadline: `ntfy` and `ntfy-alertmanager` (the alert path, so the most worth doing), `searxng`, `unpoller`,
+`network-optimizer` and its InfluxDB. For each: find an endpoint that says "serving" without depending on anything external,
+add the probe, measure the real start time, and set `progressDeadlineSeconds` to a few times that. Convention:
+[`../docs/adding-an-app.md`](../docs/adding-an-app.md). Do it before widening Renovate's auto-merge to any of them.

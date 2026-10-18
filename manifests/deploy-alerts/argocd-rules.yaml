@@ -16,11 +16,17 @@ spec:
   groups:
     - name: argocd-apps
       rules:
-        # 10m: a Deployment that never becomes available is marked Degraded
-        # once its progress deadline (10m by default) passes.
+        # 5m on top of ArgoCD's own delay: an app only turns Degraded once a
+        # Deployment's progress deadline has passed (10m by default; 2 to 5
+        # minutes on the apps Renovate auto-merges) or a pod or hook fails, so
+        # this only has to ride out a brief flap. Total time to the alert is
+        # that deadline plus 5m. Lowered from 10m on 2026-10-18; in the ~15
+        # hours of ArgoCD metrics then available no app had ever been
+        # Degraded or Missing, only 0.5 to 2 minute Progressing/Unknown blips
+        # during syncs.
         - alert: ArgoAppDegraded
           expr: argocd_app_info{health_status=~"Degraded|Missing"} == 1
-          for: 10m
+          for: 5m
           labels:
             severity: warning
           annotations:
