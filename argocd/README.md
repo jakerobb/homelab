@@ -898,10 +898,19 @@ manual `helm upgrade` (see "Upgrading ArgoCD itself").
   restricts ingress only, so egress is open; the one change needed was
   letting that pod into ntfy's :8080
   ([`manifests/ntfy/networkpolicy.yaml`](../manifests/ntfy/networkpolicy.yaml)).
+- **Recipient name.** The subscription's recipient, and the `--recipient` of
+  the test command below, is `ntfy`, the notifier's name. `webhook:ntfy` is
+  wrong: a destination is `service[:recipient]`, and `webhook` isn't a service
+  name here, so it fails with "notification service 'webhook' is not supported"
+  when a trigger fires. (The first version of this config had it wrong and
+  was caught by the test message on 2026-10-18.)
 - **Check** after the `helm upgrade`: `kubectl -n argocd logs deploy/argocd-notifications-controller`
-  shows a bad template or trigger at startup. To send one on demand, run
-  `argocd admin notifications template notify deploy-failed <app> --recipient webhook:ntfy --namespace argocd`
-  from rpi5-1.
+  shows a bad template or trigger at startup. The `Trigger '...' FAILED` lines
+  there are normal; they mean the trigger's condition isn't met. To send a test
+  message on demand, from rpi5-1 (there's no `argocd` CLI there, so use the
+  controller pod's):
+  `kubectl -n argocd exec deploy/argocd-notifications-controller -- argocd admin notifications template notify deploy-failed <app> --recipient ntfy --namespace argocd`.
+  It publishes a real "Sync failed: <app>" to `homelab-alerts`.
 - **Tested** by rendering the three templates with Go's `text/template` and
   sprig (what the controller uses) against sample apps (this repo, chart
   repo, multi-source), checking each produces valid JSON; not yet run live.
