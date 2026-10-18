@@ -1,0 +1,24 @@
+# The Healthchecks.io ping URL for Alertmanager's Watchdog heartbeat, the
+# dead-man's-switch described in argocd/README.md. The URL is the secret:
+# anyone who has it can send a false "alive" ping and silence the alarm. It
+# lives in the `healthchecks-watchdog` item's `url` field in 1Password.
+#
+# Alertmanager reads it from a mounted file (`url_file`), listed under
+# alertmanagerSpec.secrets in argocd/apps/kube-prometheus-stack/. It never
+# appears in a manifest or the Helm values.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: healthchecks-watchdog
+  namespace: monitoring
+spec:
+  refreshInterval: 24h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword
+  target:
+    name: healthchecks-watchdog
+  data:
+    - secretKey: url
+      remoteRef:
+        key: healthchecks-watchdog/url
