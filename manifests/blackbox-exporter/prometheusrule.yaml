@@ -1,0 +1,79 @@
+# Alerts on the synthetic checks, through Alertmanager to ntfy like the rest.
+# Alertmanager groups by alertname and namespace, so when the whole Gateway,
+# DNS or Authelia is down and 25 routes fail at once, that's one notification
+# listing them, not 25.
+#
+# Don't start a line in an annotation with a {{ template }}: Renovate strips
+# templates before parsing, which breaks a folded block's indentation and
+# silently drops the whole file from its scan.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+spec:
+  groups:
+    - name: synthetic-checks
+      rules:
+        # 5m rides out a pod restart behind the route. A lone failing route
+        # means that app or its HTTPRoute; many at once mean the Gateway, DNS or
+        # Authelia (which sits in front of most of them).
+        - alert: PublicRouteDown
+          expr: probe_success{job=~"blackbox-.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.instance }} isn't answering the way it should."
+            description: >-
+              The synthetic check from inside the cluster failed: no DNS answer,
+              a TLS error, a status it shouldn't return (a 404 usually means the
+              HTTPRoute is gone; a 5xx a broken backend or Authelia), or a body
+              that isn't healthy. If many routes fail together it's upstream of
+              the apps: `kubectl -n gateway-system get gateway`, Authelia
+              (`kubectl -n authelia get pods`), DNS, or the certificate. Try
+              `curl -v {{ $labels.instance }}` from rpi5-1.
+        # What the Gateway actually serves, not what cert-manager holds: it's the
+        # check that a renewed certificate reached the listener. All the hostnames
+        # share one wildcard certificate, so this is one alert, not 25.
+        - alert: PublicCertificateExpiring
+          expr: |
+            (min(probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"}) - time() < 14 * 86400)
+            and
+            (min(probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"}) - time() >= 3 * 86400)
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: The certificate the Gateway serves expires in under 14 days.
+            description: >-
+              It should have been renewed 30 days before expiry. The
+              CertificateRenewalOverdue alert covers cert-manager's side; if that
+              isn't firing, the renewed certificate may not have reached the
+              Gateway listener (`kubectl -n gateway-system get gateway,secret`).
+        - alert: PublicCertificateExpiringVerySoon
+          expr: min(probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"}) - time() < 3 * 86400
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: The certificate the Gateway serves expires in under 3 days.
+            description: >-
+              Every app behind the Gateway fails TLS when it expires. Fix the
+              issuance (see CertificateRenewalOverdue) or issue the certificate
+              by hand.
+        # absent() also catches the probes or the exporter being gone, which would
+        # silence everything above.
+        - alert: SyntheticChecksMissing
+          expr: absent(probe_success{job="blackbox-gateway"})
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: No synthetic check results.
+            description: >-
+              The blackbox exporter isn't producing probe results: it's down, or
+              Prometheus can't reach it (check its network policy in
+              manifests/network-policies/monitoring.yaml, and the Probe objects in
+              manifests/blackbox-exporter/). None of the checks can alert until
+              it's back.

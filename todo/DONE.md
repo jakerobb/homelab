@@ -101,6 +101,19 @@ loop). Three CronJob rules catch a backup or other job that quietly stops runnin
 of real history (two true incidents, no false positives), and all nine rules pass `promtool` tests. The certificate renewal due
 2026-11-12 is their first real test. The rest of the audit is in [`READY.md`](READY.md).
 
+## Synthetic checks of the public hostnames
+
+**Done (2026-10-18).** Pod probes see pods, and nothing checked what a client sees. The blackbox exporter now probes, every 60s
+from inside the cluster, all 25 hostnames behind the Gateway (DNS, a verified certificate, and Authelia or the app answering),
+plus Authelia's, ArgoCD's and Home Assistant's health endpoints and ntfy's `/v1/health` with its body. Four alerts: a route
+failing for 5 minutes (one grouped notification when the whole Gateway or Authelia is down), and the certificate the Gateway
+*actually serves* expiring in under 14 and 3 days, which checks that a renewed certificate reached the listener, plus missing
+results. The modules were prototyped against the live endpoints, with cases that must fail, and then run from a pod in a
+throwaway namespace (all 25 hostnames succeeded); the one finding was that Authelia answers the exporter with a 401, not a
+browser's 302. The same change fixed a bug in the certificate alerts from the same day: their scrape needed `honorLabels` so each
+alert names the certificate's real namespace. See
+[`../argocd/README.md`](../argocd/README.md#synthetic-checks-added-2026-10-18).
+
 ## Radar added beside Headlamp
 
 **Done (2026-10-10).** [Radar](https://radarhq.io) runs at `radar.jakerobb.org` from its official Helm chart, with native
