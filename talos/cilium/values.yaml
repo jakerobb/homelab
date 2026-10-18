@@ -107,6 +107,16 @@ hubble:
         name: hubble-ca
   relay:
     enabled: true
+    # hubble-relay took about 98s to become Ready (measured once, 2026-10-18,
+    # during the Cilium sync that restarted every agent; the cause wasn't
+    # investigated), more than half the cluster default for a Deployment's
+    # progress deadline (180s; manifests/admission-policies/), and it is rolled
+    # together with the agents. 300s leaves room. The
+    # chart has no setting for the field, but it can annotate the Deployment, and
+    # the policy applies this value. Annotating the Deployment doesn't touch its
+    # pod template, so it restarts nothing.
+    annotations:
+      jakerobb.org/progress-deadline-seconds: "300"
     resources:
       requests:
         cpu: 10m

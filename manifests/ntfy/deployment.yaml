@@ -12,6 +12,10 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # The alert delivery path, so a rollout that can't finish should show up fast.
+  # The pod started in about 10s when last measured (2026-10-18), including its
+  # ReadWriteOnce cache volume. 180s leaves room for a volume re-attach.
+  progressDeadlineSeconds: 180
   strategy:
     # Not RollingUpdate: the cache PVC is ReadWriteOnce, so a second pod
     # can't schedule (and mount it) until the first one's fully gone.
@@ -58,6 +62,16 @@ spec:
             # memory pressure from unrelated pod churn, not from ntfy
             # itself being unhealthy. 3s gives real slack for transient
             # load without masking an actually-stuck process.
+            timeoutSeconds: 3
+          # Same endpoint. Gates a rollout (the Recreate strategy has no old pod
+          # to keep, but Ready still decides when the Service sends traffic),
+          # and drops the pod from the Service if it stops answering. Same 3s
+          # timeout as liveness, for the same node-contention reason.
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: http
+            periodSeconds: 10
             timeoutSeconds: 3
           resources:
             requests:

@@ -1,0 +1,32 @@
+# Cluster-wide admission policies, built into Kubernetes (no extra component
+# to run). Currently one: the default progressDeadlineSeconds for Deployments,
+# which Kubernetes hardcodes at 600s. See
+# manifests/admission-policies/default-progress-deadline.yaml for what it does
+# and how to override it, and argocd/README.md's "Cluster-wide default for
+# progressDeadlineSeconds".
+#
+# Cluster-scoped resources, so the destination namespace is irrelevant.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: admission-policies
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/admission-policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

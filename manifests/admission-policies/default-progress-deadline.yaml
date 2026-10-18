@@ -1,0 +1,80 @@
+# A cluster-wide default for a Deployment's `progressDeadlineSeconds`.
+#
+# Kubernetes has no setting for this: the API server defaults it to 600s (10
+# minutes), hardcoded. That's how long a rollout that can't finish (a bad
+# image tag, a failing pull, a crash loop) takes to turn the Deployment
+# Degraded, and so how long before ArgoCD's health, its `ArgoAppDegraded`
+# alert and its ntfy message notice. This policy lowers it to 180s (3 minutes)
+# for every Deployment that didn't set its own. Measured start times here (49
+# Deployments) are 1 to 55s, with one outlier at 98s: hubble-relay, measured
+# once, during the Cilium sync that restarted every agent.
+#
+# How it works: defaulting runs before admission, so an unset field arrives
+# as 600 and the policy can recognize it. An explicit 600 is therefore
+# indistinguishable and also gets replaced. Two ways to choose a different
+# value:
+#   - set `progressDeadlineSeconds` in the manifest (any value but exactly 600).
+#     Use this for anything you write yourself.
+#   - annotate the Deployment `jakerobb.org/progress-deadline-seconds: "<n>"` and
+#     the policy applies that value. Use this where a Helm chart has no
+#     setting for the field but does let you annotate the Deployment (Cilium's
+#     `hubble.relay.annotations` does this for hubble-relay). "600" keeps the
+#     API server's default. The annotation always wins, even over an explicit
+#     field and over a value the policy set earlier, so adding it later works;
+#     don't set both. Removing it later leaves the last value in place.
+#
+# Anything that typically takes longer than about 60s to become Ready needs an
+# explicit value, and so does any Deployment whose startupProbe budget (period
+# x failureThreshold), init containers and image pull can exceed 180s: a slow
+# but healthy rollout would otherwise be flagged. Rule of thumb: startup budget
+# plus 2 minutes. Something that reliably starts in a few seconds can go much
+# lower (60s). See docs/adding-an-app.md.
+#
+# It applies on CREATE and UPDATE, so an existing Deployment keeps its 600
+# until its next change (typically the next image bump, which is the rollout
+# that matters). Changing only this field doesn't restart any pods. A
+# malformed annotation value makes the expression fail, which `Ignore` treats
+# as "leave it alone".
+#
+# failurePolicy: Ignore, so a broken policy can never block a Deployment from
+# being created or updated; it just stops lowering the default.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: default-progress-deadline
+spec:
+  failurePolicy: Ignore
+  reinvocationPolicy: Never
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+  matchConditions:
+    - name: api-server-default-or-annotated
+      expression: >-
+        has(object.spec.progressDeadlineSeconds) &&
+        (object.spec.progressDeadlineSeconds == 600 ||
+         (has(object.metadata.annotations) &&
+          'jakerobb.org/progress-deadline-seconds' in object.metadata.annotations))
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{
+            spec: Object.spec{
+              progressDeadlineSeconds:
+                (has(object.metadata.annotations) &&
+                 'jakerobb.org/progress-deadline-seconds' in object.metadata.annotations)
+                  ? int(object.metadata.annotations['jakerobb.org/progress-deadline-seconds'])
+                  : 180
+            }
+          }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: default-progress-deadline
+spec:
+  policyName: default-progress-deadline

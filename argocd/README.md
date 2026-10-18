@@ -306,10 +306,11 @@ Renovate PRs like everything else) — see the
     liveness probes, which doesn't depend on the UPSes or TrueNAS).
     `restock-radar` and `modbus-controller` use `Recreate` on purpose, so
     there's no old pod to fall back on; for them the guard is speed.
-    All four set `progressDeadlineSeconds` (120s, or 300s for restock-radar's
-    iSCSI volume, against a measured start time of 2–15s), so a rollout that
-    can't finish turns the app Degraded in minutes, not the default ten. The
-    `ArgoAppDegraded` alert then adds its own 5 minutes before it fires.
+    All four set `progressDeadlineSeconds` (60s for the three small stateless
+    apps, 300s for restock-radar's iSCSI volume, against measured start times
+    of 2–15s), so a rollout that can't finish turns the app Degraded in a
+    minute or a few, not the default ten. The `ArgoAppDegraded` alert then
+    adds its own 5 minutes before it fires.
   - **The safety net** is the rest of this README's tooling: the `lint` check
     (render, kubeconform, image architectures, the rendered-diff comment), the
     deploy alerts, and ArgoCD notifications to ntfy. A bad merge is reverted
@@ -921,6 +922,81 @@ likely way through. Worth rehearsing on a quiet day, or at least reading
   tracking annotation on each resource plus `Prune=false` on the CRDs. The sync
   restarted nothing, the app stayed Synced on a hard refresh, and
   `argocd-controller/Apply` now appears in the CRDs' managed fields.
+
+## Readiness probes and a cluster-wide progress deadline (added 2026-10-18)
+
+Merges deploy, and some of them are unattended, so a rollout that can't finish
+has to be noticed in minutes, not ten. Two parts: a readiness probe on every
+workload that can have one (so a new pod only replaces the old once it serves),
+and a shorter `progressDeadlineSeconds` (how long a rollout may stall before the
+Deployment turns Degraded, and so before ArgoCD's health, the `ArgoAppDegraded`
+alert and the ntfy message notice).
+
+- **Kubernetes has no cluster-wide setting for the deadline.** The API server
+  hardcodes 600s. The only built-in way to change it is an admission policy, and
+  this cluster (v1.37) serves `MutatingAdmissionPolicy` as GA, so nothing extra
+  runs. [`manifests/admission-policies/default-progress-deadline.yaml`](../manifests/admission-policies/default-progress-deadline.yaml)
+  (the [`admission-policies`](apps/admission-policies/application.yaml)
+  Application) lowers it to **180s** for every Deployment that didn't set its
+  own. Defaulting runs before admission, so the policy sees an unset field as
+  600 and replaces it; an explicit 600 is indistinguishable and is replaced too.
+- **Overrides.** Set `progressDeadlineSeconds` in the manifest (any value but
+  600), or annotate the Deployment `jakerobb.org/progress-deadline-seconds: "<n>"`
+  and the policy applies that value, always (even over an explicit field, and even
+  after the policy already set one). The annotation is for Helm charts with no
+  setting for the field that still let you annotate the Deployment: Cilium's
+  `hubble.relay.annotations` does, and sets hubble-relay to 300s. It took about
+  98s to become Ready the one time it was measured, during the Cilium sync that
+  restarted every agent (the cause wasn't investigated), and it's rolled together
+  with the agents.
+- **How the values were chosen.** Start times measured on the live pods:
+  scheduled to Ready took 1 to 55s for 48 of 49 Deployments, and 98s for
+  hubble-relay. The very fast ones (2 to 4s: nut-exporter, truenas-exporter,
+  modbus-controller, ntfy-alertmanager, searxng, unpoller, unbound, Glance,
+  Headlamp) use 60s. Slow-but-healthy startups need more than 180s because of
+  their own `startupProbe` budgets (period x failureThreshold) plus a restore
+  init container and a pull: Home Assistant, zigbee2mqtt, matter-server and
+  InfluxDB (5 minutes) use 420, and Scrypted and network-optimizer (3 minutes)
+  300. The rule is the startup budget plus 2 minutes. Home Assistant's and
+  Scrypted's budgets were 10 minutes, sized for the 2026-10-01 cutover, and were cut
+  the same day: over 10 days Home Assistant took 25 to 55s to become Ready in each
+  of three starts (253MB recorder database), and Scrypted 27s on its one recorded
+  start. The 5 minutes still leaves room for a recorder schema migration after a
+  major upgrade; if one restarts the pod without it ever becoming Ready, raise
+  `failureThreshold` for that rollout. zigbee2mqtt, matter-server and InfluxDB
+  still have 5 minute budgets against 9 to 54s measured, and are candidates for the
+  same cut.
+- **What it doesn't do.** It acts on CREATE and UPDATE, so an existing Deployment
+  keeps 600 until its next change, which is usually the next image bump, the
+  rollout that matters. Changing only the deadline restarts no pods. It covers
+  Deployments only (a StatefulSet or DaemonSet has no such deadline), and it's
+  `failurePolicy: Ignore`, so a broken policy can never block a create or update.
+  A malformed annotation value fails safe (the deadline stays 600).
+- **Tested** live on a labeled scratch namespace, with the policy bound only to
+  it and everything deleted afterwards: unset gives 180, explicit values are kept,
+  600 gives 180, the annotation applies (including on an object already set to
+  180, and over an explicit field), a bad annotation leaves 600, an UPDATE to an
+  existing 600 Deployment gives 180, and a server-side apply the way ArgoCD does
+  it keeps 180. The test also found, and fixed, a flaw: the first version ignored
+  an annotation added after the policy had already set 180.
+- **Readiness probes added** (each endpoint checked on the live pod first, and
+  none depends on anything external): `ntfy` (`/v1/health`), `ntfy-alertmanager`
+  (`/health`; its `/` is 405), `searxng` (`/healthz`), `unpoller` (`/`; not the
+  heavier `/metrics`), `network-optimizer` (`/api/health`, main container only),
+  `influxdb` (`/health`), `nut-exporter` and `truenas-exporter` (their `/health`),
+  and, through [`install/values.yaml`](install/values.yaml), ArgoCD's ApplicationSet
+  controller, notifications controller and Redis (the chart's own probes; Redis's
+  30s initial delay is cut to 5s). Argo's changes and the hubble-relay annotation
+  take effect on the next Sync of the `argocd` and `cilium` Applications.
+- **Not done, and why.** `cert-manager`'s controller and cainjector (the chart
+  has no readiness setting for them), `external-secrets` (the chart can, but
+  enabling it starts a health server and restarts ESO, and an ESO restart
+  re-reads every 1Password item against the daily request limit, for little
+  gain), the ARC controller (no probe settings in its chart), and workloads that
+  are sidecars or DaemonSets with nothing to probe (config-reloaders, CSI
+  registrars, the node-tuning DaemonSet, the docs builder, network-optimizer's
+  speedtest sidecar). Not examined individually: democratic-csi's controllers,
+  hubble-ui's backend and the SigNoz ClickHouse operator.
 
 ## Deploy alerts (added 2026-10-16)
 

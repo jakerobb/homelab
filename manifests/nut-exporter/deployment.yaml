@@ -19,11 +19,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
-  # The pod starts in about 2s (measured 2026-10-18, image cached). 120s covers
+  # The pod starts in about 2s (measured 2026-10-18, image cached). 60s covers
   # a cold pull with room to spare and turns a rollout that can't finish
-  # (bad tag, pull failure, crash) into a Degraded app in 2 minutes instead of
+  # (bad tag, pull failure, crash) into a Degraded app in a minute instead of
   # the default 10. This app is auto-merged by Renovate; see argocd/README.md.
-  progressDeadlineSeconds: 120
+  progressDeadlineSeconds: 60
   strategy:
     type: RollingUpdate
   selector:

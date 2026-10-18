@@ -51,12 +51,19 @@ applicationSet:
     requests:
       cpu: 10m
       memory: 96Mi
+  # The chart's readiness probes are off by default: without one a pod is Ready
+  # the moment its container starts. This is a TCP check on the probe port.
+  readinessProbe:
+    enabled: true
 
 notifications:
   resources:
     requests:
       cpu: 10m
       memory: 96Mi
+  # See applicationSet above; a TCP check on the metrics port.
+  readinessProbe:
+    enabled: true
   # Deploy notifications to ntfy, so an alert says which revision caused it
   # (see argocd/README.md's "Deploy notifications"). ntfy has no auth (see
   # manifests/ntfy/httproute.yaml), so there is no secret to configure. The
@@ -156,6 +163,13 @@ redis:
     requests:
       cpu: 10m
       memory: 64Mi
+  # See applicationSet above; the chart's own script (redis-cli ping, answers in
+  # ~20ms). The chart's 30s initial delay is shortened: Redis was Ready as soon as
+  # it started when measured (2026-10-18), and the default would add 30s to every
+  # restart of the server and repo-server's cache.
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
 
 configs:
   params:

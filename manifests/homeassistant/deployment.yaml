@@ -35,6 +35,12 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # The startupProbe budget below plus 2 minutes for the restore init container and
+  # an image pull, so a slow but healthy rollout isn't flagged. The pod took 25 to
+  # 55s to become Ready in each of its three starts over 10 days (2026-10-18).
+  # Without this the cluster default (180s, see argocd/README.md) would cut it off
+  # first.
+  progressDeadlineSeconds: 420
   strategy:
     # Not RollingUpdate: the config PVC is ReadWriteOnce, and two instances would fight over
     # the HomeKit ports and the SQLite database.
@@ -95,12 +101,22 @@ spec:
             - name: http
               containerPort: 8123
           # /manifest.json is served without authentication.
+          #
+          # The budget is 5 minutes (30 x 10s). It was 10 minutes, sized for the
+          # 2026-10-01 cutover (the first start on restored data, expected to take
+          # "5-10 minutes"); in steady state the pod is Ready in 25 to 55s. What
+          # it still has to cover is a recorder schema migration after a major
+          # upgrade, on a ~250MB SQLite database. If the probe kills the container
+          # partway through one, the migration restarts and can loop: so if an
+          # upgrade is slow (the pod restarts without ever becoming Ready, and the
+          # log shows the database upgrade running), raise failureThreshold for
+          # that rollout.
           startupProbe:
             httpGet:
               path: /manifest.json
               port: http
             periodSeconds: 10
-            failureThreshold: 60
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /manifest.json

@@ -259,11 +259,21 @@ Helm charts without CRDs, patch bumps of other apps, and charts with CRDs only a
 under ArgoCD (the item above) and the rendered diff covers them. Server-side dry-run in CI would be the extra gate for the
 riskier slices. The runner image and tool pins need a check that tests the new runner, not the old one.
 
-## Readiness probes and rollout deadlines on the remaining Deployments
+## After the readiness-probe and deadline change merges
 
-The four apps Renovate auto-merges got readiness probes and `progressDeadlineSeconds` (see [`DONE.md`](DONE.md)). These
-Deployments still have no readiness probe, so a pod is Ready the moment its container starts, and they use the 10 minute
-default deadline: `ntfy` and `ntfy-alertmanager` (the alert path, so the most worth doing), `searxng`, `unpoller`,
-`network-optimizer` and its InfluxDB. For each: find an endpoint that says "serving" without depending on anything external,
-add the probe, measure the real start time, and set `progressDeadlineSeconds` to a few times that. Convention:
-[`../docs/adding-an-app.md`](../docs/adding-an-app.md). Do it before widening Renovate's auto-merge to any of them.
+Two manual steps make it complete, and a few things are worth a look:
+
+- Sync the `argocd` Application (ApplicationSet, notifications and Redis readiness probes) and the `cilium` Application
+  (the hubble-relay deadline annotation, which restarts nothing). See "Upgrading ArgoCD itself" in
+  [`../argocd/README.md`](../argocd/README.md#upgrading-argocd-itself) and [`../talos/README.md`](../talos/README.md#cilium-version-management).
+- The new probes restart ntfy, ntfy-alertmanager, searxng, unpoller, network-optimizer and InfluxDB once each when they sync.
+  Check that each comes back Ready and `ntfy` still takes a test message. If the `admission-policies` app is Healthy,
+  `kubectl get mutatingadmissionpolicy,mutatingadmissionpolicybinding` shows the policy and its binding.
+- Over the next weeks, watch for an unexpected `ArgoAppDegraded` on a slow rollout: the cluster default is 180s, and an app
+  that legitimately needs longer wants an explicit value (budget + 2 minutes) or the annotation. After the next Home Assistant
+  upgrade that migrates its recorder database, check it stayed Ready within its 5 minute startup budget; if it restarted
+  during the migration, raise `failureThreshold` (see the comment on its `startupProbe`).
+- zigbee2mqtt, matter-server and InfluxDB still have 5 minute startup budgets against 9 to 54s measured. Cutting them the
+  way Home Assistant's and Scrypted's were would let their deadlines shrink too.
+- Still without a readiness probe, by choice or because the chart has no setting: see the "Not done" list in
+  [`../argocd/README.md`](../argocd/README.md#readiness-probes-and-a-cluster-wide-progress-deadline-added-2026-10-18).

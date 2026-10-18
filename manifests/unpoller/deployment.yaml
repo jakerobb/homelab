@@ -13,6 +13,10 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # Small and stateless: the pod started in about 2s when last measured (2026-10-18).
+  # 60s covers a cold image pull and turns a rollout that can't finish into a
+  # Degraded app in a minute.
+  progressDeadlineSeconds: 60
   strategy:
     type: RollingUpdate
   selector:
@@ -89,6 +93,15 @@ spec:
               port: metrics
             initialDelaySeconds: 10
             periodSeconds: 30
+          # `/` answers 200 from the same server without querying the controller
+          # (unlike /metrics, which is heavier), so a UniFi outage doesn't take
+          # the pod out of the Service. Without this the pod was Ready the moment
+          # its container started.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            periodSeconds: 10
           resources:
             requests:
               cpu: 10m

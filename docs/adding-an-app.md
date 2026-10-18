@@ -108,17 +108,33 @@ and is trustworthy:
   where the field is available (chart defaults are usually 10 — this
   repo intentionally keeps less history, just enough to roll back one
   step).
-- A readiness probe and a `progressDeadlineSeconds` on every
-  Deployment, especially one whose image Renovate auto-merges. Without a
-  readiness probe a pod counts as Ready the moment its container starts, so a
-  rolling update retires the old pod for a new one that may never serve.
-  Point it at an endpoint that says "the process is serving" and doesn't
+- A readiness probe, and a deadline that fits the app, on every Deployment.
+  Without a readiness probe a pod counts as Ready the moment its container
+  starts, so a rolling update retires the old pod for a new one that may never
+  serve. Point it at an endpoint that says "the process is serving" and doesn't
   depend on anything external (a NAS or UPS being down must not block a
-  rollout). The default deadline is 600s; set it to a few times the app's real
-  start time (measure it from the pod's `started` and `Ready` times, plus an
-  image pull), so a rollout that can't finish turns the app Degraded in
-  minutes. 120s fits a small stateless app, 300s one that attaches an iSCSI
-  volume. See `manifests/nut-exporter/deployment.yaml`.
+  rollout); verify it on the live pod first (`kubectl port-forward` and curl),
+  because a wrong path takes a single-replica app out of its Service. A pod
+  with a `startupProbe` is already held back until that passes, but still wants
+  a readiness probe for later. Skip auxiliary sidecars, whose readiness would
+  take the whole pod out of its Service.
+- `progressDeadlineSeconds` is how long a rollout may go without progress before
+  the Deployment (and so the ArgoCD app) turns Degraded. Kubernetes defaults it
+  to 600s; a cluster policy lowers that to **180s** for every Deployment that
+  doesn't set its own (`manifests/admission-policies/`, explained in
+  `argocd/README.md`). Set your own when 180 is wrong:
+  - **Much faster:** something that starts in a few seconds can use 60s.
+  - **Slower than about 60s to become Ready, or a long startup budget:** use
+    the startupProbe budget (period x failureThreshold) plus init containers and
+    an image pull, i.e. budget + 2 minutes. Otherwise a slow but healthy rollout
+    is flagged. Home Assistant (5 minute budget) uses 420.
+  - **Set it in the manifest** (any value but exactly 600, which the policy
+    treats as unset), or, for a Helm chart with no setting for it that does
+    let you annotate the Deployment, annotate it
+    `jakerobb.org/progress-deadline-seconds: "<n>"` (Cilium's
+    `hubble.relay.annotations` does this). Measure the real start time first:
+    the pod's `started` and `Ready` times, plus a pull. See
+    `manifests/nut-exporter/deployment.yaml`.
 - Pin dependency versions explicitly (chart `targetRevision`, image
   tags) — never track `latest`, so Renovate's `kubernetes`/`argocd`
   managers (see [`renovate.json`](../renovate.json)) can detect and PR
