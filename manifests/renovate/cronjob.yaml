@@ -13,9 +13,15 @@ metadata:
   name: renovate
   namespace: renovate
 spec:
-  # Same off-peak slot as the since-removed Watchtower's old schedule
-  # (4:00am America/Detroit).
-  schedule: "17 4 * * *"
+  # Two runs a day. 4:30am (off-peak, like the since-removed Watchtower's slot)
+  # opens PRs for new releases. 11:30am is inside renovate.json's
+  # `automergeSchedule` (after 11am, before 1pm, weekdays): Renovate only merges
+  # while it runs, and it can't use GitHub's native auto-merge, which ignores
+  # the schedule. So the midday run merges the auto-merge-eligible PRs that
+  # passed lint since the morning, on a weekday while the owner is at their desk
+  # and the house is quiet, so a bad deploy gets full attention. Both runs share
+  # one cron expression, hence the same minute.
+  schedule: "30 4,11 * * *"
   timeZone: America/Detroit
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 2
