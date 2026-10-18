@@ -1,0 +1,31 @@
+# Alerts that catch a bad deploy after a merge. Every merge to main is synced
+# by ArgoCD as-is (automerged Renovate PRs included), and the stock
+# kube-prometheus-stack rules only fire after 15m to 1h, so this adds:
+#   - scraping for ArgoCD itself (it had no metrics at all) and alerts on app
+#     health, failed syncs, render/comparison errors and Argo being down;
+#   - a fast alert for pods that can't start their image or config.
+# See argocd/README.md's "Deploy alerts" section.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: deploy-alerts
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/deploy-alerts
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

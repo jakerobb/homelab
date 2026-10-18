@@ -816,6 +816,54 @@ already installed, `helm upgrade` instead) and re-run with the same
 `-f argocd/install/values.yaml`. This is the one recurring manual step, by
 design — see "Bootstrap pattern" above.
 
+## Deploy alerts (added 2026-10-16)
+
+A merge to `main` is a deploy: every app here syncs automatically, Renovate's
+PRs included (and may merge unattended), and CI can only check that manifests
+render and validate. These alerts are the check on what ArgoCD then does.
+Deployed as [`apps/deploy-alerts/`](apps/deploy-alerts/application.yaml) →
+[`manifests/deploy-alerts/`](../manifests/deploy-alerts/).
+
+- **ArgoCD had no metrics at all.** A failed sync, a Degraded app, a
+  chart that wouldn't render, or the controller being down alerted nothing.
+  [`argocd-podmonitor.yaml`](../manifests/deploy-alerts/argocd-podmonitor.yaml)
+  scrapes every component that exposes a port named `metrics`. It's a
+  PodMonitor, not ServiceMonitors, because the chart is installed by hand and
+  creates no metrics Services; the pods expose the ports anyway, so enabling it
+  needs no `helm upgrade`. The scrape job is `argocd/argocd`.
+- **App alerts** ([`argocd-rules.yaml`](../manifests/deploy-alerts/argocd-rules.yaml)):
+  `ArgoAppDegraded` (Degraded or Missing, 10m), `ArgoAppProgressingTooLong`
+  (30m), `ArgoAppSyncUnknown` (the controller can't compare the app with Git:
+  a missing chart version, a values file that breaks a template, a repo-server
+  or GitHub failure; 10m), `ArgoAppSyncFailed` (a sync ended Failed or Error),
+  and `ArgoAppOutOfSync` (30m, auto-synced apps only). Manual-sync apps (cilium)
+  get `ArgoManualAppOutOfSync` after 15m instead: Git has a merged change that
+  nobody has synced yet. The `autosync_enabled` label on `argocd_app_info`
+  tells them apart.
+- **ArgoCD itself:** `ArgoCDTargetDown`, `ArgoCDClusterDisconnected`, and
+  `ArgoCDComponentMissing`, an `absent()` on the controller and repo-server,
+  the two components a deploy can't happen without. It also fires if the
+  PodMonitor stops matching, which would otherwise leave every other ArgoCD
+  alert silent.
+- **`PodCantStart`** ([`pod-startup-rules.yaml`](../manifests/deploy-alerts/pod-startup-rules.yaml)):
+  ImagePullBackOff, ErrImagePull, InvalidImageName, CreateContainerConfigError
+  or CreateContainerError for 5m. The stock rules take 15m to 1h
+  (`KubePodNotReady`, `KubeContainerWaiting`) and still fire later as the
+  backstop.
+- **`ArgoAppSyncFailed` and new series.** The sync counter only exists from an
+  app's first failure, and `increase()` reads a series that appears at 1 as
+  no increase. The rule therefore also matches series that weren't there 15m
+  ago, but only once ArgoCD's metrics are themselves 15m old; otherwise the
+  first scrape after this shipped would have reported every past failure as new.
+- **Tested** with `promtool test rules` while writing them (both
+  `ArgoAppSyncFailed` paths, its resolve, and the absent() cases), but those
+  tests aren't kept in the repo.
+
+Not covered here, and planned: a dead-man's-switch for the alerting pipeline
+itself (Watchdog goes to the null receiver, so nothing notices if Prometheus,
+Alertmanager, ntfy-alertmanager or ntfy breaks), and ArgoCD notifications to
+ntfy carrying the app and revision.
+
 ## SigNoz (decided and deployed 2026-09-22)
 
 Cluster observability (logs/metrics/traces in one stack) — closes out
