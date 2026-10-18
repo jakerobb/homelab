@@ -1,9 +1,22 @@
 # Homelab overrides for the argo-cd chart. Only deltas from chart defaults —
-# see `helm show values argo/argo-cd --version 10.9.1` for everything else.
+# see `helm show values argo/argo-cd --version <targetRevision in
+# apps/argocd/application.yaml>` for everything else.
 # Chart: https://github.com/argoproj/argo-helm, repo https://argoproj.github.io/argo-helm
 
 nameOverride: argocd
 fullnameOverride: argocd
+
+# Managed by the `argocd` Application (apps/argocd/application.yaml), which
+# reads this file; edit it and Sync there. A bad version can still break the
+# controller that applies it, so the recovery path is `helm install` against
+# this file from rpi5-1 (argocd/README.md, "Bootstrap").
+crds:
+  # The chart's default is `ServerSideApply=true` (the applicationsets CRD is
+  # ~377KB, past the client-side-apply cap), and setting this key replaces that
+  # map, so it's repeated here. Prune=false: ArgoCD's own CRDs vanishing would
+  # take every Application with them.
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true,Prune=false
 
 global:
   # Chart default is 3 (Deployments); lowered to match the homelab-wide

@@ -1,0 +1,66 @@
+# ArgoCD's own Helm chart, managed by ArgoCD itself. Before this, the chart was
+# the one recurring `helm upgrade` by hand on rpi5-1, so a merged Renovate bump
+# only edited a README code block and nothing deployed it. Now a bump (or a
+# change to argocd/install/values.yaml) is a PR, and applying it is one Sync
+# click here, like Cilium.
+#
+# The very first install still has to be manual, and always will: ArgoCD can't
+# apply its own chart before it exists. See argocd/README.md's "Bootstrap
+# (one-time, manual)", which is also the recovery path if a bad version breaks
+# the controller that's meant to apply the fix. This Application only manages
+# ArgoCD from there on, on a cluster where it's already running.
+#
+# Manual sync only (no `syncPolicy.automated`), for the same reason as Cilium:
+# a bad version can break the very controller applying it, and auto-sync would
+# keep re-applying it with nothing left to revert it from the UI. Merge the
+# PR, read `argocd app diff argocd`, then Sync. The ArgoManualAppOutOfSync
+# alert (manifests/deploy-alerts/) reminds you when a merge is waiting.
+#
+# Values come from argocd/install/values.yaml via a second source + $values
+# ref, the same file `helm install`/`helm upgrade -f` used, so there's one copy
+# of the config. The same release name (`argocd`) and namespace as the Helm
+# install, so Argo adopts the live resources in place; the stale Helm release
+# Secrets (sh.helm.release.v1.argocd.*) get deleted once after adoption, see
+# argocd/README.md. Don't `helm upgrade` again after that.
+#
+# ServerSideApply + ServerSideDiff: the chart's `applicationsets` CRD is ~377KB,
+# over the 256KiB client-side-apply annotation cap, the same situation as
+# kube-prometheus-stack's CRDs (see argocd/README.md). Without the annotation
+# the CRDs sync but sit OutOfSync forever. The chart also marks its CRDs
+# ServerSideApply itself, and argocd/install/values.yaml adds Prune=false to
+# them: ArgoCD's own CRDs vanishing would take every Application with them.
+#
+# No finalizer, deliberately: deleting this Application must not cascade into
+# deleting ArgoCD.
+#
+# No ignoreDifferences: a server-side diff of the rendered chart against the
+# live resources (2026-10-18) differed only in the chart's pre-upgrade hook Job
+# (argocd-redis-secret-init), which exists only during a sync. The Secrets the
+# server writes into (argocd-secret) and argocd-initial-admin-secret compare
+# clean.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
+spec:
+  project: default
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.10.5
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $values/argocd/install/values.yaml
+    - repoURL: https://github.com/jakerobb/homelab.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
