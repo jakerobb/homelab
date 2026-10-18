@@ -1,0 +1,52 @@
+# Probe modules for blackbox-exporter (see ../../argocd/README.md's "Synthetic
+# checks"). Prototyped against the live endpoints with the exporter image before
+# this was written, including cases that must FAIL (a missing route, a TLS name
+# mismatch, a 404, a wrong body).
+#
+# All three verify the certificate chain and name (insecure_skip_verify: false)
+# and don't follow redirects: an Authelia redirect is itself the proof that the
+# Gateway, DNS, TLS and Authelia all answered.
+#
+# http_gateway accepts 401 as well as the redirects. A browser gets a 302 from
+# Authelia, but the exporter sends no `Accept: text/html`, and Authelia answers
+# that with a 401 (seen against alertmanager.jakerobb.org). 404 and every 5xx
+# fail: an unknown hostname gets a 404 from the Gateway, which is the "route is
+# gone" case to catch.
+modules:
+  http_gateway:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: false
+      valid_status_codes: [200, 301, 302, 303, 307, 308, 401, 403]
+      fail_if_not_ssl: true
+      tls_config:
+        insecure_skip_verify: false
+  http_health:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: false
+      valid_status_codes: [200]
+      fail_if_not_ssl: true
+      tls_config:
+        insecure_skip_verify: false
+  http_ntfy_health:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      follow_redirects: false
+      valid_status_codes: [200]
+      fail_if_not_ssl: true
+      fail_if_body_not_matches_regexp: ['"healthy":\s*true']
+      tls_config:
+        insecure_skip_verify: false

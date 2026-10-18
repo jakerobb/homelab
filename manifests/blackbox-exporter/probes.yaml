@@ -1,0 +1,93 @@
+# What the exporter checks, every 60s. Static targets, because the Probe resource
+# can only discover Ingress objects, not HTTPRoutes: when you add an app behind
+# the Gateway, add its hostname to the first list (docs/adding-an-app.md). The
+# result is `probe_success` per target, plus the served certificate's expiry
+# (`probe_ssl_earliest_cert_expiry`) and the status code and timing.
+#
+# otel.jakerobb.org (the OTLP ingest) is left out on purpose: it answers 404 on
+# `/` by design, and the checks below treat 404 as "route gone".
+---
+# Every hostname behind the Gateway answers at all: DNS, the Gateway, a valid
+# certificate, and Authelia in front (a redirect, or its 401 to a non-browser,
+# counts). Which backend is behind it isn't tested here; the pods' own probes do
+# that.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: gateway-routes
+  namespace: monitoring
+spec:
+  jobName: blackbox-gateway
+  interval: 60s
+  scrapeTimeout: 15s
+  module: http_gateway
+  prober:
+    url: blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+          - https://argocd.jakerobb.org/
+          - https://auth.jakerobb.org/
+          - https://changedetection.jakerobb.org/
+          - https://docs.jakerobb.org/
+          - https://home.jakerobb.org/
+          - https://headlamp.jakerobb.org/
+          - https://homeassistant.jakerobb.org/
+          - https://hubble.jakerobb.org/
+          - https://gateway.jakerobb.org/
+          - https://kvm.jakerobb.org/
+          - https://modbus-relay.jakerobb.org/
+          - https://modbus.jakerobb.org/
+          - https://rack-led.jakerobb.org/
+          - https://alertmanager.jakerobb.org/
+          - https://prometheus.jakerobb.org/
+          - https://influxdb.jakerobb.org/
+          - https://optimizer.jakerobb.org/
+          - https://ntfy.jakerobb.org/
+          - https://radar.jakerobb.org/
+          - https://restock-radar.jakerobb.org/
+          - https://scrypted.jakerobb.org/
+          - https://search.jakerobb.org/
+          - https://signoz.jakerobb.org/
+          - https://zigbee.jakerobb.org/
+          - https://zwave.jakerobb.org/
+---
+# A few services' own health endpoints, through the Gateway: strict, so these also
+# prove the backend behind the route is serving.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: service-health
+  namespace: monitoring
+spec:
+  jobName: blackbox-health
+  interval: 60s
+  scrapeTimeout: 15s
+  module: http_health
+  prober:
+    url: blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - https://auth.jakerobb.org/api/health
+        - https://argocd.jakerobb.org/healthz
+        - https://homeassistant.jakerobb.org/manifest.json
+---
+# ntfy's health endpoint must also say the server is healthy, since ntfy is the
+# only way any alert reaches you.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: ntfy-health
+  namespace: monitoring
+spec:
+  jobName: blackbox-ntfy
+  interval: 60s
+  scrapeTimeout: 15s
+  module: http_ntfy_health
+  prober:
+    url: blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - https://ntfy.jakerobb.org/v1/health

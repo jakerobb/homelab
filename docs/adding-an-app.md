@@ -296,7 +296,9 @@ from `kubectl get endpointslices`. After it syncs, watch
    (ServiceAccount + ClusterRole/ClusterRoleBinding if the app needs
    cluster access).
 4. `manifests/<name>/httproute.yaml` — `homelab-gateway` parentRef,
-   `<name>.jakerobb.org` hostname.
+   `<name>.jakerobb.org` hostname. Add the hostname to the `gateway-routes`
+   Probe in `manifests/blackbox-exporter/probes.yaml` so a synthetic check
+   covers it (the list is static).
 5. Decide OIDC vs. forward-auth; wire up
    `argocd/apps/authelia/application.yaml` (`access_control` rule, plus
    an OIDC client if applicable) and any needed `ReferenceGrant`.

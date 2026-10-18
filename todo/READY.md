@@ -281,8 +281,6 @@ Found while checking what the alerts and the cluster's history show. The alerts 
   `KubePersistentVolumeFillingUp` would only warn days before the end, so the fix is retention or a bigger volume, not an alert.
   Check SigNoz's retention settings and whether the volume can be expanded. `zigbee2mqtt-data` is on track to fill in about 45
   days at only 11.5% used, which is odd for a Zigbee config: find out what's growing.
-- **No synthetic checks of the public URLs.** Probes see pods; nothing checks that `ntfy`, `argocd` and `auth` answer through DNS,
-  the Gateway, TLS and Authelia. A blackbox exporter with a handful of probes would, and also reports TLS expiry from outside.
 - **ntfy delivery isn't verified.** The Healthchecks heartbeat covers Prometheus and Alertmanager but skips ntfy-alertmanager and
   ntfy. A small CronJob could publish a message, poll to confirm ntfy stored it, and ping a second Healthchecks check.
 - **Are the app backups copied offsite?** The Home Assistant, Scrypted and change-detection backups go to a `hexos-nfs` volume,

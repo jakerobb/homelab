@@ -1,0 +1,32 @@
+# Synthetic checks of the public hostnames, from inside the cluster: the one view
+# pod probes don't have (DNS, the Gateway, TLS and Authelia, the way a client
+# sees them). See argocd/README.md's "Synthetic checks".
+#
+# Targets the existing `monitoring` namespace (it exists to serve Prometheus), so
+# no namespace.yaml here and no CreateNamespace=true: kube-prometheus-stack's
+# Application already owns that Namespace, and two Applications managing one
+# Namespace object would be an ownership conflict. Same as ntfy-alertmanager.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: blackbox-exporter
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/blackbox-exporter
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

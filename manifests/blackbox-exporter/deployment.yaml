@@ -1,0 +1,78 @@
+# prometheus/blackbox_exporter: probes the public hostnames from inside the
+# cluster the way a client would (DNS, the Gateway, TLS, Authelia), which pod
+# probes can't see. Prometheus drives it through the Probe objects in
+# probes.yaml; see argocd/README.md's "Synthetic checks". No official Helm chart
+# is needed for one Deployment and a config file, so bare manifests, like
+# ntfy-alertmanager.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  # Small and stateless; a static Go binary that starts in about a second.
+  # 60s covers a cold image pull and turns a rollout that can't finish into a
+  # Degraded app in a minute.
+  progressDeadlineSeconds: 60
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: blackbox-exporter
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: blackbox-exporter
+          image: quay.io/prometheus/blackbox-exporter:v0.29.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config.file=/config/blackbox.yml
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 9115
+          # /-/healthy doesn't probe anything, so a Gateway outage doesn't take the
+          # exporter itself out of rotation: the probes report that.
+          readinessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 24Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /config
+              name: config
+              readOnly: true
+      volumes:
+        # Generated from blackbox.yml by kustomization.yaml; the name gets a
+        # content-hash suffix, so a config change rolls the pod.
+        - name: config
+          configMap:
+            name: blackbox-exporter-config

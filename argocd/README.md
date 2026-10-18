@@ -1061,7 +1061,10 @@ found three blind spots, so the `deploy-alerts` Application also holds these.
   renewal is the first real test of the path.
   [`cert-manager-podmonitor.yaml`](../manifests/deploy-alerts/cert-manager-podmonitor.yaml)
   scrapes the controller (a PodMonitor, so no cert-manager chart change or
-  restart), and [`manifests/network-policies/cert-manager.yaml`](../manifests/network-policies/cert-manager.yaml)
+  restart; `honorLabels: true`, because the first scrape showed Prometheus
+  replacing each certificate's own `namespace` label with cert-manager's, which
+  would have put `kubectl -n cert-manager` in every alert for a certificate that
+  lives in `gateway-system`), and [`manifests/network-policies/cert-manager.yaml`](../manifests/network-policies/cert-manager.yaml)
   now lets Prometheus in on 9402. Rules in
   [`cert-manager-rules.yaml`](../manifests/deploy-alerts/cert-manager-rules.yaml):
   `CertificateRenewalOverdue` (6h past the scheduled renewal and still not
@@ -1093,6 +1096,52 @@ found three blind spots, so the `deploy-alerts` Application also holds these.
   suspended CronJob), and the operator's admission webhook accepted them in a
   server-side dry-run. The certificate rules can't be replayed (the data starts
   when the scrape does).
+
+### Synthetic checks (added 2026-10-18)
+
+Pod probes see pods. Nothing checked what a client sees: DNS, the Gateway, TLS and
+Authelia. [`manifests/blackbox-exporter/`](../manifests/blackbox-exporter/) (the
+[`blackbox-exporter`](apps/blackbox-exporter/application.yaml) Application, in the
+`monitoring` namespace) runs prometheus/blackbox_exporter and three `Probe`
+resources that Prometheus drives every 60s.
+
+- **What's probed.** `gateway-routes`: all 25 hostnames behind the Gateway answer
+  (DNS resolves, the certificate chain and name verify, and the status is a 200, a
+  redirect or Authelia's 401; a 404 or 5xx fails). `service-health`: Authelia's
+  `/api/health`, ArgoCD's `/healthz` and Home Assistant's `/manifest.json` must
+  return 200, which also proves the backend behind the route. `ntfy-health`:
+  `/v1/health` must return 200 with `"healthy":true`, since ntfy is the only way
+  any alert reaches you. `otel.jakerobb.org` is left out on purpose: it answers 404
+  on `/` by design.
+- **Alerts** ([`prometheusrule.yaml`](../manifests/blackbox-exporter/prometheusrule.yaml)):
+  `PublicRouteDown` (a check failing for 5m; Alertmanager groups by alertname and
+  namespace, so a Gateway or Authelia outage that fails many routes is one
+  notification); `PublicCertificateExpiring` (the certificate the Gateway
+  *actually serves*, under 14 days: it checks that a renewed certificate reached
+  the listener, and it's one alert, since every hostname shares the wildcard) and
+  `PublicCertificateExpiringVerySoon` (under 3 days, critical);
+  `SyntheticChecksMissing` (no probe results for 15m). The exporter's own scrape is
+  covered by the stock `TargetDown`.
+- **What it can't see.** It runs inside the cluster, so it doesn't test the path
+  from another VLAN or the internet, and the hostnames resolve to a LAN address
+  anyway. The Healthchecks.io heartbeat is the check from outside.
+- **Adding an app:** add its hostname to the `gateway-routes` Probe in
+  [`probes.yaml`](../manifests/blackbox-exporter/probes.yaml). The list is static,
+  because a `Probe` can only discover Ingress objects, not HTTPRoutes.
+- **Network policy.** The exporter reaches the Gateway on 443 the way radar does:
+  `toEntities: ingress` (Envoy on the same node) plus the Gateway's address
+  (a different node), in the `blackbox-exporter` policy in
+  [`manifests/network-policies/monitoring.yaml`](../manifests/network-policies/monitoring.yaml).
+- **Tested** before shipping: the three modules against the live endpoints with the
+  exporter image, including the cases that must fail (a missing route, a TLS name
+  mismatch, a 404, a wrong body); then the same config and image from a pod in a
+  throwaway namespace, where DNS resolved in 8 to 15ms and all 25 hostnames
+  succeeded; `promtool` unit tests of the four alerts (including that a 3 minute
+  flap and a certificate under 3 days don't notify twice); a server-side dry-run
+  that the Prometheus operator's webhook accepted. It found that Authelia answers
+  the exporter with a 401, not the 302 a browser sees, which is why 401 is
+  accepted. The one thing not tested before it shipped is the `monitoring`
+  namespace's own network policy.
 
 ### Deploy notifications (added 2026-10-17)
 
