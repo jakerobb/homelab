@@ -82,7 +82,10 @@ own, with an annotation override for Helm charts, used for hubble-relay (98s to 
 restarted every agent). Start times were measured on all 49 Deployments: 48 are 1 to 55s. Fast apps got 60s; Home Assistant, Scrypted, zigbee2mqtt, matter-server, InfluxDB and
 network-optimizer got longer values because their own startup budgets reach or exceed 180s. Home Assistant's and Scrypted's
 were 10 minutes (sized for the 2026-10-01 cutover) and were cut to 5 and 3 after checking 10 days of real start times (25 to 55s
-and 27s). The policy was tested live on a scratch
+and 27s); zigbee2mqtt's, matter-server's and InfluxDB's 5 minutes were cut to 2, 2 and 3 the same day (9s, 19s and about 10s to
+Ready on one recorded start each; InfluxDB logs "Listening" 2s after it starts, with 14GB in 131 shards). All of it rolled out cleanly: the probes and
+the policy were synced that day, the budget cut went out with its merge, every pod came back Ready, and a test message through
+ntfy went out. The policy was tested live on a scratch
 namespace (the test found a flaw, fixed before merging) and everything was checked against the cluster with read-only
 diffs. What was skipped and why is in [`../argocd/README.md`](../argocd/README.md#readiness-probes-and-a-cluster-wide-progress-deadline-added-2026-10-18).
 

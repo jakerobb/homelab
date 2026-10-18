@@ -955,17 +955,22 @@ alert and the ntfy message notice).
   modbus-controller, ntfy-alertmanager, searxng, unpoller, unbound, Glance,
   Headlamp) use 60s. Slow-but-healthy startups need more than 180s because of
   their own `startupProbe` budgets (period x failureThreshold) plus a restore
-  init container and a pull: Home Assistant, zigbee2mqtt, matter-server and
-  InfluxDB (5 minutes) use 420, and Scrypted and network-optimizer (3 minutes)
-  300. The rule is the startup budget plus 2 minutes. Home Assistant's and
-  Scrypted's budgets were 10 minutes, sized for the 2026-10-01 cutover, and were cut
-  the same day: over 10 days Home Assistant took 25 to 55s to become Ready in each
-  of three starts (253MB recorder database), and Scrypted 27s on its one recorded
-  start. The 5 minutes still leaves room for a recorder schema migration after a
-  major upgrade; if one restarts the pod without it ever becoming Ready, raise
-  `failureThreshold` for that rollout. zigbee2mqtt, matter-server and InfluxDB
-  still have 5 minute budgets against 9 to 54s measured, and are candidates for the
-  same cut.
+  init container and a pull: Home Assistant (5 minutes) uses 420,
+  zigbee2mqtt and matter-server (2 minutes) 240, and Scrypted, InfluxDB and
+  network-optimizer (3 minutes) 300. The rule is the startup budget plus 2
+  minutes. Home Assistant's and Scrypted's budgets were 10 minutes, sized for the
+  2026-10-01 cutover, and were cut the same day: over 10 days Home Assistant took
+  25 to 55s to become Ready in each of three starts (253MB recorder database), and
+  Scrypted 27s on its one recorded start. The 5 minutes still leaves room for a
+  recorder schema migration after a major upgrade; if one restarts the pod without
+  it ever becoming Ready, raise `failureThreshold` for that rollout. zigbee2mqtt,
+  matter-server and InfluxDB had 5 minute budgets and were cut the same day (to 2, 2
+  and 3 minutes): 9s and 19s to Ready on one recorded start each, no restarts in 10
+  days, and InfluxDB (14GB, 131 shards) logs "Listening" 2s after it starts and is
+  Ready about 10s after its container starts, so shards open lazily and the rest of
+  a pod's 41s is the volume attach. The cases that aren't measured, a slow
+  coordinator handshake and a WAL replay after an unclean stop, are what the
+  remaining margin is for.
 - **What it doesn't do.** It acts on CREATE and UPDATE, so an existing Deployment
   keeps 600 until its next change, which is usually the next image bump, the
   rollout that matters. Changing only the deadline restarts no pods. It covers
