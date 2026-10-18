@@ -15,11 +15,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
-  # Longer than the 5 minute startupProbe budget below (30 x 10s, for opening ~90
-  # days of shards on a first boot) plus a ReadWriteOnce volume attach and an
-  # image pull. The pod started in about 41s when last measured (2026-10-18).
-  # Without this the cluster default (180s) would cut it off first.
-  progressDeadlineSeconds: 420
+  # The startupProbe budget below plus 2 minutes for a ReadWriteOnce volume attach
+  # and an image pull. The pod took 41s to become Ready on its one recorded start
+  # (2026-10-18), most of it the volume. Without this the cluster default (180s)
+  # would cut it off first.
+  progressDeadlineSeconds: 300
   strategy:
     # The data PVC is ReadWriteOnce, and the bolt db takes an exclusive lock.
     type: Recreate
@@ -83,12 +83,18 @@ spec:
             - name: http
               containerPort: 8086
           startupProbe:
-            # Opening ~90 days of shards takes a while on first boot.
+            # The budget is 3 minutes (18 x 10s). It was 5, for opening ~90 days
+            # of shards on the first boot. Measured 2026-10-18 (14GB, 131 shards):
+            # influxd logs "Listening" 2s after it starts and the container is
+            # Ready in about 10s, so shards open lazily and the rest of a pod's 41s
+            # is the volume attach. 3 minutes leaves room for the case that isn't
+            # measured: replaying the WAL after an unclean stop. If that restarts
+            # the pod without it ever becoming Ready, raise failureThreshold.
             httpGet:
               path: /health
               port: http
             periodSeconds: 10
-            failureThreshold: 30
+            failureThreshold: 18
           livenessProbe:
             httpGet:
               path: /health

@@ -22,11 +22,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
-  # Longer than the 5 minute startupProbe budget below (30 x 10s) plus the restore
-  # init container and an image pull. The pod started in about 47s when last
-  # measured (2026-10-18). Without this the cluster default (180s) would cut it
-  # off first.
-  progressDeadlineSeconds: 420
+  # The startupProbe budget below plus 2 minutes for the restore init container
+  # and an image pull. The pod took 47s to become Ready on its one recorded start
+  # (2026-10-18), most of it the init container and the volume. Without this the
+  # cluster default (180s) would cut it off first.
+  progressDeadlineSeconds: 240
   strategy:
     # Not RollingUpdate: the data PVC is ReadWriteOnce, and two instances talking
     # to one coordinator would fight over its single TCP connection.
@@ -92,12 +92,18 @@ spec:
               containerPort: 8080
           # The coordinator handshake can take a while, and the process exits if it
           # fails, so give it room before the liveness probe applies.
+          #
+          # The budget is 2 minutes (12 x 10s). It was 5. The container took 9s to
+          # become Ready on its one recorded start, and hasn't restarted in 10
+          # days (2026-10-18), so this is about 13x that, with room for a slow
+          # handshake. If a slow start restarts the pod without it ever becoming
+          # Ready, raise failureThreshold.
           startupProbe:
             httpGet:
               path: /
               port: http
             periodSeconds: 10
-            failureThreshold: 30
+            failureThreshold: 12
             timeoutSeconds: 3
           readinessProbe:
             httpGet:
