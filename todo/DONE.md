@@ -57,6 +57,19 @@ after 11am and before 1pm on weekdays, and the CronJob runs twice a day (4:30am 
 deploy happens on a weekday at midday, with the owner at their desk and the house quiet. It was built after the safety net it relies on: the image-architecture and rendered-diff checks in `lint`,
 the deploy alerts, and ArgoCD notifications to ntfy. Widening it is tracked in [`READY.md`](READY.md).
 
+## Rollout guards on the auto-merged apps
+
+**Done (2026-10-18).** Before Renovate started merging our own images unattended, the four apps got rollout guards in their
+Deployments. `nut-exporter` and `truenas-exporter` had no readiness probe, so a new pod counted as Ready the moment its
+container started; both now probe the same `/health` as their liveness probes (which deliberately doesn't depend on the UPSes or
+TrueNAS). `restock-radar` and `modbus-controller` already had one, and use `Recreate` on purpose (one SQLite file; never two
+controllers on the relay board), so for them there is no old pod to fall back on. All four now set `progressDeadlineSeconds`:
+120s, or 300s for restock-radar's iSCSI volume, against start times measured on the live pods of 2–3s (15s for restock-radar,
+volumes included). A rollout that can't finish now turns the app Degraded in 2 to 5 minutes instead of 10. A read-only
+server-side diff against the cluster showed exactly those fields and nothing else. Other Deployments without a readiness probe
+(ntfy, ntfy-alertmanager, searxng, unpoller, network-optimizer, its InfluxDB) are tracked in [`READY.md`](READY.md); the
+convention is in [`../docs/adding-an-app.md`](../docs/adding-an-app.md).
+
 ## Radar added beside Headlamp
 
 **Done (2026-10-10).** [Radar](https://radarhq.io) runs at `radar.jakerobb.org` from its official Helm chart, with native

@@ -14,6 +14,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # The pod starts in about 2s (measured 2026-10-18, image cached). 120s covers
+  # a cold pull with room to spare and turns a rollout that can't finish
+  # (bad tag, pull failure, crash) into a Degraded app in 2 minutes instead of
+  # the default 10. This app is auto-merged by Renovate; see argocd/README.md.
+  progressDeadlineSeconds: 120
   strategy:
     type: RollingUpdate
   selector:
@@ -70,6 +75,16 @@ spec:
               port: http
             initialDelaySeconds: 2
             periodSeconds: 30
+          # Same /health: "the process is serving". Without a readiness probe a
+          # pod is Ready the moment its container starts, so the RollingUpdate
+          # would retire the old pod for a new one that hasn't opened its port
+          # (or never does). It stays independent of TrueNAS on purpose: a NAS
+          # outage must not block a rollout or drop the pod from its Service.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
           resources:
             requests:
               cpu: 5m
