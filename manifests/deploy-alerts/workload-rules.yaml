@@ -1,0 +1,96 @@
+# Two blind spots in the stock kube-prometheus-stack rules, found by auditing
+# the cluster's own history (see argocd/README.md's "Deploy alerts"):
+#
+# - A container that restarts now and then. KubePodCrashLooping only fires on a
+#   continuous crash loop (CrashLoopBackOff for 15m). restock-radar restarted 5
+#   times in one hour on 2026-10-09 (a wrong image digest, fixed in the next
+#   commit), and that alert was firing for about 14 minutes in total across the
+#   whole 10 days.
+# - A CronJob that quietly stops running. KubeJobFailed reports a Job that
+#   failed, but nothing notices a schedule that was suspended, never fired or
+#   whose runs all fail. The backups (Home Assistant, Scrypted, change-detection)
+#   are CronJobs.
+#
+# Don't start a line in an annotation with a {{ template }}: Renovate strips
+# templates before parsing, which breaks a folded block's indentation and
+# silently drops the whole file from its scan.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: workloads
+  namespace: monitoring
+spec:
+  groups:
+    - name: workloads
+      rules:
+        # 3 restarts in 6h. A pod that's in CrashLoopBackOff right now is left to
+        # KubePodCrashLooping, so a real crash loop doesn't notify twice; this is
+        # for the ones that restart, recover and restart again. 6h rather than
+        # longer so the alert clears the same day.
+        - alert: ContainerRestartingRepeatedly
+          expr: |
+            increase(kube_pod_container_status_restarts_total[6h]) >= 3
+            unless on (namespace, pod, container)
+            kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Container {{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} keeps restarting.
+            description: >-
+              It has restarted 3 or more times in the last 6 hours but isn't
+              crash-looping right now. Why it died last:
+              `kubectl -n {{ $labels.namespace }} get pod {{ $labels.pod }} -o jsonpath='{.status.containerStatuses[*].lastState}'`
+              (exit 137 is a kill, often OOMKilled; 255 a runtime or startup
+              failure), and `kubectl -n {{ $labels.namespace }} logs {{ $labels.pod }} --previous`.
+        # Daily CronJobs: no successful run for 30 hours (a day's schedule plus
+        # slack). Suspended CronJobs are exempt. eso-restarter runs every 5
+        # minutes and has its own, tighter rule below.
+        - alert: CronJobNoRecentSuccess
+          expr: |
+            (
+              time() - kube_cronjob_status_last_successful_time{cronjob!="eso-restarter"} > 30 * 3600
+            )
+            unless on (namespace, cronjob) (kube_cronjob_spec_suspend == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: CronJob {{ $labels.namespace }}/{{ $labels.cronjob }} hasn't succeeded in over 30 hours.
+            description: >-
+              Either it isn't running (suspended, or the schedule never fires) or
+              every run fails. For a backup that means no recent backup. See
+              `kubectl -n {{ $labels.namespace }} get cronjob,job {{ $labels.cronjob }}`
+              and the latest Job's logs.
+        - alert: CronJobNoRecentSuccessFrequent
+          expr: |
+            (
+              time() - kube_cronjob_status_last_successful_time{cronjob="eso-restarter"} > 3600
+            )
+            unless on (namespace, cronjob) (kube_cronjob_spec_suspend == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: CronJob {{ $labels.namespace }}/{{ $labels.cronjob }} hasn't succeeded in over an hour.
+            description: >-
+              It runs every 5 minutes, so an hour without a success means it has
+              stopped. For eso-restarter that means a wedged ESO won't be
+              restarted automatically.
+        # Scheduled at least once but never succeeded (a new CronJob whose first
+        # runs fail): the stale-success rules above have no series to compare.
+        - alert: CronJobNeverSucceeded
+          expr: |
+            (
+              kube_cronjob_status_last_schedule_time
+              unless on (namespace, cronjob) kube_cronjob_status_last_successful_time
+            )
+            unless on (namespace, cronjob) (kube_cronjob_spec_suspend == 1)
+          for: 3h
+          labels:
+            severity: warning
+          annotations:
+            summary: CronJob {{ $labels.namespace }}/{{ $labels.cronjob }} has run but never succeeded.
+            description: >-
+              It has been scheduled but has no successful run. See
+              `kubectl -n {{ $labels.namespace }} get job` and the latest Job's logs.

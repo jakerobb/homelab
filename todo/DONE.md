@@ -89,6 +89,18 @@ ntfy went out. The policy was tested live on a scratch
 namespace (the test found a flaw, fixed before merging) and everything was checked against the cluster with read-only
 diffs. What was skipped and why is in [`../argocd/README.md`](../argocd/README.md#readiness-probes-and-a-cluster-wide-progress-deadline-added-2026-10-18).
 
+## Platform alerts: certificate expiry, flapping containers, stale CronJobs
+
+**Done (2026-10-18).** An audit of what the cluster's own history showed the stock rules missing turned up three blind spots,
+now covered in the `deploy-alerts` Application ([`../argocd/README.md`](../argocd/README.md#platform-alerts-added-2026-10-18)).
+cert-manager wasn't scraped at all, so nothing watched the wildcard certificate that fronts every app; it now has a PodMonitor
+(plus a network-policy rule for the scrape) and five rules, the earliest of which fires when a renewal is overdue, weeks before
+anything breaks. `ContainerRestartingRepeatedly` catches a container that restarts now and then without crash-looping, which
+`KubePodCrashLooping` missed (it fired for about 14 minutes across 10 days that held an 11 hour OOM loop and a 26 minute crash
+loop). Three CronJob rules catch a backup or other job that quietly stops running. The workload rules were replayed against 10 days
+of real history (two true incidents, no false positives), and all nine rules pass `promtool` tests. The certificate renewal due
+2026-11-12 is their first real test. The rest of the audit is in [`READY.md`](READY.md).
+
 ## Radar added beside Headlamp
 
 **Done (2026-10-10).** [Radar](https://radarhq.io) runs at `radar.jakerobb.org` from its official Helm chart, with native

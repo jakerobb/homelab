@@ -4,6 +4,9 @@
 #   - scraping for ArgoCD itself (it had no metrics at all) and alerts on app
 #     health, failed syncs, render/comparison errors and Argo being down;
 #   - a fast alert for pods that can't start their image or config.
+# It also holds a few platform alerts for blind spots the stock rules leave:
+# certificate expiry (cert-manager wasn't scraped at all), containers that
+# restart now and then, and CronJobs that quietly stop running.
 # See argocd/README.md's "Deploy alerts" section.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

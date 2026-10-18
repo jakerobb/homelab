@@ -1,4 +1,5 @@
-# cert-manager. The API server calls the webhook; the controller talks to the API server, to Let's
+# cert-manager. The API server calls the webhook, and Prometheus scrapes the controller's metrics
+# (9402); the controller talks to the API server, to Let's
 # Encrypt and Cloudflare over HTTPS, and does DNS-01 propagation checks directly against 1.1.1.1 and 8.8.8.8
 # (--dns01-recursive-nameservers-only, see argocd/apps/cert-manager).
 #
@@ -35,6 +36,16 @@ spec:
       toPorts:
         - ports:
             - port: '10250'
+              protocol: TCP
+    # Prometheus scrapes the controller's metrics (certificate expiry and
+    # readiness; manifests/deploy-alerts/cert-manager-podmonitor.yaml).
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: prometheus
+      toPorts:
+        - ports:
+            - port: '9402'
               protocol: TCP
   egress:
     - toEndpoints:

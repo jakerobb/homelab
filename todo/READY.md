@@ -264,8 +264,6 @@ riskier slices. The runner image and tool pins need a check that tests the new r
 The readiness probes, the cluster-wide 180s deadline policy and the tightened startup budgets are all live (see
 [`DONE.md`](DONE.md)). What's left is watching them on real rollouts:
 
-- After the startup-budget cut for zigbee2mqtt, matter-server and InfluxDB merges, each restarts once. Check that zigbee2mqtt
-  reconnects its devices, matter-server comes back Ready, and network-optimizer sees InfluxDB again.
 - Watch for an unexpected `ArgoAppDegraded` on a slow rollout: the cluster default is 180s, and an app that legitimately needs
   longer wants an explicit value (startup budget + 2 minutes) or the annotation (see `docs/adding-an-app.md`).
 - After the next Home Assistant upgrade that migrates its recorder database, check it stayed Ready within its 5 minute startup
@@ -273,3 +271,19 @@ The readiness probes, the cluster-wide 180s deadline policy and the tightened st
   for InfluxDB after an unclean stop, which would replay its WAL, and for zigbee2mqtt if its coordinator handshake runs long.
 - Still without a readiness probe, by choice or because the chart has no setting: see the "Not done" list in
   [`../argocd/README.md`](../argocd/README.md#readiness-probes-and-a-cluster-wide-progress-deadline-added-2026-10-18).
+
+## Resilience follow-ups from the 2026-10-18 audit
+
+Found while checking what the alerts and the cluster's history show. The alerts bundle that came out of it is in
+[`DONE.md`](DONE.md); these are what's left.
+
+- **SigNoz's ClickHouse volume is on track to be full in about 21 days** (59% used, at its 7-day trend). The stock
+  `KubePersistentVolumeFillingUp` would only warn days before the end, so the fix is retention or a bigger volume, not an alert.
+  Check SigNoz's retention settings and whether the volume can be expanded. `zigbee2mqtt-data` is on track to fill in about 45
+  days at only 11.5% used, which is odd for a Zigbee config: find out what's growing.
+- **No synthetic checks of the public URLs.** Probes see pods; nothing checks that `ntfy`, `argocd` and `auth` answer through DNS,
+  the Gateway, TLS and Authelia. A blackbox exporter with a handful of probes would, and also reports TLS expiry from outside.
+- **ntfy delivery isn't verified.** The Healthchecks heartbeat covers Prometheus and Alertmanager but skips ntfy-alertmanager and
+  ntfy. A small CronJob could publish a message, poll to confirm ntfy stored it, and ping a second Healthchecks check.
+- **Are the app backups copied offsite?** The Home Assistant, Scrypted and change-detection backups go to a `hexos-nfs` volume,
+  which lives on the same NAS as the iSCSI primaries. If they aren't copied elsewhere, a NAS failure takes both.
