@@ -67,6 +67,16 @@ spec:
             # alert notifications (e.g. "silence this") open in a browser.
             # The chart default is the in-cluster Service address.
             externalUrl: https://alertmanager.jakerobb.org
+            # The Healthchecks.io ping URL for the Watchdog heartbeat (see the
+            # route below), synced by ESO from 1Password
+            # (manifests/external-secrets-config/healthchecks-watchdog.yaml).
+            # Mounted at /etc/alertmanager/secrets/healthchecks-watchdog/url
+            # and read through the receiver's `url_file`, so the URL (which
+            # works like a password: anyone holding it can send a false "alive"
+            # ping) never appears in this file. Alertmanager's pod waits in
+            # ContainerCreating until the Secret exists.
+            secrets:
+              - healthchecks-watchdog
             # Single replica, no HA gossip — matches this being a
             # best-effort home notification path, not a paged on-call
             # system. Trivial resource footprint either way.
@@ -103,14 +113,22 @@ spec:
               # chart-default-adjacent-but-unset behavior, made explicit.
               repeat_interval: 4h
               routes:
-                # The chart's Watchdog alert (always firing by design, to
-                # prove the pipeline itself works) would otherwise repeat
-                # every 4h forever — inhibit at the route instead of
-                # dropping the rule, so it's still visible in the
-                # Prometheus/Alertmanager UI if ever checked by hand.
-                - receiver: "null"
+                # The chart's Watchdog alert is always firing by design, to
+                # prove the pipeline itself works. It's the dead-man's-switch
+                # heartbeat: re-sent to Healthchecks.io every 5m (not the 4h
+                # default), which emails if the pings stop for 10m + a 10m
+                # grace. That catches Prometheus or Alertmanager breaking, or
+                # the cluster or its internet connection going down, which
+                # nothing in-cluster can report. It does not go to ntfy, so it
+                # doesn't spam it. Still visible in the Prometheus/Alertmanager
+                # UI for a manual check. See argocd/README.md's
+                # "Dead-man's-switch".
+                - receiver: healthchecks
                   matchers:
                     - alertname = "Watchdog"
+                  # 1m is the group_interval above; Alertmanager re-sends at
+                  # the first flush after repeat_interval, so about every 5m.
+                  repeat_interval: 5m
                 # InfoInhibitor is a meta-alert, not a real one — it fires
                 # whenever a severity="info" alert is active with nothing
                 # more severe alongside it in the same namespace, and per
@@ -131,6 +149,13 @@ spec:
                 webhook_configs:
                   - url: http://ntfy-alertmanager.monitoring.svc.cluster.local:8080
                     send_resolved: true
+              # The Watchdog heartbeat. send_resolved is off: Watchdog never
+              # resolves while the pipeline is up, and a resolve here would
+              # only be a spurious ping.
+              - name: healthchecks
+                webhook_configs:
+                  - url_file: /etc/alertmanager/secrets/healthchecks-watchdog/url
+                    send_resolved: false
               - name: "null"
             # Same four rules as the chart's own default values. They were
             # already live before this block existed: Helm deep-merges maps,

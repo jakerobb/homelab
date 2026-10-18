@@ -391,12 +391,13 @@ chart `kube-prometheus-stack` from `prometheus-community`.
   - **Single replica, no HA gossip, 4h `repeat_interval`** — this is a
     best-effort home-notification path, not a paged on-call system; no need
     for Alertmanager's usual multi-replica dedup/gossip setup.
-  - **`Watchdog` routed to a `null` receiver**, not dropped as a rule — it's
-    the chart's always-firing canary alert (proves the Prometheus→
-    Alertmanager pipeline itself is alive), which would otherwise re-notify
-    every `repeat_interval` forever. Routing to `null` keeps it visible in
-    the Prometheus/Alertmanager UI for a manual check without spamming a
-    notification for it.
+  - **`Watchdog` is the dead-man's-switch heartbeat**, not a notification —
+    it's the chart's always-firing canary alert (proves the Prometheus→
+    Alertmanager pipeline itself is alive). It goes to Healthchecks.io every
+    5 minutes (see "Dead-man's-switch" below), not to ntfy, so it never
+    spams a notification, and it stays visible in the Prometheus/
+    Alertmanager UI for a manual check. (Until 2026-10-17 it was routed to
+    a `null` receiver.)
   - **`KubeProxyDown`/the whole `kubeProxy` rule group disabled**
     (`defaultRules.rules.kubeProxy: false`, `kubeProxy.enabled: false`) — a
     permanent false positive on this cluster: Cilium runs in
@@ -859,10 +860,108 @@ Deployed as [`apps/deploy-alerts/`](apps/deploy-alerts/application.yaml) →
   `ArgoAppSyncFailed` paths, its resolve, and the absent() cases), but those
   tests aren't kept in the repo.
 
-Not covered here, and planned: a dead-man's-switch for the alerting pipeline
-itself (Watchdog goes to the null receiver, so nothing notices if Prometheus,
-Alertmanager, ntfy-alertmanager or ntfy breaks), and ArgoCD notifications to
-ntfy carrying the app and revision.
+The alerting pipeline itself is watched by the dead-man's-switch below.
+
+### Deploy notifications (added 2026-10-17)
+
+The alerts above say what is broken; these say which sync and revision did it.
+ArgoCD's notifications controller (already running, previously unconfigured)
+POSTs to the in-cluster ntfy. Config is under `notifications:` in
+[`install/values.yaml`](install/values.yaml), so it takes effect only after a
+manual `helm upgrade` (see "Upgrading ArgoCD itself").
+
+- **What you get.** `Sync failed: <app>` (a sync ended Failed or Error) and
+  `Degraded: <app>`, priority 4, on the **`homelab-alerts`** topic, the one
+  `ntfy-alertmanager` publishes to, so the cause lands next to the alert. The
+  body is `<app> at <short SHA>` plus ArgoCD's message (cut at 800 characters;
+  ntfy rejects bodies over 4 KB). Tapping the notification opens the GitHub
+  commit; an "ArgoCD" button opens the app. Apps that come from a chart repo
+  show the chart version instead of a SHA and link to ArgoCD instead of a
+  commit. Multi-source apps (cilium, arc-runners) have no single revision, so they show `?`.
+- **Delivery.** One `webhook` service, `ntfy`, posting ntfy's JSON publish
+  format to `http://ntfy.ntfy.svc.cluster.local:8080`; the JSON body is what
+  lets each template choose its own topic and priority (a webhook template
+  can't set headers). Same in-cluster path as `ntfy-alertmanager`, off the
+  Gateway/DNS/TLS chain. ntfy has no auth (see
+  [`manifests/ntfy/httproute.yaml`](../manifests/ntfy/httproute.yaml)), so
+  there is no credential and nothing in 1Password.
+- **Subscriptions** are global (every Application, no per-app annotations to
+  forget). The controller fires only when a trigger's condition becomes true,
+  and `on-sync-failed` also uses `oncePer` the revision, so an app's ten
+  automatic retries notify once rather than ten times.
+- **Optional "deployed" message.** `on-sync-succeeded` and its template exist
+  but aren't subscribed: they publish a priority-1 `Deployed: <app>` to a
+  separate **`argocd-deploys`** topic, so merges don't bury the alerts. To
+  turn it on, add `on-sync-succeeded` to `notifications.subscriptions` and
+  subscribe to `https://ntfy.jakerobb.org/argocd-deploys`.
+- **NetworkPolicy.** The chart's `argocd-notifications-controller` policy
+  restricts ingress only, so egress is open; the one change needed was
+  letting that pod into ntfy's :8080
+  ([`manifests/ntfy/networkpolicy.yaml`](../manifests/ntfy/networkpolicy.yaml)).
+- **Check** after the `helm upgrade`: `kubectl -n argocd logs deploy/argocd-notifications-controller`
+  shows a bad template or trigger at startup. To send one on demand, run
+  `argocd admin notifications template notify deploy-failed <app> --recipient webhook:ntfy --namespace argocd`
+  from rpi5-1.
+- **Tested** by rendering the three templates with Go's `text/template` and
+  sprig (what the controller uses) against sample apps (this repo, chart
+  repo, multi-source), checking each produces valid JSON; not yet run live.
+
+### Dead-man's-switch (added 2026-10-17)
+
+Alerting only reports problems while it works. If Prometheus, Alertmanager or
+the cluster breaks, the result is silence, which looks like "all fine". Every
+merge to `main` now deploys, including bumps of the monitoring stack, so that
+needed a check from outside. The `Watchdog` alert fires permanently by
+design; Alertmanager sends it to [Healthchecks.io](https://healthchecks.io)
+every 5 minutes, and Healthchecks.io emails if the pings stop.
+
+- **What it catches:** Prometheus or Alertmanager down or wedged (including a
+  bad merge of kube-prometheus-stack), the cluster down, and the home
+  internet or power down. It's the only alerting check that doesn't depend on
+  the cluster.
+- **What it doesn't:** `ntfy-alertmanager` or ntfy being down. Heartbeats go
+  straight from Alertmanager to Healthchecks.io, past both, so a dead ntfy
+  still leaves alerts undelivered without this noticing. Closing that would
+  take a periodic test message through ntfy that something checks arrived.
+- **Healthchecks.io check** (free plan, one of 20 checks; email is the only
+  channel, since ntfy integration isn't on the free plan): period 10
+  minutes, grace 10 minutes, so an outage is reported 10 to 20 minutes after
+  the last ping, and one missed ping or a router reboot doesn't trigger it.
+  The check's description, which goes into the email, is:
+  "Homelab alerting heartbeat missed. Alertmanager pings this check every 5
+  minutes, from the always-firing Watchdog alert. The pings have stopped:
+  Prometheus or Alertmanager is down or wedged, the cluster (power, network
+  or internet) is down, or the path to hc-ping.com is blocked. ntfy alerts may
+  be dead too. First checks from rpi5-1.lan: `kubectl -n monitoring get pods`,
+  the Alertmanager pod's logs, and `kubectl -n argocd get applications`. A
+  recent merge to main (a kube-prometheus-stack or ntfy bump) is the usual
+  cause."
+- **The ping URL is the secret** (anyone holding it can send a false
+  "alive"), so it's in 1Password: item `healthchecks-watchdog`, field `url`,
+  `homelab-k8s` vault. [`healthchecks-watchdog.yaml`](../manifests/external-secrets-config/healthchecks-watchdog.yaml)
+  syncs it to a Secret of the same name in `monitoring`, which
+  [`kube-prometheus-stack`](apps/kube-prometheus-stack/application.yaml)
+  mounts through `alertmanagerSpec.secrets`; the receiver reads it with
+  `url_file`, so it never appears in a manifest. Alertmanager's pod waits in
+  ContainerCreating if the Secret doesn't exist yet (first deploy only; ESO
+  keeps the last synced value afterwards). To rotate the URL, make a new check
+  in Healthchecks.io and edit the item's field.
+- **Route:** `Watchdog` goes to the `healthchecks` receiver with
+  `repeat_interval: 5m` (Alertmanager re-sends at the first 1m
+  `group_interval` flush after that). `send_resolved` is off. Everything else
+  still goes to ntfy, and `InfoInhibitor` to `null`.
+- **NetworkPolicy:** Alertmanager now reaches `hc-ping.com:443`
+  ([`alertmanager-healthchecks`](../manifests/network-policies/monitoring.yaml),
+  a FQDN policy like SigNoz's init egress). Without it the pings never leave
+  the namespace.
+- **Test it** by silencing `Watchdog` in the Alertmanager UI
+  (`https://alertmanager.jakerobb.org`) for about 30 minutes: Healthchecks.io
+  should mark the check down and email within 20 minutes of the last ping.
+  Expire the silence and it recovers on the next ping. A silence suppresses the
+  notification, so the heartbeat stops without touching anything else.
+- **Checked** with `amtool check-config` and `amtool config routes test` at the
+  cluster's Alertmanager version (Watchdog goes to `healthchecks`, other alerts
+  to `ntfy`); not yet run live.
 
 ## SigNoz (decided and deployed 2026-09-22)
 

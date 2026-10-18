@@ -44,6 +44,94 @@ notifications:
     requests:
       cpu: 10m
       memory: 96Mi
+  # Deploy notifications to ntfy, so an alert says which revision caused it
+  # (see argocd/README.md's "Deploy notifications"). ntfy has no auth (see
+  # manifests/ntfy/httproute.yaml), so there is no secret to configure. The
+  # webhook service POSTs ntfy's JSON publish format to the in-cluster
+  # Service (the same path ntfy-alertmanager uses, so it doesn't depend on
+  # the Gateway, DNS or TLS), which lets one service carry a per-template
+  # topic, priority and tags; a webhook template can't set headers.
+  context:
+    argocdUrl: https://argocd.jakerobb.org
+  notifiers:
+    service.webhook.ntfy: |
+      url: http://ntfy.ntfy.svc.cluster.local:8080
+      headers:
+        - name: Content-Type
+          value: application/json
+  templates:
+    # Revision is `status.sync.revision` in all three: the one field that
+    # exists whenever ArgoCD has compared the app with Git, even when the
+    # sync failed before producing a syncResult (a template that hits a
+    # missing key is dropped, not sent). It's a commit SHA for apps from this
+    # repo and a chart version for the rest, hence the github.com check before
+    # linking a commit. Multi-source apps (cilium, arc-runners) have no
+    # `status.sync.revision`, so they show no revision, just the app link.
+    template.deploy-failed: |
+      webhook:
+        ntfy:
+          method: POST
+          body: |
+            {
+              "topic": "homelab-alerts",
+              "title": {{ printf "Sync failed: %s" .app.metadata.name | toJson }},
+              "message": {{ printf "%s at %s\n%s" .app.metadata.name (.app.status.sync.revision | default "?" | trunc 7) (.app.status.operationState.message | default "" | trunc 800) | toJson }},
+              "priority": 4,
+              "tags": ["x"],
+              "click": {{ if and .app.spec.source (contains "github.com/jakerobb/homelab" .app.spec.source.repoURL) }}{{ printf "%s/commit/%s" (call .repo.RepoURLToHTTPS .app.spec.source.repoURL) .app.status.sync.revision | toJson }}{{ else }}{{ printf "%s/applications/%s" .context.argocdUrl .app.metadata.name | toJson }}{{ end }},
+              "actions": [{"action": "view", "label": "ArgoCD", "url": {{ printf "%s/applications/%s" .context.argocdUrl .app.metadata.name | toJson }}}]
+            }
+    template.deploy-degraded: |
+      webhook:
+        ntfy:
+          method: POST
+          body: |
+            {
+              "topic": "homelab-alerts",
+              "title": {{ printf "Degraded: %s" .app.metadata.name | toJson }},
+              "message": {{ printf "%s at %s\n%s" .app.metadata.name (.app.status.sync.revision | default "?" | trunc 7) (.app.status.health.message | default "" | trunc 800) | toJson }},
+              "priority": 4,
+              "tags": ["warning"],
+              "click": {{ if and .app.spec.source (contains "github.com/jakerobb/homelab" .app.spec.source.repoURL) }}{{ printf "%s/commit/%s" (call .repo.RepoURLToHTTPS .app.spec.source.repoURL) .app.status.sync.revision | toJson }}{{ else }}{{ printf "%s/applications/%s" .context.argocdUrl .app.metadata.name | toJson }}{{ end }},
+              "actions": [{"action": "view", "label": "ArgoCD", "url": {{ printf "%s/applications/%s" .context.argocdUrl .app.metadata.name | toJson }}}]
+            }
+    # Not subscribed by default (a message per merged change is noise next to
+    # the alerts): add `on-sync-succeeded` to `subscriptions` below to enable.
+    template.deploy-succeeded: |
+      webhook:
+        ntfy:
+          method: POST
+          body: |
+            {
+              "topic": "argocd-deploys",
+              "title": {{ printf "Deployed: %s" .app.metadata.name | toJson }},
+              "message": {{ printf "%s at %s" .app.metadata.name (.app.status.sync.revision | default "?" | trunc 7) | toJson }},
+              "priority": 1,
+              "tags": ["white_check_mark"],
+              "click": {{ if and .app.spec.source (contains "github.com/jakerobb/homelab" .app.spec.source.repoURL) }}{{ printf "%s/commit/%s" (call .repo.RepoURLToHTTPS .app.spec.source.repoURL) .app.status.sync.revision | toJson }}{{ else }}{{ printf "%s/applications/%s" .context.argocdUrl .app.metadata.name | toJson }}{{ end }}
+            }
+  triggers:
+    # oncePer: an app retries a failed sync up to 10 times (see the Application
+    # manifests' retry blocks), and each failure would otherwise notify.
+    trigger.on-sync-failed: |
+      - when: app.status.operationState != nil and app.status.operationState.phase in ['Error', 'Failed']
+        oncePer: app.status.sync.revision
+        send: [deploy-failed]
+    trigger.on-health-degraded: |
+      - when: app.status.health.status == 'Degraded'
+        send: [deploy-degraded]
+    trigger.on-sync-succeeded: |
+      - when: app.status.operationState != nil and app.status.operationState.phase in ['Succeeded']
+        oncePer: app.status.sync.revision
+        send: [deploy-succeeded]
+  # Every Application, no per-app annotations to forget. ArgoCD's controller
+  # only fires on a transition into the trigger's condition.
+  subscriptions:
+    - recipients:
+        - webhook:ntfy
+      triggers:
+        - on-sync-failed
+        - on-health-degraded
 
 redis:
   resources:

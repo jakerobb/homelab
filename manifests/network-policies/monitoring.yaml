@@ -121,3 +121,38 @@ spec:
         - ports:
             - port: '9100'
               protocol: TCP
+---
+# Alertmanager's Watchdog heartbeat: a webhook POST to Healthchecks.io's ping host every 5 minutes (the
+# dead-man's-switch in argocd/README.md). The only thing Alertmanager reaches outside the cluster. Under the
+# default-deny above it needs this rule, or the pings never leave and Healthchecks.io emails that they've
+# stopped. toFQDNs only works when Cilium's DNS proxy sees the lookups, hence the `rules.dns` on the DNS rule,
+# as in signoz-clickhouse-init-egress; the pattern allows every name, so it filters nothing itself.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: alertmanager-healthchecks
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: '53'
+              protocol: UDP
+            - port: '53'
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: '*'
+    - toFQDNs:
+        - matchName: hc-ping.com
+      toPorts:
+        - ports:
+            - port: '443'
+              protocol: TCP
