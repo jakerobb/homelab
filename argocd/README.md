@@ -13,7 +13,7 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   Values in [`install/values.yaml`](install/values.yaml) — only deltas from
   chart defaults. Chart defaults are already non-HA (1 replica each), so no
   HA-related overrides were needed.
-- **Bootstrap pattern: app-of-apps.** ArgoCD's own Helm install is the one
+- **Bootstrap pattern: app-of-apps.** ArgoCD's *initial* Helm install is the one
   manual, non-GitOps step — same chicken-and-egg reasoning as Cilium's
   *initial* install (nothing has pod networking, including ArgoCD's own
   pods, until Cilium is already running; nothing can run ArgoCD's own
@@ -21,8 +21,11 @@ upgrade` from rpi5-1 for anything that isn't ArgoCD's own bootstrap.
   is GitOps'd like everything else as of 2026-09-15
   ([`apps/cilium/`](apps/cilium/application.yaml)) — manual sync policy
   only, unlike the rest of `apps/`, see [`talos/README.md`](../talos/README.md#cilium-version-management)
-  for why. ArgoCD's own install stays manual permanently, since it can never
-  bootstrap itself. Everything else — starting
+  for why. ArgoCD's initial install stays manual permanently, since it can never
+  bootstrap itself, and is also the recovery path if a bad version breaks the
+  controller. Its ongoing lifecycle is GitOps'd the same way as Cilium's: the
+  [`apps/argocd/`](apps/argocd/application.yaml) Application, manual sync
+  only (see "Upgrading ArgoCD itself"). Everything else — starting
   with ArgoCD's own ingress route — is reconciled from
   [`apps/`](apps/) by the root `Application` in
   [`bootstrap/root-app.yaml`](bootstrap/root-app.yaml), which is the second
@@ -787,12 +790,16 @@ create`, it works for both the first install and upgrades.
 From a machine with `helm`/`kubectl` pointed at the cluster
 (`KUBECONFIG=~/.kube/config`, the default path — no need to export it):
 
-<!-- renovate: datasource=helm depName=argo-cd registryUrl=https://argoproj.github.io/argo-helm -->
+Use the chart version in
+[`apps/argocd/application.yaml`](apps/argocd/application.yaml)'s
+`targetRevision` for `--version`, so the install matches what the Application
+expects (Renovate bumps it there):
+
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
 helm install argocd argo/argo-cd \
-  --version 10.10.5 \
+  --version <targetRevision from apps/argocd/application.yaml> \
   --namespace argocd --create-namespace \
   -f argocd/install/values.yaml
 kubectl apply -f argocd/bootstrap/root-app.yaml
@@ -812,10 +819,49 @@ as `admin`. Before that's up, `http://192.168.102.128` with a
 
 ## Upgrading ArgoCD itself
 
-Bump the chart version in the `helm install` command above (now that it's
-already installed, `helm upgrade` instead) and re-run with the same
-`-f argocd/install/values.yaml`. This is the one recurring manual step, by
-design — see "Bootstrap pattern" above.
+ArgoCD manages its own chart through the
+[`argocd` Application](apps/argocd/application.yaml), which reads
+[`install/values.yaml`](install/values.yaml) through a `$values` ref (the same
+file `helm install -f` used). A chart bump (a Renovate PR to `targetRevision`)
+or a values change is therefore a normal PR. Sync policy is **manual**, like
+Cilium's: a bad version can break the controller that's applying it, and
+auto-sync would keep re-applying it.
+
+1. Merge the PR. The root app picks up the change, and the
+   `ArgoManualAppOutOfSync` alert reminds you if it sits unsynced.
+2. Read what will change: `argocd app diff argocd` (the CLI is on rpi5-1,
+   v3.5.5 in `/usr/local/bin`, a manual install; update it to match the server
+   after an upgrade, since nothing tracks it).
+3. Sync from the UI or `argocd app sync argocd`. The controller restarts
+   itself partway; the sync resumes. The chart's `redis-secret-init` Job runs
+   as a hook each time.
+4. Confirm: `argocd app get argocd`, pods Running at the new version.
+
+If a bad version leaves ArgoCD unable to sync itself, recover from rpi5-1 with
+the `helm install` command in "Bootstrap" above (same release name and values;
+`helm upgrade` if it still shows up in `helm list -n argocd`), at the last good
+`targetRevision`.
+
+- **CRDs can't be pruned.** `install/values.yaml` sets `Prune=false` (with the
+  chart's own `ServerSideApply=true`) on the chart's three CRDs. The
+  `applicationsets` CRD is ~377KB, past the client-side-apply cap, so the
+  Application also sets `ServerSideApply=true` and the
+  `compare-options: ServerSideDiff=true` annotation (same as
+  kube-prometheus-stack, above).
+- **No finalizer.** Deleting the Application doesn't delete ArgoCD.
+- **Don't `helm upgrade` any more**, once adopted. Argo renders the chart with
+  `helm template` and applies it; the old Helm release (`sh.helm.release.v1.argocd.*`
+  Secrets in `argocd`) is stale and gets deleted after adoption, so nobody runs
+  a `helm upgrade` against it.
+
+**Status (2026-10-18): not adopted yet.** The Application exists but hasn't
+been synced. Until it is, `helm upgrade` from rpi5-1 with
+`-f argocd/install/values.yaml` is still how a change lands. The one-time
+adoption, once this is merged: check `argocd app diff argocd` (expect only the
+CRDs' new `Prune=false` annotation, plus the pre-upgrade hook Job), sync the
+Application, then delete the stale Helm release Secrets without uninstalling:
+`kubectl -n argocd delete secret -l owner=helm,name=argocd`. Then delete this
+paragraph.
 
 ## Deploy alerts (added 2026-10-16)
 
@@ -867,8 +913,8 @@ The alerting pipeline itself is watched by the dead-man's-switch below.
 The alerts above say what is broken; these say which sync and revision did it.
 ArgoCD's notifications controller (already running, previously unconfigured)
 POSTs to the in-cluster ntfy. Config is under `notifications:` in
-[`install/values.yaml`](install/values.yaml), so it takes effect only after a
-manual `helm upgrade` (see "Upgrading ArgoCD itself").
+[`install/values.yaml`](install/values.yaml), so it takes effect only after the
+`argocd` Application is synced (see "Upgrading ArgoCD itself").
 
 - **What you get.** `Sync failed: <app>` (a sync ended Failed or Error) and
   `Degraded: <app>`, priority 4, on the **`homelab-alerts`** topic, the one
@@ -904,12 +950,11 @@ manual `helm upgrade` (see "Upgrading ArgoCD itself").
   name here, so it fails with "notification service 'webhook' is not supported"
   when a trigger fires. (The first version of this config had it wrong and
   was caught by the test message on 2026-10-18.)
-- **Check** after the `helm upgrade`: `kubectl -n argocd logs deploy/argocd-notifications-controller`
+- **Check** after the sync: `kubectl -n argocd logs deploy/argocd-notifications-controller`
   shows a bad template or trigger at startup. The `Trigger '...' FAILED` lines
   there are normal; they mean the trigger's condition isn't met. To send a test
-  message on demand, from rpi5-1 (there's no `argocd` CLI there, so use the
-  controller pod's):
-  `kubectl -n argocd exec deploy/argocd-notifications-controller -- argocd admin notifications template notify deploy-failed <app> --recipient ntfy --namespace argocd`.
+  message on demand, from rpi5-1 (the `argocd` CLI is installed there):
+  `argocd admin notifications template notify deploy-failed <app> --recipient ntfy --namespace argocd`.
   It publishes a real "Sync failed: <app>" to `homelab-alerts`.
 - **Tested** by rendering the three templates with Go's `text/template` and
   sprig (what the controller uses) against sample apps (this repo, chart

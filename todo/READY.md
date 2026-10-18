@@ -192,29 +192,24 @@ backup today do it themselves onto `hexos-nfs` (Home Assistant, Scrypted and res
 working whatever happens to snapshots. Worth doing if a service turns up that can't copy its own data, or for
 Prometheus and ClickHouse, whose volumes are too big to copy.
 
-## Let ArgoCD manage its own Helm chart
+## Adopt the `argocd` Application (finish ArgoCD self-management)
 
-ArgoCD's own chart is the one recurring manual `helm upgrade`
-([`argocd/README.md`](../argocd/README.md#upgrading-argocd-itself)). Everything else, Cilium included, is an
-Application. Make ArgoCD adopt itself so a merged Renovate PR is the whole deploy, with no cron job or runner. (A cron on
-rpi5-1 like [compose-deploy](../docs/compose-deploy.md) would work but means parsing the version out of a README code
-block. A GitHub Actions deploy is out: the only runner is on rpi5-1, which holds the Talos secrets.)
+The `argocd` Application ([`argocd/apps/argocd/application.yaml`](../argocd/apps/argocd/application.yaml)) is merged but
+not synced, so ArgoCD's own chart is still upgraded with a hand-run `helm upgrade`. The adoption is a one-time, watched
+step, because a bad sync can break the controller that's applying it (recovery is `helm install` from rpi5-1, see
+"Upgrading ArgoCD itself" in [`argocd/README.md`](../argocd/README.md)).
 
-1. Add an `argocd` Application for `argo/argo-cd` with the values from
-   [`argocd/install/values.yaml`](../argocd/install/values.yaml) (multi-source with a `$values` ref, or `valuesObject`).
-   Renovate tracks its `targetRevision`.
-2. Start with manual sync, like Cilium, and flip to automated after watching a couple of upgrades. A bad version can break
-   the controller that's applying it; recovery is `helm install` against the same values from rpi5-1.
-3. One-time adoption: sync the Application over the live resources, then delete the stale Helm release Secrets
-   (`sh.helm.release.v1.argocd.*` in the `argocd` namespace) without uninstalling, so nobody runs `helm upgrade` against
-   stale state.
-4. Expect to need `ignoreDifferences` or sync options for `argocd-initial-admin-secret` and the redis secret-init job, so
-   Argo doesn't fight them. The chart's CRDs need the same treatment as kube-prometheus-stack's: the `applicationsets`
-   CRD is ~377KB, over the client-side-apply annotation cap, so the Application needs `ServerSideApply=true` plus the
-   `argocd.argoproj.io/compare-options: ServerSideDiff=true` annotation (see the CRD item below). Also protect the CRDs
-   from `prune` (`Prune=false`): ArgoCD's own CRDs vanishing would take every Application with them.
-5. Update "Upgrading ArgoCD itself" and the "Bootstrap pattern" section of `argocd/README.md` (the "manual permanently"
-   claim), and move the Renovate comment off the `helm install` block.
+A server-side diff of the rendered chart against the live resources (2026-10-18) differed only in the three CRDs' new
+`Prune=false` annotation and the pre-upgrade hook Job, so no `ignoreDifferences` should be needed.
+
+1. Run `argocd app diff argocd` on rpi5-1 and confirm it shows only that.
+2. Sync the Application (UI or `argocd app sync argocd`) and watch the controller restart itself and the sync resume.
+   Check the CRDs now carry `Prune=false` and `argocd-controller/Apply` shows up in their managed fields.
+3. Delete the stale Helm release Secrets without uninstalling: `kubectl -n argocd delete secret -l owner=helm,name=argocd`.
+   Don't `helm uninstall`.
+4. Delete the "Status: not adopted yet" paragraph from "Upgrading ArgoCD itself", and log it in `DONE.md`.
+5. Later, once a couple of upgrades have gone cleanly: consider automated sync. Cilium stays manual, but ArgoCD's blast
+   radius is smaller (a broken Argo stops deploys; it doesn't take the network down).
 
 ## Move the remaining hand-applied CRDs under ArgoCD
 
