@@ -1,0 +1,88 @@
+# Certificate alerts, through Alertmanager to ntfy like the rest. The wildcard
+# certificate (wildcard-jakerobb-org, Let's Encrypt via Cloudflare DNS-01) is
+# the TLS for every app behind the Gateway; it renews 30 days before expiry, so
+# a failure shows up well before anything breaks, if something is watching. The
+# metrics come from cert-manager's controller; see cert-manager-podmonitor.yaml.
+#
+# Don't start a line in an annotation with a {{ template }}: Renovate strips
+# templates before parsing, which breaks a folded block's indentation and
+# silently drops the whole file from its scan.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+spec:
+  groups:
+    - name: cert-manager
+      rules:
+        # The earliest warning: the certificate's scheduled renewal time has
+        # passed and it still hasn't been renewed (the metric moves into the
+        # future once it is). 6h of grace for cert-manager's own retries.
+        - alert: CertificateRenewalOverdue
+          expr: time() - certmanager_certificate_renewal_timestamp_seconds > 6 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Certificate {{ $labels.namespace }}/{{ $labels.name }} should have renewed by now.
+            description: >-
+              cert-manager hasn't renewed it, which is usually a failing
+              issuance: for the wildcard certificate, a Cloudflare DNS-01 problem
+              (an expired or revoked API token in 1Password, a rate limit) or
+              Let's Encrypt being unreachable. It still has time left, so nothing
+              is broken yet. See
+              `kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }}`
+              and `kubectl get certificaterequest,order,challenge -A`.
+        # The 3 to 14 day band only; under 3 days it's CertificateExpiringVerySoon's
+        # (critical), so one certificate doesn't notify twice.
+        - alert: CertificateExpiringSoon
+          expr: |
+            (certmanager_certificate_expiration_timestamp_seconds - time() < 14 * 86400)
+            and
+            (certmanager_certificate_expiration_timestamp_seconds - time() >= 3 * 86400)
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 14 days.
+            description: >-
+              Renewal has been failing for weeks. When it expires, every app
+              behind the Gateway shows a certificate error. See
+              `kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }}`.
+        - alert: CertificateExpiringVerySoon
+          expr: certmanager_certificate_expiration_timestamp_seconds - time() < 3 * 86400
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 3 days.
+            description: >-
+              Fix the issuance now (see CertificateRenewalOverdue), or issue the
+              certificate by hand. After it expires every app behind the Gateway
+              fails TLS.
+        - alert: CertificateNotReady
+          expr: certmanager_certificate_ready_status{condition="False"} == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: Certificate {{ $labels.namespace }}/{{ $labels.name }} isn't Ready.
+            description: >-
+              It's expired, was never issued, or its issuer is failing. See
+              `kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }}`.
+        # absent() also catches the PodMonitor or the network policy for the
+        # scrape breaking, which would otherwise leave every alert above silent
+        # (which is exactly how things were before this file existed).
+        - alert: CertManagerMetricsMissing
+          expr: absent(certmanager_certificate_expiration_timestamp_seconds)
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: No certificate metrics from cert-manager.
+            description: >-
+              Either cert-manager's controller is down, or Prometheus isn't
+              scraping it (check the PodMonitor in manifests/deploy-alerts/ and
+              the ingress rule in manifests/network-policies/cert-manager.yaml).
+              Until it's back, none of the certificate alerts can fire.

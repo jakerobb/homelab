@@ -1048,6 +1048,52 @@ Deployed as [`apps/deploy-alerts/`](apps/deploy-alerts/application.yaml) →
 
 The alerting pipeline itself is watched by the dead-man's-switch below.
 
+### Platform alerts (added 2026-10-18)
+
+A review of what the cluster's own history showed the stock rules missing
+found three blind spots, so the `deploy-alerts` Application also holds these.
+
+- **Certificate expiry.** cert-manager wasn't scraped at all (no
+  `certmanager_*` series in Prometheus), so nothing could warn that the wildcard
+  certificate, the TLS for every app behind the Gateway, had failed to renew. It
+  renews on 2026-11-12 (30 days before it expires on 2026-12-12), through
+  Let's Encrypt and Cloudflare DNS-01 with a token from 1Password, and that
+  renewal is the first real test of the path.
+  [`cert-manager-podmonitor.yaml`](../manifests/deploy-alerts/cert-manager-podmonitor.yaml)
+  scrapes the controller (a PodMonitor, so no cert-manager chart change or
+  restart), and [`manifests/network-policies/cert-manager.yaml`](../manifests/network-policies/cert-manager.yaml)
+  now lets Prometheus in on 9402. Rules in
+  [`cert-manager-rules.yaml`](../manifests/deploy-alerts/cert-manager-rules.yaml):
+  `CertificateRenewalOverdue` (6h past the scheduled renewal and still not
+  renewed: the earliest warning, weeks before anything breaks),
+  `CertificateExpiringSoon` (3 to 14 days), `CertificateExpiringVerySoon`
+  (under 3 days, critical), `CertificateNotReady` (30m) and
+  `CertManagerMetricsMissing` (no certificate metrics for 30m, which also catches
+  the PodMonitor or the network policy breaking).
+- **A container that restarts now and then.** `KubePodCrashLooping` only
+  fires on a continuous crash loop, and it was firing for about 14 minutes in total
+  across 10 days that included an 11 hour OOM loop and a 26 minute crash loop.
+  `ContainerRestartingRepeatedly` fires on 3 restarts in 6 hours when the pod
+  isn't in CrashLoopBackOff right now (that stays `KubePodCrashLooping`'s, so a
+  real loop doesn't notify twice).
+- **A CronJob that quietly stops.** `KubeJobFailed` reports a Job that failed;
+  nothing noticed a schedule that was suspended, never fired or always failed.
+  `CronJobNoRecentSuccess` (30 hours, for the daily ones: the Home Assistant,
+  Scrypted and change-detection backups, descheduler, pv-janitor and Renovate),
+  `CronJobNoRecentSuccessFrequent` (1 hour, for eso-restarter's 5 minute
+  schedule) and `CronJobNeverSucceeded`. Suspended CronJobs are exempt.
+- **Checked** before shipping: the two workload rules replayed against the
+  cluster's real 10 days of history. `ContainerRestartingRepeatedly` flags exactly
+  two episodes, restock-radar on 2026-10-09 (five restarts in an hour from a wrong
+  image digest, fixed in the next commit) and the SigNoz collector's OOM loop on
+  2026-10-12, and nothing else. The CronJob rules would never have fired (daily
+  jobs peaked at 24.1 hours against the 30 hour limit, eso-restarter at under 3
+  minutes against 60). All nine rules pass `promtool` unit tests, including the
+  cases that must stay quiet (a healthy certificate, a pod in CrashLoopBackOff, a
+  suspended CronJob), and the operator's admission webhook accepted them in a
+  server-side dry-run. The certificate rules can't be replayed (the data starts
+  when the scrape does).
+
 ### Deploy notifications (added 2026-10-17)
 
 The alerts above say what is broken; these say which sync and revision did it.
