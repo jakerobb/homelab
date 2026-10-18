@@ -1,4 +1,6 @@
-# kube-prometheus-stack (Prometheus, Alertmanager, operator, kube-state-metrics), ntfy-alertmanager and the blackbox exporter.
+# kube-prometheus-stack (Prometheus, Alertmanager, operator, kube-state-metrics) and ntfy-alertmanager.
+# The blackbox exporter is on the host network, which pod policy doesn't cover, so it has none here (see
+# manifests/blackbox-exporter/deployment.yaml for why it can't be a policed pod).
 # Node-exporter is hostNetwork, so no pod policy applies to it.
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
@@ -152,35 +154,6 @@ spec:
               - matchPattern: '*'
     - toFQDNs:
         - matchName: hc-ping.com
-      toPorts:
-        - ports:
-            - port: '443'
-              protocol: TCP
----
-# The blackbox exporter probes the public hostnames from inside the cluster
-# (manifests/blackbox-exporter/), so it has to reach the Gateway on 443 like a client
-# does. Same two rules as radar's: `ingress` when Cilium's Envoy runs on the same
-# node as the pod, and the Gateway's address when it doesn't. DNS and the rest of the
-# namespace are already allowed by the `monitoring` policy above; Prometheus reaches
-# the exporter as a member of this namespace.
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: blackbox-exporter
-  namespace: monitoring
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: blackbox-exporter
-  egress:
-    - toEntities:
-        - ingress
-      toPorts:
-        - ports:
-            - port: '443'
-              protocol: TCP
-    - toCIDR:
-        - 192.168.102.128/32
       toPorts:
         - ports:
             - port: '443'
