@@ -126,9 +126,14 @@ notifications:
         send: [deploy-succeeded]
   # Every Application, no per-app annotations to forget. ArgoCD's controller
   # only fires on a transition into the trigger's condition.
+  # The recipient is the notifier's name, `ntfy`, not `webhook:ntfy`: a
+  # destination is `service[:recipient]`, and the service for a
+  # `service.webhook.ntfy` notifier is named `ntfy`. `webhook:ntfy` fails with
+  # "notification service 'webhook' is not supported" the moment a trigger
+  # fires, so nothing is ever sent.
   subscriptions:
     - recipients:
-        - webhook:ntfy
+        - ntfy
       triggers:
         - on-sync-failed
         - on-health-degraded
