@@ -469,6 +469,12 @@ spec:
             serviceMonitorSelectorNilUsesHelmValues: false
             podMonitorSelectorNilUsesHelmValues: false
             ruleSelectorNilUsesHelmValues: false
+            # Same as the three above, for Probe resources (the blackbox exporter's
+            # checks, manifests/blackbox-exporter/). Left at the chart's default,
+            # Prometheus only selects Probes labelled `release:
+            # kube-prometheus-stack`, so the Probes sat unscraped and nothing said so
+            # until SyntheticChecksMissing went pending (2026-10-18).
+            probeSelectorNilUsesHelmValues: false
             # No VictoriaMetrics remote-write yet (see
             # todo/READY.md#log-and-metrics-aggregation), so keep
             # local retention/storage modest — this is a bridge, not the

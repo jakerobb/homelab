@@ -1128,20 +1128,40 @@ resources that Prometheus drives every 60s.
 - **Adding an app:** add its hostname to the `gateway-routes` Probe in
   [`probes.yaml`](../manifests/blackbox-exporter/probes.yaml). The list is static,
   because a `Probe` can only discover Ingress objects, not HTTPRoutes.
-- **Network policy.** The exporter reaches the Gateway on 443 the way radar does:
-  `toEntities: ingress` (Envoy on the same node) plus the Gateway's address
-  (a different node), in the `blackbox-exporter` policy in
-  [`manifests/network-policies/monitoring.yaml`](../manifests/network-policies/monitoring.yaml).
-- **Tested** before shipping: the three modules against the live endpoints with the
-  exporter image, including the cases that must fail (a missing route, a TLS name
-  mismatch, a 404, a wrong body); then the same config and image from a pod in a
-  throwaway namespace, where DNS resolved in 8 to 15ms and all 25 hostnames
-  succeeded; `promtool` unit tests of the four alerts (including that a 3 minute
-  flap and a certificate under 3 days don't notify twice); a server-side dry-run
-  that the Prometheus operator's webhook accepted. It found that Authelia answers
-  the exporter with a 401, not the 302 a browser sees, which is why 401 is
-  accepted. The one thing not tested before it shipped is the `monitoring`
-  namespace's own network policy.
+- **It runs on the host network, on purpose.** As an ordinary pod it has to be
+  covered by the namespace's default-deny, and Cilium's Gateway treats a pod with
+  *any* egress policy as itself: it checks each backend's ingress policy against the
+  exporter's own identity, and every backend that doesn't allow `monitoring` answers
+  **403** (Hubble showed `http-request DROPPED` at the Gateway; `ntfy` alone passed,
+  because its policy allows the `monitoring` namespace). The same image in a
+  namespace with no policy got 200; with a policy holding nothing but the Gateway's
+  address, 403 again; on the host network, 200 from all three workers, identical to
+  a LAN client. So `hostNetwork: true` with `dnsPolicy: ClusterFirstWithHostNet`, which
+  is what node-exporter does in this namespace (PodSecurity-privileged). Because the
+  pod binds port 9115 on its node, the Deployment is `Recreate` (a surge pod on the
+  same node would fail to bind). The cost: the port is open on whichever node it
+  lands on, so any host on the Server VLAN can use `/probe` as an HTTP prober. Pod
+  policy can't restrict a host-network pod, so there is no `blackbox-exporter`
+  policy in `manifests/network-policies/monitoring.yaml`.
+- **`http_gateway` doesn't accept 403.** The first version did (as "Authelia
+  denying"), and so reported success for hosts the Gateway was rejecting. A 403 from
+  the Gateway now fails the check.
+- **Probes need the Prometheus selector.** Prometheus only selected Probes labelled
+  `release: kube-prometheus-stack`, so the first version's three Probes sat unscraped
+  until `SyntheticChecksMissing` went pending.
+  `probeSelectorNilUsesHelmValues: false` in the kube-prometheus-stack values makes it
+  match the other three selectors, which already select everything.
+- **Tested.** The three modules against the live endpoints with the exporter image,
+  including the cases that must fail (a missing route, a TLS name mismatch, a 404, a
+  wrong body); the final config on host-network exporters on all three workers, where
+  all 25 hostnames succeed with 403 not accepted, the four strict health checks pass, and
+  the missing route, the 404 and the TLS-by-IP cases still fail; `promtool` unit tests of
+  the four alerts (including that a 3 minute flap and a certificate under 3 days don't
+  notify twice); a server-side dry-run that the Prometheus operator's webhook accepted.
+  It found that Authelia answers the exporter with a 401, not the 302 a browser sees,
+  which is why 401 is accepted. The first version was tested from a pod in a throwaway
+  namespace with no policy, which is exactly the one situation that hides the 403
+  problem; the real `monitoring` namespace showed it on the first probe after it shipped.
 
 ### Deploy notifications (added 2026-10-17)
 

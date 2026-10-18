@@ -108,10 +108,13 @@ from inside the cluster, all 25 hostnames behind the Gateway (DNS, a verified ce
 plus Authelia's, ArgoCD's and Home Assistant's health endpoints and ntfy's `/v1/health` with its body. Four alerts: a route
 failing for 5 minutes (one grouped notification when the whole Gateway or Authelia is down), and the certificate the Gateway
 *actually serves* expiring in under 14 and 3 days, which checks that a renewed certificate reached the listener, plus missing
-results. The modules were prototyped against the live endpoints, with cases that must fail, and then run from a pod in a
-throwaway namespace (all 25 hostnames succeeded); the one finding was that Authelia answers the exporter with a 401, not a
-browser's 302. The same change fixed a bug in the certificate alerts from the same day: their scrape needed `honorLabels` so each
-alert names the certificate's real namespace. See
+results. The modules were prototyped against the live endpoints, with cases that must fail. The first deployment then showed two
+problems, both fixed the same day: Prometheus wasn't selecting the Probes at all (it needed `probeSelectorNilUsesHelmValues:
+false`), and the exporter, as a pod covered by the namespace's default-deny, was answered with 403 by almost every backend, because
+Cilium's Gateway checks each backend's ingress policy against the pod's own identity. It now runs on the host network (200 on all
+three workers, and all 25 hostnames succeed with 403 no longer accepted), which is the one design cost worth remembering: its
+port is open on the node. The same change fixed a bug in the certificate alerts: their scrape needed `honorLabels` so each alert
+names the certificate's real namespace. See
 [`../argocd/README.md`](../argocd/README.md#synthetic-checks-added-2026-10-18).
 
 ## Radar added beside Headlamp

@@ -17,7 +17,10 @@ spec:
   # Degraded app in a minute.
   progressDeadlineSeconds: 60
   strategy:
-    type: RollingUpdate
+    # Recreate, not RollingUpdate: on the host network the pod binds port 9115 on
+    # its node, and a surge pod landing on the same node would fail with "address
+    # already in use".
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: blackbox-exporter
@@ -26,6 +29,18 @@ spec:
       labels:
         app.kubernetes.io/name: blackbox-exporter
     spec:
+      # On the host network, on purpose. As an ordinary pod the exporter has to be
+      # covered by this namespace's default-deny, and a pod with ANY egress policy
+      # is treated by Cilium's Gateway as itself: the Gateway checks each
+      # backend's ingress policy against the exporter's own identity, and every
+      # backend that doesn't allow `monitoring` answers 403 (Hubble showed
+      # `http-request DROPPED` at the Gateway). The same image in a namespace with
+      # no policy, or on the host network, gets exactly what a LAN client gets. The
+      # host network is also what node-exporter does in this namespace, which is
+      # PodSecurity-privileged. The cost: port 9115 is open on whichever node it
+      # lands on, so any host on the Server VLAN can use /probe as an HTTP prober.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true

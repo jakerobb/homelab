@@ -9,9 +9,12 @@
 #
 # http_gateway accepts 401 as well as the redirects. A browser gets a 302 from
 # Authelia, but the exporter sends no `Accept: text/html`, and Authelia answers
-# that with a 401 (seen against alertmanager.jakerobb.org). 404 and every 5xx
-# fail: an unknown hostname gets a 404 from the Gateway, which is the "route is
-# gone" case to catch.
+# that with a 401 (seen against alertmanager.jakerobb.org). 404, 403 and every
+# 5xx fail: an unknown hostname gets a 404 from the Gateway, which is the "route
+# is gone" case to catch, and a 403 from the Gateway means a network policy is
+# denying the exporter. An earlier version accepted 403 and so reported success
+# while the Gateway was rejecting it (see deployment.yaml, which is on the host
+# network for that reason).
 modules:
   http_gateway:
     prober: http
@@ -21,7 +24,7 @@ modules:
       preferred_ip_protocol: ip4
       ip_protocol_fallback: false
       follow_redirects: false
-      valid_status_codes: [200, 301, 302, 303, 307, 308, 401, 403]
+      valid_status_codes: [200, 301, 302, 303, 307, 308, 401]
       fail_if_not_ssl: true
       tls_config:
         insecure_skip_verify: false
