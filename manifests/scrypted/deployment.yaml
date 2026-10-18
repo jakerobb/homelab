@@ -32,6 +32,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # The startupProbe budget below plus 2 minutes for the restore init container
+  # and a large image pull, so a slow but healthy rollout isn't flagged. The pod
+  # took 27s to become Ready on its one recorded start (2026-10-18). Without this
+  # the cluster default (180s) would cut it off first.
+  progressDeadlineSeconds: 300
   strategy:
     # Not RollingUpdate: the data PVC is ReadWriteOnce, and two instances would fight over
     # the HomeKit identities and ports.
@@ -92,11 +97,18 @@ spec:
             - name: http
               containerPort: 11080
           # The login page is served without authentication.
+          #
+          # The budget is 3 minutes (18 x 10s). It was 10 minutes, sized for the
+          # 2026-10-01 cutover; in steady state the pod is Ready in under 30s (one
+          # recorded start, so less evidence than Home Assistant has). It only
+          # checks that the port is open, so plugin loading after that doesn't
+          # count against it. If a slow start restarts the pod without it ever
+          # becoming Ready, raise failureThreshold for that rollout.
           startupProbe:
             tcpSocket:
               port: http
             periodSeconds: 10
-            failureThreshold: 60
+            failureThreshold: 18
           readinessProbe:
             tcpSocket:
               port: http

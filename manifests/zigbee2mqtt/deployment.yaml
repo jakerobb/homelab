@@ -22,6 +22,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # Longer than the 5 minute startupProbe budget below (30 x 10s) plus the restore
+  # init container and an image pull. The pod started in about 47s when last
+  # measured (2026-10-18). Without this the cluster default (180s) would cut it
+  # off first.
+  progressDeadlineSeconds: 420
   strategy:
     # Not RollingUpdate: the data PVC is ReadWriteOnce, and two instances talking
     # to one coordinator would fight over its single TCP connection.

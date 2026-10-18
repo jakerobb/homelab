@@ -18,12 +18,12 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
-  # The pod starts in about 3s (measured 2026-10-18, image cached). 120s covers
+  # The pod starts in about 3s (measured 2026-10-18, image cached). 60s covers
   # a cold pull. With Recreate there's no old pod left to fall back on, so a
-  # rollout that can't finish is an outage: this makes it a Degraded app in 2
-  # minutes instead of the default 10. Auto-merged by Renovate; see
+  # rollout that can't finish is an outage: this makes it a Degraded app in a
+  # minute instead of the default 10. Auto-merged by Renovate; see
   # argocd/README.md.
-  progressDeadlineSeconds: 120
+  progressDeadlineSeconds: 60
   strategy:
     # Recreate, not RollingUpdate, so old and new pods never overlap and
     # can't both drive the relay board.

@@ -64,11 +64,27 @@ Deployments. `nut-exporter` and `truenas-exporter` had no readiness probe, so a 
 container started; both now probe the same `/health` as their liveness probes (which deliberately doesn't depend on the UPSes or
 TrueNAS). `restock-radar` and `modbus-controller` already had one, and use `Recreate` on purpose (one SQLite file; never two
 controllers on the relay board), so for them there is no old pod to fall back on. All four now set `progressDeadlineSeconds`:
-120s, or 300s for restock-radar's iSCSI volume, against start times measured on the live pods of 2–3s (15s for restock-radar,
-volumes included). A rollout that can't finish now turns the app Degraded in 2 to 5 minutes instead of 10. A read-only
+60s (first set at 120s, tightened the same day), or 300s for restock-radar's iSCSI volume, against start times measured on the
+live pods of 2–3s (15s for restock-radar, volumes included). A rollout that can't finish now turns the app Degraded in 1 to 5
+minutes instead of 10. A read-only
 server-side diff against the cluster showed exactly those fields and nothing else. Other Deployments without a readiness probe
-(ntfy, ntfy-alertmanager, searxng, unpoller, network-optimizer, its InfluxDB) are tracked in [`READY.md`](READY.md); the
+(ntfy, ntfy-alertmanager, searxng, unpoller, network-optimizer, its InfluxDB) were done next, see the entry below; the
 convention is in [`../docs/adding-an-app.md`](../docs/adding-an-app.md).
+
+## Readiness probes everywhere we can, and a cluster-wide progress deadline
+
+**Done (2026-10-18).** Of 65 workloads, 38 had a readiness probe on every container; the rest were audited. Probes were added
+where an endpoint was verified on the live pod and doesn't depend on anything external: ntfy, ntfy-alertmanager, searxng,
+unpoller, network-optimizer (main container), InfluxDB, and, through ArgoCD's own values, its ApplicationSet controller,
+notifications controller and Redis. Kubernetes has no cluster-wide setting for `progressDeadlineSeconds` (hardcoded 600s), so a
+built-in `MutatingAdmissionPolicy` (GA in this cluster's v1.37) now lowers it to 180s for every Deployment that doesn't set its
+own, with an annotation override for Helm charts, used for hubble-relay (98s to Ready, measured once during the Cilium sync that
+restarted every agent). Start times were measured on all 49 Deployments: 48 are 1 to 55s. Fast apps got 60s; Home Assistant, Scrypted, zigbee2mqtt, matter-server, InfluxDB and
+network-optimizer got longer values because their own startup budgets reach or exceed 180s. Home Assistant's and Scrypted's
+were 10 minutes (sized for the 2026-10-01 cutover) and were cut to 5 and 3 after checking 10 days of real start times (25 to 55s
+and 27s). The policy was tested live on a scratch
+namespace (the test found a flaw, fixed before merging) and everything was checked against the cluster with read-only
+diffs. What was skipped and why is in [`../argocd/README.md`](../argocd/README.md#readiness-probes-and-a-cluster-wide-progress-deadline-added-2026-10-18).
 
 ## Radar added beside Headlamp
 

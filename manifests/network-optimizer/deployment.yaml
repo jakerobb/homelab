@@ -16,6 +16,11 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 2
+  # Longer than the 3 minute startupProbe budget below (18 x 10s; upstream allows
+  # a 120s start period for database migrations on upgrade) plus a volume attach
+  # and an image pull. The pod started in about 41s when last measured
+  # (2026-10-18).
+  progressDeadlineSeconds: 300
   strategy:
     # The data PVC is ReadWriteOnce, and SQLite must never have two writers.
     type: Recreate
@@ -129,6 +134,16 @@ spec:
             # Same slack as ntfy's probe; see its deployment.yaml.
             timeoutSeconds: 5
             failureThreshold: 3
+          # Same endpoint. The startup probe above only gates the first start;
+          # this keeps the pod out of the Service if it later stops answering.
+          # Only on this container: the speedtest sidecar is auxiliary, and its
+          # readiness would take the whole pod out of the Service.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
           resources:
             # ~505MiB steady state on rpi5-1 at migration.
             requests:
