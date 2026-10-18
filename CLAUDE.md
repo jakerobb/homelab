@@ -25,7 +25,8 @@ see [`docs/truenas-ops-access.md`](docs/truenas-ops-access.md).
 Before making any change:
 1. Make sure the local repo is clean and up to date. 
    * Feel free to pull in latest. If there are uncommitted changes (staged or otherwise), check with me before you proceed.
-2. Create a suitably named branch
+   * Avoid using worktrees. I would rather you wait for a clean working directory.
+2. Create a suitably named branch. My preferred workflow is: switch to main, pull latest, branch from there.
 
 ## Docs
 
