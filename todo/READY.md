@@ -192,25 +192,6 @@ backup today do it themselves onto `hexos-nfs` (Home Assistant, Scrypted and res
 working whatever happens to snapshots. Worth doing if a service turns up that can't copy its own data, or for
 Prometheus and ClickHouse, whose volumes are too big to copy.
 
-## Adopt the `argocd` Application (finish ArgoCD self-management)
-
-The `argocd` Application ([`argocd/apps/argocd/application.yaml`](../argocd/apps/argocd/application.yaml)) is merged but
-not synced, so ArgoCD's own chart is still upgraded with a hand-run `helm upgrade`. The adoption is a one-time, watched
-step, because a bad sync can break the controller that's applying it (recovery is `helm install` from rpi5-1, see
-"Upgrading ArgoCD itself" in [`argocd/README.md`](../argocd/README.md)).
-
-A server-side diff of the rendered chart against the live resources (2026-10-18) differed only in the three CRDs' new
-`Prune=false` annotation and the pre-upgrade hook Job, so no `ignoreDifferences` should be needed.
-
-1. Run `argocd app diff argocd` on rpi5-1 and confirm it shows only that.
-2. Sync the Application (UI or `argocd app sync argocd`) and watch the controller restart itself and the sync resume.
-   Check the CRDs now carry `Prune=false` and `argocd-controller/Apply` shows up in their managed fields.
-3. Delete the stale Helm release Secrets without uninstalling: `kubectl -n argocd delete secret -l owner=helm,name=argocd`.
-   Don't `helm uninstall`.
-4. Delete the "Status: not adopted yet" paragraph from "Upgrading ArgoCD itself", and log it in `DONE.md`.
-5. Later, once a couple of upgrades have gone cleanly: consider automated sync. Cilium stays manual, but ArgoCD's blast
-   radius is smaller (a broken Argo stops deploys; it doesn't take the network down).
-
 ## Move the remaining hand-applied CRDs under ArgoCD
 
 kube-prometheus-stack's CRDs have been ArgoCD-managed since 2026-10-02, using `ServerSideApply=true` plus the
@@ -260,10 +241,20 @@ If something did break, restore the Service (see the comment at the top of `mani
 git history of the matter-server and zwave-js-ui Services) and point the client at the in-cluster name instead. If it's all
 quiet, delete this item.
 
-## Sync Cilium after the `upgradeCompatibility` removal
+## Watch the first Renovate auto-merges, then widen the rules
 
-The `upgradeCompatibility: "1.19"` key is gone from `talos/cilium/values.yaml` (see [`DONE.md`](DONE.md)). Once that PR is
-merged, sync Cilium in ArgoCD (manual sync). The key was holding `envoy-xds-mode` at its legacy-safe default instead of
-1.20+'s `"ads"`, so afterward watch for envoy/xDS errors in `cilium-envoy` and `cilium-agent` logs and for any L7/Ingress
-traffic dropping. If it's all quiet, delete this item. See
-[`../talos/README.md`](../talos/README.md#cilium-version-management).
+The tier-1 `AUTO-MERGE` rules in [`../renovate.json`](../renovate.json) (our own app images, GitHub Actions patch/digest, the
+`renovate/renovate` image, patch bumps of Glance/Headlamp/Radar) are merged by the CronJob's new 11:30am weekday run
+([`../manifests/renovate/cronjob.yaml`](../manifests/renovate/cronjob.yaml)). After the first weekday or two, check:
+
+- A PR opened by the 4:30am run is merged by the 11:30am run (`kubectl logs -n renovate job/<latest>` shows the merge), and
+  nothing is merged outside 11am to 1pm on a weekday, or on a weekend. If PRs just sit, the likely causes are the `automergeSchedule` syntax, `lint` not
+  reporting as the required check, or the token lacking permission to merge.
+- The `automerge` label appears on eligible PRs, and `internalChecksFilter: strict` isn't hiding updates that should be
+  open (a package without a release timestamp and a `minimumReleaseAge` is held back; check the Dependency Dashboard).
+- A merge of one of our own images deploys cleanly: ArgoCD syncs it, no `ArgoApp*` or `PodCantStart` alert fires.
+
+Then consider widening, one slice at a time, with the reasoning in [`../argocd/README.md`](../argocd/README.md#renovate-dependency-updates-decided-and-deployed-2026-09-16):
+Helm charts without CRDs, patch bumps of other apps, and charts with CRDs only after the remaining hand-applied CRDs are
+under ArgoCD (the item above) and the rendered diff covers them. Server-side dry-run in CI would be the extra gate for the
+riskier slices. The runner image and tool pins need a check that tests the new runner, not the old one.

@@ -18,6 +18,15 @@ issues surface before then.
 grants, which is fine with a single user — but worth building real group/role mapping (`argocd-rbac-cm`) before that
 stops being true. No target date — this depends on a new user showing up, not on elapsed time.
 
+## ArgoCD automated sync for its own chart
+
+**Waiting on:** a few ArgoCD upgrades going cleanly through the manual sync (adopted 2026-10-18; see "Upgrading ArgoCD
+itself" in [`../argocd/README.md`](../argocd/README.md#upgrading-argocd-itself)). Then consider `syncPolicy.automated` on
+[`../argocd/apps/argocd/application.yaml`](../argocd/apps/argocd/application.yaml) so a merged Renovate bump is the whole
+deploy. The case for it is a smaller blast radius than Cilium's (a broken Argo stops deploys, it doesn't take the network
+down); the case against is that auto-sync keeps re-applying a bad version to a controller that can't revert it. Cilium stays
+manual either way. Also rehearse the `helm install` recovery path first (noted in the README as untested since adoption).
+
 ## Alertmanager label-based routing
 
 **Waiting on:** enough real alert volume/noise to know what routing is actually worth building. Only `severity` maps to

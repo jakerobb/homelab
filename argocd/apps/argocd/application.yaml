@@ -19,9 +19,9 @@
 # Values come from argocd/install/values.yaml via a second source + $values
 # ref, the same file `helm install`/`helm upgrade -f` used, so there's one copy
 # of the config. The same release name (`argocd`) and namespace as the Helm
-# install, so Argo adopts the live resources in place; the stale Helm release
-# Secrets (sh.helm.release.v1.argocd.*) get deleted once after adoption, see
-# argocd/README.md. Don't `helm upgrade` again after that.
+# install, so Argo adopted the live resources in place (synced 2026-10-18); the
+# stale Helm release Secrets (sh.helm.release.v1.argocd.*) were deleted then.
+# There is no Helm release any more: don't `helm upgrade`.
 #
 # ServerSideApply + ServerSideDiff: the chart's `applicationsets` CRD is ~377KB,
 # over the 256KiB client-side-apply annotation cap, the same situation as
@@ -33,11 +33,12 @@
 # No finalizer, deliberately: deleting this Application must not cascade into
 # deleting ArgoCD.
 #
-# No ignoreDifferences: a server-side diff of the rendered chart against the
-# live resources (2026-10-18) differed only in the chart's pre-upgrade hook Job
-# (argocd-redis-secret-init), which exists only during a sync. The Secrets the
-# server writes into (argocd-secret) and argocd-initial-admin-secret compare
-# clean.
+# No ignoreDifferences: before adoption, a server-side diff of the rendered
+# chart against the live resources (2026-10-18) differed only in the chart's
+# pre-upgrade hook Job (argocd-redis-secret-init), which exists only during a
+# sync, and the Secrets the server writes into (argocd-secret) compared clean.
+# The first sync changed only Argo's tracking annotation on each resource, plus
+# Prune=false on the three CRDs, and the app stayed Synced on a hard refresh.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

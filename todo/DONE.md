@@ -19,12 +19,43 @@ restoring the P3 Plus data from B2 (done, 2026-09-20) and the mail-alerting queu
 
 ## Cilium `upgradeCompatibility` flag removed
 
-**Done (2026-10-16), pending the ArgoCD sync (tracked in [`READY.md`](READY.md)).** The `upgradeCompatibility: "1.19"` key,
+**Done (2026-10-16), synced 2026-10-17.** The `upgradeCompatibility: "1.19"` key,
 set as a one-time flag during the 1.19→1.20 upgrade (2026-09-15), was removed from
 [`../talos/cilium/values.yaml`](../talos/cilium/values.yaml) after Cilium 1.20.2 ran from 2026-09-16 with zero restarts on any
 agent, envoy or operator pod (checked 2026-10-15). Its one effect was keeping `envoy-xds-mode` unset (the agent's legacy-safe
-default) instead of 1.20+'s `"ads"`, so that is what changes on the next sync. Background:
+default) instead of 1.20+'s `"ads"`. The manual sync was done the evening of 2026-10-17 (about 22:40 local, after the
+`ArgoManualAppOutOfSync` alert fired as its first live test). `cilium-config` now has `envoy-xds-mode: ads`, all 7 agents and 7
+envoys were recreated and are Ready, and over the next two hours none restarted and neither the agents nor the envoys logged
+an error or an xDS NACK. Not checked: L7/Ingress traffic by hand. Background:
 [`../talos/README.md`](../talos/README.md#cilium-version-management).
+
+## ArgoCD manages its own Helm chart
+
+**Done (2026-10-18).** ArgoCD's chart was the one recurring hand-run `helm upgrade`, so a merged Renovate bump only edited a
+README code block and nothing deployed it. It's now an Application,
+[`../argocd/apps/argocd/application.yaml`](../argocd/apps/argocd/application.yaml), reading
+[`../argocd/install/values.yaml`](../argocd/install/values.yaml) through a `$values` ref, with **manual sync** like
+Cilium (a bad version can break the controller that applies it). Before the first sync, `argocd app diff` and a server-side
+diff of the rendered chart against the live resources showed only Argo's tracking annotation on each resource plus
+`Prune=false` on the three CRDs (the chart already sets `ServerSideApply` on them; the `applicationsets` CRD is ~377KB), so no
+`ignoreDifferences` was needed. The sync restarted nothing and the app stayed Synced on a hard refresh; the ten stale
+`sh.helm.release.v1.argocd.*` Secrets were then deleted (never `helm uninstall`). Renovate now tracks `targetRevision` through
+its built-in Argo manager, and the custom manager that watched the README was removed. Same day, the `argocd` CLI (v3.5.5, to
+match the server) was installed on rpi5-1. Details: [`../argocd/README.md`](../argocd/README.md#upgrading-argocd-itself).
+Automated sync is parked in [`FUTURE.md`](FUTURE.md).
+
+## Renovate auto-merge, tier 1
+
+**Done (2026-10-18).** A narrow slice of Renovate's PRs now merges itself once `lint` passes; everything else stays manual.
+The rules are the `AUTO-MERGE` entries in [`../renovate.json`](../renovate.json): our own app images
+(`docker.io/jakerobb/*`), GitHub Actions patch and digest bumps (held 3 days), the `renovate/renovate` image's minor and
+patch (held 3 days), and patch bumps of Glance, Headlamp and Radar. Helm charts, CRD-bearing apps, Cilium, ArgoCD, ntfy, the
+runner image and tool pins, Terraform and every major are excluded on purpose (reasons in
+[`../argocd/README.md`](../argocd/README.md#renovate-dependency-updates-decided-and-deployed-2026-09-16)). Native GitHub
+auto-merge can't follow a schedule, so Renovate merges itself (`platformAutomerge: false`) inside an `automergeSchedule` of
+after 11am and before 1pm on weekdays, and the CronJob runs twice a day (4:30am opens PRs, 11:30am merges them) so a bad
+deploy happens on a weekday at midday, with the owner at their desk and the house quiet. It was built after the safety net it relies on: the image-architecture and rendered-diff checks in `lint`,
+the deploy alerts, and ArgoCD notifications to ntfy. Widening it is tracked in [`READY.md`](READY.md).
 
 ## Radar added beside Headlamp
 

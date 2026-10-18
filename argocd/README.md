@@ -267,8 +267,48 @@ Renovate PRs like everything else) — see the
 - **Self-hosted CLI image, not the GitHub App** — keeps this entirely
   in-cluster/GitOps'd like everything else here, at the cost of one manual
   bootstrap step (the GitHub token below).
-- **Schedule:** daily, 4:17am America/Detroit — the same off-peak slot
-  Watchtower used to run in.
+- **Schedule:** twice daily, America/Detroit. 4:30am (off-peak, like the slot
+  Watchtower used to run in) opens PRs; 11:30am merges the auto-merge ones that
+  have passed lint, on weekdays (see "Auto-merge" below).
+- **Auto-merge (added 2026-10-18).** A small, explicit slice of Renovate's PRs
+  merges itself once the required `lint` check passes; everything else stays
+  for a human. Merging deploys (ArgoCD auto-syncs `main`), so the list is
+  deliberately conservative, and it lives in `renovate.json` as
+  `packageRules` whose descriptions start with `AUTO-MERGE`. Nothing is
+  auto-merged unless a rule says so. Eligible PRs get an `automerge` label.
+  - **What merges:** our own app images (`docker.io/jakerobb/*`: restock-radar,
+    nut-relay, truenas-exporter, modbus-eth-controller; any version, since their
+    timestamp tags read as majors); GitHub Actions patch and digest bumps (held 3
+    days); the `renovate/renovate` image's minor and patch (held 3 days); and
+    patch bumps of Glance, Headlamp and Radar.
+  - **What doesn't, on purpose:** every Helm chart (kube-prometheus-stack,
+    SigNoz, cert-manager, ESO, democratic-csi, Authelia, ARC) and anything with
+    CRDs, until the remaining hand-applied CRDs are under ArgoCD and the
+    rendered diff covers them (see `todo/READY.md`); Cilium and ArgoCD (manual
+    sync, and a merge isn't a deploy); ntfy (the alert delivery path); the ARC
+    runner image and the tool versions pinned in the runner Dockerfile and
+    workflows (a bad runner breaks lint for every PR, and the PR's own lint runs
+    on the *old* runner); Terraform providers; and every major update.
+  - **When it merges.** Renovate does the merge itself (`platformAutomerge:
+    false`), because GitHub's native auto-merge is queued when the PR is opened
+    and ignores `automergeSchedule`. Renovate only acts while it runs, which is
+    why the CronJob has the midday run: `automergeSchedule` is "after 11am and
+    before 1pm every weekday", so merges land at 11:30 on a weekday, with the
+    owner at their desk and the house quiet, to keep the blast radius of a bad
+    deploy small (not at 4am, not on a weekend). A PR opened at 4:30am merges at
+    11:30 the same weekday; one opened at 11:30 merges the next weekday. PRs that
+    become eligible over a weekend wait until Monday and merge together.
+    `internalChecksFilter: strict` keeps PRs with a release-age hold from being
+    opened until the hold has passed.
+  - **The safety net** is the rest of this README's tooling: the `lint` check
+    (render, kubeconform, image architectures, the rendered-diff comment), the
+    deploy alerts, and ArgoCD notifications to ntfy. A bad merge is reverted
+    with `git revert` on `main`.
+  - **To stop it,** delete the `AUTO-MERGE` rules, or set `"automerge": false`
+    at the top level of `renovate.json`; the CronJob can keep both runs.
+  - **Scope.** This `renovate.json` only covers this repo. The four Go app repos
+    the CronJob also scans each have their own `renovate.json`, which this
+    doesn't touch.
 - **Signed commits (SSH key, added 2026-10-05).** The repo's rulesets
   require signed commits. Squash merges are signed by GitHub, but Renovate's
   branch commits were unsigned (`verified=false, reason=unsigned`). Neither
@@ -308,7 +348,7 @@ Renovate PRs like everything else) — see the
   Save it as the `token` field of the `renovate-github-token` item in the
   `homelab-k8s` 1Password vault; ESO syncs it (see "External Secrets
   Operator").
-- **First run:** trigger it on demand instead of waiting for 4:17am —
+- **First run:** trigger it on demand instead of waiting for the next scheduled run —
   `kubectl create job --from=cronjob/renovate -n renovate renovate-manual-1`
   — then `kubectl logs -n renovate job/renovate-manual-1 -f`. Check the logs
   against current [Renovate docs](https://docs.renovatebot.com/) if
@@ -829,18 +869,33 @@ auto-sync would keep re-applying it.
 
 1. Merge the PR. The root app picks up the change, and the
    `ArgoManualAppOutOfSync` alert reminds you if it sits unsynced.
-2. Read what will change: `argocd app diff argocd` (the CLI is on rpi5-1,
-   v3.5.5 in `/usr/local/bin`, a manual install; update it to match the server
-   after an upgrade, since nothing tracks it).
-3. Sync from the UI or `argocd app sync argocd`. The controller restarts
-   itself partway; the sync resumes. The chart's `redis-secret-init` Job runs
-   as a hook each time.
-4. Confirm: `argocd app get argocd`, pods Running at the new version.
+2. Read what will change: `argocd app diff argocd --core` (the CLI is on
+   rpi5-1, v3.5.5 in `/usr/local/bin`, a manual install; update it to match the
+   server after an upgrade, since nothing tracks it).
+3. Sync from the UI or `argocd app sync argocd --core`. If the controller
+   restarts itself partway, the sync resumes. The chart's `redis-secret-init`
+   Job runs as a hook each time.
+4. Confirm: `argocd app get argocd --core`, pods Running at the new version.
+
+`--core` talks to the Kubernetes API with the kubeconfig instead of logging in
+to the server, but it reads the *current namespace* of the kubeconfig context
+for `argocd-cm` and fails with `configmap "argocd-cm" not found` unless that's
+`argocd`. Use a throwaway copy rather than changing your own:
+
+```bash
+kubectl config view --flatten > /tmp/argocd-core-kc && chmod 600 /tmp/argocd-core-kc
+KUBECONFIG=/tmp/argocd-core-kc kubectl config set-context --current --namespace=argocd
+export KUBECONFIG=/tmp/argocd-core-kc   # then the argocd --core commands above
+```
 
 If a bad version leaves ArgoCD unable to sync itself, recover from rpi5-1 with
-the `helm install` command in "Bootstrap" above (same release name and values;
-`helm upgrade` if it still shows up in `helm list -n argocd`), at the last good
-`targetRevision`.
+the `helm install` command in "Bootstrap" above (same release name and values),
+at the last good `targetRevision`; ArgoCD takes over again from the next sync.
+**Not rehearsed since adoption.** No Helm release owns the live resources any
+more, so Helm may refuse the install because they already exist; if it does,
+`--take-ownership` (or deleting the broken Deployment/StatefulSet first) is the
+likely way through. Worth rehearsing on a quiet day, or at least reading
+`helm install --help`, before it's needed.
 
 - **CRDs can't be pruned.** `install/values.yaml` sets `Prune=false` (with the
   chart's own `ServerSideApply=true`) on the chart's three CRDs. The
@@ -849,19 +904,13 @@ the `helm install` command in "Bootstrap" above (same release name and values;
   `compare-options: ServerSideDiff=true` annotation (same as
   kube-prometheus-stack, above).
 - **No finalizer.** Deleting the Application doesn't delete ArgoCD.
-- **Don't `helm upgrade` any more**, once adopted. Argo renders the chart with
-  `helm template` and applies it; the old Helm release (`sh.helm.release.v1.argocd.*`
-  Secrets in `argocd`) is stale and gets deleted after adoption, so nobody runs
-  a `helm upgrade` against it.
-
-**Status (2026-10-18): not adopted yet.** The Application exists but hasn't
-been synced. Until it is, `helm upgrade` from rpi5-1 with
-`-f argocd/install/values.yaml` is still how a change lands. The one-time
-adoption, once this is merged: check `argocd app diff argocd` (expect only the
-CRDs' new `Prune=false` annotation, plus the pre-upgrade hook Job), sync the
-Application, then delete the stale Helm release Secrets without uninstalling:
-`kubectl -n argocd delete secret -l owner=helm,name=argocd`. Then delete this
-paragraph.
+- **Don't `helm upgrade`.** Argo renders the chart with `helm template` and
+  applies it. The old Helm release's Secrets (`sh.helm.release.v1.argocd.*`)
+  were deleted at adoption, so `helm list -n argocd` is empty.
+- **Adopted 2026-10-18.** A server-side diff before the sync showed only Argo's
+  tracking annotation on each resource plus `Prune=false` on the CRDs. The sync
+  restarted nothing, the app stayed Synced on a hard refresh, and
+  `argocd-controller/Apply` now appears in the CRDs' managed fields.
 
 ## Deploy alerts (added 2026-10-16)
 

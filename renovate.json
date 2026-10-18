@@ -6,6 +6,10 @@
   "platformCommit": "disabled",
   "prHourlyLimit": 0,
   "prConcurrentLimit": 10,
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
+  "automergeSchedule": ["after 11am and before 1pm every weekday"],
+  "internalChecksFilter": "strict",
   "kubernetes": {
     "managerFilePatterns": [
       "/^argocd/apps/.+\\.ya?ml$/",
@@ -57,6 +61,43 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["docker.io/jakerobb/*", "jakerobb/*"],
       "maxMajorIncrement": 0
+    },
+    {
+      "description": "AUTO-MERGE, tier 1 (see argocd/README.md's Renovate section; everything not matched below stays manual). Our own apps' images: we wrote them and a bad one breaks only that app. Not the runner image (ghcr.io/jakerobb/homelab-arc-runner): a bad runner breaks lint for every PR. These tags are timestamps, which Renovate calls a major update, so this rule can't filter on update type.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["docker.io/jakerobb/*", "jakerobb/*"],
+      "addLabels": ["automerge"],
+      "automerge": true
+    },
+    {
+      "description": "AUTO-MERGE, tier 1: GitHub Actions patch and digest updates (and the initial digest pin). Held 3 days so a compromised release is usually caught first. Minor and major stay manual.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch", "digest", "pin", "pinDigest"],
+      "minimumReleaseAge": "3 days",
+      "addLabels": ["automerge"],
+      "automerge": true
+    },
+    {
+      "description": "AUTO-MERGE, tier 1: the Renovate image that runs the CronJob (manifests/renovate/), minor and patch. It ships several times a week; if a release is bad the failure is Renovate not opening PRs, nothing in the cluster. Held 3 days. Majors stay manual.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["renovate/renovate", "docker.io/renovate/renovate"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "minimumReleaseAge": "3 days",
+      "addLabels": ["automerge"],
+      "automerge": true
+    },
+    {
+      "description": "AUTO-MERGE, tier 1: patch updates of low-stakes dashboards and UIs (Glance, Headlamp, Radar). A bad one loses a page, not a service. Deliberately not ntfy: it's the alert delivery path.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "glanceapp/glance",
+        "docker.io/glanceapp/glance",
+        "ghcr.io/headlamp-k8s/headlamp",
+        "ghcr.io/skyhook-io/radar"
+      ],
+      "matchUpdateTypes": ["patch"],
+      "addLabels": ["automerge"],
+      "automerge": true
     }
   ],
   "customManagers": [
