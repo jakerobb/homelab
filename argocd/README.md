@@ -2846,9 +2846,15 @@ app built from what each one actually talks to.
   pod start, so a restart fails under default-deny (it did on 2026-10-08: ClickHouse sat in `Init:Error` for about six
   hours before anyone noticed). `signoz-clickhouse-init-egress` in
   [`signoz.yaml`](../manifests/network-policies/signoz.yaml) allows just `github.com` and GitHub's release-asset hosts on
-  443 using `toFQDNs`, the one place the cluster uses it. It only works with the `rules.dns` on the DNS rule beside it,
+  443 using `toFQDNs`. It only works with the `rules.dns` on the DNS rule beside it,
   which sends those pods' lookups through Cilium's DNS proxy. If the init container fails again, check where the
   download redirects now (`curl -sIL <url>`) and add that host.
+- **FQDN egress (Zigbee2MQTT OTA).** Zigbee2MQTT downloads the [zigbee-OTA](https://github.com/Koenkk/zigbee-OTA) index and
+  firmware images for Hue, Third Reality and innr devices (976 index entries as of 2026-10-19, all on
+  `raw.githubusercontent.com` over HTTPS). Under default-deny every download failed with `fetch failed`, so HA's
+  Zigbee "update" buttons did nothing (found 2026-10-19). `manifests/zigbee2mqtt/networkpolicy.yaml` now allows just that
+  host on 443, with the same `rules.dns` proxy. If a vendor's firmware later comes from another host, add it there, or
+  fall back to the usual "internet minus RFC1918 on 443" rule.
 - **Not covered.** `hostNetwork` pods ignore pod policy: Home Assistant,
   Matter Server, Scrypted, node-exporter, the CSI node pods, node-tuning and
   Cilium itself. `kube-system`, `argocd` (its chart ships its own policies) and

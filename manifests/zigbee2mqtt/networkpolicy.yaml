@@ -1,5 +1,8 @@
 # Zigbee2MQTT. Web UI through the Gateway; MQTT to the in-cluster Mosquitto; the coordinator is a
-# network radio at 192.168.102.4:6638.
+# network radio at 192.168.102.4:6638. Egress to raw.githubusercontent.com:443 is for OTA firmware:
+# Zigbee2MQTT downloads the zigbee-OTA index and images from there, and without it HA's "update"
+# buttons for Zigbee devices fail with "fetch failed". The FQDN rule only works with `rules.dns` on
+# the DNS rule beside it (see the FQDN note in argocd/README.md's "NetworkPolicies" section).
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
@@ -45,6 +48,15 @@ spec:
             - port: '53'
               protocol: UDP
             - port: '53'
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: '*'
+    - toFQDNs:
+        - matchName: raw.githubusercontent.com
+      toPorts:
+        - ports:
+            - port: '443'
               protocol: TCP
     - toEndpoints:
         - matchLabels:
