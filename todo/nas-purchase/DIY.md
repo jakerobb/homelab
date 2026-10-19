@@ -111,3 +111,60 @@ assembly.
 * [ECC UDIMM price bands, Oct 2026](https://computingforgeeks.com/best-ecc-udimm-kits/)
 * [Intel X710-DA2 listings](https://www.shi.com/product/33204890/Intel-Ethernet-Converged-Network-Adapter-X710-DA2)
 * [EPYC 4244P listing](https://ebay.com/itm/305816615779)
+
+# Alternative build
+
+⚙️ Components Selected So Far
+
+• Chassis: Athena Power RM-2U208G (2U, 8-Bay Front Hot-Swap, 430mm short depth).
+• Motherboard: ASUS Pro WS W680M-ACE SE (Micro-ATX, Intel W680 Workstation Chipset with onboard ASpeed AST2600 IPMI/BMC
+remote management).
+• Host Bus Adapter (HBA): LSI 9300-8i (PCIe 3.0 x8, flashed to IT Mode for raw ZFS disk access).
+• Internal Data Cabling: Two SFF-8643 to SFF-8643 (Mini-SAS HD to Mini-SAS HD) internal server cables to bridge the HBA
+directly to the Athena front drive backplane.
+• Expansion Connectivity: Two Flexible PCIe 90-degree Riser Ribbon Cables (allows mounting the LSI HBA and your SFP+ NIC
+horizontally into the 2U rear chassis tracks).
+• Network Interface Card (NIC): A generic Dual-Port SFP+ PCIe Network Interface Card (e.g., Intel X520-DA2 or Mellanox
+ConnectX-3/4) configured with a low-profile bracket.
+
+🔍 Missing Components Needed to Complete the Machine
+
+To turn this into a fully operational, bootable server, you still need to select the following five hardware categories:
+
+1. The Processor (CPU)
+
+Because compute and app workloads (like Plex) live on your Kubernetes cluster, your NAS processor only needs to handle
+basic ZFS pool calculations. It will spend most of its life idling.
+• What to buy: An entry-level, non-K 12th, 13th, or 14th Gen Intel Core i3 or i5 processor (e.g., Intel Core i3-12100 or
+i5-13400). These chips pull very little power at idle but provide massive bandwidth for storage throughput.
+• Note: Avoid "F" suffix chips (e.g., i5-13400F) just in case you ever need to tap into local diagnostics, but standard
+consumer chips will unlock full ECC features once socketed into your W680 motherboard.
+
+2. System Memory (RAM)
+
+True ZFS data protection requires true side-band server memory.
+• What to buy: DDR5 ECC Unbuffered (ECC UDIMM) modules. Ensure you do not buy standard desktop DDR5, nor enterprise
+Registered ECC (RDIMM) memory, as neither will boot.
+• Capacity: Aim for 32GB or 64GB (e.g., a 2x16GB or 2x32GB kit) to give your Kubernetes iSCSI block storage plenty of
+high-speed caching headroom.
+
+3. Power Supply Unit (PSU)
+
+Because the Athena case is a short-depth 2U layout, standard consumer ATX power supplies will not physically fit.
+• What to buy: A 1U Server Power Supply or a Flex-ATX Power Supply.
+• Specs to look for: Look for a unit rated between 400W and 500W to comfortably cover the spin-up power surge of 8
+mechanical hard drives. High-efficiency ratings (80 Plus Gold or Platinum) are critical because server power supplies
+use tiny 40mm fans; higher efficiency means less wasted heat and a much quieter fan curve inside your home.
+
+4. OS Boot Drives
+
+TrueNAS SCALE takes over its entire installation medium, meaning you cannot store personal data on the boot drive.
+• What to buy: One or two small, cheap M.2 NVMe SSDs (128GB to 256GB is more than enough).
+• Why two? TrueNAS allows you to natively mirror your boot drive across two physical M.2 slots during installation. If
+one cheap boot SSD dies down the road, your server stays online without interruption.
+
+5. CPU Cooling (Low Profile)
+
+Standard Intel stock coolers are too tall to fit underneath the metal lid of a 2U rack chassis.
+• What to buy: A low-profile CPU cooler with a maximum height clearance of under 65mm (such as the Noctua NH-L9i or
+Thermalright AXP90-X47).

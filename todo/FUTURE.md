@@ -12,6 +12,31 @@ B2 safety copy of the restored P3 Plus data. The restore itself is done and `rcl
 stable, and the bucket safe to delete, on or after 2026-10-20** (one month from the verified restore), assuming no
 issues surface before then.
 
+## SigNoz ClickHouse volume: confirm it plateaus
+
+**Waiting on:** the 30-day TTL starting to expire the oldest SigNoz metrics and ClickHouse system-log data. Everything in that
+volume dates from SigNoz's install on 2026-09-22, so nothing has expired yet and the volume has been growing a steady 0.58 GiB/day
+(17.5 of 29.4 GiB used on 2026-10-19). The straight-line "full in about 21 days" ignores the TTLs; the expectation is a plateau
+near 19 GiB (about 65%), up to 22 GiB if ClickHouse needs merge headroom. SigNoz logs, on a 15-day TTL, already flattened.
+**Check on or after 2026-10-25.** If it's still climbing by about 0.5 GiB/day then, the model is wrong and the volume does need
+retention changes or a bigger volume (see the ClickHouse item in [`READY.md`](READY.md)).
+
+Usage on the volume itself:
+
+```bash
+kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- df -h /var/lib/clickhouse
+```
+
+And whether expiry is really dropping the old metrics. The oldest daily partition should now be around 30 days old, not
+2026-09-22:
+
+```bash
+kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clickhouse-client -q \
+  "SELECT min(partition) FROM system.parts WHERE active AND database='signoz_metrics' AND table='samples_v4'"
+```
+
+If both look right, delete this item and the ClickHouse volume bullet in `READY.md`.
+
 ## Authelia RBAC group/role mapping
 
 **Waiting on:** a second real Authelia user. Right now anyone who authenticates gets whatever ArgoCD's default policy
