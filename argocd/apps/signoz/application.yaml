@@ -228,6 +228,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: signoz
+  # The chart doesn't set progressDeadlineSeconds, so it renders as the API
+  # server's default (600) and the default-progress-deadline admission policy
+  # rewrites it to 180 on apply. Without this, Argo sees that as permanent
+  # drift (ArgoAppOutOfSync on signoz-otel-collector).
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/progressDeadlineSeconds
   syncPolicy:
     automated:
       selfHeal: true
