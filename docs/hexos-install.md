@@ -209,6 +209,6 @@ Cosmetic only.
       use the classic ATA SMART self-test framework `smartd` manages (that's
       SATA/SAS-only); NVMe health is polled natively by TrueNAS's middleware
       instead. Keep the B2 backup for a few extra weeks
-      as insurance against early failure of the new (non-redundant, unless
-      AnyRaid) pool before deleting the bucket — don't delete immediately
+      as insurance against early failure of the new (single-disk, non-redundant)
+      pool before deleting the bucket — don't delete immediately
       just because the pool checks out on day one.

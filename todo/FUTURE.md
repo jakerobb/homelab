@@ -6,11 +6,12 @@ clears, move it into the active backlog as regular actionable work.
 
 ## HexOS B2 backup bucket deletion
 
-**Waiting on:** enough elapsed time to trust the new non-redundant (striped, no AnyRaid) HexOS pool before deleting the
-B2 safety copy of the restored P3 Plus data. The restore itself is done and `rclone check`-verified (0 differences,
-318821 files) as of 2026-09-20 — this is pure insurance against early pool failure, not active work. **Consider the pool
-stable, and the bucket safe to delete, on or after 2026-10-20** (one month from the verified restore), assuming no
-issues surface before then.
+**Waiting on:** local *redundant* storage for that data. The HexOS pool (`data`) is a single 4TB SSD (the P3 Plus) with the 2TB T500 as a
+separate ZFS log device, so there is no redundancy: the B2 bucket is currently the only second copy of the restored P3
+Plus data, and losing that one SSD would otherwise lose it. The restore itself is done and `rclone check`-verified (0 differences, 318821 files) as of 2026-09-20. Elapsed
+time doesn't change this: a month of the pool staying healthy (reached 2026-10-20) doesn't make a single-disk pool safe.
+**Delete the bucket only once the data also lives on redundant local storage** (for example, the replacement NAS
+hardware with a mirrored or RAID-Z layout), and re-run `rclone check` against the new copy first. No target date.
 
 ## SigNoz ClickHouse volume: confirm it plateaus
 
@@ -51,15 +52,6 @@ itself" in [`../argocd/README.md`](../argocd/README.md#upgrading-argocd-itself))
 deploy. The case for it is a smaller blast radius than Cilium's (a broken Argo stops deploys, it doesn't take the network
 down); the case against is that auto-sync keeps re-applying a bad version to a controller that can't revert it. Cilium stays
 manual either way. Also rehearse the `helm install` recovery path first (noted in the README as untested since adoption).
-
-## Alertmanager label-based routing
-
-**Waiting on:** enough real alert volume/noise to know what routing is actually worth building. Only `severity` maps to
-ntfy priority/tags today ([
-`../manifests/ntfy-alertmanager/configmap.yaml`](../manifests/ntfy-alertmanager/configmap.yaml)); per-namespace topics
-or similar are premature until there's a track record to design against. **Consider there to be enough of a track record
-to design against on or after 2026-10-20** (one month from Alertmanager going live), assuming no issues surface before
-then.
 
 ## SigNoz alerting -> ntfy-alertmanager direct integration
 
