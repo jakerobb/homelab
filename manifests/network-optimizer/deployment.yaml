@@ -13,6 +13,10 @@ kind: Deployment
 metadata:
   name: network-optimizer
   namespace: network-optimizer
+  annotations:
+    # Radar reads the workload, not the Pod template; see the Pod template's
+    # annotation below for why the app container keeps escalation.
+    radarhq.io/ignore-checks: privilegeEscalation
 spec:
   replicas: 1
   revisionHistoryLimit: 2
@@ -34,9 +38,11 @@ spec:
       annotations:
         # Opts out of the cluster's default allowPrivilegeEscalation: false
         # (manifests/admission-policies/default-no-privilege-escalation.yaml),
-        # and silences Radar's matching check. Traceroute/ping get NET_RAW
-        # from file capabilities, which no_new_privs would strip. Untested
-        # without the opt-out, so this is a precaution, not a measured need.
+        # and silences Radar's matching check. The app drops to UID 1654 with
+        # gosu, and /usr/bin/ping gets NET_RAW from a file capability
+        # (cap_net_raw=ep, checked 2026-10-20), which no_new_privs would
+        # strip. Because this skips the whole Pod, the speedtest sidecar sets
+        # allowPrivilegeEscalation: false itself.
         radarhq.io/ignore-checks: privilegeEscalation
     spec:
       affinity:
@@ -198,6 +204,8 @@ spec:
               memory: 32Mi
             limits:
               memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
       volumes:
         - name: data
           persistentVolumeClaim:

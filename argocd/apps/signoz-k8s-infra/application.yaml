@@ -52,11 +52,15 @@ spec:
         # 180-290Mi on worker-1/-2, 386Mi on talos-worker-mbp (7-day peaks,
         # 2026-09-24).
         otelAgent:
+          securityContext:
+            allowPrivilegeEscalation: false
           resources:
             requests:
               cpu: 50m
               memory: 384Mi
         otelDeployment:
+          securityContext:
+            allowPrivilegeEscalation: false
           resources:
             requests:
               cpu: 10m

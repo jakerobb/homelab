@@ -49,6 +49,14 @@ spec:
         global:
           storageClass: hexos-iscsi
         clickhouse:
+          # The chart has no container-level securityContext for the operator
+          # or the ClickHouse pod (its `securityContext` is pod-level), so the
+          # cluster's default-no-privilege-escalation admission policy covers
+          # their pods at runtime. This annotation only tells Radar to stop
+          # flagging the operator Deployment, whose spec can't set the field.
+          clickhouseOperator:
+            annotations:
+              radarhq.io/ignore-checks: privilegeEscalation
           # SigNoz's own stated ~4GB practical floor for ClickHouse, with
           # headroom — chart default (100m/200Mi, no limits at all) is only
           # sized for a toy/eval install.
@@ -124,6 +132,8 @@ spec:
                 cpu: 500m
                 memory: 1Gi
         signoz:
+          securityContext:
+            allowPrivilegeEscalation: false
           persistence:
             storageClass: hexos-iscsi
           resources:
@@ -134,6 +144,13 @@ spec:
               cpu: 500m
               memory: 1Gi
         otelCollector:
+          securityContext:
+            allowPrivilegeEscalation: false
+          # The chart gives its `check` init container no securityContext
+          # setting, so the admission policy covers that at runtime; this tells
+          # Radar to stop flagging the Deployment for it.
+          annotations:
+            radarhq.io/ignore-checks: privilegeEscalation
           # Raised 2026-09-24: OOM-killed that week at the old 1Gi limit
           # (peak 1016Mi), and still peaking ~680Mi after the batch tuning
           # below. Raised again 2026-10-09 (2Gi -> 3Gi): OOM-killed at 2Gi on

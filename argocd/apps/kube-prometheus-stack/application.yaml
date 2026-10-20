@@ -526,6 +526,9 @@ spec:
                       # in place (hexos-iscsi allows volume expansion).
                       storage: 20Gi
         prometheus-node-exporter:
+          # Merges with the chart's default (readOnlyRootFilesystem: true).
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
           # Chart default tolerations are empty, so node-exporter wouldn't
           # otherwise run on the (tainted) control-plane nodes — tolerate it
           # explicitly for full-cluster host metrics coverage.

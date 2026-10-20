@@ -74,7 +74,17 @@ spec:
         # none. Kept deliberately above peak: this is the storage path for
         # every PVC in the cluster.
         controller:
+          # The chart only takes a securityContext for the driver container;
+          # the sidecars and csi-proxy are covered by the cluster's
+          # default-no-privilege-escalation admission policy at runtime.
+          # Radar reads the workload spec, so this annotation (on the
+          # workload, not the Pod, so the policy still applies) silences its
+          # finding for them.
+          annotations:
+            radarhq.io/ignore-checks: privilegeEscalation
           driver:
+            securityContext:
+              allowPrivilegeEscalation: false
             image:
               # renovate: datasource=docker depName=ghcr.io/democratic-csi/democratic-csi
               tag: 'v1.9.5'
@@ -126,6 +136,11 @@ spec:
               cpu: 5m
               memory: 32Mi
         node:
+          # The driver is privileged with SYS_ADMIN (hardcoded in the chart's
+          # node template; the API server rejects allowPrivilegeEscalation:
+          # false on it), so Radar's finding can't be fixed, only silenced.
+          annotations:
+            radarhq.io/ignore-checks: privilegeEscalation
           # Replaced by node-driver-registrar.yaml (a standalone DaemonSet).
           # The chart's registrar mounts all of /var/lib/kubelet without
           # mount propagation, which pins old copies of iSCSI mounts and
