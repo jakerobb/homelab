@@ -38,6 +38,9 @@ spec:
           replicas: 1
           # See revisionHistoryLimit policy in argocd/README.md.
           revisionHistoryLimit: 2
+          securityContext:
+            container:
+              allowPrivilegeEscalation: false
           resources:
             requests:
               cpu: 50m

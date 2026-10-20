@@ -41,6 +41,8 @@ spec:
         # The chart's default is debug.
         flags:
           logLevel: info
+        securityContext:
+          allowPrivilegeEscalation: false
         resources:
           requests:
             cpu: 10m

@@ -1026,6 +1026,19 @@ chart-created Pods without editing their manifests.
 - **Rollout:** CREATE only, so running Pods keep their current setting until they
   restart. If something breaks after a restart, check for a setuid binary, `sudo`
   or file capabilities, then annotate that Pod.
+- **Workload specs (2026-10-20).** Radar reads the workload's pod template, not
+  the mutated Pod, so the policy alone never clears its finding. Each chart that
+  has a container-level `securityContext` value sets `allowPrivilegeEscalation:
+  false` there (Authelia, ARC controller, local-path, node-exporter, SigNoz,
+  its collector, k8s-infra, democratic-csi's driver). Where a chart has no
+  setting (democratic-csi's sidecars and privileged node driver, the SigNoz
+  ClickHouse operator, the collector's `check` init container), the workload
+  carries `radarhq.io/ignore-checks: privilegeEscalation`; the policy still
+  covers those Pods at runtime. The ClickHouse StatefulSet is operator-created
+  from a chart template whose `securityContext` is pod-level and can't be
+  annotated, so Radar will keep flagging it. network-optimizer's app container
+  needs escalation (`/usr/bin/ping` has `cap_net_raw=ep`), so it's exempt; its
+  speedtest sidecar sets `false` explicitly.
 - **Tested** by applying the policy briefly and server-side dry-running Pods:
   unset containers got `false`; explicit `true`, `privileged`, `SYS_ADMIN` and an
   annotated Pod were left alone.
