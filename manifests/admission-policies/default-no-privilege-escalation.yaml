@@ -1,0 +1,108 @@
+# A cluster-wide default of `allowPrivilegeEscalation: false` for every
+# container (init and regular) that doesn't set its own.
+#
+# Kubernetes leaves the field unset, which the container runtime treats as
+# "allowed": setuid binaries and file capabilities can grant a process more
+# privilege than its parent had. Radar flags that as its top finding
+# (`privilegeEscalation`). This policy sets it to false on Pod CREATE, so it
+# covers every Pod however it arrived (Helm charts, operators, Jobs), without
+# touching each manifest.
+#
+# What it leaves alone:
+#   - a container that sets the field itself, either way. An explicit `true`
+#     is a deliberate choice.
+#   - `privileged: true` containers, and ones adding `SYS_ADMIN` (or `ALL`).
+#     The API server rejects `allowPrivilegeEscalation: false` on those, so
+#     the Pod would fail to create. In this cluster: Cilium's mount-bpf-fs,
+#     cilium-agent, cilium-envoy and its init containers, and the democratic-csi
+#     node drivers.
+#   - ephemeral (debug) containers, which this policy doesn't match.
+#   - a Pod annotated `radarhq.io/ignore-checks` with `privilegeEscalation` in
+#     its (comma-separated) value, Radar's own "skip this check" annotation, so
+#     one annotation both silences Radar and opts the Pod out of this default.
+#     It has to be on the *Pod* (the workload's `spec.template.metadata`), not
+#     just the Deployment, because that's all the policy can see; for a Helm
+#     chart, use its podAnnotations value. Use it for anything that needs
+#     setuid or file capabilities to work (`sudo`, `ping` via setcap). Today:
+#     network-optimizer, whose traceroute/ping rely on `NET_RAW` via file caps.
+#
+# Whether a container breaks under it: with `no_new_privs` set, an `execve`
+# can no longer gain privilege from a setuid bit or file capabilities. A root
+# process that already holds its capabilities (including ones added with
+# `capabilities.add`) and drops with `setuid()`/`gosu` is unaffected.
+#
+# It applies on Pod CREATE only, so running Pods keep their current setting
+# until they're next recreated (a rollout, a node drain, a restart); nothing
+# restarts because of this policy.
+#
+# failurePolicy: Ignore, so a broken policy can never block a Pod from being
+# created; it just stops applying the default.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: default-no-privilege-escalation
+spec:
+  failurePolicy: Ignore
+  reinvocationPolicy: Never
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: not-opted-out
+      expression: >-
+        !(has(object.metadata.annotations) &&
+          'radarhq.io/ignore-checks' in object.metadata.annotations &&
+          object.metadata.annotations['radarhq.io/ignore-checks']
+            .split(',').map(s, s.trim()).exists(s, s == 'privilegeEscalation'))
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{
+            spec: Object.spec{
+              containers: object.spec.containers
+                .filter(c,
+                  !(has(c.securityContext) &&
+                    (has(c.securityContext.allowPrivilegeEscalation) ||
+                     (has(c.securityContext.privileged) && c.securityContext.privileged) ||
+                     (has(c.securityContext.capabilities) &&
+                      has(c.securityContext.capabilities.add) &&
+                      c.securityContext.capabilities.add.exists(x,
+                        x in ['SYS_ADMIN', 'CAP_SYS_ADMIN', 'ALL', 'CAP_ALL']))))
+                )
+                .map(c, Object.spec.containers{
+                  name: c.name,
+                  securityContext: Object.spec.containers.securityContext{
+                    allowPrivilegeEscalation: false
+                  }
+                }),
+              initContainers: has(object.spec.initContainers)
+                ? object.spec.initContainers
+                    .filter(c,
+                      !(has(c.securityContext) &&
+                        (has(c.securityContext.allowPrivilegeEscalation) ||
+                         (has(c.securityContext.privileged) && c.securityContext.privileged) ||
+                         (has(c.securityContext.capabilities) &&
+                          has(c.securityContext.capabilities.add) &&
+                          c.securityContext.capabilities.add.exists(x,
+                            x in ['SYS_ADMIN', 'CAP_SYS_ADMIN', 'ALL', 'CAP_ALL']))))
+                    )
+                    .map(c, Object.spec.initContainers{
+                      name: c.name,
+                      securityContext: Object.spec.initContainers.securityContext{
+                        allowPrivilegeEscalation: false
+                      }
+                    })
+                : []
+            }
+          }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: default-no-privilege-escalation
+spec:
+  policyName: default-no-privilege-escalation

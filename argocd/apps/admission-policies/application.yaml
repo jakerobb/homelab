@@ -1,9 +1,9 @@
 # Cluster-wide admission policies, built into Kubernetes (no extra component
-# to run). Currently one: the default progressDeadlineSeconds for Deployments,
-# which Kubernetes hardcodes at 600s. See
-# manifests/admission-policies/default-progress-deadline.yaml for what it does
-# and how to override it, and argocd/README.md's "Cluster-wide default for
-# progressDeadlineSeconds".
+# to run). Currently two: the default progressDeadlineSeconds for Deployments,
+# which Kubernetes hardcodes at 600s, and a default of allowPrivilegeEscalation:
+# false for containers. See the files in manifests/admission-policies/ for what
+# each does and how to override it, and argocd/README.md's "Cluster-wide default
+# for progressDeadlineSeconds".
 #
 # Cluster-scoped resources, so the destination namespace is irrelevant.
 apiVersion: argoproj.io/v1alpha1
