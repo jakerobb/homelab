@@ -266,3 +266,10 @@ Found while checking what the alerts and the cluster's history show. The alerts 
   ntfy. A small CronJob could publish a message, poll to confirm ntfy stored it, and ping a second Healthchecks check.
 - **Are the app backups copied offsite?** The Home Assistant, Scrypted and change-detection backups go to a `hexos-nfs` volume,
   which lives on the same NAS as the iSCSI primaries. If they aren't copied elsewhere, a NAS failure takes both.
+
+## Alertmanager label-based routing
+
+Alertmanager has been live for a month (as of 2026-10-20), so there's now a track record to design against. Only `severity`
+maps to ntfy priority/tags today ([`../manifests/ntfy-alertmanager/configmap.yaml`](../manifests/ntfy-alertmanager/configmap.yaml)).
+Review the month's alerts (what fired, what was noise, what you wished went elsewhere) and decide whether per-namespace
+topics or other label-based routing are worth building.
