@@ -26,10 +26,17 @@ spec:
         # 3 restarts in 6h. A pod that's in CrashLoopBackOff right now is left to
         # KubePodCrashLooping, so a real crash loop doesn't notify twice; this is
         # for the ones that restart, recover and restart again. 6h rather than
-        # longer so the alert clears the same day.
+        # longer so the alert clears the same day. The container has to exist
+        # now: increase() over 6h still sees the series of a pod that was replaced
+        # after it restarted, so without the kube_pod_container_info check the
+        # alert kept firing (and re-notifying every 4h) for hours after a healthy
+        # replacement took over (Radar, 2026-10-19: four OIDC-startup crashes
+        # during the Talos upgrade, alerting until the old pod aged out).
         - alert: ContainerRestartingRepeatedly
           expr: |
             increase(kube_pod_container_status_restarts_total[6h]) >= 3
+            and on (namespace, pod, container)
+            kube_pod_container_info
             unless on (namespace, pod, container)
             kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} == 1
           for: 5m

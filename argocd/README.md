@@ -1078,7 +1078,12 @@ found three blind spots, so the `deploy-alerts` Application also holds these.
   across 10 days that included an 11 hour OOM loop and a 26 minute crash loop.
   `ContainerRestartingRepeatedly` fires on 3 restarts in 6 hours when the pod
   isn't in CrashLoopBackOff right now (that stays `KubePodCrashLooping`'s, so a
-  real loop doesn't notify twice).
+  real loop doesn't notify twice) and the container still exists. The existence
+  check (`kube_pod_container_info`) was added 2026-10-19: `increase()[6h]` keeps a
+  replaced pod's series for the whole window, so Radar's four startup crashes
+  (Authelia unreachable during the Talos upgrade, so its OIDC check failed) kept
+  the alert firing, and re-notifying every 4h, for hours after a healthy pod had
+  replaced the crashed one.
 - **A CronJob that quietly stops.** `KubeJobFailed` reports a Job that failed;
   nothing noticed a schedule that was suspended, never fired or always failed.
   `CronJobNoRecentSuccess` (30 hours, for the daily ones: the Home Assistant,
