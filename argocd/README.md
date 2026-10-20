@@ -1003,6 +1003,33 @@ alert and the ntfy message notice).
   speedtest sidecar). Not examined individually: democratic-csi's controllers,
   hubble-ui's backend and the SigNoz ClickHouse operator.
 
+## Default `allowPrivilegeEscalation: false` (added 2026-10-19)
+
+Radar's top finding was `privilegeEscalation`: 39 containers across 119 pods
+left `allowPrivilegeEscalation` unset, which the runtime treats as allowed.
+[`manifests/admission-policies/default-no-privilege-escalation.yaml`](../manifests/admission-policies/default-no-privilege-escalation.yaml)
+(a `MutatingAdmissionPolicy`, in the same `admission-policies` Application as
+the progress-deadline default) sets it to `false` on every Pod CREATE, for init
+and regular containers that don't set it. It covers operator- and
+chart-created Pods without editing their manifests.
+
+- **Skipped automatically:** containers that set the field themselves, and
+  `privileged` containers or ones adding `SYS_ADMIN`/`ALL` (the API server
+  rejects `false` on those). Here that's Cilium's agent, envoy and init
+  containers, and the democratic-csi node drivers.
+- **Opt-out:** annotate the *Pod* (the workload's pod template, or a chart's
+  `podAnnotations`) `radarhq.io/ignore-checks: privilegeEscalation`, Radar's own
+  skip annotation, comma-separated for several checks. Putting it only on the
+  Deployment silences Radar but not the policy, which only sees Pods.
+  network-optimizer has it as a precaution: its ping/traceroute use `NET_RAW`
+  and, if that's from file capabilities, `no_new_privs` would strip it.
+- **Rollout:** CREATE only, so running Pods keep their current setting until they
+  restart. If something breaks after a restart, check for a setuid binary, `sudo`
+  or file capabilities, then annotate that Pod.
+- **Tested** by applying the policy briefly and server-side dry-running Pods:
+  unset containers got `false`; explicit `true`, `privileged`, `SYS_ADMIN` and an
+  annotated Pod were left alone.
+
 ## Deploy alerts (added 2026-10-16)
 
 A merge to `main` is a deploy: every app here syncs automatically, Renovate's

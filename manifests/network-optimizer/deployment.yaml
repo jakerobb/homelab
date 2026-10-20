@@ -31,6 +31,13 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: network-optimizer
+      annotations:
+        # Opts out of the cluster's default allowPrivilegeEscalation: false
+        # (manifests/admission-policies/default-no-privilege-escalation.yaml),
+        # and silences Radar's matching check. Traceroute/ping get NET_RAW
+        # from file capabilities, which no_new_privs would strip. Untested
+        # without the opt-out, so this is a precaution, not a measured need.
+        radarhq.io/ignore-checks: privilegeEscalation
     spec:
       affinity:
         nodeAffinity:
