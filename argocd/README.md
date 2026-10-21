@@ -625,14 +625,14 @@ at [`manifests/headlamp/`](../manifests/headlamp/).
   ArgoCD (see "Authelia SSO" above), for the same reason: Headlamp supports
   OIDC login natively, so stacking Cilium's `ExternalAuth` filter in front
   would just mean logging into Authelia twice against the same IdP.
-- **RBAC: cluster-admin, no per-user distinction** (decided with Jake
-  2026-09-21) — see the comment on
+- **RBAC: per-user via OIDC, ServiceAccount read-only** (narrowed 2026-10-21;
+  originally cluster-admin) — see the comment on
   [`manifests/headlamp/clusterrolebinding.yaml`](../manifests/headlamp/clusterrolebinding.yaml).
-  Headlamp runs in `-in-cluster` mode using its own ServiceAccount's token
-  for every API call; OIDC only gates who can reach the UI, not what they
-  can do once in. Fine for a single-admin homelab; revisit (real
-  kube-apiserver OIDC + per-user RBAC) if a second, less-trusted user ever
-  gets an Authelia account.
+  Headlamp's ServiceAccount is bound to the built-in `view` role. Logged-in
+  users' requests carry their own OIDC token, which kube-apiserver authorizes
+  through the `oidc-admin` binding, so a compromised Headlamp pod no longer
+  owns the cluster. If a feature breaks, it's still using the SA's token:
+  add a small custom role rather than restoring cluster-admin.
 - **Exposure:** `HTTPRoute` on `homelab-gateway`
   ([`manifests/headlamp/httproute.yaml`](../manifests/headlamp/httproute.yaml)),
   hostname `headlamp.jakerobb.org`, linked from Glance's `bookmarks`.
