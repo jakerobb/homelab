@@ -1,16 +1,15 @@
-# Bound to the built-in cluster-admin ClusterRole — matches the upstream
-# Helm chart's own default (confirmed against charts/headlamp/values.yaml),
-# and what Jake's own kubeconfig from the jump box already grants via
-# kubectl/talosctl. Deliberate call (2026-09-21): Headlamp runs in
-# `-in-cluster` mode using this ServiceAccount's own token for every API
-# call it makes, not a per-user token — the OIDC login below authenticates
-# *who can reach the Headlamp UI at all*, but doesn't map claims to
-# per-user RBAC (that needs kube-apiserver's own --oidc-* flags wired up,
-# a separate and much bigger cluster change, not done here). So every
-# Authelia user who logs in gets full cluster-admin through Headlamp,
-# same as everyone using kubectl from the jump box today — no new blast
-# radius for a single-admin homelab, but revisit if a second, less-trusted
-# user ever gets an Authelia account.
+# Bound to the built-in read-only `view` ClusterRole, not cluster-admin
+# (narrowed 2026-10-21). Headlamp runs in `-in-cluster` mode, but once a
+# user logs in through OIDC it sends that user's own ID token to
+# kube-apiserver, which trusts the same Authelia issuer
+# (talos/patches/control-plane/oidc.yaml) and authorizes the request as
+# `jakerobb@gmail.com` via the `oidc-admin` binding
+# (clusterrolebinding-oidc-user.yaml). So this ServiceAccount is only what
+# Headlamp's backend uses for itself, and a compromised pod shouldn't hand
+# over the cluster. Originally cluster-admin (2026-09-21), when the API
+# server didn't yet accept OIDC tokens and every call went out as the SA.
+# If a Headlamp feature breaks after this, it's still using the SA's token;
+# prefer a small custom role over going back to cluster-admin.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -18,7 +17,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: view
 subjects:
   - kind: ServiceAccount
     name: headlamp
