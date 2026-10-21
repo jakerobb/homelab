@@ -267,3 +267,21 @@ means setting a module option and reloading SCST or rebooting the NAS, and a han
 a TrueNAS update. The Proxmox host has about 1GB left, so another RAM increase means shrinking a worker first. Another
 possible lever is lowering the optimal transfer length at the target, so every initiator gets it for free; unchecked
 whether TrueNAS exposes that. If it's quiet, delete this item and the SCST notes can stay in `DONE.md`.
+
+## Remove restock-radar's `npm <12` Renovate constraint
+
+**Waiting on:** a fixed npm 12 release. npm 12 defaults `allow-remote` to `none`, and `npm install --package-lock-only`
+(what Renovate runs for lockfile updates) wrongly refuses registry tarballs of packages that declare
+`bundleDependencies`, such as Tailwind 4's `@tailwindcss/oxide-wasm32-wasi`, with `EALLOWREMOTE`. It's tracked in
+[npm/cli#9800](https://github.com/npm/cli/issues/9800); the candidate fixes are
+[#9818](https://github.com/npm/cli/pull/9818) and [#9819](https://github.com/npm/cli/pull/9819), both open and
+unreviewed as of 2026-10-21. It still reproduced on npm 12.2.1, the latest release then. Until it's fixed,
+`restock-radar`'s `renovate.json` caps Renovate's npm at `<12` (`constraints.npm`), with a package rule so Renovate
+doesn't open a PR to raise that cap. Real installs and CI are unaffected (they skip the package, and Node 24 ships
+npm 11).
+
+**To check:** whether #9800 is closed and which npm release has the fix. Then verify it in a scratch directory:
+`echo '{"name":"repro","version":"1.0.0","dependencies":{"@tailwindcss/oxide":"4.3.3"}}' > package.json`, then
+`npx -p node@24 -p npm@<fixed version> -- npm install --package-lock-only`. If it succeeds, remove the `constraints`
+block and the `renovate-config` package rule from `restock-radar`'s `renovate.json`, and delete this item. No target
+date; this depends on upstream.
