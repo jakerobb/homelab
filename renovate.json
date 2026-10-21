@@ -10,6 +10,7 @@
   "automergeStrategy": "squash",
   "automergeSchedule": ["after 11am and before 1pm every weekday"],
   "internalChecksFilter": "strict",
+  "osvVulnerabilityAlerts": true,
   "kubernetes": {
     "managerFilePatterns": [
       "/^argocd/apps/.+\\.ya?ml$/",
