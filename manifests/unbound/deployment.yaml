@@ -43,7 +43,7 @@ spec:
       containers:
         - name: unbound
           # renovate: datasource=docker depName=klutchell/unbound
-          image: docker.io/klutchell/unbound:1.26.1
+          image: docker.io/klutchell/unbound:v1.26.2
           imagePullPolicy: IfNotPresent
           # The image starts as root, binds :53, then chroots to /var/unbound
           # and drops to its own `unbound` user. DAC_OVERRIDE is needed because
