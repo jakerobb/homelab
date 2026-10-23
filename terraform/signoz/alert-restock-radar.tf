@@ -10,7 +10,7 @@
 # The metric reaches SigNoz by federation from Prometheus
 # (argocd/apps/signoz/application.yaml, job "restock-radar"). If that, the
 # scrape, or the pod itself stops, the series disappears; alert_on_absent
-# turns that into an alert too, after 30 minutes.
+# turns that into an alert too, after an hour.
 #
 # Delivery is the same ntfy-alertmanager channel as the packet-loss alert
 # (alert-packet-loss.tf), landing in ntfy's homelab-alerts topic.
@@ -57,9 +57,11 @@ resource "signoz_rule" "restock_radar_stalled" {
 
     selected_query_name = "A"
 
-    # absent_for is in minutes.
+    # absent_for is in minutes. 60 rather than 30 so a ClickHouse hiccup that
+    # blanks the series for ~40 minutes (2026-10-22) doesn't look like the
+    # pod vanishing.
     alert_on_absent = true
-    absent_for      = 30
+    absent_for      = 60
 
     thresholds = {
       basic = {
