@@ -65,9 +65,12 @@ resource "signoz_rule" "packet_loss" {
 
     selected_query_name = "A"
 
-    # Grafana's rule had no-data = Alerting. absent_for is in minutes.
+    # Grafana's rule had no-data = Alerting. absent_for is in minutes. 15, not
+    # 2: SigNoz itself can briefly return no data (ClickHouse hit its memory
+    # cap on 2026-10-22 and the rule saw nothing while Telegraf kept
+    # sending), and that shouldn't page as packet loss.
     alert_on_absent = true
-    absent_for      = 2
+    absent_for      = 15
 
     thresholds = {
       basic = {

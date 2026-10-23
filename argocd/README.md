@@ -1372,7 +1372,7 @@ consumer SSD despite being network-attached iSCSI.
 
 | Component | Requests | Limits |
 |---|---|---|
-| ClickHouse | 500m / 2Gi | 2 / 6Gi |
+| ClickHouse | 500m / 2Gi | 2 / 8Gi |
 | ZooKeeper | 100m / 256Mi | 500m / 512Mi |
 | SigNoz core | 100m / 256Mi | 500m / 1Gi |
 | otel-collector | 100m / 256Mi | 1 / 1Gi |
