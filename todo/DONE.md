@@ -3,6 +3,29 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Headlamp's ServiceAccount narrowed to `view`
+
+**Done (2026-10-21), verified 2026-10-22.** The `headlamp` ClusterRoleBinding
+([`../manifests/headlamp/clusterrolebinding.yaml`](../manifests/headlamp/clusterrolebinding.yaml)) now binds Headlamp's own
+ServiceAccount to the built-in `view` role instead of `cluster-admin`, so a compromised Headlamp pod no longer owns the cluster.
+Once logged in through OIDC, Headlamp sends the user's own token to kube-apiserver, and the `oidc-admin` binding authorizes it.
+Verified by scaling the Browserless deployment from Headlamp: the write succeeded (ArgoCD's self-heal reverted it a second later),
+and `kubectl auth can-i update deployments/scale` answers no for the ServiceAccount and yes for `jakerobb@gmail.com`. If a Headlamp
+feature ever breaks, it's using the ServiceAccount's token; give it a small custom role rather than restoring `cluster-admin`.
+
+## SSH hardening on rpi5-1 and free GitHub security features
+
+**Done (2026-10-21).** From the 2026-10-04 review. `/etc/ssh/sshd_config.d/10-hardening.conf` on rpi5-1 sets
+`PermitRootLogin no` and `X11Forwarding no` (key-only auth was already on). CodeQL's default setup, scanning the `actions`
+language, is on for homelab, restock-radar, nut-relay, truenas-exporter and modbus-eth-controller. Homelab has a
+[`SECURITY.md`](../SECURITY.md) and private vulnerability reporting. The `$GITHUB_OUTPUT` quoting fix went into all four Go
+apps' `docker-publish.yml`, and 29 merged remote branches were deleted from restock-radar, truenas-exporter and
+modbus-eth-controller (kept: restock-radar's `hardening`, which has two commits no merged PR matches, and modbus's
+Renovate branch with an open PR). "Automatically delete head branches" was already on in every repo.
+
+Dependabot malware alerts were turned on by hand in all five repos (no API field for it), along with secret scanning on
+nut-relay and push protection on nut-relay and restock-radar (2026-10-22).
+
 ## Hardware migration (SSD install, Proxmox, Talos worker, HexOS VM)
 
 **Done (2026-09-18).** Originally a phased checklist in README.md (B2 backup, physical SSD install, Proxmox, Talos

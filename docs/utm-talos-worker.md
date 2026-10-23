@@ -170,6 +170,9 @@ dashboard, `CONNECTIVITY OK`, the expected IP) before moving on.
    silent drift here before on the existing workers).
 7. Detach/eject the `metal-amd64.iso` from the VM's Drives once install is
    confirmed working — not needed again unless reinstalling from scratch.
+8. Add the worker's IP to `nut_v4` in the rpi5-1 host firewall (`scripts/rpi5-1-firewall/homelab-fw.nft`), run
+   `sudo ./install.sh` there, and see [`rpi5-1-firewall.md`](rpi5-1-firewall.md#adding-a-node). Otherwise
+   `nut-exporter` can't read the UPS when it lands on this node.
 
 ## Recovering from a corrupted image store
 

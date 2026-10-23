@@ -84,33 +84,13 @@ did *not* cover (UniFi's inter-VLAN firewall and any WAN port forwards, what Clo
 Proxmox and TrueNAS/HexOS API exposure, and 2FA on the GitHub, 1Password, Cloudflare and UniFi accounts) still needs a
 separate look.
 
-### Scope Headlamp's ServiceAccount
+### Switch the rpi5-1 host firewall to enforcing
 
-The `headlamp` ClusterRoleBinding gives Headlamp's own ServiceAccount `cluster-admin`
-([`manifests/headlamp/clusterrolebinding.yaml`](../manifests/headlamp/clusterrolebinding.yaml)), so a compromised
-Headlamp pod would own the cluster. That was a deliberate 2026-09-21 call, because Headlamp ran in `-in-cluster` mode and
-used the SA's token for every request. Since then kube-apiserver was wired to Authelia's OIDC
-([`talos/patches/control-plane/oidc.yaml`](../talos/patches/control-plane/oidc.yaml)) with an `oidc-admin` binding for
-`jakerobb@gmail.com`, and the comment on that binding says the SA is for Headlamp's backend only, not for requests that
-carry a user's token. **Find out which is true now** before changing anything: bind the SA to `view` (or a narrower
-role) and check that Headlamp still works for you, including writes, since those should then be authorized by your own
-`oidc-admin` identity. If writes break, Headlamp is still using the SA's token, and the answer is a smaller custom role
-instead of `view`. Update the "RBAC" bullet in the Headlamp section of `argocd/README.md` either way.
-
-### Harden SSH and the host firewall on rpi5-1
-
-`sshd` is already key-only. Still to do: `PermitRootLogin` is `without-password`, so set it to `no`, and set
-`X11Forwarding no`. `3493` (the NUT data port for the UPS) is reachable from the LAN without authentication; it's
-read-only data, but consider limiting it to the hosts that need it. A first look at the nftables ruleset showed only
-Docker's NAT chains, so confirm what, if anything, filters INPUT, and settle on a default-deny baseline (SSH from the
-LAN, DNS on `:53`, `:3493` from where it's needed, and whatever the two entries above leave open) so that new
-host-network containers aren't exposed by default. Jump-box OS upgrade (Debian 12 to 13) is tracked in `FUTURE.md`.
-
-### Turn on the remaining free GitHub security features
-
-Code scanning's default setup with the `actions` language (CodeQL looks for script injection in workflow files, which
-matters with self-hosted runners on a public repo; Settings, Advanced Security). Dependabot malware alerts (Dependabot
-alerts are already on). A `SECURITY.md`, plus private vulnerability reporting if you ever want outside reports.
+The firewall is installed and has been in log-only mode since 2026-10-22 (see
+[`../docs/rpi5-1-firewall.md`](../docs/rpi5-1-firewall.md)). After about a week, read `journalctl -k | grep homelab-fw`,
+add rules for anything legitimate it shows, and run `sudo ./install.sh enforce`. Then decide whether to narrow NUT (`:3493`)
+from the whole Server VLAN to the worker nodes, which is all that uses it. Jump-box OS upgrade (Debian 12 to 13) is
+tracked in `FUTURE.md`.
 
 ### Pin container images by digest
 
@@ -162,17 +142,6 @@ one in `ci.yml`. Leave the write token to `docker-publish.yml`.
 
 Renovate logs "Cannot access vulnerability alerts" for homelab and restock-radar. Add **Dependabot alerts: Read-only**
 to its token, so security-driven updates can be flagged as such. Optional.
-
-### Clean up merged branches
-
-The app repos have a pile of merged branches on the remote (`unique-image-tags`, `go-1.27.2-and-ci`, `ci-docker-login`,
-`renovate-git-author` and so on, plus restock-radar's old `renovate/golang-1.27.1`). Delete them, and turn on
-"Automatically delete head branches" in the three repos that don't have it (nut-relay already does).
-
-### Quote `$GITHUB_OUTPUT`
-
-`actionlint` flags `echo "tag=$(date ...)" >> $GITHUB_OUTPUT` (SC2086, info level) in all four `docker-publish.yml`
-files. Quote it, in all four at once so they stay identical.
 
 ### Stop copying the workflows
 
@@ -273,3 +242,13 @@ Alertmanager has been live for a month (as of 2026-10-20), so there's now a trac
 maps to ntfy priority/tags today ([`../manifests/ntfy-alertmanager/configmap.yaml`](../manifests/ntfy-alertmanager/configmap.yaml)).
 Review the month's alerts (what fired, what was noise, what you wished went elsewhere) and decide whether per-namespace
 topics or other label-based routing are worth building.
+
+## SigNoz alerting -> ntfy-alertmanager direct integration
+
+SigNoz went live on 2026-09-22, and a month in it's time for an opinion on whether it's staying. If it is, SigNoz's own
+alert rules (evaluated against its ClickHouse-backed data, not Prometheus) can notify a generic Webhook channel. That
+webhook's payload shape looks like the "Alertmanager outbound notification" format `ntfy-alertmanager`
+([`../manifests/ntfy-alertmanager/`](../manifests/ntfy-alertmanager/)) already parses, so SigNoz-native alerts could point
+straight at it and reuse the existing ntfy pipeline, skipping Alertmanager for that path. Not verified live; found via
+docs comparison, not a real test POST. Start with a test POST. See
+[`../argocd/README.md`](../argocd/README.md#signoz-decided-and-deployed-2026-09-22) for the SigNoz deployment itself.
