@@ -565,6 +565,9 @@ Check that Cilium's L2 announcements are behaving. Workers announce LB IPs
 others; confirm those addresses still answer from another machine, and that
 the `nic-10g` Services are still announced only by 10GbE nodes.
 
+Add the worker's IP to `nut_v4` in the host firewall ([`rpi5-1-firewall.md`](rpi5-1-firewall.md#adding-a-node)),
+or `nut-exporter` can't read the UPS once it lands here. (Done for `.35` already.)
+
 Leave it cordoned until the arm64 audit from "Before the window" is done
 and you're happy. Then `kubectl uncordon talos-worker-3`.
 

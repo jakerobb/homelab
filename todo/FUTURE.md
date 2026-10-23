@@ -53,19 +53,6 @@ deploy. The case for it is a smaller blast radius than Cilium's (a broken Argo s
 down); the case against is that auto-sync keeps re-applying a bad version to a controller that can't revert it. Cilium stays
 manual either way. Also rehearse the `helm install` recovery path first (noted in the README as untested since adoption).
 
-## SigNoz alerting -> ntfy-alertmanager direct integration
-
-**Waiting on:** enough time actually using SigNoz to know whether it's staying. SigNoz's own alert rules (evaluated
-against its ClickHouse-backed data, not Prometheus) can notify a generic Webhook channel, and that webhook's payload
-shape turned out to be the same "Alertmanager outbound notification" format `ntfy-alertmanager`
-([`../manifests/ntfy-alertmanager/`](../manifests/ntfy-alertmanager/)) already parses (built to consume real
-Alertmanager's webhook) — meaning SigNoz-native alerts could plausibly point straight at it, skipping Alertmanager
-entirely for that path, reusing the existing ntfy pipeline. Not verified live; found via docs comparison, not a real
-test POST. Deliberately not investigated further yet — see
-[`../argocd/README.md`](../argocd/README.md#signoz-decided-and-deployed-2026-09-22) for the SigNoz deployment itself.
-**Revisit on or after 2026-10-22** (one month from SigNoz going live), once there's a real opinion on whether SigNoz is
-worth keeping — no point building integration plumbing for a tool that might get replaced.
-
 ## Linode workload migration
 **Waiting on:** the Mac Studio being online and all home workloads being moved. 
 

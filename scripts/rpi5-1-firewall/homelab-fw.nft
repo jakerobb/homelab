@@ -1,0 +1,75 @@
+#!/usr/sbin/nft -f
+# rpi5-1 host firewall. Its own table, so Docker's iptables-nft tables are left
+# alone (never `flush ruleset` here). Installed by install.sh; see
+# docs/rpi5-1-firewall.md. Whatever no rule allows is logged, then sent to the
+# `final` chain, which mode.nft fills: empty = log-only (nothing is blocked),
+# `drop` = enforcing.
+
+define ssh_v4    = { 192.168.3.0/24, 192.168.92.0/24 }
+# NUT is read by the nut-exporter pod, which can land on any worker, so every worker's
+# IP goes here (add new workers; see docs/rpi5-1-firewall.md). No IPv6: nodes have none yet.
+define nut_v4    = { 192.168.102.31, 192.168.102.32, 192.168.102.34, 192.168.102.35 }
+define syslog_v4 = { 192.168.102.0/24, 192.168.0.0/24 }
+define dns_v4    = 192.168.0.0/16
+define ssh_v6    = { fd3d:b17d:9f8e:3::/64, fd3d:b17d:9f8e:92::/64 }
+define syslog_v6 = { fd3d:b17d:9f8e:102::/64 }
+define dns_v6    = fd3d:b17d:9f8e::/48
+
+table inet homelab_fw
+delete table inet homelab_fw
+
+table inet homelab_fw {
+	# Traffic addressed to the host itself (SSH, Unbound, and the docker-proxy
+	# listeners, which is how IPv6 and host-local connections reach NUT and Vector).
+	chain input {
+		type filter hook input priority filter; policy accept;
+
+		ct state established,related accept
+		iif lo accept
+		iifname "br-*" accept
+		iifname "docker0" accept
+		meta l4proto { icmp, ipv6-icmp } accept
+		udp sport 67 udp dport 68 accept
+		ip6 saddr fe80::/10 udp dport 546 accept
+
+		tcp dport 22 ip saddr $ssh_v4 counter accept
+		tcp dport 22 ip6 saddr $ssh_v6 counter accept
+		meta l4proto { tcp, udp } th dport 53 ip saddr $dns_v4 counter accept
+		meta l4proto { tcp, udp } th dport 53 ip6 saddr $dns_v6 counter accept
+		tcp dport 3493 ip saddr $nut_v4 counter accept
+		udp dport { 514, 5140 } ip saddr $syslog_v4 counter accept
+		udp dport { 514, 5140 } ip6 saddr $syslog_v6 counter accept
+
+		limit rate 20/second log prefix "homelab-fw would-drop in: "
+		counter jump final
+	}
+
+	# IPv4 ports Docker publishes are DNATed in prerouting, so they're forwarded
+	# to the container and never reach the input chain. Runs before Docker's own
+	# forward chain; an accept here still goes on through Docker's rules.
+	chain forward {
+		type filter hook forward priority -10; policy accept;
+
+		ct status dnat jump published
+	}
+
+	chain final {
+	}
+
+	chain published {
+		ct state established,related accept
+		iifname "br-*" accept
+		iifname "docker0" accept
+
+		meta l4proto tcp ct original proto-dst 3493 ip saddr $nut_v4 counter accept
+		meta l4proto udp ct original proto-dst 514 ip saddr $syslog_v4 counter accept
+		meta l4proto udp ct original proto-dst 5140 ip saddr $syslog_v4 counter accept
+		meta l4proto udp ct original proto-dst 514 ip6 saddr $syslog_v6 counter accept
+		meta l4proto udp ct original proto-dst 5140 ip6 saddr $syslog_v6 counter accept
+
+		limit rate 20/second log prefix "homelab-fw would-drop fwd: "
+		counter jump final
+	}
+}
+
+include "/etc/homelab-fw/mode.nft"

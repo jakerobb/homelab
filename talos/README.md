@@ -1185,7 +1185,8 @@ rebuild should use one of these IDs.
   take a schematic, and the control planes use local NVMe rather than iSCSI. `talos-worker-3` does have iSCSI
   volumes, so it's the one most worth revisiting.
 - **New nodes:** bake the arg into their schematics, and add their IP to the `nodes` map in the Vector
-  transform so `k8s.node.name` is right (an unmapped node shows up under its IP). The Pi 5 worker
+  transform so `k8s.node.name` is right (an unmapped node shows up under its IP). Also add a worker's IP to `nut_v4` in the rpi5-1 host firewall
+  ([`../docs/rpi5-1-firewall.md`](../docs/rpi5-1-firewall.md#adding-a-node)), or `nut-exporter` can't read the UPS from it. The Pi 5 worker
   (`talos-worker-3`) can't take a schematic, so it's the open problem; see "Additional worker: talos-worker-3".
 - **Receiver address:** the arg is baked into each node's boot entry, so changing `.2` or the port means
   another upgrade per node. The swapped jump box kept `.2`.

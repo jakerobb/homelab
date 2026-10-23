@@ -1,0 +1,14 @@
+[Unit]
+Description=rpi5-1 host firewall (homelab-fw)
+Wants=network-pre.target
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/homelab-fw/homelab-fw.nft
+ExecReload=/usr/sbin/nft -f /etc/homelab-fw/homelab-fw.nft
+ExecStop=-/usr/sbin/nft delete table inet homelab_fw
+
+[Install]
+WantedBy=multi-user.target
