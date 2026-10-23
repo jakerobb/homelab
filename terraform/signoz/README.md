@@ -13,7 +13,7 @@ Manages SigNoz dashboards and alerts. SigNoz itself is deployed by ArgoCD (`argo
   old Compose Grafana), and the `ntfy-alertmanager` webhook channel it notifies through.
   New alerts can reuse that channel.
 - `alert-restock-radar.tf` — "Restock Radar stalled": no successful UniFi store fetch for an
-  hour (or the metric vanishing for 30 minutes), from restock-radar's
+  hour (or the metric vanishing for an hour), from restock-radar's
   `restock_radar_last_success_timestamp_seconds`. Same ntfy channel. Three more rules in
   the same file (notifications stuck, notification rejected, backup stale) share one
   `for_each` resource.

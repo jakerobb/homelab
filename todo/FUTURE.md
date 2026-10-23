@@ -272,3 +272,19 @@ npm 11).
 `npx -p node@24 -p npm@<fixed version> -- npm install --package-lock-only`. If it succeeds, remove the `constraints`
 block and the `renovate-config` package rule from `restock-radar`'s `renovate.json`, and delete this item. No target
 date; this depends on upstream.
+
+## Doorbell relay PoE auto-recovery: confirm it stays off
+
+**Waiting on:** time. UniFi's "device auto-recovery" on USW Pro HD 24 PoE Port 18 (the modbus eth relay) re-enabled
+itself once already: the relay carries zero traffic except when the doorbell rings, so UniFi reads the silence as a dead
+device and power-cycles the port, visible as "power-cycled Port 18" in the UniFi logs about every 35 minutes
+(first confirmed 2026-10-08, still happening 2026-10-22). Turned back off by hand on 2026-10-22 at 10:51pm.
+**Check on or after 2026-11-01** that the setting is still off, and that the cycling has stopped:
+
+```bash
+# On rpi5-1: any "power-cycled Port 18" in the last day? Expect none.
+kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clickhouse-client -q "select count() from signoz_logs.distributed_logs_v2 where ts_bucket_start >= toUnixTimestamp(now())-86400 and timestamp > (toUnixTimestamp(now())-86400)*1000000000 and body like '%power-cycled Port 18%' settings max_memory_usage=1500000000"
+```
+
+If it came back, find what re-enabled it (a UniFi Network update or a re-adoption of the switch are the likely suspects)
+and consider an alert on the log line.
