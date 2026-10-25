@@ -1,0 +1,45 @@
+# external-dns alerts, through Alertmanager to ntfy like the rest. external-dns
+# fails quietly: a revoked or expired Cloudflare token, or an API outage, leaves
+# the pod Running and Ready while DNS records stop updating, so a new app's
+# hostname never resolves. The metrics come from the chart's ServiceMonitor
+# (argocd/apps/external-dns/application.yaml); the scrape is allowed by
+# manifests/network-policies/external-dns.yaml.
+#
+# Don't start a line in an annotation with a {{ template }}: Renovate strips
+# templates before parsing, which breaks a folded block's indentation and
+# silently drops the whole file from its scan.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  groups:
+    - name: external-dns
+      rules:
+        # Reconciles run every minute by default, so 15 minutes without a
+        # successful sync means every attempt is failing (or the loop is stuck).
+        - alert: ExternalDNSSyncStale
+          expr: time() - external_dns_controller_last_sync_timestamp_seconds > 15 * 60
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: external-dns hasn't synced with Cloudflare in over 15 minutes.
+            description: >-
+              Existing records keep working, but new or changed hostnames won't
+              be published. Look at the pod's logs with
+              `kubectl -n external-dns logs deploy/external-dns`: a 403 or
+              "Invalid request headers" means the Cloudflare token
+              (cloudflare-api-token, from 1Password) is bad or expired.
+        - alert: ExternalDNSErrors
+          expr: increase(external_dns_source_errors_total[30m]) > 0 or increase(external_dns_registry_errors_total[30m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: external-dns is logging source or registry errors.
+            description: >-
+              Source errors are reads from the cluster (Gateway routes,
+              Services); registry errors are reads or writes against
+              Cloudflare. See `kubectl -n external-dns logs deploy/external-dns`.

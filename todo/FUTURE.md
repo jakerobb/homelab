@@ -76,19 +76,6 @@ app makes is Flux (all in `MonitoringInfluxClient.cs`), and InfluxDB 3 dropped F
 moves to SQL or InfluxQL, remove that rule and plan the 2.x → 3.x data migration; 3.x doesn't read 2.x's storage
 directly.
 
-## Trim over-sized memory requests
-
-**Waiting on:** a clean month of usage history. **Revisit on or after 2026-10-25.** The 2026-09-24 audit set memory
-requests just above each workload's 7-day *peak*; p95 is the usual basis. Biggest overshoots, summed across
-replicas/nodes: cilium-agent (~1.8GiB over p95), otel-agent (~1.5GiB; 384Mi on every node, sized for mbp, while the
-Pis use ~65Mi), kube-apiserver (~0.9GiB; 1536Mi each on three control planes), cilium-envoy (~0.6GiB). Together
-about 2-3GiB of requested memory. Waiting because Cilium and every pod on mbp restarted on 2026-09-24, so the recent
-history understates their steady state. Re-run the same Prometheus comparison (per-container 7d/30d p95 and max vs
-`kube_pod_container_resource_requests`) and size to about p95. The apiserver lives in
-[`../talos/patches/control-plane/control-plane-resources.yaml`](../talos/patches/control-plane/control-plane-resources.yaml)
-(needs a `talosctl patch` per control plane); the rest are Helm values in `argocd/apps/` and `talos/cilium/values.yaml`
-(Cilium needs a manual ArgoCD sync).
-
 ## Memory requests for SigNoz's ClickHouse operator
 
 **Waiting on:** the upstream `signoz` Helm chart exposing resources for its bundled clickhouse-operator. As of chart
@@ -242,3 +229,13 @@ kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clic
 
 If it came back, find what re-enabled it (a UniFi Network update or a re-adoption of the switch are the likely suspects)
 and consider an alert on the log line.
+
+## Radar flags completed CronJob pods as warnings
+
+**Waiting on:** [skyhook-io/radar#2302](https://github.com/skyhook-io/radar/issues/2302), which we filed. Radar's Issues
+page shows every finished Job/CronJob pod (`Succeeded`, `Ready=False` with reason `PodCompleted`) as a "Controller reports a
+problem" warning. `eso-restarter` runs every 5 minutes, so one is almost always showing; renovate, descheduler, pv-janitor
+and the backup CronJobs do the same. It's cosmetic: the Jobs themselves are `Complete 1/1`. The chart (1.18.1) has no
+setting for it, since `audit.disabledChecks` only covers the best-practice audit, not this issue category. Check whether the
+issue has been closed and which release fixes it, then bump the `radar` chart in `argocd/apps/radar/application.yaml` and
+confirm the warnings are gone. No target date; this depends on upstream.

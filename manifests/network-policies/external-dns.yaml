@@ -1,4 +1,5 @@
 # external-dns: watches the API server, writes Cloudflare records over HTTPS.
+# Prometheus scrapes its metrics (ServiceMonitor, port 7979); nothing else connects in.
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
@@ -25,6 +26,15 @@ metadata:
   namespace: external-dns
 spec:
   endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: prometheus
+      toPorts:
+        - ports:
+            - port: '7979'
+              protocol: TCP
   egress:
     - toEndpoints:
         - matchLabels:

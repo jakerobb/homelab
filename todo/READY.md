@@ -298,3 +298,16 @@ means setting a module option and reloading SCST or rebooting the NAS, and a han
 a TrueNAS update. The Proxmox host has about 1GB left, so another RAM increase means shrinking a worker first. Another
 possible lever is lowering the optimal transfer length at the target, so every initiator gets it for free; unchecked
 whether TrueNAS exposes that. If it's quiet, delete this item and the SCST notes can stay in `DONE.md`.
+
+## Trim over-sized memory requests
+
+**Unblocked 2026-10-25** (a clean month of usage history has accrued since the 2026-09-24 restarts). The 2026-09-24 audit set memory
+requests just above each workload's 7-day *peak*; p95 is the usual basis. Biggest overshoots, summed across
+replicas/nodes: cilium-agent (~1.8GiB over p95), otel-agent (~1.5GiB; 384Mi on every node, sized for mbp, while the
+Pis use ~65Mi), kube-apiserver (~0.9GiB; 1536Mi each on three control planes), cilium-envoy (~0.6GiB). Together
+about 2-3GiB of requested memory. Waiting because Cilium and every pod on mbp restarted on 2026-09-24, so the recent
+history understates their steady state. Re-run the same Prometheus comparison (per-container 7d/30d p95 and max vs
+`kube_pod_container_resource_requests`) and size to about p95. The apiserver lives in
+[`../talos/patches/control-plane/control-plane-resources.yaml`](../talos/patches/control-plane/control-plane-resources.yaml)
+(needs a `talosctl patch` per control plane); the rest are Helm values in `argocd/apps/` and `talos/cilium/values.yaml`
+(Cilium needs a manual ArgoCD sync).
