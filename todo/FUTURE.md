@@ -209,52 +209,6 @@ running kubeconform against `manifests/external-secrets-config/clustersecretstor
 location; once it validates, remove the pinned `-schema-location` line and its comment. No target date: this depends on
 upstream.
 
-## Watch the HexOS iSCSI target logs after the memory bump
-
-**Waiting on:** a week of normal use after the HexOS VM went from 8GB to 10GB (applied and restarted 2026-10-08). This is
-**not** clean: the failures came back in small bursts on 2026-10-11 (13 at 13:00 EDT, 2 at 19:00), and an unexplained
-94-second iSCSI outage hit all four workers at 2026-10-08 17:15 (see [`WATCHING.md`](WATCHING.md)). Then, at 23:26 to
-23:28 EDT on 2026-10-11, about 10,400 allocation failures in three minutes stalled the SigNoz ClickHouse volume for 180s;
-ext4 aborted its journal and remounted it read-only, and SigNoz stored nothing from about 23:25 to 07:05 EDT until the
-pod was deleted on 2026-10-12. So the review on or after 2026-10-19 should not retire this item unless there has been a
-clean week since the last failure, and it should decide on a fix (shrinking `max_sectors_kb` or raising the SCST limits)
-rather than just keep watching.
-The Prometheus volume stalls of 2026-09-29, 10-05 and 10-07 were SCST (the iSCSI target) failing to allocate 8 MiB command
-buffers: `Allocation of sgv_pool_obj failed (size 8388608)` in `/var/log/scst.log`, answered BUSY/QUEUE FULL, until the
-worker's write timed out after 180s. **Check on or after 2026-10-19:**
-- `ssh truenas-ops 'sudo /usr/bin/cat /var/log/scst.log' | grep -c 'Allocation of sgv_pool_obj failed'` (plus
-  `scst.log.1`; the older `.gz` files need `zcat` entries in `claude-ops`'s sudo list). Before the bump there were bursts of
-  thousands a minute on most days.
-- No "Kernel storage error" ntfy alert from SigNoz, and no Prometheus restart with `persist head block ... input/output error`.
-- No `detected conn error` lines in the workers' `talosctl dmesg` (the 2026-10-08 17:15 outage left nothing in the NAS's log).
-- `MemTotal` on the NAS is about 10GB, and `/proc/meminfo` shows how much is free and in slab.
-
-**Rolled out to all four workers (2026-10-16 ~08:11 EDT); trial began 2026-10-12 ~08:08 EDT on `talos-worker-mbp`.** The initiators' `max_sectors_kb` is capped at 1024, via [`../talos/patches/iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml)
-(a `UdevRulesConfig` document, applied with `--mode=no-reboot`; Talos re-triggered udev live). The target advertises an
-optimal transfer length of 8 MiB, which is why every `TrueNAS` disk sat at `max_sectors_kb=8192`; the session's
-negotiated `MaxBurstLength` is only 1 MiB. Workers 1, 2 and 3 got it live on 2026-10-16 (`--mode=no-reboot`), after the 2026-10-13 13:15 EDT burst (~8,300 failures) gave worker-1 `Buffer I/O error`s on `sdc` while the capped mbp logged nothing. The `worker.yaml` template on rpi5-1 has the document
-(appended 2026-10-12, backup `worker.yaml.bak-20261012`), so a rebuilt node gets it by default. What to look at:
-- **First 48 hours:** no regression in ClickHouse or scrypted-backup throughput or in write latency on the mbp
-  (`node_disk_io_time_seconds_total`).
-- **Persistence:** after the next iSCSI reconnect or reboot of the mbp, confirm its iSCSI disks come back at 1024
-  (`talosctl -n 192.168.102.34 read /sys/block/sdb/queue/max_sectors_kb`, and the other TrueNAS disks).
-- **A burst:** the verdict. If SCST logs a burst (hundreds of allocation failures a minute or more) and the mbp's
-  `talosctl dmesg` shows no `timing out command` or ext4 errors, the trial passed. Compare against the other workers:
-  SCST's failures are global to the target, so one node's change shouldn't lower the NAS-side count much; judge it by
-  the node's own volumes.
-- **Stalls despite 1024:** the trial failed; fall back to raising the SCST limits.
-- **7 to 14 days with no burst:** inconclusive, so roll it out to all four workers anyway (low risk, easy to revert)
-  (the template already has it).
-  If the trial fails, remove the document from the template too.
-
-**If the failures continue after a rollout:** raise `scst_max_cmd_mem` / `scst_max_dev_cmd_mem`. They are auto-scaled
-to 25% of the NAS's RAM (and the per-device limit to 40% of that), so they are **2486 and 994 MB** at 10GB, not the
-1985 and 794 of the 8GB VM. They are read-only module parameters (`/sys/module/scst/parameters/`), so changing them
-means setting a module option and reloading SCST or rebooting the NAS, and a hand-edited modprobe file may not survive
-a TrueNAS update. The Proxmox host has about 1GB left, so another RAM increase means shrinking a worker first. Another
-possible lever is lowering the optimal transfer length at the target, so every initiator gets it for free; unchecked
-whether TrueNAS exposes that. If it's quiet, delete this item and the SCST notes can stay in `DONE.md`.
-
 ## Remove restock-radar's `npm <12` Renovate constraint
 
 **Waiting on:** a fixed npm 12 release. npm 12 defaults `allow-remote` to `none`, and `npm install --package-lock-only`
