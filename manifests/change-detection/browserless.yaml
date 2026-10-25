@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: browserless
-          image: ghcr.io/browserless/chromium:v2.57.2
+          image: ghcr.io/browserless/chromium:v2.57.3
           imagePullPolicy: IfNotPresent
           env:
             - name: SCREEN_WIDTH

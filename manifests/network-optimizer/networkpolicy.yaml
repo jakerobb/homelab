@@ -86,6 +86,16 @@ spec:
     - toEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: network-optimizer
+    # ntfy via its in-cluster Service (http://ntfy.ntfy.svc.cluster.local:8080). The Gateway URL doesn't work: the
+    # Gateway's Envoy answers 403 to this pod no matter what ntfy's own ingress policy allows.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ntfy
+            app.kubernetes.io/name: ntfy
+      toPorts:
+        - ports:
+            - port: '8080'
+              protocol: TCP
     - toCIDR:
         - 192.168.0.0/16
     - toCIDRSet:

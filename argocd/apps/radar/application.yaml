@@ -26,7 +26,7 @@ spec:
   source:
     repoURL: https://skyhook-io.github.io/helm-charts
     chart: radar
-    targetRevision: 1.18.0
+    targetRevision: 1.18.1
     helm:
       releaseName: radar
       valuesObject:
