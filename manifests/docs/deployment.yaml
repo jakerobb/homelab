@@ -40,7 +40,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: builder
-          image: docker.io/squidfunk/mkdocs-material:9.7.7
+          image: docker.io/squidfunk/mkdocs-material:9.8.0
           imagePullPolicy: IfNotPresent
           # tini (the image's own init) so SIGTERM stops the loop promptly.
           command: ["/sbin/tini", "--", "/bin/sh", "/scripts/build-loop.sh"]
