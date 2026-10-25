@@ -223,6 +223,24 @@ spec:
                           # (manifests/restock-radar/), for the "Restock
                           # Radar stalled" alert in SigNoz. ~15 series.
                           - '{job="restock-radar"}'
+                          # external-dns sync timestamps and error counters
+                          # (the chart's ServiceMonitor), for history past
+                          # Prometheus's 10 days. ~80 series.
+                          - '{job="external-dns"}'
+                          # Blackbox probes (manifests/blackbox-exporter/):
+                          # reachability and latency of the gateway apps, the
+                          # health checks and ntfy, plus the exporter itself.
+                          # ~900 series.
+                          - '{job=~"blackbox-.+"}'
+                          # Pool and dataset usage from the NAS
+                          # (manifests/truenas-exporter/), for capacity trends.
+                          # ~15 series.
+                          - '{job="truenas-exporter"}'
+                          # Certificate expiry and renewal times
+                          # (manifests/deploy-alerts/cert-manager-podmonitor.yaml).
+                          # The job label is namespace/name for a PodMonitor.
+                          # ~150 series.
+                          - '{job="cert-manager/cert-manager"}'
                           - 'up'
                       static_configs:
                         - targets:

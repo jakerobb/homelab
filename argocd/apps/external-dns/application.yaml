@@ -21,6 +21,13 @@ spec:
             cpu: 10m
             memory: 160Mi
 
+        # Metrics on 7979 (sync timestamps, error counters, record counts).
+        # Needs the ingress rule in manifests/network-policies/external-dns.yaml,
+        # or the namespace's default-deny drops the scrape. Alerts are in
+        # manifests/deploy-alerts/external-dns-rules.yaml.
+        serviceMonitor:
+          enabled: true
+
         provider:
           name: cloudflare
         sources:
