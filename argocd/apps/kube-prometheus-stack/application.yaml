@@ -63,6 +63,9 @@ spec:
         alertmanager:
           enabled: true
           alertmanagerSpec:
+            # Alertmanager never calls the Kubernetes API, so it needs no
+            # service account token.
+            automountServiceAccountToken: false
             # Public URL from httproute-alertmanager.yaml, so the links in
             # alert notifications (e.g. "silence this") open in a browser.
             # The chart default is the in-cluster Service address.
@@ -412,7 +415,13 @@ spec:
             enabled: true
             port: 2381
             targetPort: 2381
+        # The operator, kube-state-metrics and Prometheus call the Kubernetes
+        # API, so they keep their service account token; the annotation tells
+        # Radar that's deliberate. Prometheus's is on the Prometheus resource,
+        # which the operator copies onto its StatefulSet.
         prometheusOperator:
+          annotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           # See revisionHistoryLimit policy in argocd/README.md. Prometheus
           # itself is an Operator-managed StatefulSet, not a Helm-templated
           # Deployment, so this chart doesn't expose an equivalent knob for
@@ -432,11 +441,15 @@ spec:
                 cpu: 5m
                 memory: 64Mi
         kube-state-metrics:
+          annotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           resources:
             requests:
               cpu: 10m
               memory: 128Mi
         prometheus:
+          annotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           # Headlamp's bundled Prometheus plugin (manifests/headlamp/deployment.yaml)
           # auto-detects a Prometheus Service by this exact label — added
           # 2026-09-22 so every browser session finds it automatically,

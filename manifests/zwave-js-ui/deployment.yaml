@@ -31,6 +31,7 @@ spec:
       labels:
         app.kubernetes.io/name: zwave-js-ui
     spec:
+      automountServiceAccountToken: false
       securityContext:
         fsGroup: 1000
       initContainers:

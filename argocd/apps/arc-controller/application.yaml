@@ -43,6 +43,7 @@ spec:
           logLevel: info
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
         resources:
           requests:
             cpu: 10m

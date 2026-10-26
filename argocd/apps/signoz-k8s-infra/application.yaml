@@ -51,16 +51,25 @@ spec:
         # with the number of pods on its node: ~65Mi on the control planes,
         # 180-290Mi on worker-1/-2, 386Mi on talos-worker-mbp (7-day peaks,
         # 2026-09-24).
+        # Both read pod and node metadata from the Kubernetes API, so they keep
+        # their service account token; the annotation tells Radar that's
+        # deliberate.
         otelAgent:
+          annotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 50m
               memory: 384Mi
         otelDeployment:
+          annotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 10m

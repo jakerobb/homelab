@@ -18,6 +18,7 @@ spec:
       labels:
         app: rpi5-nic-mitigation
     spec:
+      automountServiceAccountToken: false
       hostNetwork: true
       # Every arm64 node, not just control planes: the only arm64 hardware is
       # Raspberry Pi 5s (same onboard NIC), and the jump-box swap adds a Pi 5
@@ -41,6 +42,7 @@ spec:
               done
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               add: ["NET_ADMIN"]
               drop: ["ALL"]

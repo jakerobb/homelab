@@ -29,6 +29,11 @@ spec:
     helm:
       releaseName: authelia
       valuesObject:
+        # Authelia never calls the Kubernetes API, but the chart has no setting
+        # for the service account token, so Radar is silenced instead. Applies
+        # to every generated resource's metadata, not the pod template.
+        annotations:
+          radarhq.io/ignore-checks: automountServiceAccountToken
         image:
           # renovate: datasource=docker depName=authelia/authelia
           tag: '4.39.28'

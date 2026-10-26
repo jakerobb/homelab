@@ -57,12 +57,17 @@ spec:
         # if the trial turns into a keeper.
         # Disable the missing-CPU-limit audit check: a limit only throttles here
         # (the SigNoz collector lost 5% of its CPU periods to a 1-core cap while
-        # averaging 0.07), and fair sharing comes from requests. The chart
-        # requires ignoredNamespaces whenever audit is set; these are Radar's
-        # defaults.
+        # averaging 0.07), and fair sharing comes from requests. Also the
+        # single-replica check (2026-10-26): about 45 Deployments are single
+        # replica, and none of them should change. Eleven are bound to an RWO
+        # volume or a device (Home Assistant, Zigbee2MQTT, Z-Wave, Mosquitto,
+        # ...) and the rest are controllers, exporters and UIs whose brief
+        # restart costs nothing at this scale. The ones that matter (CoreDNS,
+        # Unbound, cilium-operator) already run two. The chart requires
+        # ignoredNamespaces whenever audit is set; these are Radar's defaults.
         audit:
           ignoredNamespaces: [kube-system, kube-node-lease, kube-public, "*-system"]
-          disabledChecks: [cpuLimitMissing]
+          disabledChecks: [cpuLimitMissing, singleReplica]
         rbac:
           helm: false
           podExec: false

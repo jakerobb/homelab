@@ -123,6 +123,8 @@ hubble:
         memory: 64Mi
   ui:
     enabled: true
+    annotations:
+      radarhq.io/ignore-checks: automountServiceAccountToken
     backend:
       resources:
         requests:
@@ -144,12 +146,29 @@ resources:
   requests:
     cpu: 100m
     memory: 448Mi
+# The agent, operator and Hubble UI use their service account token (the agent
+# and operator call the API; Hubble UI is annotated rather than tested), so the
+# annotation tells Radar that's deliberate. The agent also can't have a
+# read-only root filesystem: it's privileged and its init containers write to
+# the host.
+annotations:
+  radarhq.io/ignore-checks: automountServiceAccountToken,readOnlyRootFs
+# Envoy talks to the agent over a local socket and has no RBAC bindings, so it
+# doesn't need a service account token.
+serviceAccounts:
+  envoy:
+    automount: false
 envoy:
   resources:
     requests:
       cpu: 10m
       memory: 128Mi
 operator:
+  annotations:
+    radarhq.io/ignore-checks: automountServiceAccountToken
+  # Merges with the chart's default (drop ALL, no privilege escalation).
+  securityContext:
+    readOnlyRootFilesystem: true
   resources:
     requests:
       cpu: 10m

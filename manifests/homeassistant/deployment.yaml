@@ -53,6 +53,7 @@ spec:
       labels:
         app.kubernetes.io/name: homeassistant
     spec:
+      automountServiceAccountToken: false
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       # Home Assistant writes the recorder database and .storage on shutdown.

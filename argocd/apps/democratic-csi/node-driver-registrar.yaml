@@ -87,6 +87,7 @@ spec:
           # root-owned host directories, but needs nothing else.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
             seccompProfile:

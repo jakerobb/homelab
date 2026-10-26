@@ -8,6 +8,9 @@ kind: CronJob
 metadata:
   name: eso-restarter
   namespace: eso-restarter
+  annotations:
+    # Restarts a Deployment through the API, so it keeps its service account token.
+    radarhq.io/ignore-checks: automountServiceAccountToken
 spec:
   schedule: "*/5 * * * *"
   timeZone: America/Detroit

@@ -33,6 +33,7 @@ spec:
       activeDeadlineSeconds: 900
       template:
         spec:
+          automountServiceAccountToken: false
           restartPolicy: Never
           affinity:
             podAffinity:

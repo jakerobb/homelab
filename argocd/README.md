@@ -1039,6 +1039,19 @@ chart-created Pods without editing their manifests.
   annotated, so Radar will keep flagging it. network-optimizer's app container
   needs escalation (`/usr/bin/ping` has `cap_net_raw=ep`), so it's exempt; its
   speedtest sidecar sets `false` explicitly.
+- **Service account tokens (2026-10-26).** Radar's `automountServiceAccountToken`
+  check flags every pod that mounts one. Workloads that never call the API set
+  `automountServiceAccountToken: false` (the bare manifests, ArgoCD's Redis,
+  Alertmanager, cilium-envoy). The real API clients carry
+  `radarhq.io/ignore-checks: automountServiceAccountToken` on the workload.
+  Authelia, SigNoz's ZooKeeper and the SigNoz app never call the API either, but
+  their charts have no setting, so they're annotated too. Still flagged, because
+  nothing here can annotate or configure them: arc-controller and Radar (their
+  charts only annotate pods), local-path-provisioner, CoreDNS (Talos-managed) and
+  the ClickHouse StatefulSet. There's deliberately no admission policy for it:
+  Radar reads the workload spec, so a default-false mutation wouldn't clear the
+  finding, and any API client that missed its opt-out would silently lose API
+  access.
 - **Tested** by applying the policy briefly and server-side dry-running Pods:
   unset containers got `false`; explicit `true`, `privileged`, `SYS_ADMIN` and an
   annotated Pod were left alone.

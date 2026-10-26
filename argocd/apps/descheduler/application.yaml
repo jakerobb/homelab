@@ -46,6 +46,9 @@ spec:
         # A run takes seconds; kill a stuck one well before the next night
         # (the chart already hardcodes concurrencyPolicy: Forbid).
         activeDeadlineSeconds: 600
+        # Calls the Kubernetes API, so it keeps its service account token; the annotation tells Radar that's deliberate.
+        cronJobAnnotations:
+          radarhq.io/ignore-checks: automountServiceAccountToken
 
         # The chart's container securityContext already meets the "restricted"
         # Pod Security Standard except for this. Talos warns at that level

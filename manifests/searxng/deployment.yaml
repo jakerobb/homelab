@@ -39,6 +39,7 @@ spec:
       labels:
         app.kubernetes.io/name: searxng
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         # 977:977 is the searxng:searxng user/group baked into the image
@@ -56,6 +57,7 @@ spec:
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           env:
@@ -97,8 +99,12 @@ spec:
               name: config
             - mountPath: /var/cache/searxng
               name: cache
+            - mountPath: /tmp
+              name: tmp
       volumes:
         - name: config
           emptyDir: {}
         - name: cache
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
