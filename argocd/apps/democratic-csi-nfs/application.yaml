@@ -131,9 +131,14 @@ spec:
         node:
           # The driver is privileged with SYS_ADMIN (hardcoded in the chart's
           # node template; the API server rejects allowPrivilegeEscalation:
-          # false on it), so Radar's finding can't be fixed, only silenced.
+          # false on it), so Radar's privilegeEscalation, dangerousCapabilities and
+          # privileged findings can't be fixed, only silenced.
           annotations:
-            radarhq.io/ignore-checks: privilegeEscalation
+            radarhq.io/ignore-checks: privilegeEscalation,dangerousCapabilities,privileged
+          # The chart defaults this to true ("required by multipath detach").
+          # No node has multipath, and an LACP bond on the NAS still presents
+          # one path, so the host IPC namespace isn't needed.
+          hostIPC: false
           # Replaced by node-driver-registrar.yaml in this directory, same as
           # the iSCSI release. The chart's registrar pins a private copy of
           # every volume mounted under /var/lib/kubelet; see the header of

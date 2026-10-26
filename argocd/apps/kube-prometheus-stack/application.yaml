@@ -526,6 +526,10 @@ spec:
                       # in place (hexos-iscsi allows volume expansion).
                       storage: 20Gi
         prometheus-node-exporter:
+          # The chart defaults this to true. Not needed: node-exporter reads
+          # the host's /proc through the --path.procfs hostPath mount, and a
+          # test pod without it produced the identical metric set (2026-10-25).
+          hostPID: false
           # Merges with the chart's default (readOnlyRootFilesystem: true).
           containerSecurityContext:
             allowPrivilegeEscalation: false

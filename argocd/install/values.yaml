@@ -35,9 +35,11 @@ controller:
       memory: 512Mi
 
 repoServer:
+  # CPU request raised 10m -> 50m on 2026-10-25: p99 0.10 cores, peak 0.10 (manifest
+  # rendering bursts), so it was running far above its request.
   resources:
     requests:
-      cpu: 10m
+      cpu: 50m
       memory: 256Mi
 
 server:

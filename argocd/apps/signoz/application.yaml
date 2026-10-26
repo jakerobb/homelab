@@ -166,8 +166,11 @@ spec:
             requests:
               cpu: 100m
               memory: 768Mi
+            # CPU limit raised 1 -> 2 on 2026-10-25: throttled in 5% of CPU
+            # periods over 7 days while averaging ~0.07 cores (peak 0.15).
+            # It bursts past one core for fractions of a second.
             limits:
-              cpu: "1"
+              cpu: "2"
               memory: 3Gi
           config:
             processors:

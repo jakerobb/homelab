@@ -39,7 +39,9 @@ spec:
         # there's history — see todo/FUTURE.md's memory-request items.
         resources:
           requests:
-            cpu: 10m
+            # 10m -> 25m on 2026-10-25: peaked at 0.078 cores (bursts on
+            # restart, when every ExternalSecret resyncs).
+            cpu: 25m
             memory: 64Mi
         webhook:
           revisionHistoryLimit: 2
