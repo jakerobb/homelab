@@ -81,7 +81,7 @@ spec:
           # workload, not the Pod, so the policy still applies) silences its
           # finding for them.
           annotations:
-            radarhq.io/ignore-checks: privilegeEscalation
+            radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken,readOnlyRootFs
           driver:
             securityContext:
               allowPrivilegeEscalation: false
@@ -141,7 +141,7 @@ spec:
           # false on it), so Radar's privilegeEscalation, dangerousCapabilities and
           # privileged findings can't be fixed, only silenced.
           annotations:
-            radarhq.io/ignore-checks: privilegeEscalation,dangerousCapabilities,privileged
+            radarhq.io/ignore-checks: privilegeEscalation,dangerousCapabilities,privileged,automountServiceAccountToken,readOnlyRootFs
           # The chart defaults this to true ("required by multipath detach").
           # No node has multipath, and an LACP bond on the NAS still presents
           # one path, so the host IPC namespace isn't needed.

@@ -45,6 +45,7 @@ spec:
         # allowPrivilegeEscalation: false itself.
         radarhq.io/ignore-checks: privilegeEscalation
     spec:
+      automountServiceAccountToken: false
       affinity:
         nodeAffinity:
           # Soft preference for the fastest NIC (label set per worker in

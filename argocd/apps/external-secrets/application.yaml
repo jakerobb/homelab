@@ -34,6 +34,12 @@ spec:
         # See revisionHistoryLimit policy in argocd/README.md. Set per
         # Deployment; the chart has no global knob.
         revisionHistoryLimit: 2
+        # All three Deployments keep their service account token (the webhook
+        # is annotated rather than tested; a broken webhook would block every
+        # ExternalSecret change), and the annotation tells Radar that's
+        # deliberate.
+        deploymentAnnotations:
+          radarhq.io/ignore-checks: automountServiceAccountToken
         # Chart sets no requests. Placeholders from ESO's typical footprint
         # at this scale (~15 ExternalSecrets); resize from real usage once
         # there's history — see todo/FUTURE.md's memory-request items.
@@ -45,12 +51,16 @@ spec:
             memory: 64Mi
         webhook:
           revisionHistoryLimit: 2
+          deploymentAnnotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           resources:
             requests:
               cpu: 10m
               memory: 32Mi
         certController:
           revisionHistoryLimit: 2
+          deploymentAnnotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           resources:
             requests:
               cpu: 10m

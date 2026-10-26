@@ -56,7 +56,7 @@ spec:
           # flagging the operator Deployment, whose spec can't set the field.
           clickhouseOperator:
             annotations:
-              radarhq.io/ignore-checks: privilegeEscalation
+              radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken
           # SigNoz's own stated ~4GB practical floor for ClickHouse, with
           # headroom — chart default (100m/200Mi, no limits at all) is only
           # sized for a toy/eval install. Limit raised 6Gi -> 8Gi 2026-10-22
@@ -125,7 +125,11 @@ spec:
             default/query_profiler_real_time_period_ns: "0"
             default/query_profiler_cpu_time_period_ns: "0"
             default/log_processors_profiles: "0"
+          # ZooKeeper and the SigNoz app (below) never call the Kubernetes API, but their
+          # charts have no setting for the token, so Radar is silenced instead.
           zookeeper:
+            commonAnnotations:
+              radarhq.io/ignore-checks: automountServiceAccountToken
             persistence:
               storageClass: hexos-iscsi
             # Memory raised 2026-09-24: it sat at ~475Mi, just under the old
@@ -138,6 +142,8 @@ spec:
                 cpu: 500m
                 memory: 1Gi
         signoz:
+          annotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           securityContext:
             allowPrivilegeEscalation: false
           persistence:
@@ -155,8 +161,10 @@ spec:
           # The chart gives its `check` init container no securityContext
           # setting, so the admission policy covers that at runtime; this tells
           # Radar to stop flagging the Deployment for it.
+          # The collector's k8sattributes processor calls the Kubernetes API, so
+          # it keeps its token; the second annotation value is for Radar.
           annotations:
-            radarhq.io/ignore-checks: privilegeEscalation
+            radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken
           # Raised 2026-09-24: OOM-killed that week at the old 1Gi limit
           # (peak 1016Mi), and still peaking ~680Mi after the batch tuning
           # below. Raised again 2026-10-09 (2Gi -> 3Gi): OOM-killed at 2Gi on

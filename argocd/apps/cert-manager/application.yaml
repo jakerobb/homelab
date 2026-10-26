@@ -26,17 +26,25 @@ spec:
           revisionHistoryLimit: 2
         crds:
           enabled: true
+        # All three Deployments call the Kubernetes API, so they keep their
+        # service account token; the annotation tells Radar that's deliberate.
+        deploymentAnnotations:
+          radarhq.io/ignore-checks: automountServiceAccountToken
         # Requests from 7-day peaks (2026-09-24); the chart sets none.
         resources:
           requests:
             cpu: 10m
             memory: 96Mi
         webhook:
+          deploymentAnnotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           resources:
             requests:
               cpu: 10m
               memory: 80Mi
         cainjector:
+          deploymentAnnotations:
+            radarhq.io/ignore-checks: automountServiceAccountToken
           resources:
             requests:
               cpu: 10m

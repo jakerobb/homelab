@@ -50,6 +50,7 @@ spec:
       labels:
         app.kubernetes.io/name: matter-server
     spec:
+      automountServiceAccountToken: false
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       securityContext:

@@ -49,6 +49,7 @@ spec:
       labels:
         app.kubernetes.io/name: scrypted
     spec:
+      automountServiceAccountToken: false
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       # Scrypted writes scrypted.db on shutdown.

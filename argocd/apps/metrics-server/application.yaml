@@ -23,6 +23,9 @@ spec:
       valuesObject:
         # See revisionHistoryLimit policy in argocd/README.md.
         revisionHistoryLimit: 2
+        # Calls the Kubernetes API, so it keeps its service account token; the annotation tells Radar that's deliberate.
+        deploymentAnnotations:
+          radarhq.io/ignore-checks: automountServiceAccountToken
         args:
           - --kubelet-insecure-tls
         # Chart default memory request is 200Mi; 7-day peak was 90Mi

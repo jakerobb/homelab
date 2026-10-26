@@ -39,6 +39,7 @@ spec:
       labels:
         app.kubernetes.io/name: zigbee2mqtt
     spec:
+      automountServiceAccountToken: false
       securityContext:
         fsGroup: 1000
       initContainers:

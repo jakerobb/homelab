@@ -32,6 +32,7 @@ spec:
       activeDeadlineSeconds: 1800
       template:
         spec:
+          automountServiceAccountToken: false
           restartPolicy: Never
           containers:
             - name: renovate

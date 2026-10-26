@@ -6,6 +6,9 @@ kind: CronJob
 metadata:
   name: pv-janitor
   namespace: pv-janitor
+  annotations:
+    # Lists and deletes PVs through the API, so it keeps its service account token.
+    radarhq.io/ignore-checks: automountServiceAccountToken
 spec:
   schedule: "45 4 * * *"
   timeZone: America/Detroit

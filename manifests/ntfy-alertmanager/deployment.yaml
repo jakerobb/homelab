@@ -27,6 +27,7 @@ spec:
       labels:
         app.kubernetes.io/name: ntfy-alertmanager
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -42,6 +43,7 @@ spec:
             - /etc/ntfy-alertmanager/config
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           ports:
