@@ -73,7 +73,9 @@ spec:
                   type: RuntimeDefault
               resources:
                 requests:
-                  cpu: 100m
+                  # 100m -> 500m on 2026-10-25: a run holds ~0.8 cores for a few
+                  # minutes.
+                  cpu: 500m
                   memory: 1Gi
                 limits:
                   memory: 4Gi
