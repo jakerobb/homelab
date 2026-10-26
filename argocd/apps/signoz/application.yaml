@@ -172,6 +172,35 @@ spec:
             limits:
               cpu: "2"
               memory: 3Gi
+          # The chart's probes hit the health_check extension on :13133, which
+          # stays up even when the OTLP receivers aren't. On 2026-10-26 a slow
+          # start (~1.1s vs ~0.3s) let the OpAMP supervisor's default-config
+          # apply land after the real config's, replacing the instance that
+          # had :4317/:4318 with one that had none. The pod stayed Ready, the
+          # supervisor said "Config has not changed" and never re-applied, and
+          # every push to otel.jakerobb.org returned 503 until a manual
+          # restart (false Packet loss alert from the missing Telegraf data).
+          # Probing :4318 itself makes Kubernetes restart it instead. The
+          # delay is generous: healthy boots have receivers up in <1s. The
+          # chart only honours the custom* probes when its own are disabled.
+          livenessProbe:
+            enabled: false
+          readinessProbe:
+            enabled: false
+          customLivenessProbe:
+            tcpSocket:
+              port: 4318
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          customReadinessProbe:
+            tcpSocket:
+              port: 4318
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           config:
             processors:
               # Chart default is timeout: 1s with send_batch_size: 50000.
