@@ -14,7 +14,8 @@
   "kubernetes": {
     "managerFilePatterns": [
       "/^argocd/apps/.+\\.ya?ml$/",
-      "/^manifests/.+\\.ya?ml$/"
+      "/^manifests/.+\\.ya?ml$/",
+      "/^talos/patches/control-plane/nic-watchdog-mitigation\\.yaml$/"
     ]
   },
   "argocd": {
