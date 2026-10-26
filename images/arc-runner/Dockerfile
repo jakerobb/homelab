@@ -13,7 +13,7 @@
 # "Dockerfile tool versions"), so bumps arrive as PRs like everything else.
 # The workflow's own checks would catch a bad bump at the next lint run.
 
-FROM ghcr.io/actions/actions-runner:2.338.1
+FROM ghcr.io/actions/actions-runner:2.338.2
 
 LABEL org.opencontainers.image.source="https://github.com/jakerobb/homelab" \
       org.opencontainers.image.description="ARC runner for jakerobb/homelab lint: Actions runner + python, node, renovate, helm, kubectl, kubeconform, shellcheck, actionlint"
