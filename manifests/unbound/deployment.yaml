@@ -12,6 +12,13 @@ kind: Deployment
 metadata:
   name: unbound
   namespace: unbound
+  annotations:
+    # Tried read-only on 2026-10-27 and it can't run as is: Unbound writes its
+    # control socket (control-enable: no fixes that) and then dies updating the
+    # RFC 5011 trust anchor (root.key, next to root.hints in /var/unbound).
+    # Fixing the second needs a seeded writable anchor file, and this is the
+    # LAN's resolver, so it stays flagged-off for now.
+    radarhq.io/ignore-checks: readOnlyRootFs
 spec:
   replicas: 2
   revisionHistoryLimit: 2
