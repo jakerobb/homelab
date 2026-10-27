@@ -41,6 +41,7 @@ spec:
             - /etc/ntfy/server.yml
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
             runAsNonRoot: true
@@ -86,6 +87,10 @@ spec:
               readOnly: true
             - mountPath: /var/cache/ntfy
               name: ntfy-cache
+            # SQLite's temp files, in case a query spills; everything else
+            # ntfy writes is cache.db on the PVC above.
+            - mountPath: /tmp
+              name: tmp
       volumes:
         - name: ntfy-config
           configMap:
@@ -93,3 +98,5 @@ spec:
         - name: ntfy-cache
           persistentVolumeClaim:
             claimName: ntfy-cache
+        - name: tmp
+          emptyDir: {}
