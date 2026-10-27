@@ -8,6 +8,13 @@ machine:
   # "Node NIC-speed labels".
   nodeLabels:
     homelab.jakerobb.org/nic-speed-mbps: "1000"
+  # Accept Route Information Options in Router Advertisements (max prefix length 64; the kernel
+  # default of 0 ignores them). Thread border routers on this VLAN (a HomePod mini, added 2026-10-27)
+  # advertise a route to the Thread mesh's OMR prefix this way, which is how matter-server (hostNetwork,
+  # any worker) reaches Thread devices. Per-interface because the kernel's `all` value doesn't apply to
+  # this setting, hence the NIC name in this per-node file.
+  sysctls:
+    net.ipv6.conf.end0.accept_ra_rt_info_max_plen: "64"
   # The 16GB Raspberry Pi 5 that used to be rpi5-1 (see docs/jump-box-swap.md),
   # so it boots the Pi 5 installer like the control planes, not the Image
   # Factory amd64 schematic the shared worker.yaml template points at.

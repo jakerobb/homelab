@@ -8,6 +8,13 @@ machine:
   # "Node NIC-speed labels".
   nodeLabels:
     homelab.jakerobb.org/nic-speed-mbps: "10000"
+  # Accept Route Information Options in Router Advertisements (max prefix length 64; the kernel
+  # default of 0 ignores them). Thread border routers on this VLAN (a HomePod mini, added 2026-10-27)
+  # advertise a route to the Thread mesh's OMR prefix this way, which is how matter-server (hostNetwork,
+  # any worker) reaches Thread devices. Per-interface because the kernel's `all` value doesn't apply to
+  # this setting, hence the NIC name in this per-node file.
+  sysctls:
+    net.ipv6.conf.ens18.accept_ra_rt_info_max_plen: "64"
   # Needed for democratic-csi's iSCSI node driver (added 2026-09-15) — see
   # talos/README.md#iscsi-tools-extension-added-2026-09-15. /etc/iscsi
   # genuinely exists on the node (the iscsi-tools extension creates it), but
