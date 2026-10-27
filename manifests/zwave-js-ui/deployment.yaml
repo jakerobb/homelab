@@ -73,7 +73,7 @@ spec:
               readOnly: true
       containers:
         - name: zwave-js-ui
-          image: zwavejs/zwave-js-ui:11.25.1
+          image: zwavejs/zwave-js-ui:11.25.2
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
