@@ -35,6 +35,8 @@ spec:
           requests:
             cpu: 10m
             memory: 96Mi
+          limits:
+            memory: 256Mi
         webhook:
           deploymentAnnotations:
             radarhq.io/ignore-checks: automountServiceAccountToken
@@ -42,6 +44,8 @@ spec:
             requests:
               cpu: 10m
               memory: 80Mi
+            limits:
+              memory: 192Mi
         cainjector:
           deploymentAnnotations:
             radarhq.io/ignore-checks: automountServiceAccountToken
@@ -49,6 +53,8 @@ spec:
             requests:
               cpu: 10m
               memory: 112Mi
+            limits:
+              memory: 256Mi
         # DNS-01 self-check was failing zone-walk lookups through the
         # cluster's own resolver chain (CoreDNS -> Unbound on the LAN),
         # which returned an unrelated/bogus SOA answer for the query rather

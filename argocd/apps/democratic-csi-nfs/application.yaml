@@ -85,6 +85,8 @@ spec:
               requests:
                 cpu: 10m
                 memory: 192Mi
+              limits:
+                memory: 256Mi
           # Sidecar images pinned here (2026-09-28): the chart's defaults are
           # only bumped occasionally upstream (last in 2024-03/2025-03), so
           # they'd otherwise sit years behind. Renovate PRs these via the
@@ -99,6 +101,8 @@ spec:
               requests:
                 cpu: 5m
                 memory: 64Mi
+              limits:
+                memory: 192Mi
           externalProvisioner:
             image:
               # renovate: datasource=docker depName=registry.k8s.io/sig-storage/csi-provisioner
@@ -107,6 +111,8 @@ spec:
               requests:
                 cpu: 5m
                 memory: 64Mi
+              limits:
+                memory: 192Mi
           externalResizer:
             image:
               # renovate: datasource=docker depName=registry.k8s.io/sig-storage/csi-resizer
@@ -115,6 +121,8 @@ spec:
               requests:
                 cpu: 5m
                 memory: 64Mi
+              limits:
+                memory: 192Mi
           externalSnapshotter:
             image:
               # renovate: datasource=docker depName=registry.k8s.io/sig-storage/csi-snapshotter
@@ -123,11 +131,15 @@ spec:
               requests:
                 cpu: 5m
                 memory: 64Mi
+              limits:
+                memory: 192Mi
         csiProxy:
           resources:
             requests:
               cpu: 5m
               memory: 32Mi
+            limits:
+              memory: 64Mi
         node:
           # The driver is privileged with SYS_ADMIN (hardcoded in the chart's
           # node template; the API server rejects allowPrivilegeEscalation:
@@ -153,6 +165,8 @@ spec:
               requests:
                 cpu: 20m
                 memory: 224Mi
+              limits:
+                memory: 384Mi
             # Without this, libmount drops the context= mount option. See
             # argocd/apps/democratic-csi/selinux-config.yaml.
             extraVolumeMounts:

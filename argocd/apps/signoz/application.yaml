@@ -49,6 +49,11 @@ spec:
         global:
           storageClass: hexos-iscsi
         clickhouse:
+          # Altinity copies these onto the StatefulSet. Silences Radar's
+          # missing-memory-limit finding for the udf-init init container,
+          # whose spec the chart can't set (the ClickHouse container has a limit).
+          annotations:
+            radarhq.io/ignore-checks: memoryLimitMissing
           # The chart has no container-level securityContext for the operator
           # or the ClickHouse pod (its `securityContext` is pod-level), so the
           # cluster's default-no-privilege-escalation admission policy covers
@@ -56,7 +61,7 @@ spec:
           # flagging the operator Deployment, whose spec can't set the field.
           clickhouseOperator:
             annotations:
-              radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken
+              radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken,memoryLimitMissing
           # SigNoz's own stated ~4GB practical floor for ClickHouse, with
           # headroom — chart default (100m/200Mi, no limits at all) is only
           # sized for a toy/eval install. Limit raised 6Gi -> 8Gi 2026-10-22
@@ -164,7 +169,7 @@ spec:
           # The collector's k8sattributes processor calls the Kubernetes API, so
           # it keeps its token; the second annotation value is for Radar.
           annotations:
-            radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken
+            radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken,memoryLimitMissing
           # Raised 2026-09-24: OOM-killed that week at the old 1Gi limit
           # (peak 1016Mi), and still peaking ~680Mi after the batch tuning
           # below. Raised again 2026-10-09 (2Gi -> 3Gi): OOM-killed at 2Gi on
