@@ -23,6 +23,8 @@ spec:
           requests:
             cpu: 10m
             memory: 160Mi
+          limits:
+            memory: 384Mi
 
         # Metrics on 7979 (sync timestamps, error counters, record counts).
         # Needs the ingress rule in manifests/network-policies/external-dns.yaml,

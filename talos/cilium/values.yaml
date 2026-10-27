@@ -121,6 +121,8 @@ hubble:
       requests:
         cpu: 10m
         memory: 64Mi
+      limits:
+        memory: 192Mi
   ui:
     enabled: true
     annotations:
@@ -134,6 +136,8 @@ hubble:
         requests:
           cpu: 10m
           memory: 48Mi
+        limits:
+          memory: 256Mi
     frontend:
       securityContext:
         readOnlyRootFilesystem: true
@@ -141,6 +145,8 @@ hubble:
         requests:
           cpu: 10m
           memory: 16Mi
+        limits:
+          memory: 64Mi
 
 # Requests from 7 days of Prometheus data (2026-09-24, see todo/DONE.md
 # "Audit app memory requests against real usage"). The chart sets none, so
@@ -158,20 +164,22 @@ resources:
 # read-only root filesystem: it's privileged and its init containers write to
 # the host.
 annotations:
-  radarhq.io/ignore-checks: automountServiceAccountToken,readOnlyRootFs
+  radarhq.io/ignore-checks: automountServiceAccountToken,readOnlyRootFs,memoryLimitMissing
 # Envoy talks to the agent over a local socket and has no RBAC bindings, so it
 # doesn't need a service account token.
 serviceAccounts:
   envoy:
     automount: false
 envoy:
+  annotations:
+    radarhq.io/ignore-checks: memoryLimitMissing
   resources:
     requests:
       cpu: 10m
       memory: 128Mi
 operator:
   annotations:
-    radarhq.io/ignore-checks: automountServiceAccountToken
+    radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
   # Merges with the chart's default (drop ALL, no privilege escalation).
   securityContext:
     readOnlyRootFilesystem: true

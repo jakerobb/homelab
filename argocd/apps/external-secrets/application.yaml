@@ -49,6 +49,8 @@ spec:
             # restart, when every ExternalSecret resyncs).
             cpu: 25m
             memory: 64Mi
+          limits:
+            memory: 1Gi
         webhook:
           revisionHistoryLimit: 2
           deploymentAnnotations:
@@ -57,6 +59,8 @@ spec:
             requests:
               cpu: 10m
               memory: 32Mi
+            limits:
+              memory: 384Mi
         certController:
           revisionHistoryLimit: 2
           deploymentAnnotations:
@@ -65,6 +69,8 @@ spec:
             requests:
               cpu: 10m
               memory: 48Mi
+            limits:
+              memory: 512Mi
         serviceMonitor:
           enabled: true
   destination:

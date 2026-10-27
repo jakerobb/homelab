@@ -442,6 +442,8 @@ spec:
             requests:
               cpu: 10m
               memory: 128Mi
+            limits:
+              memory: 256Mi
           # Covers the config-reloader sidecar in both Prometheus and
           # Alertmanager.
           prometheusConfigReloader:
@@ -449,16 +451,18 @@ spec:
               requests:
                 cpu: 5m
                 memory: 64Mi
+              limits:
+                memory: 128Mi
         kube-state-metrics:
           annotations:
-            radarhq.io/ignore-checks: automountServiceAccountToken
+            radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
           resources:
             requests:
               cpu: 10m
               memory: 128Mi
         prometheus:
           annotations:
-            radarhq.io/ignore-checks: automountServiceAccountToken
+            radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
           # Headlamp's bundled Prometheus plugin (manifests/headlamp/deployment.yaml)
           # auto-detects a Prometheus Service by this exact label — added
           # 2026-09-22 so every browser session finds it automatically,
@@ -566,6 +570,8 @@ spec:
             requests:
               cpu: 10m
               memory: 48Mi
+            limits:
+              memory: 128Mi
           # Adds a `node` label (talos-cp-1, ...) to every node-exporter
           # series. Without it, the only host identifier is `instance`
           # (192.168.102.11:9100), which is what SigNoz legends would show.

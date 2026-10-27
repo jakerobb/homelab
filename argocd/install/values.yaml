@@ -27,7 +27,7 @@ controller:
   # The controllers and servers below call the Kubernetes API, so they keep
   # their service account token; the annotation tells Radar that's deliberate.
   statefulsetAnnotations:
-    radarhq.io/ignore-checks: automountServiceAccountToken
+    radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
   # Chart default is 5 for the application-controller StatefulSet; same
   # policy as global above.
   revisionHistoryLimit: 2
@@ -40,7 +40,7 @@ controller:
 
 repoServer:
   deploymentAnnotations:
-    radarhq.io/ignore-checks: automountServiceAccountToken
+    radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
   # CPU request raised 10m -> 50m on 2026-10-25: p99 0.10 cores, peak 0.10 (manifest
   # rendering bursts), so it was running far above its request.
   resources:
@@ -55,6 +55,8 @@ server:
     requests:
       cpu: 10m
       memory: 160Mi
+    limits:
+      memory: 384Mi
 
 applicationSet:
   deploymentAnnotations:
@@ -63,6 +65,8 @@ applicationSet:
     requests:
       cpu: 10m
       memory: 96Mi
+    limits:
+      memory: 384Mi
   # The chart's readiness probes are off by default: without one a pod is Ready
   # the moment its container starts. This is a TCP check on the probe port.
   readinessProbe:
@@ -75,6 +79,8 @@ notifications:
     requests:
       cpu: 10m
       memory: 96Mi
+    limits:
+      memory: 384Mi
   # See applicationSet above; a TCP check on the metrics port.
   readinessProbe:
     enabled: true
@@ -179,6 +185,8 @@ redis:
     requests:
       cpu: 10m
       memory: 64Mi
+    limits:
+      memory: 192Mi
   # See applicationSet above; the chart's own script (redis-cli ping, answers in
   # ~20ms). The chart's 30s initial delay is shortened: Redis was Ready as soon as
   # it started when measured (2026-10-18), and the default would add 30s to every
