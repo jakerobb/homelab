@@ -27,7 +27,7 @@ spec:
           serviceAccountName: eso-restarter
           containers:
             - name: eso-restarter
-              image: docker.io/library/python:3.15.1-alpine3.24
+              image: docker.io/library/python:3.15.2-alpine3.24
               command: [python3, /app/eso-restarter.py]
               env:
                 # "true" logs what it would do without restarting or notifying.
