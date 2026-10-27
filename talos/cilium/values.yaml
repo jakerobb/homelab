@@ -125,12 +125,18 @@ hubble:
     enabled: true
     annotations:
       radarhq.io/ignore-checks: automountServiceAccountToken
+    # Read-only root filesystem trial (2026-10-26). The chart already mounts a
+    # writable /tmp emptyDir in both containers.
     backend:
+      securityContext:
+        readOnlyRootFilesystem: true
       resources:
         requests:
           cpu: 10m
           memory: 48Mi
     frontend:
+      securityContext:
+        readOnlyRootFilesystem: true
       resources:
         requests:
           cpu: 10m
@@ -169,6 +175,14 @@ operator:
   # Merges with the chart's default (drop ALL, no privilege escalation).
   securityContext:
     readOnlyRootFilesystem: true
+  # The operator's gops agent writes to /home/gops at startup; without this it
+  # exits with "read-only file system" and the pod crash-loops (2026-10-27).
+  extraVolumes:
+    - name: gops
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: gops
+      mountPath: /home/gops
   resources:
     requests:
       cpu: 10m
