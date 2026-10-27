@@ -296,7 +296,13 @@ spec:
                   # for 15 minutes is the signal. Because the score decays
                   # as the silence grows, the alert stays up for up to ~12h
                   # of silence. A device that disappears (pod moved, volume
-                  # detached) has no series, so it doesn't match.
+                  # detached) must not match, but rate() over 15m keeps
+                  # returning 0 from the old samples for up to 15 minutes
+                  # after the series ends (a false alarm on 2026-10-27 when
+                  # matter-server's pod was deleted). The final clause
+                  # requires the device to exist right now: the instant
+                  # selector goes empty as soon as the scrape stops
+                  # reporting it.
                   - alert: ISCSIVolumeWritesStopped
                     expr: >-
                       avg_over_time((rate(node_disk_written_bytes_total{job="node-exporter",
@@ -304,6 +310,9 @@ spec:
                       and
                       rate(node_disk_written_bytes_total{job="node-exporter",
                       instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[15m]) == 0
+                      and on (instance, device)
+                      node_disk_written_bytes_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}
                     for: 5m
                     labels:
                       severity: warning
