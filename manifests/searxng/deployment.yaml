@@ -82,12 +82,16 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 15
+            # The default 1s timed out while a search had the pod at ~1.1
+            # cores (2026-10-26); /healthz just queues behind the search.
+            timeoutSeconds: 2
           # Same endpoint, so a rollout waits for a pod that actually serves.
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             periodSeconds: 10
+            timeoutSeconds: 2
           resources:
             requests:
               cpu: 100m
