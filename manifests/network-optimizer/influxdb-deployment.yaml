@@ -53,6 +53,7 @@ spec:
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
             # The image's `influxdb` user; its entrypoint skips the
@@ -125,9 +126,13 @@ spec:
             # Only the CLI's connection profile, written by `influx setup`.
             - mountPath: /etc/influxdb2
               name: cli-config
+            - mountPath: /tmp
+              name: tmp
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: influxdb-data
         - name: cli-config
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}

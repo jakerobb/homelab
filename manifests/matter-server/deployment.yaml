@@ -109,6 +109,7 @@ spec:
               value: America/Detroit
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
             runAsNonRoot: true
@@ -146,7 +147,11 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: data
+            - mountPath: /tmp
+              name: tmp
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: matter-server-data
