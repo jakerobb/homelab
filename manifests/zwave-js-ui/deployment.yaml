@@ -112,6 +112,7 @@ spec:
                   key: LR_S2_AccessControl
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
             runAsNonRoot: true
@@ -144,9 +145,13 @@ spec:
             limits:
               memory: 384Mi
           volumeMounts:
+            - mountPath: /tmp
+              name: tmp
             - mountPath: /usr/src/app/store
               name: store
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: store
           persistentVolumeClaim:
             claimName: zwave-js-ui-store

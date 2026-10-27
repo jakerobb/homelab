@@ -81,6 +81,7 @@ spec:
               value: America/Detroit
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
             runAsNonRoot: true
@@ -125,6 +126,8 @@ spec:
             limits:
               memory: 256Mi
           volumeMounts:
+            - mountPath: /tmp
+              name: tmp
             - mountPath: /app/data
               name: data
             # configuration.yaml refers to the key as `!secret network_key`, so the key
@@ -135,6 +138,8 @@ spec:
               subPath: secret.yaml
               readOnly: true
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: zigbee2mqtt-data

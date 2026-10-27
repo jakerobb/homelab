@@ -72,6 +72,7 @@ spec:
               value: ws://browserless:3000/?stealth=1&--disable-web-security=true&blockAds=true
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           ports:
@@ -93,9 +94,13 @@ spec:
             limits:
               memory: 768Mi
           volumeMounts:
+            - mountPath: /tmp
+              name: tmp
             - mountPath: /datastore
               name: data
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: change-detection-data
