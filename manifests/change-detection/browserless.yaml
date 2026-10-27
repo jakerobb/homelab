@@ -58,6 +58,7 @@ spec:
               value: "no"
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           ports:
@@ -84,8 +85,19 @@ spec:
           volumeMounts:
             - mountPath: /dev/shm
               name: shm
+            - mountPath: /tmp
+              name: tmp
+            # Chromium's crash handler needs a writable home (it fails to launch
+            # with "--database is required" otherwise). Only an empty
+            # Downloads directory is hidden.
+            - mountPath: /home/blessuser
+              name: home
       volumes:
         - name: shm
           emptyDir:
             medium: Memory
             sizeLimit: 512Mi
+        - name: tmp
+          emptyDir: {}
+        - name: home
+          emptyDir: {}

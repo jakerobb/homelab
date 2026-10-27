@@ -67,6 +67,7 @@ spec:
                       key: private-key
               securityContext:
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities:
                   drop: [ALL]
                 runAsNonRoot: true
@@ -80,3 +81,14 @@ spec:
                   memory: 1Gi
                 limits:
                   memory: 4Gi
+              # Renovate's clones, caches and containerbase state all live under
+              # /tmp. Dry-run tested read-only on 2026-10-27 against all five
+              # repos with no write errors. The image's preinstalled toolchains
+              # are in /opt/containerbase; a bump that needs a tool version the
+              # image doesn't have would try to install it there and fail.
+              volumeMounts:
+                - mountPath: /tmp
+                  name: tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
