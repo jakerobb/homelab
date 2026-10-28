@@ -13,31 +13,6 @@ time doesn't change this: a month of the pool staying healthy (reached 2026-10-2
 **Delete the bucket only once the data also lives on redundant local storage** (for example, the replacement NAS
 hardware with a mirrored or RAID-Z layout), and re-run `rclone check` against the new copy first. No target date.
 
-## SigNoz ClickHouse volume: confirm it plateaus
-
-**Waiting on:** the 30-day TTL starting to expire the oldest SigNoz metrics and ClickHouse system-log data. Everything in that
-volume dates from SigNoz's install on 2026-09-22, so nothing has expired yet and the volume has been growing a steady 0.58 GiB/day
-(17.5 of 29.4 GiB used on 2026-10-19). The straight-line "full in about 21 days" ignores the TTLs; the expectation is a plateau
-near 19 GiB (about 65%), up to 22 GiB if ClickHouse needs merge headroom. SigNoz logs, on a 15-day TTL, already flattened.
-**Check on or after 2026-10-25.** If it's still climbing by about 0.5 GiB/day then, the model is wrong and the volume does need
-retention changes or a bigger volume (see the ClickHouse item in [`READY.md`](READY.md)).
-
-Usage on the volume itself:
-
-```bash
-kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- df -h /var/lib/clickhouse
-```
-
-And whether expiry is really dropping the old metrics. The oldest daily partition should now be around 30 days old, not
-2026-09-22:
-
-```bash
-kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clickhouse-client -q \
-  "SELECT min(partition) FROM system.parts WHERE active AND database='signoz_metrics' AND table='samples_v4'"
-```
-
-If both look right, delete this item and the ClickHouse volume bullet in `READY.md`.
-
 ## Authelia RBAC group/role mapping
 
 **Waiting on:** a second real Authelia user. Right now anyone who authenticates gets whatever ArgoCD's default policy
@@ -229,13 +204,3 @@ kubectl -n signoz exec chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clic
 
 If it came back, find what re-enabled it (a UniFi Network update or a re-adoption of the switch are the likely suspects)
 and consider an alert on the log line.
-
-## Radar flags completed CronJob pods as warnings
-
-**Waiting on:** [skyhook-io/radar#2302](https://github.com/skyhook-io/radar/issues/2302), which we filed. Radar's Issues
-page shows every finished Job/CronJob pod (`Succeeded`, `Ready=False` with reason `PodCompleted`) as a "Controller reports a
-problem" warning. `eso-restarter` runs every 5 minutes, so one is almost always showing; renovate, descheduler, pv-janitor
-and the backup CronJobs do the same. It's cosmetic: the Jobs themselves are `Complete 1/1`. The chart (1.18.1) has no
-setting for it, since `audit.disabledChecks` only covers the best-practice audit, not this issue category. Check whether the
-issue has been closed and which release fixes it, then bump the `radar` chart in `argocd/apps/radar/application.yaml` and
-confirm the warnings are gone. No target date; this depends on upstream.

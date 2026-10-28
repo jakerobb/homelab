@@ -98,6 +98,9 @@ gateway's overlay and survive normal reboots and app upgrades, but a full **UniF
 heap silently reverts. rpi5-1 runs the report from cron (daily digest 07:00, hourly threshold check). See
 [`../docs/unifi-gc-report.md`](../docs/unifi-gc-report.md) for the background and the reapply steps.
 
+UniFi OS 5.1.34 went on in the evening of 2026-10-27, which did exactly this: the gateway rebooted, `/etc/default/unifi` reverted
+to `-Xms128M -Xmx512M`, and the lock was reapplied by hand on 2026-10-28 (the report's SSH key survived that upgrade).
+
 **Check:** read the report's own log on rpi5-1, which gets a line for every hourly run:
 ```bash
 ssh jakerobb@rpi5-1.lan 'stat -c %y ~/.unifi-gc-report.log; tail -n 30 ~/.unifi-gc-report.log'
