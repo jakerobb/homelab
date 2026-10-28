@@ -3,6 +3,13 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Radar no longer flags completed CronJob pods
+
+**Done (2026-10-25 upstream, confirmed 2026-10-28).** Radar's Issues page used to show every finished Job/CronJob pod as a
+"Controller reports a problem" warning ([skyhook-io/radar#2302](https://github.com/skyhook-io/radar/issues/2302)). The fix
+(skyhook-io/radar#2303, "Keep successfully completed Pods out of condition-based Issues") shipped in chart 1.18.2, which
+`argocd/apps/radar/application.yaml` now pins. Radar shows no such warnings.
+
 ## Headlamp's ServiceAccount narrowed to `view`
 
 **Done (2026-10-21), verified 2026-10-22.** The `headlamp` ClusterRoleBinding

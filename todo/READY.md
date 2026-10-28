@@ -221,13 +221,13 @@ The readiness probes, the cluster-wide 180s deadline policy and the tightened st
 Found while checking what the alerts and the cluster's history show. The alerts bundle that came out of it is in
 [`DONE.md`](DONE.md); these are what's left.
 
-- **SigNoz's ClickHouse volume should plateau near 19 GiB, not fill** (checked 2026-10-19). It grew a steady 0.58 GiB/day
-  (17.5 of 29.4 GiB used), and a straight-line projection of that said "full in about 21 days". That ignored the TTLs: every table
-  expires its data after 30 days (SigNoz logs after 15), and all of it dates from SigNoz's install on 2026-09-22, so nothing had
-  expired yet. The logs table, old enough for its TTL to have acted, has already flattened. The metrics (51% of the volume) and
-  ClickHouse's own `system` logs (37%: `query_log`, `part_log` and three more) should level off between 2026-10-22 and 2026-10-25;
-  the check is in [`FUTURE.md`](FUTURE.md#signoz-clickhouse-volume-confirm-it-plateaus). Optional: the system logs cost more than
-  all of SigNoz's logs, and shortening their TTL or the volume of what they record would free 3 to 4 GiB.
+- **SigNoz's ClickHouse volume is not plateauing** (checked 2026-10-28; the 2026-10-19 expectation was a plateau near 19 GiB by
+  2026-10-25). It's at 21 of 30 GiB (70%), up from 17.5 GiB on 2026-10-19: still about 0.58 GiB/day, so full in roughly 15 days.
+  The oldest `signoz_metrics.samples_v4` partition is still 2026-09-23, so the 30-day TTL isn't dropping data yet (it should
+  be about 2026-09-28 by now). Work out why (TTL merges are lazy, or the TTL isn't what we assumed: look at
+  `system.parts` and the table's `TTL`/`ttl_only_drop_parts` settings), then either fix the expiry, shorten retention, or
+  grow the volume. Optional: the system logs cost more than all of SigNoz's logs, and shortening their TTL or the volume of
+  what they record would free 3 to 4 GiB.
 - **`zigbee2mqtt-data` looks like it's filling** (about 45 days to full at its 7-day trend, at only 11.5% used), which is odd for a
   Zigbee config. That is also a straight-line projection, so first check whether it's real growth or a log or backup that rotates,
   then find what's growing.
