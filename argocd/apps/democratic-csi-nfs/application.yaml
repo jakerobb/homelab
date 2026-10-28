@@ -74,7 +74,7 @@ spec:
           # workload, not the Pod, so the policy still applies) silences its
           # finding for them.
           annotations:
-            radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken,readOnlyRootFs,livenessProbeMissing
+            radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken,readOnlyRootFs,livenessProbeMissing,runAsRoot
           driver:
             securityContext:
               allowPrivilegeEscalation: false

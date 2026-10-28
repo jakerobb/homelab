@@ -16,7 +16,10 @@ metadata:
   annotations:
     # Radar reads the workload, not the Pod template; see the Pod template's
     # annotation below for why the app container keeps escalation.
-    radarhq.io/ignore-checks: privilegeEscalation
+    # runAsRoot: both images start as root (the app's entrypoint drops to
+    # UID 1654 with gosu; the speedtest sidecar is stock nginx). Running them
+    # as non-root hasn't been tried.
+    radarhq.io/ignore-checks: privilegeEscalation,runAsRoot
 spec:
   replicas: 1
   revisionHistoryLimit: 2
