@@ -31,9 +31,9 @@ spec:
         - all
       toPorts:
         - ports:
-            - port: '53'
+            - port: '1053'
               protocol: UDP
-            - port: '53'
+            - port: '1053'
               protocol: TCP
   egress:
     - toCIDR:
