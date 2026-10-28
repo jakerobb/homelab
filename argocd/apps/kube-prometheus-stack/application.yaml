@@ -62,6 +62,11 @@ spec:
           enabled: false
         alertmanager:
           enabled: true
+          # Copied by the operator onto Alertmanager's StatefulSet. Silences
+          # Radar for the config-reloader sidecar, which the operator builds
+          # without a liveness probe.
+          annotations:
+            radarhq.io/ignore-checks: livenessProbeMissing
           alertmanagerSpec:
             # Alertmanager never calls the Kubernetes API, so it needs no
             # service account token.
@@ -462,7 +467,7 @@ spec:
               memory: 128Mi
         prometheus:
           annotations:
-            radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
+            radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing,livenessProbeMissing
           # Headlamp's bundled Prometheus plugin (manifests/headlamp/deployment.yaml)
           # auto-detects a Prometheus Service by this exact label — added
           # 2026-09-22 so every browser session finds it automatically,

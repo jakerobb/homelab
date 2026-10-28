@@ -27,7 +27,7 @@ controller:
   # The controllers and servers below call the Kubernetes API, so they keep
   # their service account token; the annotation tells Radar that's deliberate.
   statefulsetAnnotations:
-    radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
+    radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing,livenessProbeMissing
   # Chart default is 5 for the application-controller StatefulSet; same
   # policy as global above.
   revisionHistoryLimit: 2
@@ -60,7 +60,7 @@ server:
 
 applicationSet:
   deploymentAnnotations:
-    radarhq.io/ignore-checks: automountServiceAccountToken
+    radarhq.io/ignore-checks: automountServiceAccountToken,livenessProbeMissing
   resources:
     requests:
       cpu: 10m
@@ -74,7 +74,7 @@ applicationSet:
 
 notifications:
   deploymentAnnotations:
-    radarhq.io/ignore-checks: automountServiceAccountToken
+    radarhq.io/ignore-checks: automountServiceAccountToken,livenessProbeMissing
   resources:
     requests:
       cpu: 10m
@@ -181,6 +181,10 @@ notifications:
 redis:
   # Redis never calls the Kubernetes API, so it needs no service account token.
   automountServiceAccountToken: false
+  # The chart has a readiness probe but no liveness probe, and its Deployment
+  # has no other probe setting; the annotation tells Radar that's deliberate.
+  deploymentAnnotations:
+    radarhq.io/ignore-checks: livenessProbeMissing
   resources:
     requests:
       cpu: 10m
