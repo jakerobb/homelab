@@ -41,9 +41,13 @@ spec:
         # The chart's default is debug.
         flags:
           logLevel: info
+        # The image already runs as 65532; declaring it lets Radar (and the
+        # kubelet) check it.
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
         resources:
           requests:
             cpu: 10m

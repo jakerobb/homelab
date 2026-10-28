@@ -38,6 +38,11 @@ kind: DaemonSet
 metadata:
   name: democratic-csi-node-driver-registrar
   namespace: democratic-csi
+  # Writes its registration socket into a root-owned hostPath under
+  # /var/lib/kubelet/plugins_registry, so it has to run as root; Radar's
+  # finding can only be silenced.
+  annotations:
+    radarhq.io/ignore-checks: runAsRoot
   labels:
     app.kubernetes.io/name: democratic-csi-node-driver-registrar
     app.kubernetes.io/part-of: democratic-csi

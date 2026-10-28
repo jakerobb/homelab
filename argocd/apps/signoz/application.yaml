@@ -61,7 +61,7 @@ spec:
           # flagging the operator Deployment, whose spec can't set the field.
           clickhouseOperator:
             annotations:
-              radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken,memoryLimitMissing,livenessProbeMissing
+              radarhq.io/ignore-checks: privilegeEscalation,automountServiceAccountToken,memoryLimitMissing,livenessProbeMissing,runAsRoot
           # SigNoz's own stated ~4GB practical floor for ClickHouse, with
           # headroom — chart default (100m/200Mi, no limits at all) is only
           # sized for a toy/eval install. Limit raised 6Gi -> 8Gi 2026-10-22
@@ -161,6 +161,12 @@ spec:
               cpu: 500m
               memory: 1Gi
         otelCollector:
+          # The image already runs as 10001. The pod-level setting also covers
+          # the `check` init container, which has no setting of its own.
+          podSecurityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
           securityContext:
             allowPrivilegeEscalation: false
           # The chart gives its `check` init container no securityContext

@@ -17,8 +17,10 @@ metadata:
     # control socket (control-enable: no fixes that) and then dies updating the
     # RFC 5011 trust anchor (root.key, next to root.hints in /var/unbound).
     # Fixing the second needs a seeded writable anchor file, and this is the
-    # LAN's resolver, so it stays flagged-off for now.
-    radarhq.io/ignore-checks: readOnlyRootFs
+    # LAN's resolver, so it stays flagged-off for now. Root for the same
+    # reason: the image's unbound user owns none of those paths, and a failed
+    # DNS pod takes the LAN's resolver with it.
+    radarhq.io/ignore-checks: readOnlyRootFs,runAsRoot
 spec:
   replicas: 2
   revisionHistoryLimit: 2
