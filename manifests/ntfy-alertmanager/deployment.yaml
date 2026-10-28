@@ -58,6 +58,16 @@ spec:
               path: /health
               port: http
             periodSeconds: 10
+          # Same endpoint: /health answers without calling ntfy, so an ntfy
+          # outage can't restart this pod. Slower and more forgiving than
+          # readiness, since a restart is the heavier response.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
               cpu: 10m

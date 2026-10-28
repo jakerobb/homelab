@@ -39,7 +39,7 @@ spec:
         # ExternalSecret change), and the annotation tells Radar that's
         # deliberate.
         deploymentAnnotations:
-          radarhq.io/ignore-checks: automountServiceAccountToken
+          radarhq.io/ignore-checks: automountServiceAccountToken,livenessProbeMissing
         # Chart sets no requests. Placeholders from ESO's typical footprint
         # at this scale (~15 ExternalSecrets); resize from real usage once
         # there's history — see todo/FUTURE.md's memory-request items.
@@ -54,7 +54,7 @@ spec:
         webhook:
           revisionHistoryLimit: 2
           deploymentAnnotations:
-            radarhq.io/ignore-checks: automountServiceAccountToken
+            radarhq.io/ignore-checks: automountServiceAccountToken,livenessProbeMissing
           resources:
             requests:
               cpu: 10m
@@ -64,7 +64,7 @@ spec:
         certController:
           revisionHistoryLimit: 2
           deploymentAnnotations:
-            radarhq.io/ignore-checks: automountServiceAccountToken
+            radarhq.io/ignore-checks: automountServiceAccountToken,livenessProbeMissing
           resources:
             requests:
               cpu: 10m

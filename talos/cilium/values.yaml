@@ -126,7 +126,7 @@ hubble:
   ui:
     enabled: true
     annotations:
-      radarhq.io/ignore-checks: automountServiceAccountToken
+      radarhq.io/ignore-checks: automountServiceAccountToken,livenessProbeMissing
     # Read-only root filesystem trial (2026-10-26). The chart already mounts a
     # writable /tmp emptyDir in both containers.
     backend:

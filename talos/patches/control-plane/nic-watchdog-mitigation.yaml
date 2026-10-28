@@ -8,7 +8,8 @@ metadata:
   annotations:
     # NET_ADMIN is what ethtool needs to change NIC settings; everything else
     # is already dropped, so Radar's finding can only be silenced.
-    radarhq.io/ignore-checks: dangerousCapabilities
+    # No port or process to probe: the container is a sleep loop around ethtool.
+    radarhq.io/ignore-checks: dangerousCapabilities,livenessProbeMissing
 spec:
   selector:
     matchLabels:

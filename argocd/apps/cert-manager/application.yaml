@@ -48,7 +48,7 @@ spec:
               memory: 192Mi
         cainjector:
           deploymentAnnotations:
-            radarhq.io/ignore-checks: automountServiceAccountToken
+            radarhq.io/ignore-checks: automountServiceAccountToken,livenessProbeMissing
           resources:
             requests:
               cpu: 10m

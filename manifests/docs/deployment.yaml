@@ -20,6 +20,11 @@ kind: Deployment
 metadata:
   name: docs
   namespace: docs
+  annotations:
+    # The builder is a shell loop with no port to probe; nginx has its own
+    # probes. A hung build only delays the next rebuild, and the site keeps
+    # serving the last good one.
+    radarhq.io/ignore-checks: livenessProbeMissing
 spec:
   replicas: 1
   revisionHistoryLimit: 2
