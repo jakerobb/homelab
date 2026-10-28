@@ -32,6 +32,9 @@ kind: Deployment
 metadata:
   name: homeassistant
   namespace: homeassistant
+  annotations:
+    # Root is deliberate (see the header and runAsUser: 0 below).
+    radarhq.io/ignore-checks: runAsRoot
 spec:
   replicas: 1
   revisionHistoryLimit: 2

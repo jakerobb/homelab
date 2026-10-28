@@ -37,9 +37,15 @@ spec:
           defaultClass: false
           reclaimPolicy: Retain
         # From 7-day usage (2026-09-24, peak 55Mi); the chart sets none.
+        # Non-root trial (2026-10-28). The provisioner only calls the API and
+        # starts helper pods; the helpers, which do the actual directory work
+        # on the node, run as root from their own template.
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
         resources:
           requests:
             cpu: 5m

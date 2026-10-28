@@ -9,7 +9,9 @@ metadata:
     # NET_ADMIN is what ethtool needs to change NIC settings; everything else
     # is already dropped, so Radar's finding can only be silenced.
     # No port or process to probe: the container is a sleep loop around ethtool.
-    radarhq.io/ignore-checks: dangerousCapabilities,livenessProbeMissing
+    # It runs as root because NET_ADMIN can't be given to a non-root user
+    # (Kubernetes has no ambient capabilities).
+    radarhq.io/ignore-checks: dangerousCapabilities,livenessProbeMissing,runAsRoot
 spec:
   selector:
     matchLabels:

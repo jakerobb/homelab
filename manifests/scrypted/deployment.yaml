@@ -29,6 +29,9 @@ kind: Deployment
 metadata:
   name: scrypted
   namespace: scrypted
+  annotations:
+    # Root is deliberate (see the header and runAsUser: 0 below).
+    radarhq.io/ignore-checks: runAsRoot
 spec:
   replicas: 1
   revisionHistoryLimit: 2

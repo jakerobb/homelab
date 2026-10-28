@@ -153,7 +153,7 @@ spec:
           # false on it), so Radar's privilegeEscalation, dangerousCapabilities and
           # privileged findings can't be fixed, only silenced.
           annotations:
-            radarhq.io/ignore-checks: privilegeEscalation,dangerousCapabilities,privileged,automountServiceAccountToken,readOnlyRootFs,livenessProbeMissing
+            radarhq.io/ignore-checks: privilegeEscalation,dangerousCapabilities,privileged,automountServiceAccountToken,readOnlyRootFs,livenessProbeMissing,runAsRoot
           # The chart defaults this to true ("required by multipath detach").
           # No node has multipath, and an LACP bond on the NAS still presents
           # one path, so the host IPC namespace isn't needed.
