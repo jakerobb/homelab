@@ -2377,6 +2377,9 @@ python-matter-server, the Matter controller Home Assistant's Matter integration 
   `ws://matter-server.matter-server.svc.cluster.local:5580/ws`. It used to be a LoadBalancer pinned to `192.168.102.133`
   and published as `matter.jakerobb.org`, while Home Assistant was still in Compose on rpi5-1 (dropped 2026-10-10). The
   server has no authentication, like Z-Wave JS.
+- **Dashboard.** The built-in web dashboard on the same port is published at `https://matter.jakerobb.org` through the
+  Gateway (`httproute.yaml`), forward-auth through Authelia (`matter.jakerobb.org` rule, `matter-server` namespace in the
+  `ReferenceGrant`) and listed in Glance. This is why the host is back: the name is now an HTTPS route, not the old WebSocket VIP.
 - **No Bluetooth.** `/run/dbus` and `apparmor=unconfined` are gone. BLE commissioning isn't available from the pod; commission
   new devices from the Home Assistant phone app, or share them from another ecosystem with a multi-admin pairing code.
 

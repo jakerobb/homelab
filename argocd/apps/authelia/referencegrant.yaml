@@ -60,6 +60,9 @@ spec:
       namespace: zigbee2mqtt
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
+      namespace: matter-server
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
       namespace: restock-radar
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
