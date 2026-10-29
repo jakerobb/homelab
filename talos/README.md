@@ -669,6 +669,26 @@ all 6 nodes the same day, with no reboot, and to the `controlplane.yaml` and
 Unbound on `.2`, so this pair is still valid. Revisit it if Compose's Unbound
 ever retires.
 
+## Worker IPv6 routes: Thread and a static default (added 2026-10-28)
+
+matter-server runs with `hostNetwork` on whichever worker it lands on, so the workers' own IPv6 routes decide
+what it can reach. Two things are set per worker in `patches/workers/worker-*.yaml`; the interface name differs
+per node (`ens18` on workers 1 and 2, `end0` on worker-3, `enp0s1` on worker-mbp), so neither lives in the shared
+template.
+
+- **Thread route** (`machine.sysctls`, `accept_ra_rt_info_max_plen: "64"`). The Office HomePod (the only Thread
+  border router on the Server VLAN) advertises a route to the Thread mesh's prefix in its Router Advertisements,
+  roughly every 3 minutes. The kernel ignores those routes by default. Check with
+  `talosctl -n <ip> read /proc/net/ipv6_route` for a `fdda:78f8:6732::/64` route via the HomePod's link-local address.
+- **Static IPv6 default route** (`machine.network.interfaces`, `::/0` via the UniFi gateway's link-local address,
+  metric 2048). The gateway's RAs carry an 1800s lifetime but don't reliably reach these nodes, and nothing re-solicits
+  one, so the RA-learned default route lapsed and the node lost IPv6 to other VLANs (found 2026-10-28: matter-server
+  could not reach the Nest at its Cloud IoT ULA). The static route is the fallback; the RA-learned one (metric 1024)
+  wins when present. Listing an interface turns off Talos's implicit DHCP, so each entry has `dhcp: true`.
+
+Applied live with `talosctl patch machineconfig --mode=no-reboot` (canary on worker-2 first with `--mode=try`). The
+gateway's link-local address comes from its MAC (`1c:0b:8b:14:a5:d5`), so it needs updating if the gateway is replaced.
+
 ## Node NIC-speed labels (added 2026-09-28)
 
 Each worker's per-node patch in [`patches/workers/`](patches/workers/) sets
