@@ -115,6 +115,9 @@ pages:
                   - title: KVM
                     url: https://kvm.jakerobb.org
                     icon: di:glinet
+                  - title: Restock Radar
+                    url: https://restock-radar.jakerobb.org
+                    icon: mdi:radar
                   - title: SearXNG
                     url: https://search.jakerobb.org
                     icon: di:searxng
@@ -135,6 +138,9 @@ pages:
                   - title: Rack LED
                     url: https://rack-led.jakerobb.org
                     icon: di:wled.png
+                  - title: Matter Server
+                    url: https://matter.jakerobb.org
+                    icon: di:matter
                   - title: Scrypted
                     url: https://scrypted.jakerobb.org
                     icon: sh:scrypted

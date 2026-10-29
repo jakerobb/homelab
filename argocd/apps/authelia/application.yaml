@@ -180,6 +180,7 @@ spec:
               - domain:
                   - 'zigbee.jakerobb.org'
                   - 'zwave.jakerobb.org'
+                  - 'matter.jakerobb.org'
                   - 'modbus.jakerobb.org'
                   - 'changedetection.jakerobb.org'
                   - 'influxdb.jakerobb.org'

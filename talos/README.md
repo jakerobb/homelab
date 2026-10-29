@@ -2,12 +2,12 @@
 
 ## Current state
 
-_(as of 2026-10-19)_
+_(as of 2026-10-29)_
 
-- **Talos v1.14.4** on all 7 nodes (3 control planes, 4 workers, including `talos-worker-3`), **Kubernetes v1.37.1**.
+- **Talos v1.14.5** on all 7 nodes (3 control planes, 4 workers, including `talos-worker-3`), **Kubernetes v1.37.1**.
   Upgrade procedure: [`../skills/rolling-node-change/instructions.md`](../skills/rolling-node-change/instructions.md).
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
-  Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.4-2`,
+  Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.5-1`,
   since stock Talos doesn't support the Pi5 directly (no NVMe-capable U-Boot in the official
   `rpi_5` overlay — see [siderolabs/sbc-raspberrypi#96](https://github.com/siderolabs/sbc-raspberrypi/issues/96)).
   `yama6a/talos-raspberry-pi5` is a maintained downstream that reuses the
@@ -15,7 +15,7 @@ _(as of 2026-10-19)_
   fix (credited, not reinvented) while tracking current Talos releases itself — see its own
   [FUTURE_WORK.md](https://github.com/yama6a/talos-raspberry-pi5/blob/main/FUTURE_WORK.md): the
   goal is to retire itself once that U-Boot patch lands upstream.
-  **`v1.14.4-2`'s plain tag is not what's actually running on these 3 nodes** — it still ships the
+  **`v1.14.5-1`'s plain tag is not what's actually running on these 3 nodes** — it still ships the
   broken (unpatched) `u-boot.bin` (confirmed 2026-09-21: no EFI-variable fix in the fork's commits
   since), so it's only safe as a *version/architecture reference*, never as a real `talosctl
   upgrade --image` target. See "Pi 5 U-Boot fix"
@@ -23,7 +23,7 @@ _(as of 2026-10-19)_
   **Any amd64 worker (e.g. the MS-A2 Talos VM) must use a Factory schematic image
   (`factory.talos.dev/installer/<schematic-id>:<version>`) — `ghcr.io/siderolabs/installer` doesn't
   exist for recent releases, and the rpi5 installer image must never be reused for amd64 hardware.**
-  Currently `factory.talos.dev/installer/85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615:v1.14.4`
+  Currently `factory.talos.dev/installer/85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615:v1.14.5`
   (the `iscsi-tools` + `util-linux-tools` schematic, plus the kernel-log arg — see "iscsi-tools extension" and
   "Talos kernel logs" below), confirmed against both workers' live `get extensions` output and persisted in machine
   config as of 2026-10-05. (Before that: `613e1592…`, the same extensions without the kernel arg.)

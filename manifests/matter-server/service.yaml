@@ -1,5 +1,7 @@
 # The matter-server WebSocket API (port 5580), which Home Assistant's Matter integration
-# connects to. Home Assistant runs in the cluster, so this is a plain ClusterIP Service:
+# connects to, and its built-in dashboard, which httproute.yaml publishes at
+# https://matter.jakerobb.org behind Authelia.
+# Home Assistant runs in the cluster, so this is a plain ClusterIP Service:
 # point it at ws://matter-server.matter-server.svc.cluster.local:5580/ws. (It used to be a
 # pinned LoadBalancer VIP, 192.168.102.133, published as matter.jakerobb.org, back when
 # Home Assistant was still in Compose on rpi5-1; dropped 2026-10-10.) The server has no

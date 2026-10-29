@@ -1,0 +1,48 @@
+# Gated by Authelia forward-auth, same pattern as zwave-js-ui/httproute.yaml. The
+# `matter.jakerobb.org` access_control rule is in argocd/apps/authelia/application.yaml,
+# and this namespace has an entry in argocd/apps/authelia/referencegrant.yaml.
+#
+# This is the server's built-in dashboard (the same port 5580 serves it at / and the
+# WebSocket API at /ws); Home Assistant keeps using the in-cluster Service directly. The
+# pod is on hostNetwork, so the Gateway reaches it at the node's IP:5580 via the Service.
+# The namespace has no NetworkPolicy, and none could apply to a hostNetwork pod anyway.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: matter-server
+  namespace: matter-server
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - matter.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: matter-server
+          port: 5580
