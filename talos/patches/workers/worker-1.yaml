@@ -1,6 +1,20 @@
 machine:
   network:
     hostname: talos-worker-1
+    # Static IPv6 default route via the UniFi gateway's link-local address (added 2026-10-28). The gateway's
+    # Router Advertisements carry a 1800s lifetime but arrive less often than that on these nodes, and
+    # nothing here re-solicits one, so the kernel's RA-learned default route lapsed and the node lost IPv6
+    # to other VLANs (matter-server then couldn't reach the Nest at its ULA on Cloud IoT). Metric 2048 so
+    # the RA-learned route (1024) still wins whenever it's present. Listing the interface turns off
+    # Talos's implicit DHCP, hence the explicit `dhcp: true`. The link-local address is derived from the
+    # gateway's MAC (1c:0b:8b:14:a5:d5); update it if the gateway is replaced.
+    interfaces:
+      - interface: ens18
+        dhcp: true
+        routes:
+          - network: "::/0"
+            gateway: "fe80::1e0b:8bff:fe14:a5d5"
+            metric: 2048
   # Host NIC link speed in Mbps (MS-A2 Proxmox VM, 10GbE uplink). An integer rather than
   # "10GbE" so pods can use nodeAffinity's Gt/Lt operators: NetworkOptimizer
   # prefers the fastest node, and talos/cilium/l2-announcement-policy-10g.yaml
