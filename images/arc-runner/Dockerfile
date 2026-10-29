@@ -31,7 +31,7 @@ ARG SHELLCHECK_VERSION=v0.11.0
 # renovate: datasource=github-releases depName=rhysd/actionlint
 ARG ACTIONLINT_VERSION=v1.7.12
 # renovate: datasource=node-version depName=node
-ARG NODE_VERSION=24.22.2
+ARG NODE_VERSION=26.13.0
 # renovate: datasource=npm depName=renovate
 ARG RENOVATE_VERSION=44.167.6
 
