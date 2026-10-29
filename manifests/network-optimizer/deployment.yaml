@@ -83,7 +83,7 @@ spec:
         - name: network-optimizer
           # The migrated db was last opened by 2.9.0, so don't drop back to
           # 2.8.x.
-          image: ghcr.io/ozark-connect/network-optimizer:2.10.2
+          image: ghcr.io/ozark-connect/network-optimizer:2.10.3
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
