@@ -34,6 +34,50 @@ spec:
         spec:
           automountServiceAccountToken: false
           restartPolicy: Never
+          # The image's user (12021) isn't root, so a fresh PVC's root-owned
+          # mount point needs fsGroup to be writable.
+          securityContext:
+            fsGroup: 12021
+          initContainers:
+            # Seeds the containerbase PVC from the image (pvc.yaml explains
+            # why). Same image as the main container, so the tag is bumped
+            # in both places by Renovate. It fingerprints the image's copy of
+            # /opt/containerbase instead of being told a version: the PVC is
+            # re-seeded (rsync --delete, which also prunes tools installed
+            # since) only when that fingerprint differs from the marker. The
+            # marker is written last, so an interrupted copy is redone.
+            - name: seed-containerbase
+              image: renovate/renovate:44.165.2
+              command:
+                - sh
+                - -euc
+                - |
+                  fp=$(find /opt/containerbase \( -type f -o -type l \) -printf '%p %s %T@\n' | LC_ALL=C sort | sha256sum | cut -d' ' -f1)
+                  if [ "$(cat /pvc/.seeded-for 2>/dev/null || true)" = "$fp" ]; then
+                    echo "containerbase PVC already matches the image"
+                    exit 0
+                  fi
+                  rm -f /pvc/.seeded-for
+                  rsync -rltOE --delete --exclude=/lost+found --exclude=/.seeded-for /opt/containerbase/ /pvc/
+                  echo "$fp" > /pvc/.seeded-for
+                  echo "seeded containerbase PVC"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+              volumeMounts:
+                - mountPath: /pvc
+                  name: containerbase
           containers:
             - name: renovate
               # Pinned, not :latest — this tag is itself now tracked by the
@@ -81,14 +125,20 @@ spec:
                   memory: 1Gi
                 limits:
                   memory: 4Gi
-              # Renovate's clones, caches and containerbase state all live under
-              # /tmp. Dry-run tested read-only on 2026-10-27 against all five
-              # repos with no write errors. The image's preinstalled toolchains
-              # are in /opt/containerbase; a bump that needs a tool version the
-              # image doesn't have would try to install it there and fail.
+              # Renovate's clones and caches live under /tmp. Dry-run tested
+              # read-only on 2026-10-27 against all five repos with no write
+              # errors. The image's preinstalled toolchains are in
+              # /opt/containerbase; a bump that needs a tool version the image
+              # doesn't have installs it there, so that's the writable PVC the
+              # init container seeded (see pvc.yaml), not the read-only root.
               volumeMounts:
                 - mountPath: /tmp
                   name: tmp
+                - mountPath: /opt/containerbase
+                  name: containerbase
           volumes:
             - name: tmp
               emptyDir: {}
+            - name: containerbase
+              persistentVolumeClaim:
+                claimName: renovate-containerbase
