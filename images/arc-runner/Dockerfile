@@ -39,8 +39,10 @@ USER root
 
 # python3-venv: Ubuntu's Python is externally managed (PEP 668), so the
 # packages below go in a venv, put first on PATH further down.
+# libatomic1: the official Node binaries link against it as of Node 26 and
+# won't start without it (this base image doesn't ship it).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3-venv xz-utils \
+ && apt-get install -y --no-install-recommends libatomic1 python3-venv xz-utils \
  && rm -rf /var/lib/apt/lists/*
 
 # Static binaries, checksum-verified where upstream publishes checksums.
