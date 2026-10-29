@@ -46,6 +46,13 @@ spec:
             spec:
               containers:
                 - name: listener
+                  # The controller image's own user (65532), same as
+                  # arc-controller.
+                  securityContext:
+                    runAsNonRoot: true
+                    runAsUser: 65532
+                    runAsGroup: 65532
+                    allowPrivilegeEscalation: false
                   resources:
                     requests:
                       cpu: 10m

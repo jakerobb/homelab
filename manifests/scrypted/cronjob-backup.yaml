@@ -21,6 +21,9 @@ kind: CronJob
 metadata:
   name: scrypted-backup
   namespace: scrypted
+  annotations:
+    # Root is deliberate (see the header and runAsUser: 0 below).
+    radarhq.io/ignore-checks: runAsRoot
 spec:
   schedule: "27 3 * * *"
   timeZone: America/Detroit
