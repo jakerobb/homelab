@@ -1,0 +1,21 @@
+# /opt/containerbase for the Renovate CronJob. The root filesystem is read-only,
+# but containerbase installs any tool version the image doesn't preload (a Node
+# bump, say) into that directory, so it has to be a writable volume. A volume
+# hides what the image had there, so cronjob.yaml's `seed-containerbase` init
+# container copies the image's tools in whenever the image's set changes, which
+# also prunes everything installed since. Between image bumps, downloaded tools
+# persist here instead of being fetched on every run. The image's own set is
+# only ~44Mi; the rest of the space is for tool versions repos ask for (Node,
+# Go, Python and so on unpack to a few hundred Mi each). hexos-iscsi like every
+# other stateful app; losing it only costs one re-seed and re-download.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: renovate-containerbase
+  namespace: renovate
+spec:
+  storageClassName: hexos-iscsi
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
