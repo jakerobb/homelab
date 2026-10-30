@@ -44,6 +44,13 @@
       "groupName": "mkdocs-material"
     },
     {
+      "description": "matterjs-server (manifests/matter-server/deployment.yaml) is the Matter controller and replaced the archived python-matter-server. It publishes a release every day or two and nightly alpha tags (1.5.6-alpha.0-20261026-4d929bb) next to them. Take stable releases only, weekly, and manually: a bad one can strand the commissioned devices.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/matter-js/matterjs-server"],
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/",
+      "schedule": ["before 5am on monday"]
+    },
+    {
       "description": "nginx's even minor versions are the stable line and odd ones are mainline. The docs site's nginx tracks stable only.",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
