@@ -299,7 +299,11 @@ Renovate PRs like everything else) — see the
     11:30 the same weekday; one opened at 11:30 merges the next weekday. PRs that
     become eligible over a weekend wait until Monday and merge together.
     `internalChecksFilter: strict` keeps PRs with a release-age hold from being
-    opened until the hold has passed.
+    opened until the hold has passed. `rebaseWhen: conflicted` (added
+    2026-10-30) keeps a green PR green: under the default, a PR that fell
+    behind `main` was rebased by the 11:30 run itself, which restarted CI after
+    Renovate had already checked for automerge, so it missed the one run in the
+    window and waited for the next weekday (and `main` usually moved again).
   - **Rollout guards on the auto-merged apps (added 2026-10-18).** A new pod
     only replaces the old one once it's Ready, so `nut-exporter` and
     `truenas-exporter` got readiness probes (on the same `/health` as their
