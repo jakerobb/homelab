@@ -7,6 +7,7 @@
   "prHourlyLimit": 0,
   "prConcurrentLimit": 10,
   "platformAutomerge": false,
+  "rebaseWhen": "conflicted",
   "automergeStrategy": "squash",
   "automergeSchedule": ["after 11am and before 1pm every weekday"],
   "internalChecksFilter": "strict",
