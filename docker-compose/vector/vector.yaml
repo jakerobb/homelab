@@ -216,7 +216,7 @@ transforms:
       if err != null { node = ip }
       body = strip_whitespace(to_string(.msg) ?? "")
       ts = parse_timestamp(to_string(get!(., ["talos-time"])) ?? "", format: "%+") ?? now()
-      ts_ns = to_string(to_unix_timestamp(ts, unit: "nanoseconds"))
+      ts_ns = to_string(to_unix_timestamp!(ts, unit: "nanoseconds"))
       . = {
         "resourceLogs": [{
           "resource": {
