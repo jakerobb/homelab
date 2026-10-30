@@ -1,5 +1,7 @@
-# python-matter-server's storage path: the fabric JSON (the commissioned nodes, plus the
-# controller's operational identity), chip_*.ini, and the PAA root certificate cache. Losing
+# The Matter server's storage path. Written by python-matter-server (the fabric JSON with the
+# commissioned nodes and the controller's operational identity, chip_*.ini, and the PAA root
+# certificate cache), then migrated in place by matterjs-server on its first start, which keeps
+# the fabric JSON up to date and adds its own `server`, `ota` and `certificates` directories. Losing
 # the fabric means re-commissioning every Matter device, so this is the part that matters.
 # A few MB at time of migration.
 #

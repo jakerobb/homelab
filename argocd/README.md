@@ -2352,7 +2352,8 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
 
 ## matter-server (migrated from Docker Compose, 2026-10-01)
 
-python-matter-server, the Matter controller Home Assistant's Matter integration talks to. Deployed as
+The Matter controller Home Assistant's Matter integration talks to: python-matter-server until 2026-10-30, then the
+matter.js rewrite (see [Moving to matterjs-server](#moving-to-matterjs-server)). Deployed as
 [`apps/matter-server/`](apps/matter-server/application.yaml) → [`manifests/matter-server/`](../manifests/matter-server/).
 
 - **Host network.** Matter discovers devices with mDNS multicast and talks to them over IPv6, and neither crosses the
@@ -2370,7 +2371,7 @@ python-matter-server, the Matter controller Home Assistant's Matter integration 
   worker without per-node configuration. Without the flag it binds every interface on the host, including the Cilium
   ones.
 - **State is a PVC (`hexos-iscsi`, 1Gi):** the fabric JSON (commissioned nodes and the controller's identity),
-  `chip_*.ini`, and the PAA certificate cache. Losing the fabric means re-commissioning every Matter device. The
+  `chip_*.ini`, and the PAA certificate cache (only used by the Python server). Losing the fabric means re-commissioning every Matter device. The
   `restore` init container holds the pod until `scripts/matter-server-cutover/restore.sh` has copied the old data in,
   because starting on an empty directory would create a second, empty fabric.
 - **Home Assistant** runs in the cluster, so the Service is a ClusterIP, reached at
@@ -2411,6 +2412,60 @@ After merging (ArgoCD syncs; the pod sits at `Init:0/1` waiting for the restore)
 5. After a few days of everything behaving, delete `~/docker/matter-server/` on rpi5-1. Until then it's the rollback:
    revert the PR and restore the Compose service (the restore script never modifies it). Then Bluetooth and avahi on
    rpi5-1 can go once Home Assistant has moved too.
+
+### Moving to matterjs-server
+
+python-matter-server was archived in 2026-06 (8.1.2 was the last release; the 8.1.1 and 8.1.2 tags were never pushed to
+ghcr, which is why Renovate never moved us past 8.1.0). Its successor is
+[matter-js/matterjs-server](https://github.com/matter-js/matterjs-server), which speaks the same WebSocket API and reads
+the Python data files on its first start, keeping the fabric, so the commissioned devices (the Nest thermostat and the
+Level Bolt lock) should stay paired. Home Assistant needs no change: the URL is the same, and its Matter client is built from the same repo.
+
+- **Image and command.** `ghcr.io/matter-js/matterjs-server`. The image has no `ip`, so the wrapper reads the default
+  route from `/proc/net/route` and then runs the image's entrypoint (a `command:` replaces it). `--paa-root-cert-dir` and
+  `--log-level-sdk` don't exist any more.
+- **Dashboard.** `PRODUCTION_MODE=true` makes it derive the WebSocket URL from the page's origin. The old dashboard
+  prompted for it when served at `https://matter.jakerobb.org`, because it only detected port `:5580` or HA ingress.
+- **Resources.** The docs expect about twice the Python server's memory (it sat at about 190Mi), so the request is 384Mi,
+  the limit 1Gi and the V8 heap capped at 768MB. The startup probe allows 5 minutes: the first start converts the data
+  and interviews each node. Lower both once there are a few clean starts.
+- **Renovate.** The `kubernetes` manager reads the image; `renovate.json` limits it to stable `X.Y.Z` tags (it publishes
+  nightly `-alpha` tags) and a weekly Monday-morning schedule, since it releases every day or two. Manual merge.
+- **Thread (the Level Bolt lock, node 7).** What it needs is on the nodes, not in the server: the RA route-info
+  sysctl and the static IPv6 default route in `talos/patches/workers/` (see `talos/README.md`), plus the UniFi mDNS proxy.
+  Both servers use the kernel's routes, so nothing changes there. The matter.js tracker has reports of Thread nodes
+  behind Apple border routers (ours is a HomePod mini) going unavailable for hours until the server restarts (an
+  Apple BR on a flaky Wi-Fi link was the cause in
+  [#1161](https://github.com/matter-js/matterjs-server/issues/1161); open
+  [#1084](https://github.com/matter-js/matterjs-server/issues/1084) is similar). If the lock sticks at unavailable
+  after the move, restart the pod first (`kubectl -n matter-server rollout restart deploy/matter-server`), then check the
+  border router's Wi-Fi link.
+- **Not carried over.** `ping` in the image relies on a file capability, which `allowPrivilegeEscalation: false` and
+  dropped capabilities prevent, so the dashboard's node ping may not work. Nothing else depends on it.
+
+#### Cutover
+
+1. Before merging, back up the data (it holds the fabric's private keys, so keep it off the repo). On rpi5-1:
+
+   ```bash
+   umask 077; mkdir -p ~/backups; kubectl -n matter-server exec deploy/matter-server -c matter-server -- tar -C /data -cf - --exclude=lost+found --exclude=credentials . > ~/backups/matter-server-data-pre-matterjs-$(date +%Y%m%d-%H%M%S).tar
+   ```
+
+2. Merge. ArgoCD syncs, the `Recreate` strategy stops the Python pod before the new one starts (two controllers must never
+   share a fabric), and the thermostat is unavailable in Home Assistant until the new server has reconnected.
+3. Watch the log. The first start migrates the data, logs an error that no device addresses are known (expected), then
+   interviews the node:
+
+   ```bash
+   kubectl -n matter-server logs -f deploy/matter-server
+   ```
+
+   It should print `using primary interface <name>`. In Home Assistant, the Matter integration should reconnect on its
+   own and the thermostat come back as available. If the pod is `OOMKilled`, raise the limit and `NODE_OPTIONS` together.
+4. Roll back by reverting the PR (the Python image reads the same files, because the new server keeps the fabric JSON up
+   to date), or, if the files look wrong, by restoring the tarball into the PVC before starting the old image.
+5. After a week or so of normal behavior, delete the `credentials/` directory on the PVC (the Python PAA cache) and the
+   backup tarball.
 
 ## homeassistant (migrated from Docker Compose, 2026-10-01)
 

@@ -1,8 +1,14 @@
 # Bare Deployment, no Helm chart: single container, no per-environment variation
 # (same reasoning as ntfy/deployment.yaml).
 #
-# Pinned to 8.1.0: the 8.1.1 and 8.1.2 GitHub releases have no image on ghcr (checked
-# 2026-10-01); bump once they're published.
+# The OHF matter.js Matter Server (matter-js/matterjs-server), the successor to
+# python-matter-server, which was archived in 2026-06 with 8.1.2 as its final release. It
+# speaks the same WebSocket API (Home Assistant's client is built from the same repo) and
+# migrates the Python data files in /data on its first start, keeping the same fabric, so
+# the commissioned devices stay paired. It keeps the Python fabric JSON up to date, so
+# reverting to ghcr.io/home-assistant-libs/python-matter-server:8.1.0 on the same PVC works
+# until nodes get added or removed in the new server (see argocd/README.md, "Moving to
+# matterjs-server"). Renovate tracks the tag (renovate.json has a weekly rule for it).
 #
 # Migrated from the docker-compose `matter-server` service on rpi5-1.
 #
@@ -10,13 +16,15 @@
 # mDNS/DNS-SD multicast and talks to them over IPv6, and neither crosses the pod network.
 # The IoT/Cloud IoT -> Server mDNS reflection is the UniFi gateway's mDNS proxy. The worker
 # nodes get a ULA address on the Server VLAN by SLAAC, which is all the Wi-Fi Matter devices
-# need. (Thread devices would additionally need net.ipv6.conf.*.accept_ra=2 on the node;
-# there are none today.)
+# need. The Level Bolt lock (node 7) is on Thread, so the nodes also carry the Thread route
+# sysctl (#436) and the static IPv6 default route (#458); see talos/README.md.
 #
 # No nodeAffinity: the container picks its mDNS interface from the node's default route at
 # start, so any worker works whatever its NIC is called (ens18 on the Proxmox VMs, enp0s1 on
 # the mbp, something else on a Pi). Without --primary-interface it would bind every interface
-# it finds on the host, cilium_host and lxc* included.
+# it finds on the host, cilium_host and lxc* included. The image has no `ip`, so the wrapper
+# reads the default route from /proc/net/route (the host's, because of hostNetwork) and runs
+# the image's own entrypoint, which a `command:` replaces.
 #
 # The `restore` init container WAITS until /store/.restored exists, then exits. Starting on
 # an empty data directory would mint a brand-new Matter fabric next to the one the commissioned
@@ -34,10 +42,8 @@ spec:
   replicas: 1
   revisionHistoryLimit: 2
   # The startupProbe budget below plus 2 minutes for the restore init container
-  # and an image pull. The pod took 45s to become Ready on its one recorded start
-  # (2026-10-18), most of it the init container and the volume. Without this the
-  # cluster default (180s) would cut it off first.
-  progressDeadlineSeconds: 240
+  # and an image pull. Without this the cluster default (180s) would cut it off first.
+  progressDeadlineSeconds: 420
   strategy:
     # Not RollingUpdate: the data PVC is ReadWriteOnce, and two controllers on one fabric
     # would fight over it.
@@ -87,26 +93,33 @@ spec:
               name: data
       containers:
         - name: matter-server
-          image: ghcr.io/home-assistant-libs/python-matter-server:8.1.0
+          image: ghcr.io/matter-js/matterjs-server:1.5.5
           imagePullPolicy: IfNotPresent
-          # Same arguments as the image's default CMD, plus the interface found from the
-          # node's default route.
+          # The image's ENTRYPOINT, plus the interface found from the node's default route.
+          # Field 2 of /proc/net/route is the destination, 00000000 for the default route.
+          # --storage-path is the image's STORAGE_PATH default (/data), repeated for clarity.
+          # --paa-root-cert-dir is gone: matter.js handles the DCL certificates itself.
           command:
             - sh
             - -c
             - |
-              set -- $(ip -4 -o route show default)
-              iface=
-              while [ $# -gt 0 ]; do
-                [ "$1" = dev ] && iface=$2
-                shift
-              done
+              iface=$(awk '$2 == "00000000" { print $1; exit }' /proc/net/route)
               [ -n "$iface" ] || { echo "no IPv4 default route; can't pick an mDNS interface" >&2; exit 1; }
               echo "using primary interface $iface"
-              exec matter-server --storage-path /data --paa-root-cert-dir /data/credentials --primary-interface "$iface"
+              exec node --enable-source-maps /app/node_modules/matter-server/dist/esm/MatterServer.js \
+                --storage-path /data --primary-interface "$iface"
           env:
             - name: TZ
               value: America/Detroit
+            # The dashboard is published at https://matter.jakerobb.org through the Gateway,
+            # so its page URL has no :5580. Without this it prompts for the WebSocket URL
+            # instead of deriving it from the page's origin.
+            - name: PRODUCTION_MODE
+              value: "true"
+            # V8 defers garbage collection while the node has free memory. Cap the heap at
+            # about 75% of the memory limit so a lazy collector can't run into the OOM killer.
+            - name: NODE_OPTIONS
+              value: --max-old-space-size=768
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -120,15 +133,16 @@ spec:
           ports:
             - name: ws
               containerPort: 5580
-          # The budget is 2 minutes (12 x 10s). It was 5. The container took 19s to
-          # become Ready on its one recorded start, and hasn't restarted in 10
-          # days (2026-10-18), so this is about 6x that. If a slow start restarts
-          # the pod without it ever becoming Ready, raise failureThreshold.
+          # The budget is 5 minutes (30 x 10s). The first start on the migrated Python data
+          # converts the storage and interviews every node, which the docs say takes a while;
+          # later starts reuse the stored addresses and are much faster. The image's own
+          # HEALTHCHECK allows 15 minutes. The Python server became Ready in 19s, so once
+          # this has a few clean starts on record, it can come back down.
           startupProbe:
             tcpSocket:
               port: ws
             periodSeconds: 10
-            failureThreshold: 12
+            failureThreshold: 30
           readinessProbe:
             tcpSocket:
               port: ws
@@ -138,12 +152,14 @@ spec:
               port: ws
             periodSeconds: 20
             timeoutSeconds: 5
+          # The Python server sat at about 190Mi with one node. The matter.js server's docs
+          # put it near twice that, growing with the node count.
           resources:
             requests:
               cpu: 100m
-              memory: 192Mi
+              memory: 384Mi
             limits:
-              memory: 512Mi
+              memory: 1Gi
           volumeMounts:
             - mountPath: /data
               name: data
