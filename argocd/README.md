@@ -1717,6 +1717,51 @@ real API key, and reporting back whether the plugin's UI actually
 round-trips correctly end-to-end. Only remove `kube-prometheus-stack` if
 that's a clean yes.
 
+## signoz-alert-relay (SigNoz alerts into Alertmanager)
+
+ntfy reports *changes*; it can't show what's firing right now. Prometheus's
+alerts already live in Alertmanager, which can (its UI, and the Glance Alerts
+widget that reads its API), but SigNoz's alerts went straight from SigNoz's
+webhook channel to `ntfy-alertmanager` and never touched it. The rules stay in
+SigNoz (that's the direction of travel; Prometheus is for what can't move);
+only their *delivery* is routed through Alertmanager so it holds every active
+alert.
+
+[`signoz-alert-relay`](apps/signoz-alert-relay/application.yaml) is a ~100-line
+stdlib Python script
+([`manifests/signoz-alert-relay/relay.py`](../manifests/signoz-alert-relay/relay.py))
+run from a ConfigMap on a stock `python` image (kustomize's `configMapGenerator`
+rolls the pod when the script changes). SigNoz's webhook sends Alertmanager's
+*notification* schema; Alertmanager's intake (`POST /api/v2/alerts`) takes a
+bare list of nearly the same shape, so the relay unwraps `alerts[]`, adds a
+`source=signoz` label, and settles `endsAt`: **firing** gets now + 6h
+(`FIRING_TTL_SECONDS`), **resolved** keeps SigNoz's resolve time, which
+Alertmanager treats as resolved at once. It keeps no state, so a restart loses
+nothing.
+
+- **Delivery changes for SigNoz alerts.** They now take the Prometheus route:
+  grouped by `alertname`/`namespace`, 30s `group_wait` before the first
+  message, 4h `repeat_interval` reminders, silenceable in Alertmanager, then
+  `ntfy-alertmanager` → ntfy. Before, each webhook went to ntfy immediately
+  with no reminders.
+- **The TTL is a backstop, not the mechanism.** It matters only if a
+  "resolved" notification is lost; the alert then expires after 6h rather than
+  staying active forever. It must exceed SigNoz's re-notify interval, or a
+  still-firing alert would drop out of Alertmanager in between. Every rule in
+  `terraform/signoz` sets `renotify` explicitly (firing, 4h); SigNoz has no
+  TTL of its own. That the 4h re-send really happens is unobserved, so the relay
+  logs each webhook body (`LOG_PAYLOADS=1`) to measure it on a real
+  long-running alert; turn the logging off after.
+- **Cutover is Terraform-side.** `signoz_notification_channel.ntfy` in
+  [`terraform/signoz/alert-packet-loss.tf`](../terraform/signoz/alert-packet-loss.tf)
+  points at the relay's Service. Merge first (so the relay exists and the
+  `signoz` CiliumNetworkPolicy allows SigNoz → relay), then `terraform apply`;
+  revert that URL to go back to the old direct path. Tested 2026-10-30
+  end to end with a synthetic alert (relay → Alertmanager → ntfy, firing and
+  resolved); the SigNoz → relay hop itself is only exercised after the apply.
+- **Network:** SigNoz → relay is the one new rule (in `signoz.yaml`); the relay
+  → Alertmanager hop is inside `monitoring`, already allowed.
+
 ## Glance (deployed 2026-09-23; the homelab dashboard since 2026-10-10)
 
 The dashboard, [Glance](https://github.com/glanceapp/glance). It started as a

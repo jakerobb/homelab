@@ -1,0 +1,31 @@
+# Own Application rather than raw manifests under root — isolates the relay's
+# sync/health status, same reasoning as ntfy-alertmanager's own Application.
+# See argocd/README.md's app-of-apps section.
+#
+# Targets the existing `monitoring` namespace (it only exists to feed that
+# stack's Alertmanager): no namespace.yaml and no CreateNamespace=true, since
+# argocd/apps/kube-prometheus-stack/application.yaml owns the Namespace object.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: signoz-alert-relay
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jakerobb/homelab.git
+    targetRevision: main
+    path: manifests/signoz-alert-relay
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

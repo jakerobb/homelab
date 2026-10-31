@@ -4,10 +4,16 @@
 # by `url`, over OTLP). Ported from the old Compose Grafana's "Packet Loss"
 # rule: over 50% loss for 2 minutes, and no data counts as alerting too.
 #
-# Delivery: SigNoz's webhook channel sends Alertmanager-format JSON, so it
-# goes straight to ntfy-alertmanager (manifests/ntfy-alertmanager/), the same
-# bridge kube-prometheus-stack's Alertmanager uses, and lands in ntfy's
-# homelab-alerts topic. The `severity` label picks the ntfy priority there.
+# Delivery: SigNoz's webhook channel sends Alertmanager-format JSON to
+# signoz-alert-relay (manifests/signoz-alert-relay/), which posts the alerts
+# into kube-prometheus-stack's Alertmanager. From there they take the same
+# route as Prometheus's own: grouping, 4h reminders, silences, then
+# ntfy-alertmanager (manifests/ntfy-alertmanager/) and ntfy's homelab-alerts
+# topic, with the `severity` label picking the ntfy priority. The point of
+# the detour is that Alertmanager (and the Glance Alerts widget reading it)
+# then holds every currently-active alert, SigNoz's included. Alerts carry a
+# `source=signoz` label. The channel is still named "ntfy-alertmanager" only
+# because renaming it would recreate every rule that references it.
 #
 # Needs /api/v2/rules and /api/v2/notification_channels open in
 # argocd/apps/signoz/httproute.yaml, and the terraform service account on
@@ -21,7 +27,7 @@ resource "signoz_notification_channel" "ntfy" {
     webhook = {
       kind = "webhook"
       spec = {
-        url           = "http://ntfy-alertmanager.monitoring.svc.cluster.local:8080"
+        url           = "http://signoz-alert-relay.monitoring.svc.cluster.local:8080"
         send_resolved = true
       }
     }

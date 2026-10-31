@@ -1,0 +1,15 @@
+# Kustomize only for configMapGenerator: it appends a content hash to the
+# ConfigMap's name and rewrites the Deployment's reference, so editing relay.py
+# rolls the pod on sync (a plain ConfigMap edit wouldn't restart it, and Python
+# reads the script once at startup). Same reasoning as manifests/glance/.
+# Old hash-suffixed ConfigMaps get pruned by the Application's `prune: true`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - deployment.yaml
+  - service.yaml
+configMapGenerator:
+  - name: signoz-alert-relay
+    files:
+      - relay.py
