@@ -8,9 +8,14 @@ machine:
     # the RA-learned route (1024) still wins whenever it's present. Listing the interface turns off
     # Talos's implicit DHCP, hence the explicit `dhcp: true`. The link-local address is derived from the
     # gateway's MAC (1c:0b:8b:14:a5:d5); update it if the gateway is replaced.
+    # Static ULA on the Server VLAN's prefix (added 2026-10-30), host part = the IPv4 last octet. The same
+    # missing RAs mean SLAAC never renews the address either: it expired 24h after boot and matter-server
+    # (hostNetwork) had no source address for the Nest or for Thread. The jump box holds ::2 on this prefix.
     interfaces:
       - interface: ens18
         dhcp: true
+        addresses:
+          - fd3d:b17d:9f8e:102::32/64
         routes:
           - network: "::/0"
             gateway: "fe80::1e0b:8bff:fe14:a5d5"
