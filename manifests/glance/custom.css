@@ -64,3 +64,8 @@ select {
 .storage .storage-bar {
     margin: 0.4rem 0;
 }
+
+/* ---- Alerts widget (glance.yml, css-class: alerts) ----------------------- */
+.alerts .alert-sev {
+    text-transform: uppercase;
+}

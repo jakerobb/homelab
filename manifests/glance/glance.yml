@@ -196,6 +196,42 @@ pages:
       # ---- Right: cluster ----------------------------------------------------
       - size: small
         widgets:
+          # Currently firing alerts, straight from Alertmanager's v2 API
+          # (unsilenced, uninhibited). ntfy only reports changes; this is the
+          # at-a-glance state. Watchdog (always firing by design) and
+          # InfoInhibitor (an inhibition helper) are filtered out. Only covers
+          # Prometheus rules: SigNoz alerts go to ntfy-alertmanager directly
+          # and never pass through Alertmanager. Title links to its UI.
+          - type: custom-api
+            title: Alerts
+            title-url: https://alertmanager.jakerobb.org
+            css-class: alerts
+            cache: 1m
+            url: http://kube-prometheus-stack-alertmanager.monitoring.svc:9093/api/v2/alerts
+            parameters:
+              active: "true"
+              silenced: "false"
+              inhibited: "false"
+              filter: alertname!~"Watchdog|InfoInhibitor"
+            template: |
+              {{ $alerts := .JSON.Array "" }}
+              {{ if eq (len $alerts) 0 }}
+                <p class="color-positive">No active alerts.</p>
+              {{ else }}
+                <ul class="list list-gap-10">
+                {{ range sortByString "startsAt" "desc" $alerts }}
+                  {{ $sev := .String "labels.severity" }}
+                  <li>
+                    <div class="flex justify-between items-baseline">
+                      <span class="color-highlight text-truncate">{{ .String "labels.alertname" }}</span>
+                      <span class="size-h6 alert-sev {{ if eq $sev "critical" }}color-negative{{ else }}color-primary{{ end }}">{{ $sev }}</span>
+                    </div>
+                    <div class="size-h6 text-truncate">{{ or (.String "labels.name") (.String "labels.job_name") (.String "labels.pod") (.String "labels.persistentvolumeclaim") (.String "labels.node") (.String "labels.instance") (.String "labels.namespace") }}: {{ or (.String "annotations.summary") (.String "annotations.description") }}</div>
+                  </li>
+                {{ end }}
+                </ul>
+              {{ end }}
+
           # Glance has no native Kubernetes widget, so this is a custom-api
           # widget over kube-prometheus-stack's Prometheus (in-cluster,
           # unauthenticated) — node-exporter for CPU/memory, kube-state-metrics
