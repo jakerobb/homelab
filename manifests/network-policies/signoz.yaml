@@ -1,7 +1,7 @@
 # SigNoz, ClickHouse, ZooKeeper, the otel collector and the k8s-infra agents. Inside the namespace anything
 # may talk to anything. Outside: the Gateway reaches the UI (8080) and OTLP ingest (4318); the collector
-# federates Prometheus; alerts go to ntfy-alertmanager; the agents read the API server and kubelets (10250
-# on the node IPs).
+# federates Prometheus; alerts go to signoz-alert-relay (which feeds Alertmanager) and ntfy-alertmanager; the
+# agents read the API server and kubelets (10250 on the node IPs).
 #
 # Default-deny both directions, then only the flows below. Gateway traffic
 # (Authelia forward-auth and the proxied request) arrives as Cilium's `ingress`
@@ -77,6 +77,14 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: monitoring
             app.kubernetes.io/name: ntfy-alertmanager
+      toPorts:
+        - ports:
+            - port: '8080'
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: signoz-alert-relay
       toPorts:
         - ports:
             - port: '8080'

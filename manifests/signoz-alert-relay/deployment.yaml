@@ -1,0 +1,95 @@
+# Relays SigNoz's webhook notifications into Alertmanager so one place holds
+# every currently-active alert (Prometheus's and SigNoz's) — see relay.py's
+# docstring for the mapping and argocd/README.md's signoz-alert-relay section
+# for why. Stateless, so a rollout or restart loses nothing; Alertmanager
+# keeps the state. The script is a ConfigMap on a stock python image rather
+# than a built image: it's stdlib-only and ~100 lines, and this repo has no
+# image pipeline for one-off helpers.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signoz-alert-relay
+  namespace: monitoring
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  # The pod starts in about a second; 60s turns a rollout that can't finish
+  # into a Degraded app in a minute (same as ntfy-alertmanager).
+  progressDeadlineSeconds: 60
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: signoz-alert-relay
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: signoz-alert-relay
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: relay
+          image: python:3.15.2-alpine3.24
+          imagePullPolicy: IfNotPresent
+          args:
+            - python
+            - -I
+            - /app/relay.py
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: ALERTMANAGER_URL
+              value: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+            # How long a firing alert stays active in Alertmanager without a
+            # fresh notification. SigNoz re-notifies a still-firing alert at
+            # each rule's `renotify` interval, which every rule in
+            # terraform/signoz sets explicitly to 4h (SigNoz has no TTL of its
+            # own; whether it really re-sends on that cadence is still to be
+            # observed). A resolved notification ends the alert at once, so
+            # this only bites if a resolve is lost. 6h clears a 4h repeat.
+            - name: FIRING_TTL_SECONDS
+              value: "21600"
+            # Logs each webhook body verbatim. On while this is new, to learn
+            # SigNoz's actual payload and re-notify cadence; drop it later.
+            - name: LOG_PAYLOADS
+              value: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /app
+              name: script
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: signoz-alert-relay
