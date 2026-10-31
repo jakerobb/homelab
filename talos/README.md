@@ -685,6 +685,12 @@ template.
   one, so the RA-learned default route lapsed and the node lost IPv6 to other VLANs (found 2026-10-28: matter-server
   could not reach the Nest at its Cloud IoT ULA). The static route is the fallback; the RA-learned one (metric 1024)
   wins when present. Listing an interface turns off Talos's implicit DHCP, so each entry has `dhcp: true`.
+- **Static ULA** (`machine.network.interfaces[].addresses`, `fd3d:b17d:9f8e:102::<IPv4 last octet>/64`, added
+  2026-10-30). The same missing RAs also stop SLAAC from renewing the node's address (valid 24h), so 24 hours
+  after a boot the workers had only link-local addresses. matter-server then had no source address to reach the
+  Nest or the Thread lock, and both showed offline (the jump box, which does get the RAs, was unaffected). The
+  static address is on the Server VLAN prefix; the jump box holds `::2`. Check with
+  `talosctl -n <ip> get addresses` for the `fd3d:b17d:9f8e:102::` entry.
 
 Applied live with `talosctl patch machineconfig --mode=no-reboot` (canary on worker-2 first with `--mode=try`). The
 gateway's link-local address comes from its MAC (`1c:0b:8b:14:a5:d5`), so it needs updating if the gateway is replaced.
