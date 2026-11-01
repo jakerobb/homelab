@@ -35,6 +35,7 @@ spec:
           - https://homeassistant.jakerobb.org/
           - https://hubble.jakerobb.org/
           - https://gateway.jakerobb.org/
+          - https://karma.jakerobb.org/
           - https://kvm.jakerobb.org/
           - https://modbus-relay.jakerobb.org/
           - https://modbus.jakerobb.org/

@@ -1930,6 +1930,40 @@ InfluxDB) and `nut-webui` (webnut).
   Glance tile, and the relay's InfluxDB token from
   `docker-compose/.env.sops.env`.
 
+## Karma (the active-alerts dashboard)
+
+ntfy says when an alert *changes*; [Karma](https://github.com/prymitive/karma)
+at `karma.jakerobb.org` shows what's firing right now, grouped and filterable
+(by `source`, `severity`, namespace, ...), with silencing. The Glance Alerts
+widget is the at-a-glance summary; Karma is the click-through. Deployed as
+[`apps/karma/`](apps/karma/application.yaml) → [`manifests/karma/`](../manifests/karma/),
+bare manifests (no official chart) in the existing `monitoring` namespace, since it only exists to
+show that stack's Alertmanager.
+
+- **One upstream: Alertmanager.** SigNoz's alerts are in it too, via
+  [`signoz-alert-relay`](apps/signoz-alert-relay/application.yaml), tagged
+  `source=signoz` (Prometheus's own carry no `source` label), so Karma needs no
+  SigNoz integration. Until that relay is live Karma shows only Prometheus's
+  alerts.
+- **In-cluster upstream, public links.** Karma reads the Alertmanager Service
+  directly; `external_uri` makes its links point at `alertmanager.jakerobb.org`.
+  `proxy: true` sends silences from the Karma pod to Alertmanager, so the
+  browser never calls Alertmanager cross-origin.
+- **Default view hides `Watchdog`** (always firing by design) and shows only
+  active alerts; both are `filters.default` in
+  [`karma.yaml`](../manifests/karma/karma.yaml). The history view is off: it
+  queries Prometheus through each alert's `generatorURL`, which is behind
+  Authelia and unreachable from the pod, and SigNoz alerts have no Prometheus
+  behind them.
+- **Auth:** Authelia forward-auth with `two_factor`, same as Alertmanager's own
+  UI, since Karma can create and expire silences. It has no login of its own.
+- **Probes** use `/health` (answers "Pong" without calling Alertmanager), so an
+  Alertmanager outage shows in Karma's UI instead of restarting it.
+- **Verified 2026-10-30** on the jump box's Docker (UID 65534, read-only root,
+  no capabilities, the shipped `karma.yaml`): it parsed the config, collected
+  Alertmanager's alerts and served `/health`. The Gateway route and the
+  Authelia rule are only exercised after merge.
+
 ## restock-radar (new, deployed 2026-10-05)
 
 Stock and price alerts for UniFi store products, from

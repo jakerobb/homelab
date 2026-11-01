@@ -1,0 +1,50 @@
+# Karma at karma.jakerobb.org. It has no login of its own, so it's gated by
+# Authelia forward-auth (the ExternalAuth filter, same as alertmanager's route
+# in argocd/apps/kube-prometheus-stack/httproute-alertmanager.yaml). It can
+# create silences, so it needs the same two_factor gate as Alertmanager's UI.
+#
+# Needs the `monitoring` entry in the ReferenceGrant in the `authelia`
+# namespace (already there, argocd/apps/authelia/referencegrant.yaml) and an
+# `access_control` rule for karma.jakerobb.org in argocd/apps/authelia/
+# application.yaml; without the rule the request falls through to Authelia's
+# default_policy (deny).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: karma
+  namespace: monitoring
+spec:
+  parentRefs:
+    - name: homelab-gateway
+      namespace: gateway-system
+  hostnames:
+    - karma.jakerobb.org
+  rules:
+    - filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              group: ""
+              kind: Service
+              name: authelia
+              namespace: authelia
+              port: 80
+            http:
+              path: /api/authz/ext-authz/
+              allowedHeaders:
+                - authorization
+                - proxy-authorization
+                - cookie
+                - accept
+                - host
+                - x-forwarded-proto
+                - x-forwarded-for
+              allowedResponseHeaders:
+                - remote-user
+                - remote-groups
+                - remote-name
+                - remote-email
+      backendRefs:
+        - name: karma
+          port: 8080

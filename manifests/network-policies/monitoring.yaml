@@ -1,4 +1,4 @@
-# kube-prometheus-stack (Prometheus, Alertmanager, operator, kube-state-metrics) and ntfy-alertmanager.
+# kube-prometheus-stack (Prometheus, Alertmanager, operator, kube-state-metrics), ntfy-alertmanager and Karma.
 # The blackbox exporter is on the host network, which pod policy doesn't cover, so it has none here (see
 # manifests/blackbox-exporter/deployment.yaml for why it can't be a policed pod).
 # Node-exporter is hostNetwork, so no pod policy applies to it.
@@ -92,6 +92,27 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: ntfy
             app.kubernetes.io/name: ntfy
+      toPorts:
+        - ports:
+            - port: '8080'
+              protocol: TCP
+---
+# Karma (manifests/karma/) is only reachable through the Gateway, on its own port. The namespace policy above
+# already covers everything else it does: DNS, and calls to Alertmanager (9093) inside the namespace.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: karma
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: karma
+  ingress:
+    - fromEntities:
+        - ingress
+        - remote-node
+        - host
       toPorts:
         - ports:
             - port: '8080'

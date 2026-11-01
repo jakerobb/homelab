@@ -51,6 +51,7 @@ kubectl exec -n authelia authelia-0 -- cat /config/notification.txt
 | SigNoz | <https://signoz.jakerobb.org> | Logs, metrics and dashboards |
 | Prometheus | <https://prometheus.jakerobb.org> | Cluster metrics and alert rules |
 | Alertmanager | <https://alertmanager.jakerobb.org> | Active alerts and silences |
+| Karma | <https://karma.jakerobb.org> | Dashboard of every active alert (Prometheus's and SigNoz's), with silencing |
 | Hubble | <https://hubble.jakerobb.org> | Cilium network flows and dropped packets |
 | ntfy | <https://ntfy.jakerobb.org> | Push notifications and alerts. No login |
 | Speed test | <http://speedtest.jakerobb.org:3005> | LAN speed test (Network Optimizer). LAN only, no login |

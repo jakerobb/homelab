@@ -1,0 +1,13 @@
+# ClusterIP only; the Gateway reaches it through httproute.yaml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: karma
+  namespace: monitoring
+spec:
+  selector:
+    app.kubernetes.io/name: karma
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

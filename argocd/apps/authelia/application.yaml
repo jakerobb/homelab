@@ -158,6 +158,8 @@ spec:
                 policy: 'two_factor'
               - domain: 'alertmanager.jakerobb.org'
                 policy: 'two_factor'
+              - domain: 'karma.jakerobb.org'
+                policy: 'two_factor'
               - domain: 'hubble.jakerobb.org'
                 policy: 'two_factor'
               - domain: 'restock-radar.jakerobb.org'

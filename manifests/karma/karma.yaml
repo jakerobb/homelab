@@ -1,0 +1,28 @@
+# Karma config — the alert dashboard at karma.jakerobb.org. Docs: https://github.com/prymitive/karma/blob/main/docs/CONFIGURATION.md
+#
+# One upstream: kube-prometheus-stack's Alertmanager. SigNoz's alerts are in it
+# too, via signoz-alert-relay (argocd/README.md), tagged source=signoz.
+alertmanager:
+  servers:
+    - name: homelab
+      # In-cluster Service, not the public hostname: keeps Karma off the
+      # Gateway/Authelia chain it's itself behind.
+      uri: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+      # What the UI links to ("View in Alertmanager", silence links): the
+      # browser-facing hostname, not the Service DNS name above.
+      external_uri: https://alertmanager.jakerobb.org
+      # Silences created in Karma go from the Karma pod to Alertmanager. Without
+      # this the browser would call Alertmanager itself, which the page's
+      # Authelia session wouldn't cover cross-origin.
+      proxy: true
+# Karma's history view asks Prometheus (via each alert's generatorURL, i.e.
+# prometheus.jakerobb.org) for past firings. That's behind Authelia and not
+# reachable from the pod, and SigNoz-sourced alerts have no Prometheus behind
+# them at all, so it would just fail.
+history:
+  enabled: false
+filters:
+  default:
+    # Watchdog is always firing by design (the dead-man's-switch heartbeat).
+    - "@state=active"
+    - alertname!=Watchdog
