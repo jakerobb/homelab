@@ -1,0 +1,76 @@
+# Karma (github.com/prymitive/karma): a dashboard over Alertmanager's active
+# alerts. No official Helm chart, single stateless Deployment, so bare manifests
+# like glance/ntfy-alertmanager. Lives in `monitoring` next to the Alertmanager
+# it only exists to show. Config is karma.yaml (see its comments), a generated
+# ConfigMap so an edit rolls the pod (kustomization.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karma
+  namespace: monitoring
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  # Starts in a few seconds and has no state; 60s turns a rollout that can't
+  # finish into a Degraded app in a minute (same as ntfy-alertmanager).
+  progressDeadlineSeconds: 60
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: karma
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: karma
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: karma
+          image: ghcr.io/prymitive/karma:v0.134
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONFIG_FILE
+              value: /etc/karma/karma.yaml
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+          # /health answers "Pong" without calling Alertmanager, so an
+          # Alertmanager outage shows in the UI instead of restarting Karma.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /etc/karma
+              name: config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: karma

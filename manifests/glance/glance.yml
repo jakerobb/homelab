@@ -161,6 +161,9 @@ pages:
                   - title: InfluxDB
                     url: https://influxdb.jakerobb.org
                     icon: di:influxdb
+                  - title: Karma
+                    url: https://karma.jakerobb.org
+                    icon: mdi:bell-alert
                   - title: Network Optimizer
                     url: https://optimizer.jakerobb.org
                     icon: mdi:speedometer
