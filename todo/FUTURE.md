@@ -171,6 +171,16 @@ running kubeconform against `manifests/external-secrets-config/clustersecretstor
 location; once it validates, remove the pinned `-schema-location` line and its comment. No target date: this depends on
 upstream.
 
+## Drop the kubeconform cilium.io schema pin
+
+**Waiting on:** the community CRD catalog fixing `cilium.io/ciliumnetworkpolicy_v2.json`. Its 2026-11-01 "Update cilium to
+1.20.2" commit (`8f08f38d`) made kubeconform fail with "could not find schema for CiliumNetworkPolicy", so
+[`../.github/workflows/lint.yml`](../.github/workflows/lint.yml) pins that group to the previous commit (`6ec4c80`). The
+file is still present and is valid JSON; kubeconform just can't compile the new schema. Root cause not yet confirmed (it may
+be the same converter bug as the external-secrets pin above). Check now and then by running kubeconform against any
+`CiliumNetworkPolicy` under `manifests/` with only the `main` catalog location; once it loads, remove the pinned
+`-schema-location` line and its comment. No target date: this depends on upstream.
+
 ## Remove restock-radar's `npm <12` Renovate constraint
 
 **Waiting on:** a fixed npm 12 release. npm 12 defaults `allow-remote` to `none`, and `npm install --package-lock-only`
