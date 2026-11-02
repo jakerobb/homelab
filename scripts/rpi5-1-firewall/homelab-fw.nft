@@ -41,6 +41,10 @@ table inet homelab_fw {
 		udp dport { 514, 5140 } ip saddr $syslog_v4 counter accept
 		udp dport { 514, 5140 } ip6 saddr $syslog_v6 counter accept
 
+		# Broadcast and multicast are never meant for this host's services; dropping them
+		# without logging keeps the would-drop log to traffic worth reading.
+		pkttype { broadcast, multicast } counter drop
+
 		limit rate 20/second log prefix "homelab-fw would-drop in: "
 		counter jump final
 	}

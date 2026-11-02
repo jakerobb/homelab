@@ -16,7 +16,8 @@ at boot (`homelab-fw.service`) and `install.sh`. It isn't deployed by the Compos
 | UniFi syslog and Talos kernel logs into Vector | UDP 514 and 5140 | Server and Management (`192.168.0.0/24`) VLANs |
 
 It also allows replies to anything rpi5-1 started, loopback, traffic from Docker's own bridges, ICMP and ICMPv6, and
-DHCP replies. Nothing else is allowed in.
+DHCP replies. Nothing else is allowed in. Broadcast and multicast packets are dropped silently in both modes, since no
+service here uses them (the gateway's UDP 10001 discovery alone was most of the log in the first week).
 
 The IPv4 ports Docker publishes (NUT and Vector) never reach the normal input rules: Docker DNATs them in prerouting and
 forwards them to the container. A separate `published` chain, hooked ahead of Docker's own forward chain, covers them.
@@ -42,12 +43,15 @@ a new control plane: it never runs the exporter, so it doesn't need a NUT entry.
 
 ## Log-only mode, then enforcing
 
-The firewall starts in log-only mode: anything no rule allows is logged and then allowed anyway. Enforcing mode drops it
-instead. The only difference is the contents of `/etc/homelab-fw/mode.nft`, which `install.sh` writes.
+The firewall starts in log-only mode: anything no rule allows is logged and then allowed anyway. Enforcing mode rejects it
+instead: a TCP reset for TCP, an ICMP port-unreachable for everything else. A reject (not a silent drop) lets a LAN
+scanner fail at once instead of waiting out a timeout. The `network-optimizer` pod does this weekly: its third-party
+DNS check tries HTTP on 80, 443 and 8080 against the resolver at `192.168.102.2`, looking for a Pi-hole or AdGuard Home
+UI, and falls back to the generic "Third-Party LAN DNS" label on a refusal. The only difference is the contents of `/etc/homelab-fw/mode.nft`, which `install.sh` writes.
 
 ```bash
-sudo ./install.sh log       # log what would be dropped, drop nothing (default)
-sudo ./install.sh enforce   # drop whatever the rules don't allow
+sudo ./install.sh log       # log what would be rejected, reject nothing (default)
+sudo ./install.sh enforce   # reject whatever the rules don't allow
 ```
 
 On rpi5-1, from `~/dev/homelab/scripts/rpi5-1-firewall`. Rerun it after changing the ruleset; it's atomic and checks
@@ -58,8 +62,9 @@ sudo journalctl -k | grep homelab-fw
 sudo nft list table inet homelab_fw
 ```
 
-Expect UniFi's discovery broadcast to UDP 10001 from `192.168.102.1`, which is harmless. Anything else that's
-legitimate needs a rule before enforcing.
+Anything that shows up and is legitimate needs a rule before enforcing. Known and harmless: `network-optimizer`'s
+weekly resolver probe (above), a stray reply from the API server VIP (conntrack lost the connection), and the occasional
+mDNS packet.
 
 **Recovering from a mistake:** if enforcing locks you out, use the console and run `sudo nft delete table inet homelab_fw`,
 or `sudo ./install.sh log`. The table isn't saved anywhere except the unit, so a reboot with the unit disabled
