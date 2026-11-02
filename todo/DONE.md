@@ -3,6 +3,13 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Doorbell relay PoE auto-recovery stays off
+
+**Done (confirmed 2026-11-01).** UniFi's "device auto-recovery" on USW Pro HD 24 PoE Port 18 (the modbus eth relay) was turned
+off by hand on 2026-10-22 after it re-enabled itself once. A week later SigNoz had no "power-cycled Port 18" log lines in the
+previous 24 hours (before, it cycled about every 35 minutes), so the setting held. If the cycling returns, suspect a UniFi Network
+update or a re-adoption of the switch.
+
 ## Radar no longer flags completed CronJob pods
 
 **Done (2026-10-25 upstream, confirmed 2026-10-28).** Radar's Issues page used to show every finished Job/CronJob pod as a
