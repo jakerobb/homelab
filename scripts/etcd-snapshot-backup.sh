@@ -38,7 +38,12 @@ find "$BACKUP_DIR" -name 'etcd-*.snapshot' -mtime "+${KEEP_DAYS}" -delete
 # nothing decrypted ever touches disk. The bucket's own 30-day lifecycle
 # rule mirrors KEEP_DAYS above, so nothing here needs to manage remote
 # deletion. See docs/etcd-backup.md.
-sops exec-env "$B2_SECRETS" "${B2_BIN} sync --no-progress --allow-empty-source ${BACKUP_DIR} b2://${B2_BUCKET}"
+#
+# --skip-newer (2026-11-01): the lifecycle rule hides a file in B2 at 30 days,
+# a day before the find above deletes it locally. That hide marker is newer
+# than the local file, so without this flag sync aborts with "source file is
+# older than destination", and set -e then skips the verify step below.
+sops exec-env "$B2_SECRETS" "${B2_BIN} sync --no-progress --skip-newer --allow-empty-source ${BACKUP_DIR} b2://${B2_BUCKET}"
 
 # Download-and-verify (2026-09-21): confirm tonight's upload is actually
 # retrievable and byte-identical from B2, not just "the sync command exited
