@@ -4,7 +4,7 @@
 
 _(as of 2026-10-29)_
 
-- **Talos v1.14.5** on all 7 nodes (3 control planes, 4 workers, including `talos-worker-3`), **Kubernetes v1.37.1**.
+- **Talos v1.14.5** on all 7 nodes (3 control planes, 4 workers, including `talos-worker-3`), **Kubernetes v1.37.2**.
   Upgrade procedure: [`../skills/rolling-node-change/instructions.md`](../skills/rolling-node-change/instructions.md).
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
   Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.5-1`,
@@ -1170,7 +1170,7 @@ decoupled name (the Mac Studio's worker will be `talos-worker-4`).
 - **NIC watchdog:** `nic-watchdog-mitigation.yaml` now selects `kubernetes.io/arch: arm64`, so it covers this node (same
   onboard NIC) as well as the control planes.
 - **Cilium L2:** it matches the generic `homelab-l2-announce` policy but not the 10G one (1GbE), like the MBP.
-- **Kubelet** matches the other nodes (v1.37.1). The jump box's `worker.yaml`, `worker-3.yaml` and `controlplane.yaml` pin it
+- **Kubelet** matches the other nodes (v1.37.2). The jump box's `worker.yaml`, `worker-3.yaml` and `controlplane.yaml` pin it
   too, and `upgrade-k8s` doesn't touch those files, so bump them by hand after each Kubernetes upgrade (see the
   rolling-node-change skill).
 - **Provisioning log:** built and test-booted in maintenance mode from the new Pi before the window, joined at
