@@ -9,7 +9,7 @@
   "platformAutomerge": false,
   "rebaseWhen": "conflicted",
   "automergeStrategy": "squash",
-  "automergeSchedule": ["after 11am and before 1pm every weekday"],
+  "automergeSchedule": ["after 11am and before 2pm every weekday"],
   "internalChecksFilter": "strict",
   "osvVulnerabilityAlerts": true,
   "kubernetes": {

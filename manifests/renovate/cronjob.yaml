@@ -13,15 +13,19 @@ metadata:
   name: renovate
   namespace: renovate
 spec:
-  # Two runs a day. 4:30am (off-peak, like the since-removed Watchtower's slot)
-  # opens PRs for new releases. 11:30am is inside renovate.json's
-  # `automergeSchedule` (after 11am, before 1pm, weekdays): Renovate only merges
-  # while it runs, and it can't use GitHub's native auto-merge, which ignores
-  # the schedule. So the midday run merges the auto-merge-eligible PRs that
-  # passed lint since the morning, on a weekday while the owner is at their desk
-  # and the house is quiet, so a bad deploy gets full attention. Both runs share
-  # one cron expression, hence the same minute.
-  schedule: "30 4,11 * * *"
+  # Four runs a day. 4:30am (off-peak, like the since-removed Watchtower's slot)
+  # opens PRs for new releases. 11:30am, 12:30pm and 1:30pm are inside
+  # renovate.json's `automergeSchedule` (after 11am, before 2pm, weekdays):
+  # Renovate only merges while it runs, and it can't use GitHub's native
+  # auto-merge, which ignores the schedule. So the midday runs merge the
+  # auto-merge-eligible PRs that passed lint since the morning, on a weekday
+  # while the owner is at their desk and the house is quiet, so a bad deploy
+  # gets full attention. Renovate automerges at most two PRs per repo per run
+  # (it restarts the repo job once after an automerge and not again, and the
+  # limit isn't configurable), hence three runs in the window: a backlog drains
+  # six a day instead of two. All runs share one cron expression, hence the
+  # same minute.
+  schedule: "30 4,11,12,13 * * *"
   timeZone: America/Detroit
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 2
