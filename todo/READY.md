@@ -188,11 +188,11 @@ When a set moves, delete its manual-apply section from the README in the same PR
 ## Watch the first Renovate auto-merges, then widen the rules
 
 The tier-1 `AUTO-MERGE` rules in [`../renovate.json`](../renovate.json) (our own app images, GitHub Actions patch/digest, the
-`renovate/renovate` image, patch bumps of Glance/Headlamp/Radar) are merged by the CronJob's new 11:30am weekday run
+`renovate/renovate` image, patch bumps of Glance/Headlamp/Radar) are merged by the CronJob's 11:30am, 12:30pm and 1:30pm weekday runs
 ([`../manifests/renovate/cronjob.yaml`](../manifests/renovate/cronjob.yaml)). After the first weekday or two, check:
 
-- A PR opened by the 4:30am run is merged by the 11:30am run (`kubectl logs -n renovate job/<latest>` shows the merge), and
-  nothing is merged outside 11am to 1pm on a weekday, or on a weekend. If PRs just sit, the likely causes are the `automergeSchedule` syntax, `lint` not
+- A PR opened by the 4:30am run is merged by the 11:30am run, or a later midday one (`kubectl logs -n renovate job/<latest>` shows the merge), and
+  nothing is merged outside 11am to 2pm on a weekday, or on a weekend. If PRs just sit, the likely causes are the `automergeSchedule` syntax, `lint` not
   reporting as the required check, or the token lacking permission to merge.
 - The `automerge` label appears on eligible PRs, and `internalChecksFilter: strict` isn't hiding updates that should be
   open (a package without a release timestamp and a `minimumReleaseAge` is held back; check the Dependency Dashboard).

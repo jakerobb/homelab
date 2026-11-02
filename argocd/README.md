@@ -267,9 +267,11 @@ Renovate PRs like everything else) — see the
 - **Self-hosted CLI image, not the GitHub App** — keeps this entirely
   in-cluster/GitOps'd like everything else here, at the cost of one manual
   bootstrap step (the GitHub token below).
-- **Schedule:** twice daily, America/Detroit. 4:30am (off-peak, like the slot
-  Watchtower used to run in) opens PRs; 11:30am merges the auto-merge ones that
-  have passed lint, on weekdays (see "Auto-merge" below).
+- **Schedule:** four times daily, America/Detroit. 4:30am (off-peak, like the
+  slot Watchtower used to run in) opens PRs; 11:30am, 12:30pm, 1:30pm merge the
+  auto-merge ones that have passed lint, on weekdays (see "Auto-merge" below).
+  Three midday runs because Renovate automerges at most two PRs per repo per
+  run.
 - **Auto-merge (added 2026-10-18).** A small, explicit slice of Renovate's PRs
   merges itself once the required `lint` check passes; everything else stays
   for a human. Merging deploys (ArgoCD auto-syncs `main`), so the list is
@@ -293,11 +295,12 @@ Renovate PRs like everything else) — see the
     false`), because GitHub's native auto-merge is queued when the PR is opened
     and ignores `automergeSchedule`. Renovate only acts while it runs, which is
     why the CronJob has the midday run: `automergeSchedule` is "after 11am and
-    before 1pm every weekday", so merges land at 11:30 on a weekday, with the
-    owner at their desk and the house quiet, to keep the blast radius of a bad
-    deploy small (not at 4am, not on a weekend). A PR opened at 4:30am merges at
-    11:30 the same weekday; one opened at 11:30 merges the next weekday. PRs that
-    become eligible over a weekend wait until Monday and merge together.
+    before 2pm every weekday", so merges land at 11:30, 12:30, or 1:30 on a
+    weekday, with the owner at their desk and the house quiet, to keep the blast
+    radius of a bad deploy small (not at 4am, not on a weekend). A PR opened at
+    4:30am merges at 11:30 the same weekday; one opened at 11:30 merges at 12:30
+    if lint has passed by then, else the next weekday. PRs that become eligible
+    over a weekend wait until Monday and merge together.
     `internalChecksFilter: strict` keeps PRs with a release-age hold from being
     opened until the hold has passed. `rebaseWhen: conflicted` (added
     2026-10-30) keeps a green PR green: under the default, a PR that fell
