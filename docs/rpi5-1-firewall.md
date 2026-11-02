@@ -10,7 +10,7 @@ at boot (`homelab-fw.service`) and `install.sh`. It isn't deployed by the Compos
 
 | What | Port | From |
 | --- | --- | --- |
-| SSH | TCP 22 | VPN VLAN (`192.168.3.0/24`) and Trusted (`192.168.92.0/24`), plus their IPv6 ULA `/64`s |
+| SSH | TCP 22 | VPN VLAN (`192.168.3.0/24`) and Trusted (`192.168.92.0/24`), plus their IPv6 ULA `/64`s; and the Proxmox host (`192.168.102.21`), IPv4 only |
 | DNS (Unbound) | TCP/UDP 53 | Any `192.168.0.0/16` and the ULA `fd3d:b17d:9f8e::/48` |
 | NUT (UPS data) | TCP 3493 | The worker nodes' IPs (`192.168.102.31`, `.32`, `.34`, `.35`), IPv4 only |
 | UniFi syslog and Talos kernel logs into Vector | UDP 514 and 5140 | Server and Management (`192.168.0.0/24`) VLANs |
@@ -25,6 +25,8 @@ input path, so the input chain has the same port rules too.
 
 Who actually talks to these ports (checked 2026-10-22):
 
+- **SSH from Proxmox:** the `pve-backup` user connects from `192.168.102.21` twice at 03:00 every night. It showed up as
+  would-drop traffic during the log-only week (2026-10-25 to 11-01), so it has its own allow.
 - **Syslog:** the gateway, which sends from its Server VLAN address `192.168.102.1`, and the living room AP at
   `192.168.0.50`. Talos nodes send to 5140 only when they boot.
 - **NUT:** the `nut-exporter` pod (nut-relay), on `talos-worker-1`, so the traffic arrives from the node's IP. The pod can
