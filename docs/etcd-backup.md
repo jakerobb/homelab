@@ -25,7 +25,9 @@ from the temporary `p3plus-archive-temp` bucket used for the HexOS restore,
 since that one is short-lived and this one isn't. The bucket has its own
 30-day lifecycle rule (`daysFromUploadingToHiding: 30`,
 `daysFromHidingToDeleting: 1`) mirroring `KEEP_DAYS` above, so nothing in
-the script needs to manage remote deletion.
+the script needs to manage remote deletion. The sync runs with `--skip-newer`: B2 hides a file at 30
+days, a day before the local prune deletes it, and without the flag that hide marker (newer than the local file) makes
+the sync abort every night until the local copy is pruned.
 
 Auth is a B2 application key scoped to *only* this bucket
 (`listBuckets,listFiles,readFiles,writeFiles` — no `deleteFiles`, since the
