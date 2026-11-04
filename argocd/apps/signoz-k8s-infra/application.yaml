@@ -51,6 +51,10 @@ spec:
         # with the number of pods on its node: ~65Mi on the control planes,
         # 180-290Mi on worker-1/-2, 386Mi on talos-worker-mbp (7-day peaks,
         # 2026-09-24).
+        # The agent request is a compromise (256Mi): a DaemonSet has one
+        # template, and 384Mi (sized for the mbp worker) left the control-plane
+        # agents Pending on 2026-11-04 once the apiserver request grew. There's
+        # no memory limit, so the mbp agent just bursts above its request.
         # Both read pod and node metadata from the Kubernetes API, so they keep
         # their service account token; the annotation tells Radar that's
         # deliberate.
@@ -67,7 +71,7 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 384Mi
+              memory: 256Mi
         otelDeployment:
           annotations:
             radarhq.io/ignore-checks: automountServiceAccountToken,memoryLimitMissing
