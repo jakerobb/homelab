@@ -22,6 +22,13 @@ raising `scst_max_cmd_mem` / `scst_max_dev_cmd_mem` (2486 and 994 MB at 10GB of 
 parameters, so a modprobe option plus a reload or NAS reboot, which a TrueNAS update may undo). The unexplained 94-second outage of
 all four workers on 2026-10-08 17:15 EDT was never explained and has not recurred.
 
+## rpi5-1 host firewall: enforcing
+
+**Done (2026-11-04).** After the 2026-11-01 rule update ([`../docs/rpi5-1-firewall.md`](../docs/rpi5-1-firewall.md)), three days of
+log-only output showed only broadcast UDP (UniFi discovery on 10001, TP-Link/Kasa on 9999 and 20002/20004, NetBIOS 138, SSDP, DHCP), which a
+reject can't answer anyway. No unicast hits, and Proxmox's nightly backups were clean. `sudo ./install.sh enforce` was run on rpi5-1;
+SSH, the API, all nodes and `nut-exporter` were fine afterward.
+
 ## Doorbell relay PoE auto-recovery stays off
 
 **Done (confirmed 2026-11-01).** UniFi's "device auto-recovery" on USW Pro HD 24 PoE Port 18 (the modbus eth relay) was turned
