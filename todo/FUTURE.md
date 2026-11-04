@@ -51,6 +51,30 @@ app makes is Flux (all in `MonitoringInfluxClient.cs`), and InfluxDB 3 dropped F
 moves to SQL or InfluxQL, remove that rule and plan the 2.x → 3.x data migration; 3.x doesn't read 2.x's storage
 directly.
 
+## Confirm SigNoz's ClickHouse volume has plateaued
+
+**Check on or after 2026-11-11.** Moved here from `READY.md` on 2026-11-04 after an investigation found nothing to fix yet.
+The volume (`data-volumeclaim-template-chi-signoz-clickhouse-cluster-0-0-0`, 30Gi) was at 21 GiB on 2026-10-28 and 22 of 30 GiB
+(74%) on 2026-11-04. The earlier "not plateauing" reading was wrong: `signoz_metrics.samples_v4` has a 30-day TTL
+(`ttl_only_drop_parts = 1`) and has dropped every partition before 2026-10-05. Volume has been steady at about 210 MiB a day
+since 10-05, so the 30-day window only finished filling on 2026-11-04. The system log tables have 30-day TTLs and start on
+10-05 or 10-06, so they've reached steady state too. Growth already slowed from about 0.58 GiB/day to about 0.14.
+
+On the 11th, check the volume's used space (`df -h /var/lib/clickhouse` in `chi-signoz-clickhouse-cluster-0-0-0`, or the PVC's
+kubelet metrics). If it's flat near 22 to 23 GiB, delete this item. If it's still climbing, grow the volume
+(`clickhouse.persistence` in [`../argocd/apps/signoz/application.yaml`](../argocd/apps/signoz/application.yaml)) or shorten retention.
+
+Notes from the investigation:
+- Two stray `samples_v4` partitions (2026-09-23 and 2026-09-27, about 4 MiB together) were past their TTL but lingered, and were
+  dropped by hand on 2026-11-04. Each held an empty part with no TTL info, which is the suspected reason ClickHouse skipped them.
+  Eleven more partitions in other tables (`signoz_logs`, `time_series_v4*`, `samples_v4_agg_*`, `metadata`) from 2026-09-17 to
+  09-27 showed the same pattern and were dropped the same way. If new ones appear, look for `delete_ttl_info_max` more than a day
+  in the past in `system.parts`.
+- About 6.3 GiB is the system log tables (`query_log`, `part_log`, `metric_log`, `asynchronous_metric_log`,
+  `aggregated_zookeeper_log`). Deliberately left alone: shortening their TTLs isn't worth the effort.
+- Heavy ad-hoc queries over `system.query_log` and `system.part_log` can trip ClickHouse's own server-wide memory cap (90% of the
+  8Gi pod limit, 7.2 GiB). That stops only the query, not the pod; keep them narrow (filter on `event_date`).
+
 ## Memory requests for SigNoz's ClickHouse operator
 
 **Waiting on:** the upstream `signoz` Helm chart exposing resources for its bundled clickhouse-operator. As of chart
