@@ -3,6 +3,25 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## HexOS iSCSI target out of command memory: retired
+
+**Done (2026-11-04).** The Prometheus and SigNoz ClickHouse volume stalls of 2026-09-29 to 10-13 were SCST (the iSCSI target on the
+HexOS VM) failing to allocate 8 MiB command buffers (`Allocation of sgv_pool_obj failed (size 8388608)` in `/var/log/scst.log`),
+answered BUSY/QUEUE FULL until the worker's write timed out after 180s. Two changes fixed it: the VM went from 8GB to 10GB RAM
+(2026-10-08, [`../terraform/proxmox/hexos.tf`](../terraform/proxmox/hexos.tf)) and the initiators' `max_sectors_kb` was capped at 1024
+on all four workers ([`../talos/patches/iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml); the mbp 2026-10-12, the
+rest 2026-10-16). The target advertises an 8 MiB optimal transfer length, which is why every disk sat at 8192 before; the session's
+`MaxBurstLength` is only 1 MiB.
+
+Evidence for retiring: the last burst was 2026-10-13 (about 13,000 failures that day), with 53 more on 10-15. Since the cap reached
+all workers, the only failures were 19 on 2026-10-29 14:01 EDT, during the workers' shutdown (SCST logging `NEXUS_LOSS_SESS` as the
+sessions dropped), with no stall and no `detected conn error`, `timing out command` or ext4 errors on any worker. Nothing in the
+last 24 hours either. The `ISCSIVolumeWritesStopped` and `ContainerOOMKilledRepeatedly` alerts in
+`argocd/apps/kube-prometheus-stack/application.yaml` stay as the tripwire, replacing the daily check. If it returns, the fallback is
+raising `scst_max_cmd_mem` / `scst_max_dev_cmd_mem` (2486 and 994 MB at 10GB of RAM, scaled to 25% of RAM; read-only module
+parameters, so a modprobe option plus a reload or NAS reboot, which a TrueNAS update may undo). The unexplained 94-second outage of
+all four workers on 2026-10-08 17:15 EDT was never explained and has not recurred.
+
 ## Doorbell relay PoE auto-recovery stays off
 
 **Done (confirmed 2026-11-01).** UniFi's "device auto-recovery" on USW Pro HD 24 PoE Port 18 (the modbus eth relay) was turned

@@ -404,8 +404,8 @@ for n in 31 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E "EX
 - `hexos.tf`: `dedicated = 24576` with a rewritten comment (the old text says the host has 32 GB and fits no more than
   10 GiB; now say 64 GB, 24 GiB, why 24 and what the SCST numbers became).
 - `todo/HARDWARE.md`: delete the done UMA, RAM and Studio items. Add a completion note to `todo/DONE.md`.
-- `todo/READY.md`: the "Watch the HexOS iSCSI target logs" item can now check SCST under the 24 GiB limits. Its
-  "another RAM increase means shrinking a worker first" note is obsolete.
+- `todo/DONE.md`: the retired "HexOS iSCSI target out of command memory" entry mentions "another RAM increase" only as
+  a fallback; note that SCST's limits are now the 24 GiB ones.
 - Update `docs/overview.md`, `docs/proxmox-os-updates.md` (the "29.1 GiB usable" arithmetic) and `talos/README.md`
   with what is true now.
 
