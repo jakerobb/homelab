@@ -33,7 +33,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: ntfy
-          image: binwiederhier/ntfy:v2.37.1
+          image: binwiederhier/ntfy:v2.37.2
           imagePullPolicy: IfNotPresent
           args:
             - serve
