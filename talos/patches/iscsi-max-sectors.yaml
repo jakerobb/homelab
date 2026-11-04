@@ -7,7 +7,7 @@
 # failed") it answers BUSY, the write times out after 180s and fails with EIO. That is what took
 # Prometheus's and ClickHouse's volumes down (2026-09-29 to 2026-10-11). The session's negotiated
 # MaxBurstLength is already 1 MiB, so nothing is gained by sending bigger commands. 1024 KiB cuts the
-# target's buffer demand per command by 8x. See todo/FUTURE.md ("Watch the HexOS iSCSI target logs").
+# target's buffer demand per command by 8x. See todo/DONE.md ("HexOS iSCSI target out of command memory: retired").
 #
 # Standalone machine-config *document* (like security-profile.yaml), applied with
 # `talosctl patch machineconfig`. Trialled on talos-worker-mbp (.34) first.
