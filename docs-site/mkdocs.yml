@@ -137,6 +137,7 @@ nav:
       - MacBook Pro worker:
           - UTM Talos worker: docs/utm-talos-worker.md
           - Host metrics: docs/mac-host-metrics.md
+      - Studio worker and RAM upgrade: docs/studio-worker-and-ram-upgrade.md
   - Terraform:
       - GitHub Actions: docs/gha-terraform.md
       - Proxmox: terraform/proxmox/README.md
