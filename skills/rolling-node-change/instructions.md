@@ -30,6 +30,16 @@ with a strategic-merge file (`machine: {kubelet: {image: ghcr.io/siderolabs/kube
 `talosctl -n <ip> patch machineconfig --mode=no-reboot -p @file.yaml`. JSON6902 patches are rejected on these
 multi-document configs. Wait for the node to report the new `kubeletVersion` and `Ready`, then uncordon.
 
+**Talos OS upgrade, first step: update `talosctl` on the jump box.** `talosctl` ships in the same GitHub release as
+Talos, with the same version tag, so match it to the target before upgrading any node. The jump box is arm64:
+```bash
+V=v1.14.5   # the target Talos version
+cd "$(mktemp -d)" && B=https://github.com/siderolabs/talos/releases/download/$V \
+  && curl -fsSLO $B/talosctl-linux-arm64 && curl -fsSLO $B/sha256sum.txt \
+  && grep ' talosctl-linux-arm64$' sha256sum.txt | sha256sum -c - \
+  && sudo install -m 0755 talosctl-linux-arm64 /usr/local/bin/talosctl && talosctl version --client --short
+```
+
 **Talos OS upgrade, workers.** Drain, then `talosctl -n <ip> upgrade --image factory.talos.dev/installer/<schematic>:<version>`.
 Use the node's own schematic (the standard one on worker-1/2/3, the `tsc=reliable` one on worker-mbp). Afterwards patch
 `.machine.install.image` to the same value (no reboot). Uncordon once it is back.

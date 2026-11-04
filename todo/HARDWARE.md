@@ -7,7 +7,9 @@ This document enumerates my hardware plans.
 ### Additional K8s nodes
 
 * I have an M5 Ultra Mac Studio with 96GB of RAM on order; it should arrive in November. I plan to run a Talos worker in
-  a VM on this machine. It becomes `talos-worker-4`.
+  a VM on this machine. It becomes `talos-worker-4`. The plan, together with collapsing the MS-A2 workers and the
+  MS-A2's 64 GB RAM upgrade, is in
+  [`../docs/studio-worker-and-ram-upgrade.md`](../docs/studio-worker-and-ram-upgrade.md).
 
 ## Todo items
 
