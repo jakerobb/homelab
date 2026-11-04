@@ -43,7 +43,7 @@ a new control plane: it never runs the exporter, so it doesn't need a NUT entry.
 
 ## Log-only mode, then enforcing
 
-The firewall starts in log-only mode: anything no rule allows is logged and then allowed anyway. Enforcing mode rejects it
+**Currently enforcing (since 2026-11-04).** The firewall started in log-only mode: anything no rule allows is logged and then allowed anyway. Enforcing mode rejects it
 instead: a TCP reset for TCP, an ICMP port-unreachable for everything else. A reject (not a silent drop) lets a LAN
 scanner fail at once instead of waiting out a timeout. The `network-optimizer` pod does this weekly: its third-party
 DNS check tries HTTP on 80, 443 and 8080 against the resolver at `192.168.102.2`, looking for a Pi-hole or AdGuard Home

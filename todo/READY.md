@@ -84,13 +84,11 @@ did *not* cover (UniFi's inter-VLAN firewall and any WAN port forwards, what Clo
 Proxmox and TrueNAS/HexOS API exposure, and 2FA on the GitHub, 1Password, Cloudflare and UniFi accounts) still needs a
 separate look.
 
-### Switch the rpi5-1 host firewall to enforcing
+### Narrow the rpi5-1 firewall's NUT rule
 
-The firewall is installed and has been in log-only mode since 2026-10-22 (see
-[`../docs/rpi5-1-firewall.md`](../docs/rpi5-1-firewall.md)). After about a week, read `journalctl -k | grep homelab-fw`,
-add rules for anything legitimate it shows, and run `sudo ./install.sh enforce`. Then decide whether to narrow NUT (`:3493`)
-from the whole Server VLAN to the worker nodes, which is all that uses it. Jump-box OS upgrade (Debian 12 to 13) is
-tracked in `FUTURE.md`.
+The rpi5-1 host firewall has been enforcing since 2026-11-04 (see [`../docs/rpi5-1-firewall.md`](../docs/rpi5-1-firewall.md)).
+Decide whether to narrow NUT (`:3493`) from the whole Server VLAN to the worker nodes, which is all that uses it. Jump-box OS
+upgrade (Debian 12 to 13) is tracked in `FUTURE.md`.
 
 ### Pin container images by digest
 
