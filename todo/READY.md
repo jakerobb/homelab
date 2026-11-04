@@ -245,16 +245,3 @@ webhook's payload shape looks like the "Alertmanager outbound notification" form
 straight at it and reuse the existing ntfy pipeline, skipping Alertmanager for that path. Not verified live; found via
 docs comparison, not a real test POST. Start with a test POST. See
 [`../argocd/README.md`](../argocd/README.md#signoz-decided-and-deployed-2026-09-22) for the SigNoz deployment itself.
-
-## Trim over-sized memory requests
-
-**Unblocked 2026-10-25** (a clean month of usage history has accrued since the 2026-09-24 restarts). The 2026-09-24 audit set memory
-requests just above each workload's 7-day *peak*; p95 is the usual basis. Biggest overshoots, summed across
-replicas/nodes: cilium-agent (~1.8GiB over p95), otel-agent (~1.5GiB; 384Mi on every node, sized for mbp, while the
-Pis use ~65Mi), kube-apiserver (~0.9GiB; 1536Mi each on three control planes), cilium-envoy (~0.6GiB). Together
-about 2-3GiB of requested memory. Waiting because Cilium and every pod on mbp restarted on 2026-09-24, so the recent
-history understates their steady state. Re-run the same Prometheus comparison (per-container 7d/30d p95 and max vs
-`kube_pod_container_resource_requests`) and size to about p95. The apiserver lives in
-[`../talos/patches/control-plane/control-plane-resources.yaml`](../talos/patches/control-plane/control-plane-resources.yaml)
-(needs a `talosctl patch` per control plane); the rest are Helm values in `argocd/apps/` and `talos/cilium/values.yaml`
-(Cilium needs a manual ArgoCD sync).

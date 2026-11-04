@@ -3,6 +3,16 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Re-audit memory requests (2026-11-04)
+
+**Done in the repo; the Talos patch still needs applying.** Re-ran the 14-day p95/max comparison once the post-2026-09-24
+history had accrued. The expected 2-3GiB of over-requesting had mostly gone: the kube-apiserver now runs *above* its 1536Mi
+request (p95 1.6-1.8Gi, max ~2.1Gi), so it was raised to 2048Mi, and kube-controller-manager went 192Mi to 256Mi (p95 hit
+192Mi on one node). cilium-agent (448Mi) and otel-agent (384Mi) are one chart value for every node and the busiest nodes
+(worker-mbp for Cilium; worker-1 and mbp for otel-agent) sit right at it, so they stay. cilium-envoy peaks at ~107Mi against
+128Mi. The remaining over-requests (signoz, argocd-repo-server, democratic-csi, ntfy) total under 1GiB and were left alone:
+nothing is short of schedulable memory, so the saving isn't worth the eviction risk.
+
 ## HexOS iSCSI target out of command memory: retired
 
 **Done (2026-11-04).** The Prometheus and SigNoz ClickHouse volume stalls of 2026-09-29 to 10-13 were SCST (the iSCSI target on the
