@@ -4,7 +4,9 @@
 # (controller-manager) and 10m/64Mi (scheduler).
 # - kube-apiserver runs at 1.3-1.4Gi, nearly 3x its default request. By
 #   2026-11-04 its 14-day p95 had grown to 1.6-1.8Gi (max ~2.1Gi), so the
-#   request was raised from 1536Mi to 2048Mi.
+#   request was raised from 1536Mi to 2048Mi. That left the 4GB control
+#   planes ~91% requested and the signoz otel-agent (384Mi) unschedulable
+#   there, so it was trimmed to 1792Mi (the same day).
 # - kube-controller-manager peaked at 160Mi against 256Mi requested; its
 #   14-day p95 reached 192Mi on one node (max 200Mi), so it went to 256Mi.
 # - kube-scheduler peaked at 67Mi, just over its 64Mi.
@@ -14,7 +16,7 @@ cluster:
     resources:
       requests:
         cpu: 200m
-        memory: 2048Mi
+        memory: 1792Mi
   controllerManager:
     resources:
       requests:
