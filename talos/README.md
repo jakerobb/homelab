@@ -4,7 +4,7 @@
 
 _(as of 2026-10-29)_
 
-- **Talos v1.14.5** on all 7 nodes (3 control planes, 4 workers, including `talos-worker-3`), **Kubernetes v1.37.2**.
+- **Talos v1.14.5** on all 6 nodes (3 control planes, 3 workers: `talos-worker-1`, `talos-worker-3` and `talos-worker-mbp`), **Kubernetes v1.37.2**.
   Upgrade procedure: [`../skills/rolling-node-change/instructions.md`](../skills/rolling-node-change/instructions.md).
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
   Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.5-1`,
@@ -673,7 +673,7 @@ ever retires.
 
 matter-server runs with `hostNetwork` on whichever worker it lands on, so the workers' own IPv6 routes decide
 what it can reach. Two things are set per worker in `patches/workers/worker-*.yaml`; the interface name differs
-per node (`ens18` on workers 1 and 2, `end0` on worker-3, `enp0s1` on worker-mbp), so neither lives in the shared
+per node (`ens18` on worker-1, `end0` on worker-3, `enp0s1` on worker-mbp), so neither lives in the shared
 template.
 
 - **Thread route** (`machine.sysctls`, `accept_ra_rt_info_max_plen: "64"`). The Office HomePod (the only Thread
@@ -703,7 +703,7 @@ link speed in Mbps:
 
 | Node | Label | Link |
 |---|---|---|
-| `talos-worker-1`, `talos-worker-2` | `10000` | MS-A2, 10GbE |
+| `talos-worker-1` | `10000` | MS-A2, 10GbE |
 | `talos-worker-mbp` | `2500` | 2018 MBP, 2.5GbE adapter |
 
 The upcoming Pi worker should get `1000`, and the Mac Studio `10000`. Control
@@ -723,7 +723,7 @@ inline patch rather than re-applying the whole per-worker file:
 talosctl patch machineconfig -n 192.168.102.31 -p '{"machine":{"nodeLabels":{"homelab.jakerobb.org/nic-speed-mbps":"10000"}}}' --mode=no-reboot
 ```
 
-Use `.32` for worker-2, and `.34` with `"2500"` for the MBP. Check with
+Use `.34` with `"2500"` for the MBP. Check with
 `kubectl get nodes -L homelab.jakerobb.org/nic-speed-mbps`.
 
 ## Control-plane VIP (added 2026-09-18)
@@ -836,7 +836,7 @@ recurrence since. Worth capturing here if/when that's dug up.
   `node-tuning-namespace.yaml`/
   `nic-watchdog-mitigation.yaml` are plain Kubernetes manifests applied via
   `kubectl`, not Talos machine-config patches).
-- `patches/workers/` — per-node patches for the workers: the two MS-A2 worker VMs and
+- `patches/workers/` — per-node patches for the workers: the MS-A2 worker VM and
   the MBP (hostname plus the iSCSI kernel-module/extraMounts settings — see
   "iscsi-tools extension" below), and `worker-3.yaml` for the Pi 5 (see "Additional
   worker: talos-worker-3" below).
@@ -844,15 +844,17 @@ recurrence since. Worth capturing here if/when that's dug up.
   `kubelet-parallel-image-pulls.yaml`, `nameservers.yaml`, `security-profile.yaml` — shared Talos machine-config patches
   applied to every node (control planes and workers alike).
 
-## MS-A2 workers: decided values (2026-09-11)
+## MS-A2 worker: decided values (2026-09-11, collapsed to one 2026-11-04)
 
-Two workers, not one — with only 3 tainted control-plane Pis and a single
-worker, upgrading that one worker would leave the cluster with zero
-schedulable capacity in the meantime. Two workers (still both VMs on the same
-physical MS-A2 for now) means one can be cordoned/upgraded while the other
-keeps serving. Naming is deliberately decoupled from "msa2" — more physical
-machines are coming later, and a worker's name shouldn't imply which box it
-happens to run on today.
+This started as two workers (`talos-worker-1` and `-2`) on the MS-A2: with only
+3 tainted control-plane Pis and a single worker, upgrading that one worker would
+have left the cluster with zero schedulable capacity. That reasoning stopped
+applying once the Pi (`talos-worker-3`) and the MacBook Pro VM joined as workers
+on other machines, so on 2026-11-04 `talos-worker-2` was drained, deleted and
+destroyed, and `talos-worker-1` was grown to 8 vCPU / 16GB RAM. (Two VMs on one
+host shared its fate anyway, and each node cost about 1.5GiB of overhead.) Naming
+is deliberately decoupled from "msa2" — more physical machines are coming later,
+and a worker's name shouldn't imply which box it happens to run on today.
 
 IP addressing convention on `192.168.102.0/24` (decided 2026-09-11): `.21-.29`
 reserved for physical hosts, `.31+` for VMs — keeps the two cleanly separated
@@ -861,14 +863,14 @@ as more of each show up.
 | Hostname | IP | MAC (fixed in Terraform) |
 |---|---|---|
 | `talos-worker-1` | `192.168.102.31` | `02:00:00:00:00:31` |
-| `talos-worker-2` | `192.168.102.32` | `02:00:00:00:00:32` |
 
-Both need a DHCP reservation on the UCG (matching the fixed MAC above).
+It needs a DHCP reservation on the UCG (matching the fixed MAC above). `.32` is
+free again.
 
-Each: 4 vCPU, 4GB RAM. (Proxmox's `cores` is a vCPU count, not a physical-core
+8 vCPU, 16GB RAM. (Proxmox's `cores` is a vCPU count, not a physical-core
 reservation — the host scheduler spreads vCPU threads across all 32 logical
-threads/16 physical cores of the 8945HX as needed, so 8 vCPUs total across
-both workers leaves comfortable headroom.)
+threads/16 physical cores of the 8945HX as needed, so 8 vCPUs leaves comfortable
+headroom.)
 
 - **Image source:** Talos doesn't publish a plain qcow2 on GitHub releases anymore —
   VM images are built on demand via [Image Factory](https://factory.talos.dev).
@@ -877,7 +879,7 @@ both workers leaves comfortable headroom.)
   https://factory.talos.dev/image/376567988ad370138ad8b2698212367b8edcb69b5fd68c80be1f2ec7d603b4ba/v1.11.5/nocloud-amd64.qcow2
   ```
   Consumed by the `proxmox_download_file.talos_worker_image` resource in
-  `terraform/proxmox/images.tf`, imported into both workers' disks.
+  `terraform/proxmox/images.tf`, imported into the worker's disk.
 
 ## iscsi-tools extension (added 2026-09-15)
 
@@ -1065,9 +1067,10 @@ cordon/drain, no data migration.
 "MS-A2 workers: decided values" above): named `talos-worker-mbp`, not
 `talos-worker-3`. That rule exists so a worker's name doesn't imply which box
 it runs on *long-term* — doesn't apply here since this node is explicitly
-short-lived and hardware-identified on purpose. The Mac Studio's worker,
-when it arrives, should get a normal decoupled `talos-worker-N` name instead,
-since it isn't a stopgap.
+short-lived and hardware-identified on purpose. (The Mac Studio's worker was
+first planned as a decoupled `talos-worker-4`. It is `talos-worker-studio`
+instead, chosen 2026-11-04: with this many different machines, a name that says
+where the node runs is easier to keep straight than a number.)
 
 `192.168.102.34` (next free `.31+` slot), MAC `02:00:00:00:00:34`, same
 `iscsi-tools`+`util-linux-tools` schematic and version as the Proxmox
@@ -1149,7 +1152,7 @@ hardware (the Proxmox workers) isn't affected, only UTM/QEMU VMs are.
 The fourth Raspberry Pi 5 node in the cluster, and the fourth worker. It's the 16GB Pi that was rpi5-1 until the jump box swap
 ([`../docs/jump-box-swap.md`](../docs/jump-box-swap.md)), now with a fresh 256GB NVMe SSD (2230). A smaller 4GB Pi
 took over as rpi5-1 using the original 1TB SSD. This node is permanent, unlike `talos-worker-mbp`, so it has a normal
-decoupled name (the Mac Studio's worker will be `talos-worker-4`).
+decoupled name (the Mac Studio's worker is `talos-worker-studio`, a hardware-identified name chosen on purpose).
 
 - **Address:** `192.168.102.35`, MAC `88:a2:9e:2b:0c:2d` (UniFi DHCP reservation). `.33` is TrueNAS, so the next
   free `.3x` slot was used rather than the `.21`-`.29` "physical host" range, matching `talos-worker-mbp` (`.34`).
@@ -1196,7 +1199,7 @@ depend on Prometheus, and it works while a node's kubelet or pod network is down
 
 | Schematic | ID | Used by |
 |---|---|---|
-| `iscsi-tools`, `util-linux-tools`, kernel-log arg | `85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615` | talos-worker-1, -2 |
+| `iscsi-tools`, `util-linux-tools`, kernel-log arg | `85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615` | talos-worker-1 |
 | the same plus `tsc=reliable` | `fc5e78730c2f3ed1f1939294d5cf2340c160d940f03994daf3ca4fbaf022f203` | talos-worker-mbp |
 
 Both were rolled out 2026-10-05 with `talosctl upgrade --image factory.talos.dev/installer/<id>:v1.14.2`, one

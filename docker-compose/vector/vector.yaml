@@ -208,7 +208,6 @@ transforms:
     source: |
       nodes = {
         "192.168.102.31": "talos-worker-1",
-        "192.168.102.32": "talos-worker-2",
         "192.168.102.34": "talos-worker-mbp"
       }
       ip = to_string(.host) ?? ""

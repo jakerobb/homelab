@@ -12,7 +12,7 @@ at boot (`homelab-fw.service`) and `install.sh`. It isn't deployed by the Compos
 | --- | --- | --- |
 | SSH | TCP 22 | VPN VLAN (`192.168.3.0/24`) and Trusted (`192.168.92.0/24`), plus their IPv6 ULA `/64`s; and the Proxmox host (`192.168.102.21`), IPv4 only |
 | DNS (Unbound) | TCP/UDP 53 | Any `192.168.0.0/16` and the ULA `fd3d:b17d:9f8e::/48` |
-| NUT (UPS data) | TCP 3493 | The worker nodes' IPs (`192.168.102.31`, `.32`, `.34`, `.35`), IPv4 only |
+| NUT (UPS data) | TCP 3493 | The worker nodes' IPs (`192.168.102.31`, `.34`, `.35`, and `.36`, which is reserved for the planned Mac Studio worker), IPv4 only |
 | UniFi syslog and Talos kernel logs into Vector | UDP 514 and 5140 | Server and Management (`192.168.0.0/24`) VLANs |
 
 It also allows replies to anything rpi5-1 started, loopback, traffic from Docker's own bridges, ICMP and ICMPv6, and

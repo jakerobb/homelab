@@ -5,7 +5,7 @@ One runbook for three connected changes, in three phases so that only the last o
 | Phase | When | Outage? | What |
 |---|---|---|---|
 | 1 | Now | No | Collapse the two MS-A2 workers into one (16 GiB, 8 cores); stage the Studio's config |
-| 2 | Studio arrives | No | Add `talos-worker-4` as a UTM VM on the Mac Studio; soak; later retire `talos-worker-mbp` |
+| 2 | Studio arrives | No | Add `talos-worker-studio` as a UTM VM on the Mac Studio; soak; later retire `talos-worker-mbp` |
 | 3 | RAM in hand | **Yes, HexOS and every volume** | Swap the MS-A2's SODIMMs to 64 GB, give HexOS 24 GiB, restart |
 
 ## Why these numbers
@@ -33,7 +33,7 @@ Final layout:
 | MS-A2 (64 GB, about 62 GiB visible) | HexOS VM | 24 GiB, 6 cores |
 | | `talos-worker-1` | 16 GiB, 8 cores |
 | | Proxmox host + spare | about 22 GiB |
-| Mac Studio | `talos-worker-4` (`.36`) | 40 GiB, 16 vCPUs |
+| Mac Studio | `talos-worker-studio` (`.36`) | 40 GiB, 16 vCPUs |
 | Pi 5 16 GB | `talos-worker-3` (`.35`) | unchanged |
 
 Run `kubectl`, `talosctl` and `ssh proxmox` on the jump box (`ssh jakerobb@rpi5-1.lan`) unless a step says otherwise.
@@ -131,14 +131,16 @@ Nothing here needs the Mac.
 
 - Add a DHCP reservation in the UCG for MAC `02:00:00:00:00:36` to `192.168.102.36`.
 - Add `.36` to `nut_v4` in the firewall file (and re-run `install.sh`), so `nut-exporter` works if it lands there.
-- Write `talos/patches/workers/worker-4.yaml`, modelled on [`worker-mbp.yaml`](../talos/patches/workers/worker-mbp.yaml):
-  hostname `talos-worker-4`, `nic-speed-mbps: "10000"` (use the real link speed), static ULA `fd3d:b17d:9f8e:102::36/64`
-  with the `::/0` route via `fe80::1e0b:8bff:fe14:a5d5` (metric 2048), `accept_ra_rt_info_max_plen`, the
-  `/etc/iscsi` and `/var/lib/iscsi` extraMounts, and `kernel.modules: [iscsi_tcp]`. Leave the interface name and
-  `install.disk` as placeholders until the VM is up. `install.image` is the same schematic as workers 1 and 2
+- `talos/patches/workers/worker-studio.yaml` is written in phase 2 (step 2.2), not now: its interface name and
+  `install.disk` are only known once the VM is up, and a file full of placeholders isn't worth committing. Model it on
+  [`worker-mbp.yaml`](../talos/patches/workers/worker-mbp.yaml): hostname `talos-worker-studio`, `nic-speed-mbps: "10000"`
+  (use the real link speed), static ULA `fd3d:b17d:9f8e:102::36/64` with the `::/0` route via
+  `fe80::1e0b:8bff:fe14:a5d5` (metric 2048), `accept_ra_rt_info_max_plen`, the `/etc/iscsi` and `/var/lib/iscsi`
+  extraMounts, and `kernel.modules: [iscsi_tcp]`. `install.image` is the same schematic as worker-1
   (`85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615`) at the current Talos version, **without**
   `tsc=reliable`. That workaround is for the x86 TSC clocksource and has no arm64 equivalent. Watch for
-  `NodeClockNotSynchronising` once the node is up.
+  `NodeClockNotSynchronising` once the node is up. Also add `"192.168.102.36": "talos-worker-studio"` to the node map in
+  `docker-compose/vector/vector.yaml`, so its kernel logs get a node name.
 - Prepare, but **do not merge**, the phase 3 change: `hexos.tf` `dedicated = 24576` with the comment rewritten (see
   3.9). It would fail to start on 29 GiB, which is why it waits for the RAM.
 
@@ -153,6 +155,28 @@ The generic recipe is [`utm-talos-worker.md`](utm-talos-worker.md). The differen
 - UTM: Virtualize, Linux, "Use Apple Virtualization" **off** (QEMU backend, as on the MBP). 16 CPU cores, 40960 MiB RAM,
   64 GiB disk, bridged to the wired interface on the Server VLAN, `virtio-net-pci`, MAC `02:00:00:00:00:36`.
 
+### 2.0 Address allowlists (before the node takes pods)
+
+Anything that allows traffic by node IP has to learn `192.168.102.36`, and forget `.32`. In the repo that's already
+done (rpi5-1's `nut_v4`; Vector's map is a phase 2 edit, see 1.5). The rest lives outside the repo:
+
+- **UniFi firewall rules.** The IoT VLAN rule that lets cluster nodes reach `kvm`, `rack-led` and `modbus-relay`
+  allows node IPs, not just rpi5-1 (see [IoT VLAN firewall](../argocd/README.md)). It's documented as
+  `.11`-`.13`, `.31`, `.32`, `.34`, without `.35`, so check whether it's an IP group and what's actually in it. Add `.36`,
+  remove `.32`. Check any other rule that names node IPs: Home Assistant, Matter and Scrypted run with `hostNetwork` and
+  float to any worker, so they reach cameras and IoT devices from the node's own address.
+- **Device-side allowlists** that name the old nodes' IPs, if any (a camera, the KVM, the Z-Wave or Zigbee gateways).
+- **DHCP reservation** for `02:00:00:00:00:36` to `192.168.102.36` (1.5). Remove `.32`'s (1.4).
+- **After the node is up**, repeat the reachability test that found the IoT rule problem: a test pod pinned to
+  `talos-worker-studio` that reaches an IoT-VLAN host, and a `hostNetwork` pod (blackbox-exporter, Home Assistant) landing on it.
+
+Nothing to change on HexOS: NFS exports are limited to the Server VLAN (`192.168.102.0/24`), and iSCSI uses
+democratic-csi's credentials rather than per-initiator addresses, so a new node on that VLAN is already allowed. The
+Cilium L2 announcement policies select nodes by label, not by name or interface, so the Studio takes part as soon as it
+has `nic-speed-mbps`. Decide that label's value on the VM's measured throughput rather than the Mac's port speed.
+`"10000"` makes it a candidate to announce the `nic-10g` Services (NetworkOptimizer's), and a UTM bridge is unlikely to
+reach 10 Gbit/s.
+
 ### 2.1 Mac host setup
 
 Do this before the VM, on the Studio:
@@ -161,7 +185,7 @@ Do this before the VM, on the Studio:
 - Stop it sleeping: System Settings, Energy, "Prevent automatic sleeping when the display is off", and "Start up
   automatically after a power failure". Check with `pmset -g` that `sleep` is 0.
 - Decide how the VM comes back after a reboot or power cut. UTM doesn't start VMs on its own, so add UTM as a login
-  item with auto-login (if you accept that) or a launch agent running `utmctl start talos-worker-4`. Without it, a
+  item with auto-login (if you accept that) or a launch agent running `utmctl start talos-worker-studio`. Without it, a
   macOS update leaves the node dead until you log in. Note that decision in this runbook.
 - Disk headroom. The 2018 MBP's host disk filling froze its VM and corrupted its image store
   ([`utm-talos-worker.md`](utm-talos-worker.md#recovering-from-a-corrupted-image-store)). Install Telegraf per
@@ -180,14 +204,14 @@ talosctl -n 192.168.102.36 --insecure get links
 talosctl -n 192.168.102.36 --insecure get disks
 ```
 
-Fill the placeholders in `worker-4.yaml`, then (on rpi5-1):
+Fill the placeholders in `worker-studio.yaml`, then (on rpi5-1):
 
 ```bash
-talosctl machineconfig patch ~/talos/homelab/worker.yaml -p @worker-4.yaml -o worker-4.yaml
+talosctl machineconfig patch ~/talos/homelab/worker.yaml -p @worker-studio.yaml -o worker-studio.yaml
 ```
 
 ```bash
-talosctl apply-config --insecure -n 192.168.102.36 -f worker-4.yaml
+talosctl apply-config --insecure -n 192.168.102.36 -f worker-studio.yaml
 ```
 
 Check the shared `worker.yaml` template's `install.image` isn't stale first (it has drifted before, see the MBP
@@ -199,7 +223,7 @@ section of [`talos/README.md`](../talos/README.md)). Eject the ISO once it's ins
   it `Ready`.
 - `talosctl -n 192.168.102.36 get machineconfig -o yaml` shows the schematic image in `install.image` (no drift).
 - A throwaway `hexos-iscsi` PVC and pod, pinned to the node with `nodeSelector: kubernetes.io/hostname:
-  talos-worker-4`, mount and write. Delete both afterwards.
+  talos-worker-studio`, mount and write. Delete both afterwards.
 - `max_sectors_kb` is capped (the [`iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml) patch is in the
   template): `talosctl -n 192.168.102.36 read /sys/block/sdb/queue/max_sectors_kb` shows 1024 on the TrueNAS disks.
 - `talosctl -n 192.168.102.36 get addresses` shows the static ULA, and `read /proc/net/ipv6_route` shows the static

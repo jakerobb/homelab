@@ -9,7 +9,7 @@
 define ssh_v4    = { 192.168.3.0/24, 192.168.92.0/24, 192.168.102.21 }
 # NUT is read by the nut-exporter pod, which can land on any worker, so every worker's
 # IP goes here (add new workers; see docs/rpi5-1-firewall.md). No IPv6: nodes have none yet.
-define nut_v4    = { 192.168.102.31, 192.168.102.32, 192.168.102.34, 192.168.102.35 }
+define nut_v4    = { 192.168.102.31, 192.168.102.34, 192.168.102.35, 192.168.102.36 }
 define syslog_v4 = { 192.168.102.0/24, 192.168.0.0/24 }
 define dns_v4    = 192.168.0.0/16
 define ssh_v6    = { fd3d:b17d:9f8e:3::/64, fd3d:b17d:9f8e:92::/64 }
