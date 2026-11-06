@@ -6,7 +6,7 @@
 #
 # Usage: ./bootstrap.sh [--homebrew] <node-host-name>
 #   e.g. ./bootstrap.sh talos-worker-mbp-host
-#   e.g. ./bootstrap.sh --homebrew talos-worker-macstudio-host
+#   e.g. ./bootstrap.sh talos-worker-studio-host
 #
 # Defaults to the manual binary + LaunchDaemon install path -- pass
 # --homebrew only once you've confirmed Homebrew actually works on this
@@ -47,7 +47,7 @@ NODE_HOST_NAME="${1:-}"
 if [ -z "$NODE_HOST_NAME" ]; then
   echo "Usage: $0 [--homebrew] <node-host-name>" >&2
   echo "  e.g.: $0 talos-worker-mbp-host" >&2
-  echo "  e.g.: $0 --homebrew talos-worker-macstudio-host" >&2
+  echo "  e.g.: $0 talos-worker-studio-host" >&2
   exit 1
 fi
 
