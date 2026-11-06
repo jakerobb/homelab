@@ -63,7 +63,7 @@ spec:
               name: data
       containers:
         - name: change-detection
-          image: dgtlmoon/changedetection.io:0.70.1
+          image: dgtlmoon/changedetection.io:0.70.2
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
