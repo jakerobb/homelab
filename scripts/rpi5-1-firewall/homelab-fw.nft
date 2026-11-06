@@ -6,7 +6,9 @@
 # `drop` = enforcing.
 
 # 192.168.102.21 is the Proxmox host, whose nightly 03:00 job SSHes in as `pve-backup`.
-define ssh_v4    = { 192.168.3.0/24, 192.168.92.0/24, 192.168.102.21 }
+# 192.168.102.22 is the Mac Studio (a workstation on the Server VLAN, and the host of
+# the talos-worker-studio VM).
+define ssh_v4    = { 192.168.3.0/24, 192.168.92.0/24, 192.168.102.21, 192.168.102.22 }
 # NUT is read by the nut-exporter pod, which can land on any worker, so every worker's
 # IP goes here (add new workers; see docs/rpi5-1-firewall.md). No IPv6: nodes have none yet.
 define nut_v4    = { 192.168.102.31, 192.168.102.32, 192.168.102.34, 192.168.102.35 }
