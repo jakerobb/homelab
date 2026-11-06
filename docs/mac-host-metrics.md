@@ -35,7 +35,7 @@ fills up, QEMU pauses the VM ("No space left on device") and its Talos node goes
 cleanup can't prevent it, because it only sees the VM's virtual disk size. This happened on 2026-09-24. The SigNoz copy
 had shown the Mac at 99.8% used for hours beforehand, but nothing was alerting on it.
 
-**Each Mac needs a DHCP reservation** so the scrape target stays put (the MacBook Pro's is `192.168.102.9`). Adding a
+**Each Mac needs a DHCP reservation** so the scrape target stays put (the MacBook Pro's is `192.168.102.9` and the Mac Studio's is `192.168.102.22`). Adding a
 Mac means a new reservation plus a new entry under the `mac-hosts` job's `targets`.
 
 ## Why Telegraf, not Vector
@@ -73,7 +73,7 @@ then, on the Mac itself, as your normal user (not via `sudo` — it calls `sudo`
 ```bash
 cd scripts/mac-host-metrics
 ./bootstrap.sh talos-worker-mbp-host                       # manual install (default)
-./bootstrap.sh --homebrew talos-worker-macstudio-host      # once you've confirmed Homebrew works there
+./bootstrap.sh talos-worker-studio-host                    # the Mac Studio (installed 2026-11)
 ```
 
 It defaults to the manual binary + LaunchDaemon path and only uses Homebrew with an explicit `--homebrew` flag — it
@@ -143,7 +143,7 @@ All steps below run on the physical Mac itself.
    Then, on every Mac:
    ```bash
    MAC_USERNAME=$(whoami)
-   NODE_HOST_NAME=talos-worker-mbp-host   # or e.g. talos-worker-macstudio-host
+   NODE_HOST_NAME=talos-worker-mbp-host   # or e.g. talos-worker-studio-host
    ```
 
 3. **Copy the scripts and config** from this repo onto the Mac (e.g. via the same `git clone`/pull you'd use for anything else in this repo, or `scp` from wherever you cloned it). `telegraf.conf` is a per-host template (see its own header comment) — substitute both variables into it on the way in rather than plain-copying it:

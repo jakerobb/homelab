@@ -533,6 +533,7 @@ spec:
                 static_configs:
                   - targets:
                       - 192.168.102.9:9273   # 2018 MacBook Pro, host of talos-worker-mbp
+                      - 192.168.102.22:9273  # Mac Studio, host of talos-worker-studio
               # Physical hosts outside the cluster running Debian's
               # prometheus-node-exporter package (docs/proxmox-host-metrics.md).
               # Named `node-exporter` on purpose: that puts them under the
