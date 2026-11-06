@@ -36,7 +36,12 @@ cleanup can't prevent it, because it only sees the VM's virtual disk size. This 
 had shown the Mac at 99.8% used for hours beforehand, but nothing was alerting on it.
 
 **Each Mac needs a DHCP reservation** so the scrape target stays put (the MacBook Pro's is `192.168.102.9` and the Mac Studio's is `192.168.102.22`). Adding a
-Mac means a new reservation plus a new entry under the `mac-hosts` job's `targets`.
+Mac means a new reservation plus a new entry under the `mac-hosts` job's `targets`, **and** the same IP in the
+`prometheus-scrape` CiliumNetworkPolicy in
+[`manifests/network-policies/monitoring.yaml`](../manifests/network-policies/monitoring.yaml). Prometheus's egress is
+restricted to listed addresses, so without that entry the target shows `context deadline exceeded` (a 10-second
+timeout) even though `curl` from the jump box or from a pod in another namespace works. Found 2026-11-06 on the Mac
+Studio, after PR 565 added only the scrape target.
 
 ## Why Telegraf, not Vector
 
@@ -179,7 +184,9 @@ All steps below run on the physical Mac itself.
    against the Intel Mac. If the script prints nothing even with the
    sudoers rule correctly in place, run `sudo powermetrics --samplers smc
    -n1 -i1000` by hand and check whether the labels changed, then update
-   the script's `awk` patterns to match.
+   the script's `awk` patterns to match. **On Apple Silicon this is a dead
+   end:** there is no `smc` sampler at all (see the first Gotcha below), so
+   `collect-smc.sh` prints nothing no matter what the sudoers rule says.
 
 6. **Start Telegraf as a service.**
 
@@ -217,6 +224,24 @@ All steps below run on the physical Mac itself.
 
 ## Gotchas found
 
+- **`powermetrics` has no `smc` sampler on Apple Silicon, so `collect-smc.sh` collects nothing there.** Found live
+  2026-11-06 on the Mac Studio (M5 Ultra, macOS 27.2): `sudo -n /usr/bin/powermetrics --samplers smc -n1 -i1000`, the
+  script's exact command line, answers `powermetrics: unrecognized sampler: smc`. The script's `|| exit 0` hides the
+  error, so the Studio simply has no `smc_temperature` or `smc_fan` series. `collect-therm.sh` also comes up empty:
+  `pmset -g therm` reports no thermal warning level recorded, and the script only prints a line when it finds one. The
+  Intel MacBook Pro is unaffected. `powermetrics` still has a `thermal` sampler, but it reports pressure notifications,
+  not die temperatures or fan speeds.
+- **[macmon](https://github.com/vladkens/macmon) can fill that gap, but it isn't wired into Telegraf yet.** Tried
+  2026-11-06 (Homebrew `macmon` 0.10.0, installed as a normal user). It needs no sudo and reads its data through
+  private macOS APIs. On the Studio, `macmon pipe -s 1` printed one JSON document with CPU and
+  GPU average temperatures (`temp.cpu_temp_avg`, `temp.gpu_temp_avg`, about 30 °C at idle), per-fan RPM and max RPM
+  (`fans`), CPU, GPU, ANE, RAM and system power in watts, per-cluster and per-core frequencies and utilisation, and
+  memory and swap. `macmon serve` also exposes the same data as Prometheus metrics. Because it relies on private Apple
+  APIs, a macOS or chip update can break it, so treat it as best effort.
+- **The Mac Studio install itself needed nothing special.** It runs macOS 27.2 on an M5 Ultra (36 cores, 96GB), and
+  `bootstrap.sh talos-worker-studio-host` took the default root LaunchDaemon path and the arm64 build. The Prometheus
+  endpoint on `:9273` served `disk_free`, `system_uptime` and `power_on_battery`, and `disk_free` was in SigNoz
+  within a minute.
 - **The macOS firewall silently blocks an unsigned Telegraf, even when it's listed as allowed.** Found live
   2026-09-24: with the Application Firewall on, `socketfilterfw --listapps` showed `/usr/local/bin/telegraf` as
   "Allow incoming connections" and `--getappblocked` said "permitted", yet every connection to `:9273` from another
