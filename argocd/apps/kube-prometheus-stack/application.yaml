@@ -307,7 +307,12 @@ spec:
                   # matter-server's pod was deleted). The final clause
                   # requires the device to exist right now: the instant
                   # selector goes empty as soon as the scrape stops
-                  # reporting it.
+                  # reporting it. The last clause requires the same LUN
+                  # (node_disk_info carries the LUN serial, so a different
+                  # volume gets a fresh series) to have been attached for
+                  # over 12 hours: the kernel reuses device names, and on
+                  # 2026-11-06 sdd went from renovate's hourly-writing volume
+                  # to restock-radar's quiet one and tripped the alert falsely.
                   - alert: ISCSIVolumeWritesStopped
                     expr: >-
                       avg_over_time((rate(node_disk_written_bytes_total{job="node-exporter",
@@ -318,6 +323,9 @@ spec:
                       and on (instance, device)
                       node_disk_written_bytes_total{job="node-exporter",
                       instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}
+                      and on (instance, device)
+                      count_over_time(node_disk_info{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[1d:5m]) > 144
                     for: 5m
                     labels:
                       severity: warning
