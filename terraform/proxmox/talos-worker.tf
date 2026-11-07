@@ -21,7 +21,7 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
   # as hexos.tf). The provider's default would reboot the worker undrained to
   # apply a change like a memory bump. Instead, apply, then drain and
   # stop/start the worker (or set the value live with `qm set` first) — see
-  # docs/proxmox-os-updates.md#resizing-the-talos-worker-vms.
+  # docs/proxmox-os-updates.md#resizing-the-talos-worker-vm.
   reboot_after_update = false
 
   machine = "q35"

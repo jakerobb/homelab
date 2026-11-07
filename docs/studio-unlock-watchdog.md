@@ -41,8 +41,8 @@ cluster's `talosconfig` and the B2 keys), and the secret is SOPS-encrypted in th
 age key that `jakerobb` already holds on the Pi. To keep the exposure small:
 
 - **Use a dedicated account, not your login.** Create a standard (non-admin) user on the Studio that exists only for
-  this, give it a long random password, and enable it for FileVault (System Settings, Privacy & Security, FileVault,
-  then enable the user). A stolen copy of the secret then unlocks the disk and logs in as a user with no rights.
+  this and give it a long random password. On macOS 27.2 a new account is enabled for FileVault automatically (older
+  releases needed System Settings, Privacy & Security, FileVault); confirm with `sudo fdesetup list`. A stolen copy of the secret then unlocks the disk and logs in as a user with no rights.
 - Keep that user out of Remote Login's allowed list (System Settings, General, Sharing, Remote Login, "Only these
   users"). **Untested:** whether the pre-boot SSH server honors that list or accepts any FileVault user. Check it
   during the test below; if a non-listed user can't unlock, add it and accept the wider exposure, or fall back to
@@ -52,7 +52,8 @@ age key that `jakerobb` already holds on the Pi. To keep the exposure small:
 
 ## Setup
 
-1. On the Studio: create the unlock user as above and note its short name.
+1. On the Studio: create the unlock user as above, note its short name, and check it is listed by
+   `sudo fdesetup list`.
 2. In the repo, create the secret **yourself** (the password shouldn't pass through chat or a tool):
 
    ```bash

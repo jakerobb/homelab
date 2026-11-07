@@ -82,7 +82,7 @@ kubectl delete node talos-worker-2
 
 `talos-worker.tf` has `reboot_after_update = false`, so set the values live first so the merge is a no-op for them,
 then roll the worker as in
-[Resizing the Talos worker VMs](proxmox-os-updates.md#resizing-the-talos-worker-vms) (VM 101):
+[Resizing the Talos worker VM](proxmox-os-updates.md#resizing-the-talos-worker-vm) (VM 101):
 
 ```bash
 kubectl drain talos-worker-1 --ignore-daemonsets --delete-emptydir-data --timeout=300s
