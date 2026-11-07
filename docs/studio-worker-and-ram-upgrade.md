@@ -153,6 +153,28 @@ start but a GUI app like UTM does not. The files are in [`../scripts/studio-work
 `run-vm.sh` (the QEMU command line), `com.jakerobb.talos-worker-studio.plist` and `install.sh`. The generic UTM recipe
 ([`utm-talos-worker.md`](utm-talos-worker.md)) still applies to the 2018 MBP.
 
+### 2.0 Address allowlists (before the node takes pods)
+
+Anything that allows traffic by node IP has to learn `192.168.102.36`, and forget `.32`. In the repo that's already
+done (rpi5-1's `nut_v4`; Vector's map is a phase 2 edit, see 1.5). The rest lives outside the repo:
+
+- **UniFi firewall rules.** The IoT VLAN rule that lets cluster nodes reach `kvm`, `rack-led` and `modbus-relay`
+  allows node IPs, not just rpi5-1 (see [IoT VLAN firewall](../argocd/README.md)). It's documented as
+  `.11`-`.13`, `.31`, `.32`, `.34`, without `.35`, so check whether it's an IP group and what's actually in it. Add `.36`,
+  remove `.32`. Check any other rule that names node IPs: Home Assistant, Matter and Scrypted run with `hostNetwork` and
+  float to any worker, so they reach cameras and IoT devices from the node's own address.
+- **Device-side allowlists** that name the old nodes' IPs, if any (a camera, the KVM, the Z-Wave or Zigbee gateways).
+- **DHCP reservation** for `02:00:00:00:00:36` to `192.168.102.36` (1.5). Remove `.32`'s (1.4).
+- **After the node is up**, repeat the reachability test that found the IoT rule problem: a test pod pinned to
+  `talos-worker-studio` that reaches an IoT-VLAN host, and a `hostNetwork` pod (blackbox-exporter, Home Assistant) landing on it.
+
+Nothing to change on HexOS: NFS exports are limited to the Server VLAN (`192.168.102.0/24`), and iSCSI uses
+democratic-csi's credentials rather than per-initiator addresses, so a new node on that VLAN is already allowed. The
+Cilium L2 announcement policies select nodes by label, not by name or interface, so the Studio takes part as soon as it
+has `nic-speed-mbps`. Decide that label's value on the VM's measured throughput rather than the Mac's port speed.
+`"10000"` makes it a candidate to announce the `nic-10g` Services (NetworkOptimizer's), and a UTM bridge is unlikely to
+reach 10 Gbit/s.
+
 ### 2.1 Mac host setup
 
 Do this before the VM, on the Studio:
@@ -166,7 +188,8 @@ Do this before the VM, on the Studio:
   terminal unlocks it remotely (tested 2026-11-06: key auth refused at 17:27:02, working by 17:28:56). The Mac then
   reaches the login window, LaunchDaemons start (Telegraf and the VM daemon both do), and the node rejoins. The
   Apple-menu Restart does an *authenticated restart* that skips the unlock, so only a shutdown or power loss needs it.
-  An automatic unlock watchdog on the jump box is possible but would store the disk password there; it isn't built.
+  An automatic unlock watchdog on the jump box is built but not yet enabled; see
+  [`studio-unlock-watchdog.md`](studio-unlock-watchdog.md) for the tradeoff and the test it still needs.
 - Disk headroom. The 2018 MBP's host disk filling froze its VM and corrupted its image store. Install Telegraf per
   [`mac-host-metrics.md`](mac-host-metrics.md) (with its disk alert, and the Cilium egress rule for `:9273`), and keep
   the qcow2 on the internal SSD with room.
@@ -212,12 +235,18 @@ Do this before the VM, on the Studio:
   it `Ready`.
 - `talosctl -n 192.168.102.36 get machineconfig -o yaml` shows the schematic image in `install.image` (no drift).
 - A throwaway `hexos-iscsi` PVC and pod, pinned to the node with `nodeSelector: kubernetes.io/hostname:
-  talos-worker-studio`, mount and write. Delete both afterwards. *(Not yet done.)*
+  talos-worker-studio`, mount and write. Delete both afterwards. *(Done 2026-11-06: attached, mounted and wrote.
+  `hexos-iscsi` is `Retain`, so the PV goes `Released` and the zvol stays on the NAS: delete the PV, then
+  `zfs destroy` the zvol under `data/k8s-iscsi/` by hand.)*
 - `max_sectors_kb` is capped (the [`iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml) patch is in the
   template): `talosctl -n 192.168.102.36 read /sys/block/sdb/queue/max_sectors_kb` shows 1024 on the TrueNAS disks.
-  *(Not yet done.)*
+  *(Done 2026-11-06: 1024 on `sda`. With no other disk attached the TrueNAS LUN was `sda`, not `sdb`.)*
 - `talosctl -n 192.168.102.36 get addresses` shows the static ULA, and `read /proc/net/ipv6_route` shows the static
-  default route. Check where `matter-server` (hostNetwork) lands, since it depends on those. *(Not yet done.)*
+  default route. Check where `matter-server` (hostNetwork) lands, since it depends on those. *(Done 2026-11-06: the
+  static ULA `::36` and both default routes, RA-learned at metric 1024 and static at 2048, are present, and the
+  sysctl reads 64. Still to check: `matter-server`'s placement. The node also picked up SLAAC addresses and on-link
+  routes for the `:42`, `:55`, `:62` and `:92` prefixes about 4.5 minutes after boot; the Pi worker has none, but
+  its SLAAC addresses expired long ago, so this is not yet known to be Studio-specific.)*
 - **Measure the network, then set the label.** The host's native 10GbE measures 9.37 Gbit/s, but the VM's pod-to-pod
   speed is lower: about 6.0-6.7 Gbit/s sending and 7.1-7.5 receiving (2026-11-06; `iperf3` against
   `network-optimizer-lb` from a pod pinned to the node, in the `network-optimizer` namespace because that namespace's
@@ -270,6 +299,11 @@ The MS-A2 has two SODIMM slots, so this is a swap, not an addition. Keep the old
 HexOS goes down, and with it every PVC and `/mnt/data/shared`. Control planes, DNS and non-PVC pods stay up. Plan for
 roughly one to two hours, plus the memory test.
 
+Expect silence from the cluster for the whole window: Prometheus, Alertmanager and ntfy all have PVCs or sit behind
+them, so nothing will alert or notify until 3.8. `network-optimizer-lb` (the 10G-only Service) has no announcer while
+`talos-worker-1` is down, which is accepted: nearly everything else is off then too. The Studio and the Pi worker keep
+running the non-PVC pods.
+
 ### 3.0 Beforehand
 
 - **Test the used SODIMMs** before they go anywhere near the NAS: memtest86+ from a USB stick, at least two full
@@ -277,8 +311,19 @@ roughly one to two hours, plus the memory test.
   outage.
 - Check they match the MS-A2's supported type (DDR5 SODIMM, same speed class as the old ones).
 - Have ready: a USB stick with memtest86+, the KVM connected, a small screwdriver.
-- Pick a quiet window. Consider an Alertmanager silence so the outage doesn't flood email and ntfy.
-- Merge nothing for phase 3 yet.
+- **The phase 1 Terraform change must already be merged and applied.** Until it lands, `terraform/proxmox` still
+  declares two 4-core, 8 GiB workers while the real VMs are collapsed (VM 101 at 16 GiB and 8 cores, set live; VM 100
+  stopped). Any apply from the HexOS PR would then try to put VM 101 back to 8 GiB and could start VM 100, and the
+  next restart of VM 101 would boot with the wrong size. Check before the window: `ssh proxmox "qm list"` shows no
+  VM 100, and the `proxmox` plan on a PR is empty.
+- **Pause the Healthchecks.io check** (the dead-man's-switch; see "Dead-man's-switch" in
+  [`../argocd/README.md`](../argocd/README.md)) when you scale things down in 3.2. Alertmanager is a StatefulSet, so
+  it goes to zero with the rest and the pings stop; the check emails 10 to 20 minutes later. Resume it in 3.8.
+- Pick a quiet window. An Alertmanager silence is pointless here, since Alertmanager is off.
+- Hold the staged `hexos.tf` PR (3.9) until after the RAM is in and HexOS is up.
+- Facts checked 2026-11-07: HexOS is VM **102** (`hexos`, 10240 MiB), the worker is VM **101** (16384 MiB), the ZFS
+  pool is `data`, and there are 21 PVCs in 14 namespaces. The host reports 29,769 MB total with about 1.5 GB
+  available, so it is genuinely full today.
 
 ### 3.1 Snapshot and back up
 
@@ -290,12 +335,21 @@ ssh truenas-ops 'sudo zfs list'
 ```
 
 ```bash
-ssh truenas-ops 'sudo zfs snapshot -r <pool>@pre-ram-upgrade'
+ssh truenas-ops 'sudo zfs snapshot -r data@pre-ram-upgrade'
 ```
 
-Run a Proxmox config backup (`/usr/local/sbin/proxmox-config-backup.sh` if that's where
-[`proxmox-config-backup.md`](proxmox-config-backup.md) put it; otherwise wait for the 03:00 cron run and confirm it).
-Take an etcd snapshot too (`~/bin/etcd-snapshot-backup.sh`).
+Run a Proxmox config backup (the script is on the Proxmox host, see
+[`proxmox-config-backup.md`](proxmox-config-backup.md); the 03:00 cron run also does it):
+
+```bash
+ssh proxmox "/usr/local/sbin/proxmox-config-backup.sh"
+```
+
+Take an etcd snapshot too, on rpi5-1:
+
+```bash
+~/bin/etcd-snapshot-backup.sh
+```
 
 ### 3.2 Stop everything that writes to HexOS
 
@@ -304,7 +358,8 @@ ArgoCD's self-heal and the Prometheus and ClickHouse operators scale PVC workloa
 is simpler. Doing it properly prevents the silently read-only volumes entirely, but the order matters. Leave
 **External Secrets running**: restarting it bursts through the 1Password quota.
 
-Stop the controller first (confirm its name with `kubectl -n argocd get sts`):
+Pause the Healthchecks.io check now (see 3.0). Then stop the controller first (confirm its name with
+`kubectl -n argocd get sts`):
 
 ```bash
 kubectl -n argocd scale statefulset argocd-application-controller --replicas=0
@@ -323,8 +378,8 @@ namespaces:
 for ns in $(kubectl get pvc -A --no-headers | awk '{print $1}' | sort -u); do kubectl -n "$ns" scale sts --all --replicas=0; kubectl -n "$ns" get cronjob -o name | xargs -r -I{} kubectl -n "$ns" patch {} -p '{"spec":{"suspend":true}}'; done
 ```
 
-Verify that no pod still mounts a PVC, and that the PVC list matches what was scaled (21 PVCs across about 17
-namespaces on 2026-11-03):
+Verify that no pod still mounts a PVC, and that the PVC list matches what was scaled (21 PVCs across 14
+namespaces on 2026-11-07):
 
 ```bash
 kubectl get pods -A -o json | jq -r '.items[] | select(.spec.volumes[]?.persistentVolumeClaim) | "\(.metadata.namespace)/\(.metadata.name) \(.status.phase)"'
@@ -338,7 +393,7 @@ kubectl drain talos-worker-1 --ignore-daemonsets --delete-emptydir-data --timeou
 
 ### 3.4 Power down, cleanly and in order
 
-HexOS first, so ZFS exports. Find its VM ID, shut it down with ACPI, and wait until it has stopped before touching
+HexOS first, so ZFS exports. Its VM ID is 102 (confirm with `qm list`); shut it down with ACPI and wait until it has stopped before touching
 the others:
 
 ```bash
@@ -346,7 +401,7 @@ ssh proxmox "qm list"
 ```
 
 ```bash
-ssh proxmox "qm shutdown <hexos-vmid> --timeout 300"
+ssh proxmox "qm shutdown 102 --timeout 300"
 ```
 
 ```bash
@@ -379,7 +434,7 @@ Staged Terraform changes don't apply to a stopped VM until the next start, and `
 `reboot_after_update = false`. Set it live so the merge is a no-op for it:
 
 ```bash
-ssh proxmox "qm set <hexos-vmid> --memory 24576 && qm start <hexos-vmid>"
+ssh proxmox "qm set 102 --memory 24576 && qm start 102"
 ```
 
 Then merge the staged `hexos.tf` PR (3.9).
@@ -426,15 +481,22 @@ The volumes all reattach at once, and Prometheus and ClickHouse can take several
 - No read-only volumes (should be none, since nothing was mounted, but it's cheap to check):
 
 ```bash
-for n in 31 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E "EXT4-fs.*(aborted journal|read-only)"; done
+for n in 31 34 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E "EXT4-fs.*(aborted journal|read-only)"; done
 ```
 
 - Prometheus is scraping, SigNoz is ingesting, Home Assistant is responding, the ntfy test notification arrives.
+- **Resume the Healthchecks.io check** and confirm it turns green within about 10 minutes (Alertmanager's `Watchdog`
+  pings it every 5).
 
 ### 3.9 Finish
 
-- `hexos.tf`: `dedicated = 24576` with a rewritten comment (the old text says the host has 32 GB and fits no more than
-  10 GiB; now say 64 GB, 24 GiB, why 24 and what the SCST numbers became).
+- `hexos.tf`: `dedicated = 24576` with a rewritten comment. The current one (lines 90 to 99) says the host has 32 GB and
+  fits no more than 10 GiB. Replace it with something like: "24 GiB, up from 10 GiB (the host went from 32 GB to
+  64 GB on <date>). SCST (the iSCSI target) sizes its command-memory limits at 25% of RAM, so 24 GiB gives about
+  6144 MB total and 2458 MB per device, against about 2.5 GB and 1 GB at 10 GiB. The earlier bump from 8 GiB
+  (2026-10-08) was for the 8 MiB-buffer allocation failures behind the Prometheus volume stalls; this adds margin.
+  The host has 64 GB: this VM, the 16 GiB worker, and about 22 GiB left for Proxmox and future VMs." Keep the "no
+  `floating`" note about ballooning. It's a no-op apply, since 3.6 already set the value live.
 - `todo/HARDWARE.md`: delete the done UMA, RAM and Studio items. Add a completion note to `todo/DONE.md`.
 - `todo/DONE.md`: the retired "HexOS iSCSI target out of command memory" entry mentions "another RAM increase" only as
   a fallback; note that SCST's limits are now the 24 GiB ones.
@@ -444,7 +506,7 @@ for n in 31 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E "EX
 ### Rollback
 
 - A bad stick: put the old pair back and boot; nothing else changed except the BIOS UMA setting, which is harmless.
-- HexOS won't start at 24 GiB: `qm set <hexos-vmid> --memory 10240` and start; the workers can stay as they are.
+- HexOS won't start at 24 GiB: `qm set 102 --memory 10240` and start; the workers can stay as they are.
 - A volume turned read-only after the restore: delete the affected pod, one at a time
   ([procedure](proxmox-os-updates.md#after-a-reboot-read-only-iscsi-volumes)).
 - The ZFS snapshot from 3.1 is the last resort. Remember `claude-ops` can't destroy snapshots.
