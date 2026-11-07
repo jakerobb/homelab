@@ -60,7 +60,7 @@ MAC_USERNAME="$(whoami)"
 # as of 2026-09-22.
 TELEGRAF_VERSION=1.40.1
 
-for f in collect-therm.sh collect-power.sh collect-smc.sh telegraf.conf telegraf-powermetrics.sudoers com.jakerobb.telegraf.plist; do
+for f in collect-therm.sh collect-power.sh collect-smc.sh collect-macmon.sh telegraf.conf telegraf-powermetrics.sudoers com.jakerobb.telegraf.plist; do
   if [ ! -f "${SCRIPT_DIR}/${f}" ]; then
     echo "Missing ${SCRIPT_DIR}/${f} -- run this from a checkout of the homelab repo (scripts/mac-host-metrics/), not a copied-out single file." >&2
     exit 1
@@ -150,7 +150,7 @@ sudo install -m 0440 -o root -g wheel "$SUDOERS_TMP" /etc/sudoers.d/telegraf-pow
 rm -f "$SUDOERS_TMP"
 
 echo "==> Smoke-testing each collector script"
-for script in collect-therm.sh collect-power.sh collect-smc.sh; do
+for script in collect-therm.sh collect-power.sh collect-smc.sh collect-macmon.sh; do
   echo "--- ${script} ---"
   # Deliberately not fatal (no `set -e` interaction) -- this is diagnostic
   # output, not a precondition for the rest of the run. An empty result
