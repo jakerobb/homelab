@@ -1,13 +1,13 @@
-# Two smaller workers rather than one big one, on purpose: with only 3
-# control-plane Pis (tainted, no workloads) and a single worker, a Talos
-# upgrade of that one worker would leave the cluster with zero schedulable
-# capacity until it came back. Two workers means one can be cordoned/upgraded
-# while the other keeps serving. Both still share the MS-A2's fate on a real
-# hardware failure — that only gets fixed once more physical machines join.
+# One worker VM on the MS-A2 (collapsed from two on 2026-11-04). Two VMs on one
+# host shared its fate anyway and each Talos node costs about 1.5 GiB of fixed
+# overhead (cilium-agent, envoy, otel, kubelet). A Talos upgrade of this worker
+# no longer leaves the cluster without schedulable capacity, since the Pi
+# (talos-worker-3), the MacBook Pro VM and the planned Mac Studio VM are
+# separate workers on separate machines. Still a `for_each` map so a second VM
+# is a one-line addition. See docs/studio-worker-and-ram-upgrade.md.
 locals {
   talos_workers = {
     talos-worker-1 = { mac_address = "02:00:00:00:00:31" } # -> 192.168.102.31
-    talos-worker-2 = { mac_address = "02:00:00:00:00:32" } # -> 192.168.102.32
   }
 }
 
@@ -18,10 +18,10 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
   name      = each.key
 
   # Never let an apply power-cycle a worker (added 2026-09-27, same reasoning
-  # as hexos.tf). The provider's default would reboot both workers at once,
-  # undrained, to apply a change like a memory bump. Instead, apply, then
-  # drain and stop/start one worker at a time — see
-  # docs/proxmox-os-updates.md#resizing-the-talos-worker-vms.
+  # as hexos.tf). The provider's default would reboot the worker undrained to
+  # apply a change like a memory bump. Instead, apply, then drain and
+  # stop/start the worker (or set the value live with `qm set` first) — see
+  # docs/proxmox-os-updates.md#resizing-the-talos-worker-vm.
   reboot_after_update = false
 
   machine = "q35"
@@ -34,14 +34,17 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
 
   cpu {
     type  = "host"
-    cores = 4
+    cores = 8
   }
 
   memory {
-    # 8 GiB since 2026-09-27 (was 4). With HexOS's 8 GiB that's 24 GiB of the
-    # host's 29 GiB usable, leaving ~5 GiB for Proxmox itself; ballooning is
-    # off on every VM, so it can't be clawed back later.
-    dedicated = 8192
+    # 16 GiB since 2026-11-04 (was 8 GiB, on each of two workers). With HexOS's
+    # 10 GiB that's 26 GiB of the host's 29 GiB usable, the same total as
+    # before the collapse. The workers use well under 4 GiB between them, so
+    # this is mostly headroom for the heavy stateful pods (Prometheus,
+    # ClickHouse). Ballooning is off on every VM, so it can't be clawed back
+    # later.
+    dedicated = 16384
     # No `floating` set — ballooning disabled, per root README step 4.
   }
 

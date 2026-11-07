@@ -11,7 +11,7 @@ any unexpected result instead of pressing on.
 
 ## Before touching anything
 
-1. All 7 nodes `Ready`, no unexpected firing alerts, no Argo app OutOfSync or Degraded.
+1. Every node `Ready` (`kubectl get nodes`), no unexpected firing alerts, no Argo app OutOfSync or Degraded.
 2. Control-plane work: take an etcd snapshot first (`~/bin/etcd-snapshot-backup.sh`). Never take two control planes
    down at once; quorum is 2 of 3.
 3. MacBook Pro worker involved: check host disk first (`ssh jakerobb@192.168.102.9 df -h /`). A full host disk has

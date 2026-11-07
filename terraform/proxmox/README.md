@@ -6,11 +6,12 @@ Provider: [`bpg/proxmox`](https://registry.terraform.io/providers/bpg/proxmox/la
 
 Proxmox VE is installed (root README step 3 done — hostname `proxmox`, static IP
 `192.168.102.21`, ext4 on the 1TB boot SSD). `images.tf`, `talos-worker.tf`, and
-`hexos.tf` are all applied: both Talos worker VMs and the HexOS VM have been
+`hexos.tf` are all applied: the Talos worker VM and the HexOS VM have been
 running in production for a while now — see `talos/README.md` and
-`docs/hexos-install.md` for their current state. DHCP reservations for both
-fixed worker MACs (`02:00:00:00:00:31` → `.31`, `...:32` → `.32`) are in place
-on the UCG.
+`docs/hexos-install.md` for their current state. A DHCP reservation for the
+fixed worker MAC (`02:00:00:00:00:31` → `.31`) is in place on the UCG. (There
+used to be a second worker, `talos-worker-2` at `.32`; it was removed on
+2026-11-04.)
 
 Known follow-up, not a blocker:
 
@@ -42,13 +43,13 @@ terraform plan   # not ./tf.sh, since the wrapper would override this with the s
 
 ## Resources
 
-- `talos-worker-1` / `talos-worker-2` (`talos-worker.tf` + `images.tf`, `for_each`
-  over `local.talos_workers`) — q35, UEFI (OVMF), virtio-net, virtio-scsi, memory
-  ballooning disabled, 4 vCPU / 4GB RAM each, boots the stock (non-rpi5) Talos
-  v1.11.5 qcow2 imported via Image Factory. Two workers rather than one so a
-  Talos upgrade doesn't leave the cluster with zero schedulable capacity — see
-  `../../talos/README.md` for that rationale and the version/installer-image
-  gotcha.
+- `talos-worker-1` (`talos-worker.tf` + `images.tf`, `for_each` over
+  `local.talos_workers`) — q35, UEFI (OVMF), virtio-net, virtio-scsi, memory
+  ballooning disabled, 8 vCPU / 16GB RAM, boots the stock (non-rpi5) Talos
+  v1.11.5 qcow2 imported via Image Factory. One worker on this host, since the
+  other workers are on other machines (the Pi, the MacBook Pro, and the planned
+  Mac Studio) — see [`../../docs/studio-worker-and-ram-upgrade.md`](../../docs/studio-worker-and-ram-upgrade.md)
+  for why, and `../../talos/README.md` for the version/installer-image gotcha.
 - `hexos` VM (`hexos.tf`) — q35, UEFI (OVMF), 6 vCPU / 10GB RAM (ballooning
   disabled — ZFS ARC wants stable RAM), boots from the TrueNAS SCALE-based
   HexOS ISO (`hexos_iso` resource, downloaded directly by Proxmox) on first

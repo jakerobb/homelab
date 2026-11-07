@@ -1,0 +1,17 @@
+[Unit]
+Description=Unlock the Mac Studio's FileVault over SSH when its Talos worker is down
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Runs as the normal user because that is who holds the age key that decrypts the secret (scripts/secrets/).
+User=jakerobb
+Environment=HOME=/home/jakerobb
+Environment=SOPS_AGE_KEY_FILE=/home/jakerobb/.config/sops/age/keys.txt
+ExecStart=/usr/local/lib/studio-unlock-watchdog/studio-unlock-watchdog.sh
+StateDirectory=studio-unlock-watchdog
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes

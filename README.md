@@ -39,7 +39,7 @@ only). New here? Start with [How it fits together](docs/overview.md), [Getting a
         - 3-node Talos control plane (`.11`-`.13`, Raspberry Pi 5 4GB with PoE+NVMe HATs and 256G NVMe storage)
             - `.10` is the cluster virtual IP
         - MinisForum MS-A2 (`.21`) running Proxmox VE, hosting:
-            - two Talos worker VMs — `talos-worker-1` (`.31`) and `talos-worker-2` (`.32`)
+            - a Talos worker VM — `talos-worker-1` (`.31`)
             - TrueNAS / HexOS (`.33`)
         - MacBook Pro (see "On top of the rack" below), running a third Talos worker VM — `talos-worker-mbp` (`.34`) — 
           under UTM. The Mac host itself is `.9`; SSH in to the Mac as `jakerobb@192.168.102.9` (key auth).
@@ -48,7 +48,7 @@ only). New here? Start with [How it fits together](docs/overview.md), [Getting a
   (`192.168.102.128/26`). Details and gotchas live in [`talos/README.md`](talos/README.md).
 - **IaC layout:**
     - [`talos/`](talos/) — non-secret Cilium config and per-node Talos patches applied to the existing cluster.
-    - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions; the two Talos worker VMs are provisioned from
+    - [`terraform/proxmox/`](terraform/proxmox/) — Proxmox VM definitions; the Talos worker VM is provisioned from
       here, applied from rpi5-1.
     - [`terraform/cloudflare/`](terraform/cloudflare/) and [`terraform/signoz/`](terraform/signoz/) — Cloudflare
       zones for the parked domains, and SigNoz dashboards. Planned on PRs and applied on merge, like `terraform/proxmox`.
@@ -374,7 +374,6 @@ Proxmox runs on the MS-A2. It manages the following VMs:
 
 * HexOS/TrueNAS
 * talos-worker-1
-* talos-worker-2
 
 The host itself runs node-exporter for metrics and temperatures, scraped by the cluster's Prometheus — see
 [`docs/proxmox-host-metrics.md`](docs/proxmox-host-metrics.md).

@@ -1,7 +1,7 @@
 # Proxmox host OS updates
 
 The Proxmox host (`proxmox.lan`, PVE 9 on Debian 13 trixie) runs
-talos-worker-1, talos-worker-2, and the HexOS VM. Until 2026-09-27 nothing
+talos-worker-1 and the HexOS VM. Until 2026-09-27 nothing
 kept its packages up to date: the last `apt upgrade` was the 2026-09-13
 install, and the 2026-09-27 check found 30 pending upgrades, 4 of them from
 `trixie-security`.
@@ -79,8 +79,8 @@ apt update && apt full-upgrade
 ```
 
 If a new `proxmox-kernel-*` was installed, it needs a reboot, which takes
-down talos-worker-1, talos-worker-2, and HexOS. Afterwards, confirm the host
-actually rebooted with `uptime`, and that both workers are `Ready` in
+down talos-worker-1 and HexOS. Afterwards, confirm the host
+actually rebooted with `uptime`, and that the worker is `Ready` in
 `kubectl get nodes`.
 
 ### After a reboot: read-only iSCSI volumes
@@ -122,32 +122,31 @@ reboot would avoid it, but ArgoCD self-heal (and the Prometheus and
 ClickHouse operators) would scale them straight back up. Deleting the pods
 afterwards is simpler.
 
-## Resizing the Talos worker VMs
+## Resizing the Talos worker VM
 
-Memory and CPU for talos-worker-1 and talos-worker-2 are set in
+Memory and CPU for talos-worker-1 are set in
 [`../terraform/proxmox/talos-worker.tf`](../terraform/proxmox/talos-worker.tf),
 which has `reboot_after_update = false`. Without that, the provider reboots
-both workers at once, undrained, when an apply changes something like
-memory. With it, a merge only stages the change, and it takes effect at the
-next full stop/start. A reboot from inside Talos isn't enough.
+the worker, undrained, when an apply changes something like memory. With it,
+a merge only stages the change, and it takes effect at the next full
+stop/start. A reboot from inside Talos isn't enough.
 
 Either merge first, or set the value live with `qm set` so the merge is a
-no-op for it. Then roll the workers one at a time. On rpi5-1, for
-talos-worker-1 (VM 101; talos-worker-2 is VM 100 at 192.168.102.32):
+no-op for it. Then roll the worker. On rpi5-1, for talos-worker-1 (VM 101 at
+192.168.102.31):
 
 ```bash
 kubectl drain talos-worker-1 --ignore-daemonsets --delete-emptydir-data --timeout=300s
 ```
 
 ```bash
-ssh proxmox "qm set 101 --memory 8192 && qm shutdown 101 --timeout 180 && qm start 101"
+ssh proxmox "qm set 101 --memory 16384 --cores 8 && qm shutdown 101 --timeout 180 && qm start 101"
 ```
 
 Wait for the node to be `Ready`, confirm it cold-started with
 `talosctl -n 192.168.102.31 read /proc/uptime` and has the new capacity with
 `kubectl get node talos-worker-1 -o jsonpath='{.status.capacity.memory}'`,
-then uncordon it and wait for all pods and apps to be healthy before doing
-the other one:
+then uncordon it and wait for all pods and apps to be healthy:
 
 ```bash
 kubectl uncordon talos-worker-1
@@ -156,9 +155,11 @@ kubectl uncordon talos-worker-1
 Drains are graceful, so iSCSI volumes detach cleanly and don't go read-only
 the way they do when HexOS goes down.
 
-On 2026-09-27 both workers went from 4 to 8 GiB this way, in about a minute
-each, with no downtime. That puts the VMs at 24 GiB of the host's 29.1 GiB
-usable (2 GiB of the 32 is reserved for the iGPU; see
+On 2026-09-27 the two workers then in service went from 4 to 8 GiB this way,
+in about a minute each, with no downtime. On 2026-11-04 the second worker was
+removed and talos-worker-1 went to 16 GiB and 8 cores the same way. With
+HexOS's 10 GiB that puts the VMs at 26 GiB of the host's 29.1 GiB usable (2
+GiB of the 32 is reserved for the iGPU; see
 [`../todo/HARDWARE.md`](../todo/HARDWARE.md)). Ballooning is off, so the
 VMs will eventually hold their full allocation, and `free -m` on the host
 should settle at around 26 GiB used.
