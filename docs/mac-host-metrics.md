@@ -231,13 +231,18 @@ All steps below run on the physical Mac itself.
   `pmset -g therm` reports no thermal warning level recorded, and the script only prints a line when it finds one. The
   Intel MacBook Pro is unaffected. `powermetrics` still has a `thermal` sampler, but it reports pressure notifications,
   not die temperatures or fan speeds.
-- **[macmon](https://github.com/vladkens/macmon) can fill that gap, but it isn't wired into Telegraf yet.** Tried
+- **[macmon](https://github.com/vladkens/macmon) fills that gap, via `collect-macmon.sh`.** Tried
   2026-11-06 (Homebrew `macmon` 0.10.0, installed as a normal user). It needs no sudo and reads its data through
   private macOS APIs. On the Studio, `macmon pipe -s 1` printed one JSON document with CPU and
   GPU average temperatures (`temp.cpu_temp_avg`, `temp.gpu_temp_avg`, about 30 °C at idle), per-fan RPM and max RPM
   (`fans`), CPU, GPU, ANE, RAM and system power in watts, per-cluster and per-core frequencies and utilisation, and
-  memory and swap. `macmon serve` also exposes the same data as Prometheus metrics. Because it relies on private Apple
-  APIs, a macOS or chip update can break it, so treat it as best effort.
+  memory and swap. Because it relies on private Apple
+  APIs, a macOS or chip update can break it, so treat it as best effort. `collect-macmon.sh` runs `macmon pipe -s 1`
+  once a minute and emits `macmon_temperature` (`cpu_avg`, `gpu_avg`), `macmon_fan` (tag `name`; `rpm`, `max_rpm`),
+  `macmon_power_watts`, `macmon_freq_mhz` and `macmon_usage_ratio`. It exits silently when macmon isn't installed, so
+  the Intel MacBook Pro just has no `macmon_*` series. On an Apple Silicon Mac, run `brew install macmon` as the
+  normal user, then rerun `bootstrap.sh` to install the script and config. macmon's `ecpu`/`pcpu` names don't map to
+  efficiency/performance on the M5 (its tiers are labelled P and S), so read them as two core groups, not as E and P.
 - **The Mac Studio install itself needed nothing special.** It runs macOS 27.2 on an M5 Ultra (36 cores, 96GB), and
   `bootstrap.sh talos-worker-studio-host` took the default root LaunchDaemon path and the arm64 build. The Prometheus
   endpoint on `:9273` served `disk_free`, `system_uptime` and `power_on_battery`, and `disk_free` was in SigNoz
