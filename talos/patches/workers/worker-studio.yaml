@@ -1,0 +1,58 @@
+machine:
+  network:
+    hostname: talos-worker-studio
+    # Static IPv6 default route via the UniFi gateway's link-local address, and a static ULA on the Server
+    # VLAN's prefix (host part = the IPv4 last octet). Same reasoning as worker-mbp.yaml: the gateway's
+    # Router Advertisements arrive too rarely to keep the RA-learned route and the SLAAC address alive.
+    # Listing the interface turns off Talos's implicit DHCP, hence the explicit `dhcp: true`. The gateway's
+    # link-local address is derived from its MAC (1c:0b:8b:14:a5:d5); update it if the gateway is replaced.
+    # enp0s2 is what the virtio NIC shows up as under QEMU's `virt` machine (read from the maintenance API
+    # 2026-11-06), not enp0s1 like the UTM VM on the MBP.
+    interfaces:
+      - interface: enp0s2
+        dhcp: true
+        addresses:
+          - fd3d:b17d:9f8e:102::36/64
+        routes:
+          - network: "::/0"
+            gateway: "fe80::1e0b:8bff:fe14:a5d5"
+            metric: 2048
+  # Effective NIC speed in Mbps, not the Studio's native 10GbE (it measures 9.37 Gbit/s). Pod-to-pod from this
+  # VM, QEMU/HVF with a vmnet-bridged virtio NIC, measured 2026-11-06 at about 6.0 Gbit/s sending and 7.5
+  # Gbit/s receiving (~1,000 TCP retransmits per 10s run; more streams didn't help), so the weaker direction
+  # is used. An integer so affinity can use Gt/Lt. 6000 is above the MBP's 2500 and below 9999, so
+  # NetworkOptimizer's weight-10 preference (Gt 1999) still counts it but the weight-100 one (Gt 9999) doesn't,
+  # and the `In ["10000"]` selector in cilium/l2-announcement-policy-10g.yaml keeps it from announcing nic-10g
+  # Services. See talos/README.md's "Node NIC-speed labels". Applied live, no reboot.
+  nodeLabels:
+    homelab.jakerobb.org/nic-speed-mbps: "6000"
+  # Accept Route Information Options in Router Advertisements, per interface (see worker-mbp.yaml).
+  sysctls:
+    net.ipv6.conf.enp0s2.accept_ra_rt_info_max_plen: "64"
+  # QEMU (HVF) under macOS on the Mac Studio, run as a root LaunchDaemon (scripts/studio-worker/). The
+  # disk is virtio-blk, so /dev/vda. The shared worker.yaml template's install.image is stale and amd64-only,
+  # so it's overridden: same Factory schematic as the Proxmox workers (iscsi-tools, util-linux-tools, kernel
+  # log arg), without tsc=reliable, which is an x86 clocksource workaround with no arm64 equivalent.
+  install:
+    disk: /dev/vda
+    image: factory.talos.dev/installer/85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615:v1.14.5
+  # Needed for democratic-csi's iSCSI node driver, same as the other workers (talos/README.md).
+  kernel:
+    modules:
+      - name: iscsi_tcp
+  kubelet:
+    extraMounts:
+      - destination: /etc/iscsi
+        type: bind
+        source: /etc/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
+      - destination: /var/lib/iscsi
+        type: bind
+        source: /var/lib/iscsi
+        options:
+          - bind
+          - rshared
+          - rw
