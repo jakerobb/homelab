@@ -1,7 +1,7 @@
 # Rolling node change
 
 How to change nodes one at a time without losing the cluster: a Talos OS upgrade, a Kubernetes or kubelet bump, a
-schematic change, or a reboot of a host that carries nodes (Proxmox, the MacBook Pro). Invoke by hand; it is not
+schematic change, or a reboot of a host that carries nodes (Proxmox, the MacBook Pro, the Mac Studio). Invoke by hand; it is not
 scheduled. This file is written to Claude as instructions and is also the human runbook. Node-type specifics live in
 [`../../talos/README.md`](../../talos/README.md), linked below; don't copy them here.
 
@@ -41,15 +41,18 @@ cd "$(mktemp -d)" && B=https://github.com/siderolabs/talos/releases/download/$V 
 ```
 
 **Talos OS upgrade, workers.** Drain, then `talosctl -n <ip> upgrade --image factory.talos.dev/installer/<schematic>:<version>`.
-Use the node's own schematic (the standard one on worker-1/2/3, the `tsc=reliable` one on worker-mbp). Afterwards patch
+Use the node's own schematic (the standard one on worker-1/3 and worker-studio, the `tsc=reliable` one on worker-mbp). Afterwards patch
 `.machine.install.image` to the same value (no reboot). Uncordon once it is back.
 
 **Talos OS upgrade, Pi control planes.** Never use the fork's plain tag: the combined-image recipe and U-Boot patch in
 [`../../talos/README.md`](../../talos/README.md#full-sequence-per-node) is required until upstream carries the fix. Do not
 patch `.machine.install.image` on these nodes (explained in that README).
 
-**Host reboot (Proxmox, MBP).** Drain the nodes it carries first; afterwards check for silently read-only iSCSI volumes
-(see [`../../docs/troubleshooting.md`](../../docs/troubleshooting.md)).
+**Host reboot (Proxmox, MBP, Mac Studio).** Drain the nodes it carries first; afterwards check for silently read-only iSCSI volumes
+(see [`../../docs/troubleshooting.md`](../../docs/troubleshooting.md)). The Studio runs FileVault: an Apple-menu Restart
+needs nothing more, but a shutdown or power loss waits at the unlock screen until someone SSHes in with the account
+password, and the node only rejoins after that (see
+[`../../docs/studio-worker-and-ram-upgrade.md`](../../docs/studio-worker-and-ram-upgrade.md#rebooting-the-studio)).
 
 ## Verify each node before starting the next
 

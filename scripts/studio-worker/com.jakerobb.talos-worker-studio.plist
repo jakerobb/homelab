@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jakerobb.talos-worker-studio</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/sbin/talos-worker-studio-run</string>
+  </array>
+  <!-- A root system daemon, so it starts at boot with no GUI session (after a FileVault unlock the Mac
+       sits at the login window), and vmnet-bridged gets the privilege it needs. -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <!-- Seconds launchd waits after SIGTERM before SIGKILL: time for Talos to shut down cleanly. -->
+  <key>ExitTimeOut</key>
+  <integer>120</integer>
+  <key>StandardOutPath</key>
+  <string>/var/log/talos-worker-studio.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/talos-worker-studio.log</string>
+</dict>
+</plist>

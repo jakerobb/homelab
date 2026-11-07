@@ -5,7 +5,7 @@ One runbook for three connected changes, in three phases so that only the last o
 | Phase | When | Outage? | What |
 |---|---|---|---|
 | 1 | Now | No | Collapse the two MS-A2 workers into one (16 GiB, 8 cores); stage the Studio's config |
-| 2 | Studio arrives | No | Add `talos-worker-4` as a UTM VM on the Mac Studio; soak; later retire `talos-worker-mbp` |
+| 2 | Studio arrives | No | Add `talos-worker-studio` as a QEMU VM on the Mac Studio (done 2026-11-06); soak; later retire `talos-worker-mbp` |
 | 3 | RAM in hand | **Yes, HexOS and every volume** | Swap the MS-A2's SODIMMs to 64 GB, give HexOS 24 GiB, restart |
 
 ## Why these numbers
@@ -33,7 +33,7 @@ Final layout:
 | MS-A2 (64 GB, about 62 GiB visible) | HexOS VM | 24 GiB, 6 cores |
 | | `talos-worker-1` | 16 GiB, 8 cores |
 | | Proxmox host + spare | about 22 GiB |
-| Mac Studio | `talos-worker-4` (`.36`) | 40 GiB, 16 vCPUs |
+| Mac Studio | `talos-worker-studio` (`.36`) | 40 GiB, 16 vCPUs |
 | Pi 5 16 GB | `talos-worker-3` (`.35`) | unchanged |
 
 Run `kubectl`, `talosctl` and `ssh proxmox` on the jump box (`ssh jakerobb@rpi5-1.lan`) unless a step says otherwise.
@@ -118,8 +118,9 @@ The merge applies [`talos-worker.tf`](../terraform/proxmox/talos-worker.tf) via
 - Remove the `talos-worker-2` entry (VM 100 and its disk get destroyed). Set `cores = 8`, `dedicated = 16384`.
   Rewrite the header comment (one worker per physical machine now) and the memory comment (the old "24 of 29 GiB"
   arithmetic).
-- Remove `.32` from `nut_v4` in `scripts/rpi5-1-firewall/homelab-fw.nft`, then on rpi5-1 run `sudo ./install.sh`
-  ([`rpi5-1-firewall.md`](rpi5-1-firewall.md#adding-a-node)).
+- Remove `.32` from `nut_v4` in `scripts/rpi5-1-firewall/homelab-fw.nft`, then on rpi5-1 run `sudo ./install.sh enforce`
+  (plain `./install.sh` defaults to log-only mode and would quietly stop enforcing;
+  [`rpi5-1-firewall.md`](rpi5-1-firewall.md#adding-a-node)).
 - Remove `talos/patches/workers/worker-2.yaml`, the `.32` DHCP reservation in the UCG, and every doc that lists two
   MS-A2 workers (root `README.md` lines 42 and 376, `terraform/proxmox/README.md`, `docs/overview.md`,
   `talos/README.md`).
@@ -130,15 +131,15 @@ The merge applies [`talos-worker.tf`](../terraform/proxmox/talos-worker.tf) via
 Nothing here needs the Mac.
 
 - Add a DHCP reservation in the UCG for MAC `02:00:00:00:00:36` to `192.168.102.36`.
-- Add `.36` to `nut_v4` in the firewall file (and re-run `install.sh`), so `nut-exporter` works if it lands there.
-- Write `talos/patches/workers/worker-4.yaml`, modelled on [`worker-mbp.yaml`](../talos/patches/workers/worker-mbp.yaml):
-  hostname `talos-worker-4`, `nic-speed-mbps: "10000"` (use the real link speed), static ULA `fd3d:b17d:9f8e:102::36/64`
-  with the `::/0` route via `fe80::1e0b:8bff:fe14:a5d5` (metric 2048), `accept_ra_rt_info_max_plen`, the
-  `/etc/iscsi` and `/var/lib/iscsi` extraMounts, and `kernel.modules: [iscsi_tcp]`. Leave the interface name and
-  `install.disk` as placeholders until the VM is up. `install.image` is the same schematic as workers 1 and 2
-  (`85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615`) at the current Talos version, **without**
-  `tsc=reliable`. That workaround is for the x86 TSC clocksource and has no arm64 equivalent. Watch for
-  `NodeClockNotSynchronising` once the node is up.
+- Add `.36` to `nut_v4` in the firewall file (and re-run `sudo ./install.sh enforce`), so `nut-exporter` works if it lands there.
+- Write `talos/patches/workers/worker-studio.yaml`, modelled on [`worker-mbp.yaml`](../talos/patches/workers/worker-mbp.yaml)
+  (the file as built is the reference): hostname `talos-worker-studio`, static ULA `fd3d:b17d:9f8e:102::36/64` with
+  the `::/0` route via `fe80::1e0b:8bff:fe14:a5d5` (metric 2048), `accept_ra_rt_info_max_plen`, the `/etc/iscsi` and
+  `/var/lib/iscsi` extraMounts, and `kernel.modules: [iscsi_tcp]`. Take the interface name and `install.disk` from the
+  maintenance API, not by analogy (they came out as `enp0s2` and `/dev/vda`). `install.image` is the same schematic
+  as worker-1 (`85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615`) at the **current** Talos version
+  (the shared template's image is stale), **without** `tsc=reliable`, which is an x86 clocksource workaround. The
+  `nic-speed-mbps` label is the measured VM speed, not the host NIC's; see 2.3.
 - Prepare, but **do not merge**, the phase 3 change: `hexos.tf` `dedicated = 24576` with the comment rewritten (see
   3.9). It would fail to start on 29 GiB, which is why it waits for the RAM.
 
@@ -146,52 +147,64 @@ Nothing here needs the Mac.
 
 ## Phase 2: Studio is ready (no outage)
 
-The generic recipe is [`utm-talos-worker.md`](utm-talos-worker.md). The differences for an Apple Silicon host:
-
-- Use the **arm64** images from the Image Factory with the schematic above: `nocloud-arm64.qcow2` and
-  `metal-arm64.iso`. The `metal` ISO is still needed for maintenance mode, for the reason the runbook gives.
-- UTM: Virtualize, Linux, "Use Apple Virtualization" **off** (QEMU backend, as on the MBP). 16 CPU cores, 40960 MiB RAM,
-  64 GiB disk, bridged to the wired interface on the Server VLAN, `virtio-net-pci`, MAC `02:00:00:00:00:36`.
+Done 2026-11-06. The VM runs under **QEMU with Hypervisor.framework (HVF) as a root LaunchDaemon**, not under UTM.
+The reason is FileVault: after a remote unlock the Mac sits at the login window with no GUI session, so LaunchDaemons
+start but a GUI app like UTM does not. The files are in [`../scripts/studio-worker/`](../scripts/studio-worker/):
+`run-vm.sh` (the QEMU command line), `com.jakerobb.talos-worker-studio.plist` and `install.sh`. The generic UTM recipe
+([`utm-talos-worker.md`](utm-talos-worker.md)) still applies to the 2018 MBP.
 
 ### 2.1 Mac host setup
 
 Do this before the VM, on the Studio:
 
-- Enable Remote Login with key auth (the 1Password SSH-agent gotcha in `utm-talos-worker.md` applies).
-- Stop it sleeping: System Settings, Energy, "Prevent automatic sleeping when the display is off", and "Start up
-  automatically after a power failure". Check with `pmset -g` that `sleep` is 0.
-- Decide how the VM comes back after a reboot or power cut. UTM doesn't start VMs on its own, so add UTM as a login
-  item with auto-login (if you accept that) or a launch agent running `utmctl start talos-worker-4`. Without it, a
-  macOS update leaves the node dead until you log in. Note that decision in this runbook.
-- Disk headroom. The 2018 MBP's host disk filling froze its VM and corrupted its image store
-  ([`utm-talos-worker.md`](utm-talos-worker.md#recovering-from-a-corrupted-image-store)). Install Telegraf per
-  [`mac-host-metrics.md`](mac-host-metrics.md) with a disk alert, and keep the qcow2 on the internal SSD with room.
+- Remote Login with key auth, and the Studio's key in rpi5-1's `authorized_keys` (the Pi's host firewall also needs the
+  Studio's IP in `ssh_v4`, see [`rpi5-1-firewall.md`](rpi5-1-firewall.md)). The 1Password SSH-agent gotcha in
+  `utm-talos-worker.md` applies: don't route automation through the agent.
+- Stop it sleeping (`pmset -g` shows `sleep 0`) and set it to start up after a power failure.
+- **FileVault stays on.** A cold boot or power loss therefore waits at the unlock screen, and the VM only comes back
+  once someone unlocks it. Pre-login SSH accepts the account password, so `ssh jakerobb@192.168.102.22` from a
+  terminal unlocks it remotely (tested 2026-11-06: key auth refused at 17:27:02, working by 17:28:56). The Mac then
+  reaches the login window, LaunchDaemons start (Telegraf and the VM daemon both do), and the node rejoins. The
+  Apple-menu Restart does an *authenticated restart* that skips the unlock, so only a shutdown or power loss needs it.
+  An automatic unlock watchdog on the jump box is possible but would store the disk password there; it isn't built.
+- Disk headroom. The 2018 MBP's host disk filling froze its VM and corrupted its image store. Install Telegraf per
+  [`mac-host-metrics.md`](mac-host-metrics.md) (with its disk alert, and the Cilium egress rule for `:9273`), and keep
+  the qcow2 on the internal SSD with room.
+- `brew install qemu` (as the normal user).
 
 ### 2.2 Bring up the node
 
-Follow `utm-talos-worker.md` steps 3 to 6 with these specifics. Before generating the config, read the real interface
-and disk names from the maintenance API (don't assume `enp0s1` or `/dev/sda`):
+1. In `~/talos-vm/` on the Studio: download `metal-arm64.iso` for the schematic at the current Talos version from the
+   Image Factory, and create a **blank** disk: `qemu-img create -f qcow2 disk.qcow2 64G`. (The `nocloud` disk image
+   never opens the maintenance API, as the UTM runbook explains. A blank disk falls through to the ISO on first boot,
+   and after the install the disk boots first. The ISO stays attached as a recovery boot.)
+2. Add a DHCP reservation for MAC `02:00:00:00:00:36` to `192.168.102.36` in the UCG.
+3. Copy `scripts/studio-worker/` to `~/talos-vm/` (or use the repo checkout) and run `./install.sh`. It installs
+   `run-vm.sh` as `/usr/local/sbin/talos-worker-studio-run` and loads the daemon. The VM is 16 vCPUs, 40960 MiB,
+   `vmnet-bridged` on `en0`, virtio-net with `rx_queue_size=1024`, virtio-blk disk. A SIGTERM (host shutdown, a
+   `launchctl bootout`) sends an ACPI power-down, so Talos shuts down cleanly; the plist's `ExitTimeOut` is 120 s.
+   **Re-running `install.sh` restarts the VM**: cordon and drain the node first.
+4. Read the real names from the maintenance API on rpi5-1 (`--insecure` goes after the subcommand):
 
-```bash
-talosctl -n 192.168.102.36 --insecure get links
-```
+   ```bash
+   talosctl get links --insecure -n 192.168.102.36
+   ```
 
-```bash
-talosctl -n 192.168.102.36 --insecure get disks
-```
+   ```bash
+   talosctl get disks --insecure -n 192.168.102.36
+   ```
 
-Fill the placeholders in `worker-4.yaml`, then (on rpi5-1):
+5. Fill in `worker-studio.yaml`, render it against the shared template on rpi5-1 and apply it:
 
-```bash
-talosctl machineconfig patch ~/talos/homelab/worker.yaml -p @worker-4.yaml -o worker-4.yaml
-```
+   ```bash
+   talosctl machineconfig patch ~/talos/homelab/worker.yaml -p @worker-studio.yaml -o worker-studio-full.yaml
+   ```
 
-```bash
-talosctl apply-config --insecure -n 192.168.102.36 -f worker-4.yaml
-```
+   ```bash
+   talosctl apply-config --insecure -n 192.168.102.36 -f worker-studio-full.yaml
+   ```
 
-Check the shared `worker.yaml` template's `install.image` isn't stale first (it has drifted before, see the MBP
-section of [`talos/README.md`](../talos/README.md)). Eject the ISO once it's installed.
+   It installs to the blank disk, reboots and joins; expect a few minutes to `Ready`.
 
 ### 2.3 Verify before trusting it
 
@@ -199,13 +212,23 @@ section of [`talos/README.md`](../talos/README.md)). Eject the ISO once it's ins
   it `Ready`.
 - `talosctl -n 192.168.102.36 get machineconfig -o yaml` shows the schematic image in `install.image` (no drift).
 - A throwaway `hexos-iscsi` PVC and pod, pinned to the node with `nodeSelector: kubernetes.io/hostname:
-  talos-worker-4`, mount and write. Delete both afterwards.
+  talos-worker-studio`, mount and write. Delete both afterwards. *(Not yet done.)*
 - `max_sectors_kb` is capped (the [`iscsi-max-sectors.yaml`](../talos/patches/iscsi-max-sectors.yaml) patch is in the
   template): `talosctl -n 192.168.102.36 read /sys/block/sdb/queue/max_sectors_kb` shows 1024 on the TrueNAS disks.
+  *(Not yet done.)*
 - `talosctl -n 192.168.102.36 get addresses` shows the static ULA, and `read /proc/net/ipv6_route` shows the static
-  default route. Check where `matter-server` (hostNetwork) lands, since it depends on those.
-- The 10G L2 announcement policy picks the node up (label `nic-speed-mbps: 10000`) and a `nic-10g` Service still answers.
-- Host disk and temperature metrics arrive from the Mac.
+  default route. Check where `matter-server` (hostNetwork) lands, since it depends on those. *(Not yet done.)*
+- **Measure the network, then set the label.** The host's native 10GbE measures 9.37 Gbit/s, but the VM's pod-to-pod
+  speed is lower: about 6.0-6.7 Gbit/s sending and 7.1-7.5 receiving (2026-11-06; `iperf3` against
+  `network-optimizer-lb` from a pod pinned to the node, in the `network-optimizer` namespace because that namespace's
+  policy blocks other clients). QEMU's vmnet backend moves packets on one thread, which pegs at ~100% (the vCPUs
+  idle), so more cores won't help; `rx_queue_size=1024` bought a few percent on sending. The label is
+  `nic-speed-mbps: "6000"`, the weaker direction. NetworkOptimizer's `Gt 9999` preference then still favours the
+  MS-A2, and the `In ["10000"]` 10G L2 policy keeps `nic-10g` Services off the Studio. That policy is a hard
+  requirement, not a preference: with `talos-worker-1` down (phase 3), `network-optimizer-lb` has no announcer and
+  is unreachable. Accepted, since such outages are rare.
+- Host disk, temperature and fan metrics arrive from the Mac (`macmon_*`, see `mac-host-metrics.md`), and the node's
+  kernel logs reach SigNoz (it needs its IP in Vector's `nodes` map).
 
 ### 2.4 Soak, then retire `talos-worker-mbp`
 
@@ -221,13 +244,22 @@ kubectl drain talos-worker-mbp --ignore-daemonsets --delete-emptydir-data --time
 
 Power the VM off but **keep it** for a week as a rollback. Then:
 
-- `kubectl delete node talos-worker-mbp`; delete the VM and the Mac's `192.168.102.9` Telegraf setup if unwanted.
-- Remove `.34` from `nut_v4` (and re-run `install.sh`), delete `talos/patches/workers/worker-mbp.yaml` and the `.34`
-  DHCP reservation.
+- `kubectl delete node talos-worker-mbp`; delete the VM and the Mac's `192.168.102.9` Telegraf setup if unwanted
+  (and its entry in the `prometheus-scrape` policy in `manifests/network-policies/monitoring.yaml`).
+- Remove `.34` from `nut_v4` (and re-run `sudo ./install.sh enforce`), delete `talos/patches/workers/worker-mbp.yaml`
+  and the `.34` DHCP reservation, and take `.34` out of Vector's `nodes` map.
 - Update the read-only-volume checks in [`troubleshooting.md`](troubleshooting.md) and
   [`proxmox-os-updates.md`](proxmox-os-updates.md), which loop over `for n in 34 35`, to `36 35`. Update the node
   counts and tables in `talos/README.md` (including the NIC-speed table), `overview.md`, the rolling-node-change
   skill's "All 7 nodes" and the `HARDWARE.md` entry.
+
+### Rebooting the Studio
+
+A shutdown or power loss needs the FileVault unlock above before anything starts. To restart it deliberately, cordon
+and drain `talos-worker-studio`, then use the Apple-menu **Restart** (authenticated restart, no unlock needed): launchd
+sends SIGTERM, the VM powers down gracefully and the daemon restarts it at boot. For a full shutdown, expect to unlock
+by SSH afterwards. A graceful stop can take a minute or two, so `launchctl bootout` followed immediately by `bootstrap`
+fails with an I/O error unless you wait (`install.sh` waits up to 150 s).
 
 ---
 

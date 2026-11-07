@@ -208,8 +208,8 @@ transforms:
     source: |
       nodes = {
         "192.168.102.31": "talos-worker-1",
-        "192.168.102.32": "talos-worker-2",
-        "192.168.102.34": "talos-worker-mbp"
+        "192.168.102.34": "talos-worker-mbp",
+        "192.168.102.36": "talos-worker-studio"
       }
       ip = to_string(.host) ?? ""
       node, err = string(get!(nodes, [ip]))

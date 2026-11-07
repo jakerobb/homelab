@@ -705,9 +705,10 @@ link speed in Mbps:
 |---|---|---|
 | `talos-worker-1`, `talos-worker-2` | `10000` | MS-A2, 10GbE |
 | `talos-worker-mbp` | `2500` | 2018 MBP, 2.5GbE adapter |
+| `talos-worker-studio` | `6000` | Mac Studio 10GbE, but the QEMU/vmnet-bridged VM measures ~6.0 Gbit/s sending, ~7.5 receiving |
 
-The upcoming Pi worker should get `1000`, and the Mac Studio `10000`. Control
-planes aren't labeled since they don't run workloads.
+The Pi worker gets `1000`. Control planes aren't labeled since they don't run workloads. The Studio's label is the
+VM's measured speed, not the host NIC's, so re-measure and update it if the VM networking changes.
 
 The value is an integer rather than `10GbE` so workloads can use
 nodeAffinity's `Gt`/`Lt` operators. NetworkOptimizer
@@ -1144,12 +1145,29 @@ updated to match. **Likely worth baking into the Mac Studio's schematic
 from the start** rather than waiting to hit the same alert again — real
 hardware (the Proxmox workers) isn't affected, only UTM/QEMU VMs are.
 
+## Additional worker: talos-worker-studio (added 2026-11-06)
+
+Talos in a QEMU/HVF VM on the Mac Studio (M5 Ultra, 96GB), the replacement for `talos-worker-mbp`. Named for its host
+rather than the decoupled `talos-worker-N` scheme, as `-mbp` is. The runbook, with the reasoning, is
+[`../docs/studio-worker-and-ram-upgrade.md`](../docs/studio-worker-and-ram-upgrade.md) (Phase 2); the VM's files are in
+[`../scripts/studio-worker/`](../scripts/studio-worker/).
+
+- **Address:** `192.168.102.36`, MAC `02:00:00:00:00:36` (set on the VM's NIC, with a UCG DHCP reservation). Static ULA
+  `fd3d:b17d:9f8e:102::36`. Interface `enp0s2`, disk `/dev/vda`.
+- **Image:** the standard Image Factory schematic `85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615`
+  (arm64), without `tsc=reliable` (an x86 workaround). Per-node config:
+  [`patches/workers/worker-studio.yaml`](patches/workers/worker-studio.yaml).
+- **Size:** 16 vCPUs, 40 GiB. `vmnet-bridged` on the host's 10GbE, which QEMU can only drive at about 6-7.5 Gbit/s
+  (one packet thread), hence `nic-speed-mbps: "6000"`.
+- **Runs as** a root LaunchDaemon, not under UTM, so it survives a FileVault unlock to the login window with no GUI
+  session. Host metrics: [`../docs/mac-host-metrics.md`](../docs/mac-host-metrics.md).
+
 ## Additional worker: talos-worker-3 (added 2026-10-06)
 
 The fourth Raspberry Pi 5 node in the cluster, and the fourth worker. It's the 16GB Pi that was rpi5-1 until the jump box swap
 ([`../docs/jump-box-swap.md`](../docs/jump-box-swap.md)), now with a fresh 256GB NVMe SSD (2230). A smaller 4GB Pi
 took over as rpi5-1 using the original 1TB SSD. This node is permanent, unlike `talos-worker-mbp`, so it has a normal
-decoupled name (the Mac Studio's worker will be `talos-worker-4`).
+decoupled name (the Mac Studio's worker is `talos-worker-studio`, named for its host like `-mbp`).
 
 - **Address:** `192.168.102.35`, MAC `88:a2:9e:2b:0c:2d` (UniFi DHCP reservation). `.33` is TrueNAS, so the next
   free `.3x` slot was used rather than the `.21`-`.29` "physical host" range, matching `talos-worker-mbp` (`.34`).
@@ -1178,7 +1196,7 @@ decoupled name (the Mac Studio's worker will be `talos-worker-4`).
 
 ## Talos kernel logs (added 2026-10-05)
 
-The three Image Factory workers (`talos-worker-1`, `-2` and `-mbp`) send their kernel logs to SigNoz. Each one's
+The Image Factory workers (`talos-worker-1`, `-mbp` and `-studio`) send their kernel logs to SigNoz. Each one's
 Image Factory schematic carries
 `talos.logging.kernel=udp://192.168.102.2:5140/`, which makes Talos push every kernel message (and the
 `user`-facility Talos messages that share the ring buffer), one JSON object per UDP datagram. The Compose
@@ -1196,7 +1214,7 @@ depend on Prometheus, and it works while a node's kubelet or pod network is down
 
 | Schematic | ID | Used by |
 |---|---|---|
-| `iscsi-tools`, `util-linux-tools`, kernel-log arg | `85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615` | talos-worker-1, -2 |
+| `iscsi-tools`, `util-linux-tools`, kernel-log arg | `85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615` | talos-worker-1, -studio |
 | the same plus `tsc=reliable` | `fc5e78730c2f3ed1f1939294d5cf2340c160d940f03994daf3ca4fbaf022f203` | talos-worker-mbp |
 
 Both were rolled out 2026-10-05 with `talosctl upgrade --image factory.talos.dev/installer/<id>:v1.14.2`, one
