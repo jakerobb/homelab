@@ -1709,6 +1709,24 @@ to `metric_log_N` on the restart. Check with
 `SELECT name FROM system.tables WHERE database = 'system' AND name LIKE 'metric_log%'`,
 and drop the renamed one once the new table is merging cleanly (its history
 goes with it).
+
+**Why 10-05 and 10-07 got stuck (found 2026-11-08).** The failures started at
+exactly 00:00 UTC on 2026-11-04, 30 days after the 10-05 partition: every one
+was a `TTLDropMerge` (`part_log.merge_reason`) emptying an expired day. Those
+merges always use the Horizontal algorithm, so the vertical-merge settings
+above never applied, and rewriting 2-4 parts of ~1,550 columns to produce zero
+rows peaked at ~6.3 GiB against the 7.2 GiB cap. 10-04 squeaked through on
+11-03; 10-05 failed 341k times over 4.5 days, 10-06 cleared after 40 minutes,
+10-07 failed 225k times, and the stuck merges also crowded out other tables'
+merges. Fixed by raising the cap (above) and, durably, by adding
+`ttl_only_drop_parts = 1` to the `metric_log` engine settings, so an expired
+day's parts are dropped outright with no merge. That is safe here because the
+table is `PARTITION BY event_date` with the TTL on `event_date`, so a whole
+part expires at once. Changing the engine string renames the table to
+`metric_log_N` again on the restart (same check and cleanup as above).
+Verify by watching `part_log` for `merge_reason = 'TTLDropMerge'` rows after
+00:00 UTC; there should be none for `metric_log`.
+
 The old `system.trace_log` and `system.zookeeper_log` (~4 GiB together)
 were dropped by hand, since removing a system log from config doesn't drop
 its existing table.
