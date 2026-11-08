@@ -71,13 +71,18 @@ spec:
           # ~40 minutes, so PromQL alert rules saw "no data" (false
           # Packet loss / Restock Radar alerts) even though samples were
           # ingested fine. Steady-state RSS is ~2.5 GiB; this is for spikes.
+          # Raised again 8Gi -> 12Gi 2026-11-08 (cap 7.2 -> 10.8 GiB; request
+          # 2Gi -> 6Gi so it's the last OOM victim): the same false alerts
+          # came back (1:23am and 6:23am) because
+          # metric_log's stuck merges peak at ~6.2 GiB and, alongside normal
+          # use, kept hitting the 7.2 GiB cap, killing series-row inserts.
           resources:
             requests:
               cpu: 500m
-              memory: 2Gi
+              memory: 6Gi
             limits:
               cpu: "2"
-              memory: 8Gi
+              memory: 12Gi
           persistence:
             storageClass: hexos-iscsi
             size: 30Gi
@@ -104,6 +109,12 @@ spec:
           # ~2 failures/sec since the day SigNoz was deployed, and ~1.5
           # cores of MergeMutate thread CPU, which was the bulk of
           # ClickHouse's usage. Vertical merges go one column at a time.
+          # TTL cut from 30 to 14 days 2026-11-08 to keep the part sizes (and
+          # merge cost) down; the table is kept because it is the record of
+          # ClickHouse's own memory/merge behaviour. Changing the engine
+          # string makes ClickHouse rename the old table to metric_log_N on
+          # startup, so see the rollout note in argocd/README.md's SigNoz
+          # section.
           #
           # If deep profiling is
           # ever needed, delete this file and the profiles below, then
@@ -120,7 +131,7 @@ spec:
                   <metric_log replace="1">
                       <database>system</database>
                       <table>metric_log</table>
-                      <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 30 DAY SETTINGS vertical_merge_algorithm_min_rows_to_activate = 1, vertical_merge_algorithm_min_columns_to_activate = 1</engine>
+                      <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 14 DAY SETTINGS vertical_merge_algorithm_min_rows_to_activate = 1, vertical_merge_algorithm_min_columns_to_activate = 1</engine>
                       <flush_interval_milliseconds>7500</flush_interval_milliseconds>
                   </metric_log>
               </clickhouse>

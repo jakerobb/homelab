@@ -1392,7 +1392,7 @@ consumer SSD despite being network-attached iSCSI.
 
 | Component | Requests | Limits |
 |---|---|---|
-| ClickHouse | 500m / 2Gi | 2 / 8Gi |
+| ClickHouse | 500m / 6Gi | 2 / 12Gi |
 | ZooKeeper | 100m / 256Mi | 500m / 512Mi |
 | SigNoz core | 100m / 256Mi | 500m / 1Gi |
 | otel-collector | 100m / 256Mi | 1 / 1Gi |
@@ -1694,6 +1694,21 @@ in config. When ClickHouse sees a system log table whose definition doesn't
 match config, it renames the old one to `metric_log_0` and creates a new
 one. That happened on 2026-09-23; `metric_log_0` held only 09-22 to 09-23
 data and was dropped by hand on 2026-09-27.
+
+**Follow-up (2026-11-08).** The 1:23am and 6:23am `[No data] Packet loss`
+false alerts (Telegraf's samples were fine, 0% loss throughout) traced back
+to the same 241 errors: `metric_log` merges of the old 10-05/10-07 parts
+were still peaking around 6.2 GiB and, with normal load, kept hitting the
+7.2 GiB cap, which also killed inserts into `time_series_v4` and so left the
+rule's PromQL query with no series to match (the same mechanism as
+2026-10-22). Changes: ClickHouse limit 8Gi -> 12Gi (cap 10.8 GiB; request
+2Gi -> 6Gi), and `metric_log` TTL 30 -> 14 days. `metric_log` is kept on
+purpose: it's the record of ClickHouse's own memory and merge behaviour.
+Because the engine string changed, expect ClickHouse to rename the old table
+to `metric_log_N` on the restart. Check with
+`SELECT name FROM system.tables WHERE database = 'system' AND name LIKE 'metric_log%'`,
+and drop the renamed one once the new table is merging cleanly (its history
+goes with it).
 The old `system.trace_log` and `system.zookeeper_log` (~4 GiB together)
 were dropped by hand, since removing a system log from config doesn't drop
 its existing table.
