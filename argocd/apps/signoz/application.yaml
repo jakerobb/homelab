@@ -116,6 +116,16 @@ spec:
           # startup, so see the rollout note in argocd/README.md's SigNoz
           # section.
           #
+          # ttl_only_drop_parts = 1 (2026-11-08): without it, expiry of a
+          # day's partition is a TTLDropMerge, which rewrites the parts to
+          # delete the expired rows. Those always use the Horizontal merge
+          # algorithm (the vertical settings above never apply to them), so
+          # emptying ~150 KiB peaked at ~6.3 GiB and, from 2026-11-04 00:00
+          # UTC (30 days after 10-05), failed ~2,350 times an hour against
+          # the 7.2 GiB cap. The table is partitioned by day and the TTL is
+          # on that same date, so every row in a part expires together and
+          # ClickHouse can simply drop it, with no merge at all.
+          #
           # If deep profiling is
           # ever needed, delete this file and the profiles below, then
           # restart ClickHouse.
@@ -131,7 +141,7 @@ spec:
                   <metric_log replace="1">
                       <database>system</database>
                       <table>metric_log</table>
-                      <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 14 DAY SETTINGS vertical_merge_algorithm_min_rows_to_activate = 1, vertical_merge_algorithm_min_columns_to_activate = 1</engine>
+                      <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 14 DAY SETTINGS ttl_only_drop_parts = 1, vertical_merge_algorithm_min_rows_to_activate = 1, vertical_merge_algorithm_min_columns_to_activate = 1</engine>
                       <flush_interval_milliseconds>7500</flush_interval_milliseconds>
                   </metric_log>
               </clickhouse>
