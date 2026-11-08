@@ -13,3 +13,7 @@ data:
     listen-http: ":8080"
     cache-file: "/var/cache/ntfy/cache.db"
     upstream-base-url: "https://ntfy.sh"
+    # Temporary: debug level logs the upstream poll requests to ntfy.sh that
+    # drive iOS push delivery (INFO hides them). Used to trace a missed
+    # restock-radar alert; drop back to the default once resolved.
+    log-level: debug
