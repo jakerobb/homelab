@@ -212,3 +212,19 @@ npm 11).
 `npx -p node@24 -p npm@<fixed version> -- npm install --package-lock-only`. If it succeeds, remove the `constraints`
 block and the `renovate-config` package rule from `restock-radar`'s `renovate.json`, and delete this item. No target
 date; this depends on upstream.
+
+## Re-run lint on the kube-prometheus-stack v93 PR (prometheus-operator arm64 image)
+
+**Waiting on:** the latest release of `quay.io/prometheus-operator/prometheus-operator` having an image index with both
+`linux/amd64` and `linux/arm64` correctly labeled. The v0.95.1 index (2026-11-06) lists five manifests, all labeled
+`linux/amd64` or `unknown/unknown`; v0.94.2 had amd64, arm/v7, arm64, ppc64le and s390x. Tracked upstream in
+[prometheus-operator/prometheus-operator#8953](https://github.com/prometheus-operator/prometheus-operator/issues/8953)
+(open as of 2026-11-08, no maintainer reply yet). A commenter says the images themselves are fine and only the index's
+platform labels are wrong. This is what fails the `lint` check on Renovate's kube-prometheus-stack v93 PR
+([#577](https://github.com/jakerobb/homelab/pull/577)).
+
+**To check:** `docker buildx imagetools inspect quay.io/prometheus-operator/prometheus-operator:<latest release tag>`
+should list `linux/arm64` (and `linux/amd64`) as platforms. Then re-run the failed `lint` check on #577. If upstream
+republished the same v0.95.1 tag, the PR needs nothing else. If it shipped v0.95.2, Renovate updates the same branch once
+a kube-prometheus-stack chart release bumps the operator (`rebaseWhen` is `conflicted`, so it won't rebase otherwise).
+Once #577 is green and merged, delete this item. No target date; this depends on upstream.
