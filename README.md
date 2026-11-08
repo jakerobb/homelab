@@ -166,7 +166,7 @@ simple spring-clips. The back can be removed as well, but this requires a #2 Phi
         - **2021 MacBook Pro 14"** (M1 Pro, 32GB, 500GB) — primary workstation; not part of the homelab infrastructure
           itself, but what's typically used to drive it. Owned by my employer.
             - **Apple Studio Display** 27" 5K display
-            - **ACER PB328** 32" 2560x1440 display
+            - **ASUS PB328** 32" 2560x1440 display
             - Apple extended keyboard (I keep it wired)
             - Kensington Expert Mouse 7
             - Logitech C920 webcam
