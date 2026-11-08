@@ -6,9 +6,8 @@ state, and unlocks the Mac over SSH. The files are in
 [`../scripts/studio-unlock-watchdog/`](../scripts/studio-unlock-watchdog/); background on FileVault and the VM
 daemon is in [`studio-worker-and-ram-upgrade.md`](studio-worker-and-ram-upgrade.md) (Phase 2).
 
-**Status:** built and dry-run tested 2026-11-07 against the live Studio (every branch of the decision table, and the
-password helper against a dummy secret). The real unlock path has **not** been exercised: that needs the secret
-below and a deliberate cold shutdown of the Studio. Don't enable the timer until you've done that test.
+**Status:** built, and the real unlock path was tested 2026-11-06 and passed (see "Test result" below). The files are
+installed on rpi5-1; whether the timer is enabled is a separate step (see "Operating it").
 
 ## What it does
 
@@ -44,9 +43,10 @@ age key that `jakerobb` already holds on the Pi. To keep the exposure small:
   this and give it a long random password. On macOS 27.2 a new account is enabled for FileVault automatically (older
   releases needed System Settings, Privacy & Security, FileVault); confirm with `sudo fdesetup list`. A stolen copy of the secret then unlocks the disk and logs in as a user with no rights.
 - Keep that user out of Remote Login's allowed list (System Settings, General, Sharing, Remote Login, "Only these
-  users"). **Untested:** whether the pre-boot SSH server honors that list or accepts any FileVault user. Check it
-  during the test below; if a non-listed user can't unlock, add it and accept the wider exposure, or fall back to
-  your own account.
+  users"). **Confirmed after boot (2026-11-06):** with the Mac up, `sshd` rejects the account with `Access denied for
+  user fvunlock by PAM account configuration [preauth]`, before checking the password, so a stolen secret can't log
+  in to a running Studio. **Pre-boot behavior, tested the same day:** the pre-boot SSH server accepted `fvunlock` even though it is not on
+  Remote Login's allowed list, so the account does not need to be added there.
 - The secret file is mode 0600 on a host that only you can log in to, and the password helper prints the password
   only for a password prompt, with the host key pinned.
 
@@ -99,8 +99,17 @@ Do this with the KVM or the keyboard attached, in case the unlock fails.
 
    On the third it should log `Unlocking the Studio`, SSH in, and within a few minutes report that Telegraf is
    answering. Confirm the node returns to `Ready`, then uncordon it.
-3. Note the result in the table above (did the dedicated user work, does Remote Login's list matter, how long did it
-   take). Only then `sudo systemctl enable --now studio-unlock-watchdog.timer`.
+3. Only then `sudo systemctl enable --now studio-unlock-watchdog.timer`.
+
+### Test result (2026-11-06)
+
+- Shut down from the Apple menu at 22:16:41; back at the FileVault screen at 22:19:40 (SSH answering, Telegraf and the
+  worker closed).
+- Three manual runs a minute apart: two counts, then on the third (22:21:59) the unlock attempt as `fvunlock`, which was
+  **not** on Remote Login's allowed list. The `ssh` exited 255 as the Mac continued booting, and Telegraf answered soon
+  after. The worker VM came back on its own and the node rejoined `Ready` a few minutes later.
+- One attempt was needed, so the retry cap and cooldown were not exercised. The three-minute wait before the first
+  attempt is by design (`LOCKED_THRESHOLD`).
 
 ## Operating it
 
