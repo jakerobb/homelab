@@ -8,8 +8,8 @@
 #   temp1 = Tctl). docs/proxmox-host-metrics.md covers the MS-A2's exporter.
 # - rpi5-1: its Compose Telegraf over OTLP (`temp_temp` by `sensor`,
 #   `fan_value`), see docker-compose/telegraf/telegraf.conf.
-# - Macs: Telegraf over OTLP (`smc_*`, `thermal_*`), see
-#   docs/mac-host-metrics.md. Both carry the host in `host.name`.
+# - Macs: Telegraf over OTLP (`smc_*`, `thermal_*` on Intel; `macmon_*` on
+#   Apple Silicon), see docs/mac-host-metrics.md. Both carry the host in `host.name`.
 #
 # Panels are generated from local.panels to keep each one to its differences.
 # Edit it in the GUI if that's easier, then export the JSON and fold the
@@ -20,7 +20,7 @@ locals {
   panels = {
     cpu = {
       title       = "CPU temperature"
-      description = "Pi 5: SoC temperature. MS-A2: Tctl. Macs: CPU die (powermetrics' SMC sampler)."
+      description = "Pi 5: SoC temperature. MS-A2: Tctl. Macs: CPU die (powermetrics' SMC sampler; macmon's average on the Mac Studio)."
       unit        = "celsius"
       soft_max    = 105
       thresholds = [
@@ -43,6 +43,12 @@ locals {
         {
           metric   = "smc_temperature_value"
           filter   = "sensor = 'cpu_die'"
+          group_by = ["host.name"]
+          legend   = "{{host.name}}"
+        },
+        {
+          metric   = "macmon_temperature_cpu_avg"
+          filter   = ""
           group_by = ["host.name"]
           legend   = "{{host.name}}"
         },
@@ -74,7 +80,7 @@ locals {
     }
     gpu = {
       title       = "GPU temperature"
-      description = "MS-A2: the Radeon iGPU's edge sensor. Macs: GPU die."
+      description = "MS-A2: the Radeon iGPU's edge sensor. Macs: GPU die (macmon's average on the Mac Studio)."
       unit        = "celsius"
       soft_max    = 105
       thresholds  = []
@@ -88,6 +94,12 @@ locals {
         {
           metric   = "smc_temperature_value"
           filter   = "sensor = 'gpu_die'"
+          group_by = ["host.name"]
+          legend   = "{{host.name}}"
+        },
+        {
+          metric   = "macmon_temperature_gpu_avg"
+          filter   = ""
           group_by = ["host.name"]
           legend   = "{{host.name}}"
         },
@@ -145,7 +157,7 @@ locals {
     }
     fan = {
       title       = "Fan speed"
-      description = "Only rpi5-1 and the Macs report fans. The control-plane Pis and the MS-A2 don't expose theirs."
+      description = "Only rpi5-1 and the Macs report fans (one line per fan on the Mac Studio). The control-plane Pis and the MS-A2 don't expose theirs."
       unit        = "rotrpm"
       soft_max    = null
       thresholds  = []
@@ -161,6 +173,12 @@ locals {
           filter   = ""
           group_by = ["host.name"]
           legend   = "{{host.name}}"
+        },
+        {
+          metric   = "macmon_fan_rpm"
+          filter   = ""
+          group_by = ["host.name", "name"]
+          legend   = "{{host.name}} {{name}}"
         },
       ]
     }

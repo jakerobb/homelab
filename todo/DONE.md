@@ -3,6 +3,16 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Mac Studio on the Temperatures dashboard (2026-11-08)
+
+**Done in the repo; the Terraform still needs applying.** The Studio was already shipping metrics (installed 2026-11-06, scraped as
+`192.168.102.22:9273`). Its temperatures and fans come from macmon, not `powermetrics`' SMC sampler, which Apple Silicon doesn't have
+(see [`../docs/mac-host-metrics.md`](../docs/mac-host-metrics.md)). So the dashboard needed new queries after all:
+[`../terraform/signoz/dashboard-temperatures.tf`](../terraform/signoz/dashboard-temperatures.tf) now plots
+`macmon_temperature_cpu_avg` and `macmon_temperature_gpu_avg` in the CPU and GPU panels (die averages, about 28 °C at idle) and
+`macmon_fan_rpm` in the fan panel (one line per fan). The speed-limit panel stays Intel-only: the Studio has no
+`thermal_cpu_speed_limit_percent`.
+
 ## Re-audit memory requests (2026-11-04)
 
 **Done in the repo; the Talos patch still needs applying.** Re-ran the 14-day p95/max comparison once the post-2026-09-24
