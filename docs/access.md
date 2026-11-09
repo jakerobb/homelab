@@ -73,7 +73,7 @@ behind Authelia. The hostnames are the files in `manifests/lan-routes/`; see
 | Talos nodes | From rpi5-1: `talosctl` with `~/talos/homelab/talosconfig`. Talos has no SSH |
 | Cilium flows | From rpi5-1: `hubble observe -P` (`-P` port-forwards to hubble-relay by itself). Or Hubble UI in a browser |
 | Proxmox (MS-A2) | <https://proxmox.lan:8006>, or `ssh proxmox` from rpi5-1 (logs in as root) |
-| HexOS / TrueNAS | <https://deck.hexos.com/dash>; for local management use the dashboard's **Switch to Local** link (`https://<hash>.local.hexos.com:<port>`; the name resolves to the NAS's LAN IP, so `local.hexos.com` must stay in Unbound's `private-domain` allowlist). The API and shares are at `truenas.lan`. Claude Code's scoped SSH access: [TrueNAS ops access](truenas-ops-access.md) |
+| HexOS / TrueNAS | <https://local.hexos.com/dash>; for local management use the dashboard's **Switch to Local** link (`https://<hash>.local.hexos.com:<port>`; the name resolves to the NAS's LAN IP, so `local.hexos.com` must stay in Unbound's `private-domain` allowlist). The API and shares are at `truenas.lan`. Claude Code's scoped SSH access: [TrueNAS ops access](truenas-ops-access.md) |
 | MacBook Pro worker host | `ssh jakerobb@192.168.102.9`. The Talos VM runs in UTM on that Mac |
 | KVM (GL.iNet Comet X) | `kvm.jakerobb.org` or `kvm.lan`. Console for rpi5-1, the MS-A2 and the MacBook Pro |
 
