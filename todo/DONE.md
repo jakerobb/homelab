@@ -3,6 +3,36 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Home Assistant backup shrink explained (2026-11-09)
+
+**Done (no change needed).** `ha-config-*.tar.gz` fell from about 20MB to 1.3MB on 2026-11-06. Comparing the 11-05 and 11-06 archives,
+the difference is HACS: `custom_components/hacs/` (its frontend bundle and source maps are most of the size) and `.storage/hacs.*`
+(including a 3.7MB `hacs.repositories`) are in 11-05 and gone in 11-06, replaced by `.storage/marketplace.*` files. The
+backup CronJob didn't change (its manifest was last touched 2026-10-29). The cause is the HA 2026.11.0 upgrade: HACS became
+a built-in "Marketplace" in that release ([release notes](https://www.home-assistant.io/blog/2026/11/04/release-202611/)). On the
+pod's first start on 2026-11-05 14:54:08 it wrote `.storage/marketplace.*`, and the `custom_components/hacs` directory's mtime
+changed a second later, i.e. HA migrated and removed the old integration itself. Custom components installed through HACS
+(`ac_infinity`) are still there, and the entity registry and other `.storage` files are in every archive. Leftovers: an old
+`.storage/hacs.critical` (harmless), and anything that referenced the `hacs` integration, such as a template using
+`integration_entities('hacs')`, now has to use `marketplace`.
+
+## NAS app backups copied offsite to B2 (2026-11-09)
+
+**Done.** The Home Assistant, Scrypted, change-detection and restock-radar backups on `data/k8s-nfs` now go to a private B2 bucket
+(`jakerobb-homelab-nas-backups`) from a daily TrueNAS Cloud Sync task, with a 30-day lifecycle rule so a bad sync can be undone.
+The first run copied 72 files (843.8 MiB) and a restored Home Assistant tarball matched its source. Two things differed from the
+plan: TrueNAS 25.10.7's rclone (v1.70.2) authorizes against B2's v1 API, which Backblaze rejects for these keys with
+`400 ... not supported on API version number 1`, so the credential is an S3 one on B2's S3 endpoint; and the bucket-scoped key needs
+`listAllBucketNames` as well as `listBuckets`, or the S3 `ListBuckets` call returns `403 not entitled`. Details and the restore proof
+are in [`../docs/nas-offsite-backup.md`](../docs/nas-offsite-backup.md).
+
+## `zigbee2mqtt-data` growth explained (2026-11-09)
+
+**Done (no change needed).** The 2026-10-18 audit projected the 1Gi volume full in about 45 days. It uses 182MB of 973MB, and nearly
+all of that is `log/`: Zigbee2MQTT starts a new log directory (up to about 26MB) at each restart and keeps 10, so it levels off near
+260MB and the oldest directory has already been pruned. The straight-line projection was wrong. To make it quieter, lower
+`advanced.log_level` or `log_directories_to_keep`.
+
 ## ClickHouse memory and `metric_log` TTL fixes confirmed (2026-11-09)
 
 **Done (confirmed and cleaned up 2026-11-09).** The 2026-11-08 changes (ClickHouse limit 8Gi to 12Gi, `metric_log` TTL 30 to 14 days

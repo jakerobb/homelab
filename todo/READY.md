@@ -58,8 +58,9 @@ Rough inventory, to be checked against the repo, 1Password and each provider bef
   stored in the `home-assistant-claude` item in the `homelab-k8s` vault). It can read every entity and call services, so
   treat it like an admin-adjacent credential; Claude only reads state with it.
 - **GitHub:** the Renovate token, and the self-hosted runner's registration.
-- **Backblaze B2:** the Terraform state key, the etcd-backup key, and the P3 Plus backup key. All three should already
-  be scoped to one bucket each; confirm that, and that none is the master key.
+- **Backblaze B2:** the Terraform state key, the etcd-backup key, the P3 Plus backup key, and the NAS Cloud Sync key (the
+  `b2-nas-backups` item in the `homelab-k8s` vault, scoped to `jakerobb-homelab-nas-backups`). All four should already be scoped to
+  one bucket each; confirm that, and that none is the master key.
 - **Brevo:** the SMTP login in `scripts/secrets/msmtprc.sops.yaml`.
 - **1Password:** the `homelab-external-secrets` service account token, which can be replaced as documented under
   [ESO bootstrap](../argocd/README.md#eso-bootstrap-one-time-manual). It's the least risky one to practice on.
@@ -92,8 +93,9 @@ upgrade (Debian 12 to 13) is tracked in `FUTURE.md`.
 
 ### Pin container images by digest
 
-Images are pinned by tag, which a registry can repoint (only restock-radar is pinned by digest today, by hand; the
-GitHub "require SHA pinning" setting covers Actions, not container images). Add `docker:pinDigests` to Renovate's `extends` so it adds
+GitHub Actions are already pinned by digest (`helpers:pinGitHubActionDigests`, see [`DONE.md`](DONE.md)), but container images
+are not: checked 2026-11-09, `renovate.json` doesn't extend `docker:pinDigests`, and of the images under `manifests/` and
+`argocd/apps/` only one is pinned by digest, by hand. A registry can repoint a tag. Add `docker:pinDigests` to Renovate's `extends` so it adds
 `@sha256:` digests and updates them with the tag. Expect a one-time PR touching most manifests, and review it as you
 would a bulk change; the `# renovate:` annotated pins in custom managers may need their regexes widened to cope with a
 digest after the tag.
@@ -187,14 +189,19 @@ When a set moves, delete its manual-apply section from the README in the same PR
 
 The tier-1 `AUTO-MERGE` rules in [`../renovate.json`](../renovate.json) (our own app images, GitHub Actions patch/digest, the
 `renovate/renovate` image, patch bumps of Glance/Headlamp/Radar) are merged by the CronJob's 11:30am, 12:30pm and 1:30pm weekday runs
-([`../manifests/renovate/cronjob.yaml`](../manifests/renovate/cronjob.yaml)). After the first weekday or two, check:
+([`../manifests/renovate/cronjob.yaml`](../manifests/renovate/cronjob.yaml)).
 
-- A PR opened by the 4:30am run is merged by the 11:30am run, or a later midday one (`kubectl logs -n renovate job/<latest>` shows the merge), and
-  nothing is merged outside 11am to 2pm on a weekday, or on a weekend. If PRs just sit, the likely causes are the `automergeSchedule` syntax, `lint` not
-  reporting as the required check, or the token lacking permission to merge.
-- The `automerge` label appears on eligible PRs, and `internalChecksFilter: strict` isn't hiding updates that should be
-  open (a package without a release timestamp and a `minimumReleaseAge` is held back; check the Dependency Dashboard).
-- A merge of one of our own images deploys cleanly: ArgoCD syncs it, no `ArgoApp*` or `PodCantStart` alert fires.
+Checked 2026-11-09: the schedule works. PRs 559 to 562 (our own images) were opened by the 11:30am run on Fri 2026-11-06 and merged at
+12:31, 12:32, 1:31 and 1:32pm, two per run, and nothing has merged outside the window. The weekend ones (573, 574, 582) are
+correctly still open. What's left:
+
+- **Lint flakes block auto-merge.** PR 582 (and 577) failed `lint` on 2026-11-08 because `helm template` got `504 Gateway Time-out`
+  from GitHub release downloads for six charts. A red `lint` means Renovate won't merge, and nothing retries. Re-run the job when it
+  happens; better, make lint retry chart fetches (or cache them).
+- Confirm the weekday of 2026-11-09 merged 573 and 574 (the first full weekday with a backlog), and that nothing fires
+  `ArgoApp*` or `PodCantStart` after an own-image merge. No such alert fired in the 14 days to 2026-11-09.
+- `internalChecksFilter: strict` isn't hiding updates that should be open (a package without a release timestamp and a
+  `minimumReleaseAge` is held back; check the Dependency Dashboard).
 
 Then consider widening, one slice at a time, with the reasoning in [`../argocd/README.md`](../argocd/README.md#renovate-dependency-updates-decided-and-deployed-2026-09-16):
 Helm charts without CRDs, patch bumps of other apps, and charts with CRDs only after the remaining hand-applied CRDs are
@@ -208,9 +215,12 @@ The readiness probes, the cluster-wide 180s deadline policy and the tightened st
 
 - Watch for an unexpected `ArgoAppDegraded` on a slow rollout: the cluster default is 180s, and an app that legitimately needs
   longer wants an explicit value (startup budget + 2 minutes) or the annotation (see `docs/adding-an-app.md`).
-- After the next Home Assistant upgrade that migrates its recorder database, check it stayed Ready within its 5 minute startup
-  budget; if it restarted during the migration, raise `failureThreshold` (see the comment on its `startupProbe`). The same goes
-  for InfluxDB after an unclean stop, which would replay its WAL, and for zigbee2mqtt if its coordinator handshake runs long.
+- Home Assistant's recorder migration is checked: the 2026.11.0 upgrade stayed Ready with 0 restarts (2026-11-09), so its startup
+  budget is enough. The same check is still open for InfluxDB after an unclean stop, which would replay its WAL, and for
+  zigbee2mqtt if its coordinator handshake runs long.
+- One slow rollout is unexplained: on 2026-11-04, `signoz-k8s-infra`'s `ArgoAppProgressingTooLong` fired from 15:13 to 17:18 UTC,
+  with `KubeDaemonSetRolloutStuck` for its otel-agent over the same span. A DaemonSet stuck for two hours points at one node (the
+  MBP or the Mac Studio worker?). Find which pod was stuck, via SigNoz logs for that window, and why.
 - Still without a readiness probe, by choice or because the chart has no setting: see the "Not done" list in
   [`../argocd/README.md`](../argocd/README.md#readiness-probes-and-a-cluster-wide-progress-deadline-added-2026-10-18).
 
@@ -219,27 +229,9 @@ The readiness probes, the cluster-wide 180s deadline policy and the tightened st
 Found while checking what the alerts and the cluster's history show. The alerts bundle that came out of it is in
 [`DONE.md`](DONE.md); these are what's left.
 
-- **`zigbee2mqtt-data` looks like it's filling** (about 45 days to full at its 7-day trend, at only 11.5% used), which is odd for a
-  Zigbee config. That is also a straight-line projection, so first check whether it's real growth or a log or backup that rotates,
-  then find what's growing.
 - **ntfy delivery isn't verified.** The Healthchecks heartbeat covers Prometheus and Alertmanager but skips ntfy-alertmanager and
   ntfy. A small CronJob could publish a message, poll to confirm ntfy stored it, and ping a second Healthchecks check.
-- **Are the app backups copied offsite?** The Home Assistant, Scrypted and change-detection backups go to a `hexos-nfs` volume,
-  which lives on the same NAS as the iSCSI primaries. If they aren't copied elsewhere, a NAS failure takes both.
-
-## Alertmanager label-based routing
-
-Alertmanager has been live for a month (as of 2026-10-20), so there's now a track record to design against. Only `severity`
-maps to ntfy priority/tags today ([`../manifests/ntfy-alertmanager/configmap.yaml`](../manifests/ntfy-alertmanager/configmap.yaml)).
-Review the month's alerts (what fired, what was noise, what you wished went elsewhere) and decide whether per-namespace
-topics or other label-based routing are worth building.
-
-## SigNoz alerting -> ntfy-alertmanager direct integration
-
-SigNoz went live on 2026-09-22, and a month in it's time for an opinion on whether it's staying. If it is, SigNoz's own
-alert rules (evaluated against its ClickHouse-backed data, not Prometheus) can notify a generic Webhook channel. That
-webhook's payload shape looks like the "Alertmanager outbound notification" format `ntfy-alertmanager`
-([`../manifests/ntfy-alertmanager/`](../manifests/ntfy-alertmanager/)) already parses, so SigNoz-native alerts could point
-straight at it and reuse the existing ntfy pipeline, skipping Alertmanager for that path. Not verified live; found via
-docs comparison, not a real test POST. Start with a test POST. See
-[`../argocd/README.md`](../argocd/README.md#signoz-decided-and-deployed-2026-09-22) for the SigNoz deployment itself.
+- **Nothing alerts when the NAS's Cloud Sync fails.** The app backups are now copied to B2 daily (live 2026-11-09, see
+  [`../docs/nas-offsite-backup.md`](../docs/nas-offsite-backup.md)), but a failed or missing run is silent. Options: a Healthchecks
+  ping from the task's post-script, or an alert on `cloudsync.query` job state. Also worth adding a B2-side check that the newest
+  object is under 36 hours old.
