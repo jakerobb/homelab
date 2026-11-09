@@ -234,7 +234,5 @@ Found while checking what the alerts and the cluster's history show. The alerts 
 
 - **ntfy delivery isn't verified.** The Healthchecks heartbeat covers Prometheus and Alertmanager but skips ntfy-alertmanager and
   ntfy. A small CronJob could publish a message, poll to confirm ntfy stored it, and ping a second Healthchecks check.
-- **Nothing alerts when the NAS's Cloud Sync fails.** The app backups are now copied to B2 daily (live 2026-11-09, see
-  [`../docs/nas-offsite-backup.md`](../docs/nas-offsite-backup.md)), but a failed or missing run is silent. Options: a Healthchecks
-  ping from the task's post-script, or an alert on `cloudsync.query` job state. Also worth adding a B2-side check that the newest
-  object is under 36 hours old.
+- **Optional: a B2-side freshness check.** The Cloud Sync failure alert is live (see [`DONE.md`](DONE.md)); it can't notice a sync
+  that succeeds but copies nothing new. A check that the newest object in the bucket is under 36 hours old would.
