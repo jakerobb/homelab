@@ -718,7 +718,7 @@ because it treats `-previewN` as a variant suffix. Renovate tracks the tags norm
 `deployment.yaml`), secrets encrypted
 (`argocd/secrets/{proxmox-api-token,truenas-api-key,unifi-credentials}.homepage.sops.yaml`). Confirmed hosts:
 `https://proxmox.lan:8006` (node name still the terraform *default*, `proxmox_node_name` — unconfirmed),
-`http://truenas.lan` for the widget's own API calls vs. `https://deck.hexos.com/dash` for the tile's click-through link
+`http://truenas.lan` for the widget's own API calls vs. `https://local.hexos.com/dash` for the tile's click-through link
 (two different things — see the comment in configmap.yaml). Remember to `sops -d ... | kubectl apply -f -` each once
 pushed (no KSOPS yet, applied out-of-band like every other secret here).
 

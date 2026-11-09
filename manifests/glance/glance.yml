@@ -187,7 +187,7 @@ pages:
                     url: https://argocd.jakerobb.org
                     icon: di:argo-cd
                   - title: HexOS/TrueNAS
-                    url: https://deck.hexos.com/dash
+                    url: https://7d3b4ea47977d8b0eb88df16db55961a99330cfb.local.hexos.com:43705/
                     icon: di:truenas-scale
                   - title: Proxmox
                     url: https://proxmox.lan:8006
@@ -332,10 +332,10 @@ pages:
           # the TrueNAS UI shows), not raw vdev capacity. One query returns
           # both per pool as a single series each, labelled by `metric`;
           # `or` keeps the pool listed (as unhealthy) if TrueNAS is down.
-          # Title links to the HexOS dashboard.
+          # Title links to the HexOS Local dashboard.
           - type: custom-api
             title: Storage
-            title-url: https://deck.hexos.com/dash
+            title-url: https://7d3b4ea47977d8b0eb88df16db55961a99330cfb.local.hexos.com:43705/
             css-class: storage
             cache: 5m
             url: http://kube-prometheus-stack-prometheus.monitoring.svc:9090/api/v1/query
