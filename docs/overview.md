@@ -117,5 +117,6 @@ docs build without broken links.
 | --- | --- | --- |
 | etcd (the whole cluster's state) | rpi5-1 daily, synced to Backblaze B2 | [etcd backups](etcd-backup.md) |
 | Proxmox host config | rpi5-1 daily | [Proxmox config backup](proxmox-config-backup.md) |
+| App backups on the NAS (`data/k8s-nfs`: Home Assistant, Scrypted, change-detection, restock-radar) | daily TrueNAS Cloud Sync to Backblaze B2 | [NAS offsite backup](nas-offsite-backup.md) |
 | Terraform state | Backblaze B2 | [Terraform via GitHub Actions](gha-terraform.md) |
 | Secrets | 1Password, plus SOPS-encrypted copies in this repo | [Talos cluster](../talos/README.md#secrets-sops--age-decided-2026-09-08) |
