@@ -2907,8 +2907,10 @@ through `homelab-gateway` like everything else. Deployed as
   filter. Grafana's and VictoriaLogs' routes were here too until 2026-10-01,
   when the Compose observability stack was retired. InfluxDB's route was here
   until 2026-09-29, when it moved to NetworkOptimizer's own instance.
-- **IoT VLAN firewall.** `kvm`, `rack-led` and `modbus-relay` are on the IoT
-  VLAN (`192.168.62.0/24`). UniFi's firewall allowed rpi5-1 in but not the
+- **IoT VLAN firewall.** `rack-led` and `modbus-relay` are on the IoT VLAN
+  (`192.168.62.0/24`); `kvm` moved to Cloud IoT (`192.168.55.0/24`, at
+  `192.168.55.8`) on 2026-11-09 so it can fetch firmware updates, and needs
+  the same allow rule there. UniFi's firewall allowed rpi5-1 in but not the
   cluster nodes: a test pod on every node (2026-09-29) timed out on all three,
   while rpi5-1 reached them. Envoy's upstream connections leave through the
   node's IP (masquerade), so the UniFi rule has to allow the node IPs

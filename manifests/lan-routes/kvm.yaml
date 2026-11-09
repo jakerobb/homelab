@@ -1,4 +1,5 @@
-# GL.iNet Comet X KVM (IoT VLAN).
+# GL.iNet Comet X KVM (Cloud IoT VLAN, 192.168.55.8; it needs internet
+# access to fetch firmware updates).
 # Deliberately NOT gated by Authelia: the app has its own login.
 #
 # HTTPS to the backend, not plain HTTP: on port 80 the KVM redirects every
@@ -33,7 +34,7 @@ ports:
     protocol: TCP
 endpoints:
   - addresses:
-      - 192.168.62.8
+      - 192.168.55.8
     conditions:
       ready: true
 ---

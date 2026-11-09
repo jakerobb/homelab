@@ -11,9 +11,9 @@
 # When a Compose app migrates into the cluster, delete its file here; its
 # own manifests take over the hostname.
 #
-# The IoT VLAN devices (kvm, rack-led, modbus-relay) need a UniFi firewall
-# rule allowing the cluster nodes in; see argocd/README.md's lan-routes
-# section.
+# The IoT and Cloud IoT VLAN devices (kvm, rack-led, modbus-relay) need a
+# UniFi firewall rule allowing the cluster nodes in; see argocd/README.md's
+# lan-routes section.
 apiVersion: v1
 kind: Namespace
 metadata:
