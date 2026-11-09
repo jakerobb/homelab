@@ -7,8 +7,8 @@ can do. This replaces the Windows install entirely.
 
 - **Proxmox VE 9.2-1** — `https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso`
   (SHA256 `4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c`)
-- If the Comet X's virtual media library supports adding media by URL directly,
-  use that — saves uploading ~1.7GB twice. Otherwise download to the Mac first,
+- The Comet X's virtual media library supports adding media by URL directly, so
+  use that — saves uploading ~1.7GB twice. Otherwise, download to the Mac first,
   then upload to the Comet X.
 - **Verify the checksum** after download, before mounting:
   ```bash
