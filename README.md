@@ -175,7 +175,7 @@ simple spring-clips. The back can be removed as well, but this requires a #2 Phi
 
 Everything is in the built-in cupboard below the TV.
 
-- LG 65C5 television, not connected to the internet
+- LG 65C5 television, not connected to the network
 - In the cupboard:
     - UniFi USW-Flex - providing GbE network connectivity to the cabinet (and PoE for the U5G)
         - Denon AVR-X1600H -- no internet connectivity; this just allows remote control from the app
