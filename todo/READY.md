@@ -93,12 +93,15 @@ upgrade (Debian 12 to 13) is tracked in `FUTURE.md`.
 
 ### Pin container images by digest
 
-GitHub Actions are already pinned by digest (`helpers:pinGitHubActionDigests`, see [`DONE.md`](DONE.md)), but container images
-are not: checked 2026-11-09, `renovate.json` doesn't extend `docker:pinDigests`, and of the images under `manifests/` and
-`argocd/apps/` only one is pinned by digest, by hand. A registry can repoint a tag. Add `docker:pinDigests` to Renovate's `extends` so it adds
-`@sha256:` digests and updates them with the tag. Expect a one-time PR touching most manifests, and review it as you
-would a bulk change; the `# renovate:` annotated pins in custom managers may need their regexes widened to cope with a
-digest after the tag.
+`docker:pinDigests` is in `renovate.json` (2026-11-09; see `argocd/README.md`, "Image digest pinning"), alongside the existing
+GitHub Actions pinning. A local Renovate dry run found 50 images to pin. What's left:
+
+- Review and merge the grouped "container image digest pins" PR when Renovate opens it, then watch ArgoCD sync every app (the
+  image is the same, but each pod is replaced). Then move this section to [`DONE.md`](DONE.md).
+- Pin the `tag:` values in the Authelia and democratic-csi Helm values, which are deliberately excluded for now. Check with
+  `helm template` that each chart renders `tag: vX@sha256:...` into a valid image reference, then widen those regex managers to
+  capture `currentDigest` and drop the exclusion rule in `renovate.json`.
+- Decide whether digest-only updates for any images should auto-merge (today they don't; a same-tag rebuild is a manual PR).
 
 ### Gate the jump-box Terraform jobs with an Environment
 

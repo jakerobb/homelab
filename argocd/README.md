@@ -291,6 +291,19 @@ Renovate PRs like everything else) — see the
     runner image and the tool versions pinned in the runner Dockerfile and
     workflows (a bad runner breaks lint for every PR, and the PR's own lint runs
     on the *old* runner); Terraform providers; and every major update.
+  - **Image digest pinning (added 2026-11-09).** `renovate.json` extends
+    `docker:pinDigests`, so every container image reference (Kubernetes
+    manifests, the Compose file, Dockerfiles, and the arc-runners pod template)
+    is written as `repo:tag@sha256:...`, and a tag bump and its new digest arrive
+    in one PR. A registry repointing a tag then shows up as its own digest PR
+    instead of silently changing what runs. The initial pinning is one grouped
+    PR ("container image digest pins"). The digest is the multi-arch index
+    digest, so it works on both the arm64 and amd64 nodes. Digest-only updates
+    are not auto-merged (only the rules above are). Not pinned: the `tag:` values
+    in the Authelia and democratic-csi Helm values (see the rule in
+    `renovate.json`; it's unverified that those charts render a digest in the
+    tag correctly). A pinned image whose tag moves on the registry keeps running
+    the pinned digest until a PR is merged.
   - **When it merges.** Renovate does the merge itself (`platformAutomerge:
     false`), because GitHub's native auto-merge is queued when the PR is opened
     and ignores `automergeSchedule`. Renovate only acts while it runs, which is
