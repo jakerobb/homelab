@@ -3,6 +3,14 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Alert when the NAS's Cloud Sync fails (2026-11-09)
+
+**Done.** The `NAS app backups to B2` task's post-script pings a Healthchecks.io check (period 1 day, grace 4 hours). TrueNAS runs a
+Cloud Sync post-script only after rclone exits 0, so the ping means the last run succeeded, and a failed run or a run that never
+happened both stop it and trigger an email. The check reports "up" after a manual run. Setup and the alarm test are in
+[`../docs/nas-offsite-backup.md`](../docs/nas-offsite-backup.md#failure-alert-healthchecksio). Not covered: a sync that succeeds but
+copies nothing new (see the optional B2-side check in [`READY.md`](READY.md)).
+
 ## Home Assistant backup shrink explained (2026-11-09)
 
 **Done (no change needed).** `ha-config-*.tar.gz` fell from about 20MB to 1.3MB on 2026-11-06. Comparing the 11-05 and 11-06 archives,

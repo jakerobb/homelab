@@ -63,8 +63,47 @@ it is a separate cost decision).
 
 ## Checking it later
 
-`ssh truenas-ops 'sudo midclt call cloudsync.query'` shows the task and its last run state. There's no alert on a
-failed Cloud Sync yet (tracked in [`../todo/READY.md`](../todo/READY.md)).
+`ssh truenas-ops 'sudo midclt call cloudsync.query'` shows the task and its last run state. Add `| jq '.[].job.state'` to see only the state.
+
+## Failure alert (Healthchecks.io)
+
+The task's post-script pings a [Healthchecks.io](https://healthchecks.io) check, the same service that watches
+Alertmanager (see "Watchdog" in [`../argocd/README.md`](../argocd/README.md)). TrueNAS runs a Cloud Sync post-script only
+after rclone exits 0 (`middlewared/plugins/cloud_sync.py` raises before it on any failure), so the ping means "last run
+succeeded". That makes it a dead-man's switch, which catches both kinds of failure:
+
+- a run that fails (bad credential, B2 outage, full bucket): no ping;
+- a run that never happens (task disabled, TrueNAS down, the NAS can't reach the internet): no ping.
+
+Setup (manual, needs your Healthchecks.io login and TrueNAS UI):
+
+1. In Healthchecks.io, add a check named `NAS Cloud Sync to B2`: period 1 day, grace time 4 hours (the task starts at
+   05:30 and takes minutes, so a ping is due by about 06:00). Description for the alert email:
+
+    > NAS Cloud Sync to B2 did not report success. The TrueNAS task "NAS app backups to B2" (daily, 05:30) pings this
+    > check only when it finishes without error, so either the last run failed or it didn't run. Check the task's last
+    > run in the TrueNAS UI (Data Protection, Cloud Sync Tasks), or from the jump box:
+    > `ssh truenas-ops 'sudo midclt call cloudsync.query' | jq '.[].job'`.
+    > See docs/nas-offsite-backup.md.
+
+2. Put the ping URL in 1Password (`homelab-k8s` vault, item `healthchecks-nas-cloudsync`, field `url`). It's a secret in
+   the same sense as the Watchdog's: anyone holding it can send a false "alive". Nothing in the cluster reads this one;
+   the item is just the record.
+3. In TrueNAS, edit the Cloud Sync task and set **Post-script** to:
+
+    ```bash
+    curl -fsS -m 10 --retry 3 -o /dev/null "https://hc-ping.com/<uuid>"
+    ```
+
+    A failed `curl` fails the job's post-script step, so the task shows as failed in the UI too, but the data has
+    already been copied by then.
+4. Use **Run Now** once and confirm the check turns green in Healthchecks.io.
+5. Test the alarm by temporarily changing the post-script's URL to one ending in `/fail`, running the task, and
+   confirming the email arrives. Then put the right URL back.
+
+What this doesn't cover: a sync that succeeds but copies nothing useful (for example, the CronJobs stopped writing
+backups, so there is nothing new to copy). The per-app backup CronJobs have their own alerts for that. A B2-side
+"newest object is under 36 hours old" check would also catch it; it's optional and not built.
 
 The TrueNAS credential is named `Backblaze B2` but is an Amazon S3 credential on B2's endpoint; the key lives in the
 `b2-nas-backups` item in the `homelab-k8s` vault.
