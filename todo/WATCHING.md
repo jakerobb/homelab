@@ -38,14 +38,13 @@ item says how).
 
 ## UniFi Network app GC thrash on the CGFiber (47Net.lan)
 
-**Why:** on 2026-09-18 the UniFi Network app became unresponsive from a JVM garbage-collection spiral. The fix is a locked
-heap (`-Xms == -Xmx = 640M` in `/etc/default/unifi` on the gateway). Both that file and the report's SSH key live on the
-gateway's overlay and survive normal reboots and app upgrades, but a full **UniFi OS** upgrade wipes them, after which the
-heap silently reverts. rpi5-1 runs the report from cron (daily digest 07:00, hourly threshold check). See
-[`../docs/unifi-gc-report.md`](../docs/unifi-gc-report.md) for the background and the reapply steps.
-
-UniFi OS 5.1.34 went on in the evening of 2026-10-27, which did exactly this: the gateway rebooted, `/etc/default/unifi` reverted
-to `-Xms128M -Xmx512M`, and the lock was reapplied by hand on 2026-10-28 (the report's SSH key survived that upgrade).
+**Why:** on 2026-09-18 the UniFi Network app became unresponsive from a JVM garbage-collection spiral. The fix was a locked
+heap (`-Xms == -Xmx = 640M` in `/etc/default/unifi` on the gateway), reapplied by hand after the UniFi OS 5.1.34 upgrade on
+2026-10-27 wiped it. **UniFi OS 6.0 and Network 11.0 went on around 2026-11-06 and reset the heap to `-Xms128M -Xmx512M`
+again. Decision (2026-11-09): don't restore the lock.** The new version promises better memory behavior, and the stock heap gets
+a chance to prove it. So `heap 128M/512M` is expected now; don't report it, and don't suggest reapplying the lock unless the rate
+below trips. The report's SSH key survived the upgrade. rpi5-1 runs the report from cron (daily digest 07:00, hourly threshold
+check). See [`../docs/unifi-gc-report.md`](../docs/unifi-gc-report.md) for the background and the lock's reapply steps.
 
 **Check:** read the report's own log on rpi5-1, which gets a line for every hourly run:
 ```bash
@@ -54,19 +53,18 @@ ssh jakerobb@rpi5-1.lan 'stat -c %y ~/.unifi-gc-report.log; tail -n 30 ~/.unifi-
 Lines start with `Skipped: <rate> Full GCs/hr <= threshold 150/hr` (healthy hour) or `Sent: UniFi GC report: <rate> Full GCs/hr,
 heap <Xms>/<Xmx>` (the daily digest, or a tripped hour).
 
-**Healthy:** the log was modified within the last two hours. Every `Skipped:` rate in the last 24 lines is under 150. Any
-`Sent:` line shows `heap 640M/640M`. Nothing but `Skipped:` and `Sent:` lines. Rates were 45 to 90 per hour on 2026-10-08;
-the docs' "healthy" range of 24 to 42 predates that, so judge by the 150 threshold and by change.
+**Healthy:** the log was modified within the last two hours. Every `Skipped:` rate in the last 24 lines is under 150. Nothing
+but `Skipped:` and `Sent:` lines. Any heap value is fine. Hourly rates were 113 to 130 on 2026-11-09 on the stock heap (45 to 90
+with the lock on 2026-10-08), so judge by the 150 threshold and by change.
 
 **Trouble:**
-- A rate of 150 or more, or a `Sent:` line with a heap other than `640M/640M` (the lock is gone: probably a UniFi OS
-  upgrade).
+- A rate of 150 or more sustained over several hours (a `Sent: ... ALERT` line), or a clear upward trend toward it. That is the
+  point at which to reconsider the lock, and to say so with the rates.
 - A stale log, or lines that are neither `Skipped:` nor `Sent:` (errors). That usually means the gateway's `authorized_keys`
   line was wiped too, so the report can't reach it.
-- A UniFi OS upgrade on the gateway since the last check. If you can see one (for example from the UniFi UI's update
-  history), say so, because it means both pieces need reapplying even if the numbers still look fine.
 
-**Retire when:** never, really. This one stays as long as that gateway does, so only retire it if the box is replaced.
+**Retire when:** the stock heap has stayed under the threshold for a month or two on UniFi Network 11.0, at which point the
+lock can be dropped from the docs for good. Otherwise it stays as long as that gateway does.
 
 ## UPS Tower stuck "Adopting" in UniFi
 

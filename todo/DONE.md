@@ -3,6 +3,14 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## ClickHouse memory and `metric_log` TTL fixes confirmed (2026-11-09)
+
+**Done (confirmed and cleaned up 2026-11-09).** The 2026-11-08 changes (ClickHouse limit 8Gi to 12Gi, `metric_log` TTL 30 to 14 days
+with `ttl_only_drop_parts = 1`; #584, #585) held through the 00:00 UTC rollover: no failed `MergeParts` in any hour from 11-08
+through 11-09 12:00 UTC, every `TTLDropMerge` that day succeeded (including the old `metric_log_0`, the live test of the 12Gi cap),
+and `signoz-alert-relay` showed no `[No data] Packet loss` after 11-08 11:45 UTC. The renamed leftovers `system.metric_log_0`
+(979 MiB) and `system.metric_log_1` (1.9 MiB) were dropped by hand; ClickHouse never drops renamed system tables itself.
+
 ## Mac Studio on the Temperatures dashboard (2026-11-08)
 
 **Done in the repo; the Terraform still needs applying.** The Studio was already shipping metrics (installed 2026-11-06, scraped as

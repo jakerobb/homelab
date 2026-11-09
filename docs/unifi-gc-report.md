@@ -9,8 +9,10 @@ live JVM heap config, and system memory, run in two modes:
   caught same-day instead of waiting for the next daily digest.
 
 Background: watching for a repeat of a 2026-09-18 JVM GC hang on this box,
-fixed at the time by locking the heap (`-Xms == -Xmx`, currently 640M/640M)
-instead of leaving it to the JVM's default sizing.
+fixed at the time by locking the heap (`-Xms == -Xmx`, 640M/640M)
+instead of leaving it to the JVM's default sizing. **The lock is currently off:** UniFi OS 6.0 / Network 11.0
+(about 2026-11-06) reset the heap to the stock `128M/512M`, and we chose on 2026-11-09 to leave it that way and see
+whether the new version behaves better. The hourly 150/hour alert is the tripwire; if it trips, reapply the lock.
 
 Runs from rpi5-1, not the gateway itself. UniFi OS/Network upgrades reset
 the gateway's overlay filesystem for things like `/etc/default/unifi` and
