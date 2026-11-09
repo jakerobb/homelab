@@ -75,28 +75,6 @@ Notes from the investigation:
 - Heavy ad-hoc queries over `system.query_log` and `system.part_log` can trip ClickHouse's own server-wide memory cap (90% of the
   12Gi pod limit, 10.8 GiB since 2026-11-08; it was 7.2 GiB before). That stops only the query, not the pod; keep them narrow (filter on `event_date`).
 
-## Confirm the ClickHouse memory and `metric_log` TTL fixes held
-
-**Check on or after 2026-11-09.** Follow-up to the 2026-11-08 investigation of the 1:23am and 6:23am `[No data] Packet loss`
-false alerts (details in [`../argocd/README.md`](../argocd/README.md), "ClickHouse CPU tuning"). Merged that day: ClickHouse
-limit 8Gi -> 12Gi (server cap 10.8 GiB), request 6Gi, and `metric_log` TTL 30 -> 14 days with `ttl_only_drop_parts = 1`
-(#584, #585). Failed merges stopped within two minutes of the first restart and were still at zero an hour later; this checks that
-it holds through the 00:00 UTC (7pm EST) day rollover, which is when the bad `TTLDropMerge` loop started on 2026-11-04.
-
-From the jump box, using `kubectl exec -n signoz chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clickhouse-client --query`:
-1. **No failed merges.** Hourly failures should be about 0 (they were 2,400 to 7,500 an hour from 11-04 to 11-08):
-   `SELECT toStartOfHour(event_time) h, countIf(error != 0) FROM system.part_log WHERE event_date >= today() - 1 AND event_type = 'MergeParts' GROUP BY h ORDER BY h`
-2. **Expiry did not use a merge.** No `TTLDropMerge` rows for `metric_log` after 00:00 UTC:
-   `SELECT count() FROM system.part_log WHERE event_date = today() AND table = 'metric_log' AND merge_reason = 'TTLDropMerge'`
-   The old `metric_log_0` is still merge-based (30-day TTL, no `ttl_only_drop_parts`), so its 2026-10-10 partition expiring at
-   00:00 UTC is the live test of the 12Gi cap: it should show one successful `TTLDropMerge` and no errors.
-3. **No false alert overnight.** No `[No data] Packet loss` in ntfy at about 1:23am or 6:23am, and none in
-   `kubectl logs -n monitoring deploy/signoz-alert-relay`.
-
-If all three are clean, delete the renamed tables (`DROP TABLE system.metric_log_0` and `system.metric_log_1`; their history is
-only the old 30-day and the first hours of the 14-day tables) or let them expire, then delete this item. If merges are still
-failing, look at which `merge_reason` and table they are before raising memory further.
-
 ## Memory requests for SigNoz's ClickHouse operator
 
 **Waiting on:** the upstream `signoz` Helm chart exposing resources for its bundled clickhouse-operator. As of chart

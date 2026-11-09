@@ -102,12 +102,14 @@ the full message, and the phone couldn't reach it:
 ## The UniFi controller is slow or unresponsive
 
 The UniFi Network app on the Cloud Gateway Fiber hung on 2026-09-18 from
-Java garbage collection. The fix locks its memory at 640 MB in
+Java garbage collection. The fix locked its memory at 640 MB in
 `/etc/default/unifi` on the gateway. A daily email from rpi5-1 reports on it,
 and an hourly check emails if it gets bad.
 
-**A full UniFi OS upgrade wipes that fix and the report's SSH key.** After
-one, reapply both. See [UniFi GC report](unifi-gc-report.md).
+**The lock is currently off, on purpose.** UniFi OS 6.0 / Network 11.0 reset it
+(around 2026-11-06) and we're giving the stock heap a chance to prove itself. If
+the hourly alert trips, reapply the lock; a full UniFi OS upgrade also wipes the
+report's SSH key. See [UniFi GC report](unifi-gc-report.md).
 
 ## The UPS Tower is stuck "Adopting" in UniFi
 
