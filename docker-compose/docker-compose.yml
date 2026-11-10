@@ -12,7 +12,7 @@ services:
 
   nut-upsd:
     <<: *dns
-    image: instantlinux/nut-upsd:2.8.5-r1
+    image: instantlinux/nut-upsd:2.8.5-r1@sha256:a186d74a586ec4e10494270f6a52e26bb5e50663d2f8570865f5bd38273e096e
     container_name: nut-upsd
     restart: unless-stopped
     privileged: true
@@ -54,7 +54,7 @@ services:
 
   unbound:
     <<: *dns
-    image: klutchell/unbound:v1.26.2
+    image: klutchell/unbound:v1.26.2@sha256:50cbeb32b5838a829a7226b19cb151f9535bd7f9f3190f950780f452fe807478
     container_name: unbound
     network_mode: host
     restart: unless-stopped
@@ -64,7 +64,7 @@ services:
   telegraf:
     <<: *dns
     container_name: telegraf
-    image: telegraf:1.40.3
+    image: telegraf:1.40.3@sha256:2958e3cbdc22d702ebd4a1e2db004c564f52a866551a65817eea26011407ea66
     restart: unless-stopped
     user: "telegraf:990"
     environment:
@@ -83,7 +83,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   vector:
-    image: timberio/vector:0.61.0-debian
+    image: timberio/vector:0.61.0-debian@sha256:f6c23b5a7e16fb2838d33619ef7acf4bad2289a7cf22bc90efc2371f520c4ea2
     container_name: vector
     restart: unless-stopped
     volumes:

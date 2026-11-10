@@ -44,7 +44,7 @@ spec:
         fsGroup: 1000
       initContainers:
         - name: restore
-          image: busybox:1.38.0
+          image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
           command:
             - sh
             - -c
@@ -74,7 +74,7 @@ spec:
               name: data
       containers:
         - name: zigbee2mqtt
-          image: koenkk/zigbee2mqtt:2.14.3
+          image: koenkk/zigbee2mqtt:2.14.3@sha256:fb4a6b0f6868ad1cd6a9996479802b2420e599c3463b62bbff8c8cd9a908f43a
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ

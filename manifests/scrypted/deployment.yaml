@@ -59,7 +59,7 @@ spec:
       terminationGracePeriodSeconds: 60
       initContainers:
         - name: restore
-          image: busybox:1.38.0
+          image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
           command:
             - sh
             - -c
@@ -87,7 +87,7 @@ spec:
               name: data
       containers:
         - name: scrypted
-          image: koush/scrypted:v0.147.0-noble-full
+          image: koush/scrypted:v0.147.0-noble-full@sha256:e78b4fcecdd6c61acaaf22b50ccef303c738da58cc0be57afdb116521df52296
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ

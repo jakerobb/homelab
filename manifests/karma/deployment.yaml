@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: karma
-          image: ghcr.io/prymitive/karma:v0.134
+          image: ghcr.io/prymitive/karma:v0.134@sha256:479c7bfad3c176b9c35c5a48c2ad8fa72d748f204314daff748fb51488f043da
           imagePullPolicy: IfNotPresent
           env:
             - name: CONFIG_FILE

@@ -66,7 +66,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0@sha256:b7fefd08651f00ac4df1a196ed4c621c2451fbb899297fe9fad9e36c667af0c0
           args:
             - --v=2
             - --csi-address=/csi-data/csi.sock

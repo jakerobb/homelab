@@ -51,7 +51,7 @@ spec:
       containers:
         - name: unbound
           # renovate: datasource=docker depName=klutchell/unbound
-          image: docker.io/klutchell/unbound:v1.26.2
+          image: docker.io/klutchell/unbound:v1.26.2@sha256:50cbeb32b5838a829a7226b19cb151f9535bd7f9f3190f950780f452fe807478
           imagePullPolicy: IfNotPresent
           # Runs as the image's own `unbound` user (101:102, owner of /var/unbound),
           # so it can't bind :53: kubernetes.conf moves it to 1053 and the Service
