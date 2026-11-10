@@ -44,7 +44,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: nut-exporter
-          image: docker.io/jakerobb/nut-relay:20261106121427@sha256:c154597ecd0a1137db83feea9157a6a4d78fc5339bfcb29d3d4bab5a8a261e37
+          image: docker.io/jakerobb/nut-relay:20261110202912@sha256:724f876ff5cf0b5dfb8a1dae49c58a25177c85a8ed47a0f1fb21ae8525d79db3
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
