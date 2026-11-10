@@ -51,7 +51,7 @@ spec:
             # since) only when that fingerprint differs from the marker. The
             # marker is written last, so an interrupted copy is redone.
             - name: seed-containerbase
-              image: renovate/renovate:44.165.2
+              image: renovate/renovate:44.165.2@sha256:12a39ef06c466491172d2449595f0f65237b3565a805527eb1de748767a25881
               command:
                 - sh
                 - -euc
@@ -87,7 +87,7 @@ spec:
               # Pinned, not :latest — this tag is itself now tracked by the
               # kubernetes manager (see renovate.json), so Renovate will open
               # a PR against itself when a new version ships.
-              image: renovate/renovate:44.165.2
+              image: renovate/renovate:44.165.2@sha256:12a39ef06c466491172d2449595f0f65237b3565a805527eb1de748767a25881
               args:
                 - jakerobb/homelab
                 # The Go apps deployed from this repo (manifests/restock-radar/,

@@ -63,7 +63,7 @@ spec:
         fsGroup: 1000
       initContainers:
         - name: restore
-          image: busybox:1.38.0
+          image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
           command:
             - sh
             - -c
@@ -93,7 +93,7 @@ spec:
               name: data
       containers:
         - name: matter-server
-          image: ghcr.io/matter-js/matterjs-server:1.5.5
+          image: ghcr.io/matter-js/matterjs-server:1.5.5@sha256:ee149c7c67eff0e90f131e8f0d628f7b099591ec58473c8cda1209e8ae4df66e
           imagePullPolicy: IfNotPresent
           # The image's ENTRYPOINT, plus the interface found from the node's default route.
           # Field 2 of /proc/net/route is the destination, 00000000 for the default route.

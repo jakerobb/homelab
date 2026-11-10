@@ -38,7 +38,7 @@ spec:
         # Holds the pod until scripts/change-detection-cutover/restore.sh has copied the old
         # datastore in. Starting on an empty volume would create a fresh instance with no watches.
         - name: restore
-          image: busybox:1.38.0
+          image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
           command:
             - sh
             - -c
@@ -63,7 +63,7 @@ spec:
               name: data
       containers:
         - name: change-detection
-          image: dgtlmoon/changedetection.io:0.70.3
+          image: dgtlmoon/changedetection.io:0.70.3@sha256:47b1e9cc3eff820e6022b655e3fcc948625f60c1770ae8b9c30aa3bf104dc255
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
