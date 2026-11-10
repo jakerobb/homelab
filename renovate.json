@@ -157,12 +157,12 @@
     },
     {
       "customType": "regex",
-      "description": "ARC runner image (ghcr.io/actions/actions-runner) pinned in the arc-runners scale set's pod template, which neither built-in manager sees (it's nested under valuesObject). Annotation comment on the line above, same pattern as the others. The regex also captures an optional @sha256 digest so the image can be digest-pinned.",
+      "description": "ARC runner image (ghcr.io/actions/actions-runner) pinned in the arc-runners scale set's pod template, which neither built-in manager sees (it's nested under valuesObject). Annotation comment on the line above, same pattern as the others. The regex also captures an optional @sha256 digest so the image can be digest-pinned. The newline and 18-space indent between the comment and `image:` are spelled out in both the regex and the replacement template, because Renovate only passes its own field names (depName, currentValue, ...) to autoReplaceStringTemplate; a custom capture group for the whitespace comes out empty, the rewritten line no longer matches, and Renovate drops the whole branch (that sank the first digest-pin run on 2026-11-09). If the indentation in argocd/apps/arc-runners/application.yaml changes, change it here too.",
       "managerFilePatterns": ["/^argocd/apps/arc-runners/application\\.yaml$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?<sep>\\s+)image: \\S+?:(?<currentValue>[^\\s@]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?"
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n {18}image: \\S+?:(?<currentValue>[^\\s@]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?"
       ],
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName={{{depName}}}{{{sep}}}image: {{{depName}}}:{{{newValue}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}"
+      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName={{{depName}}}\n                  image: {{{depName}}}:{{{newValue}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}"
     }
   ]
 }
