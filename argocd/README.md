@@ -299,10 +299,13 @@ Renovate PRs like everything else) — see the
     instead of silently changing what runs. The initial pinning is one grouped
     PR ("container image digest pins"). The digest is the multi-arch index
     digest, so it works on both the arm64 and amd64 nodes. Digest-only updates
-    are not auto-merged (only the rules above are). Not pinned: the `tag:` values
-    in the Authelia and democratic-csi Helm values (see the rule in
-    `renovate.json`; it's unverified that those charts render a digest in the
-    tag correctly). A pinned image whose tag moves on the registry keeps running
+    are not auto-merged (only the rules above are). The `tag:` values in the Authelia
+    and democratic-csi Helm values are pinned too, as `tag: 'v1@sha256:...'`
+    (2026-11-10); `helm template` of each chart (authelia 0.11.22,
+    democratic-csi 0.15.1) with and without the digest differs only in the
+    `image:` lines, so the charts don't use the tag anywhere a digest would break
+    (labels, for example). The regex manager for those files captures
+    `currentDigest`, so Renovate bumps tag and digest together. A pinned image whose tag moves on the registry keeps running
     the pinned digest until a PR is merged.
   - **When it merges.** Renovate does the merge itself (`platformAutomerge:
     false`), because GitHub's native auto-merge is queued when the PR is opened

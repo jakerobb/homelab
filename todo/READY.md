@@ -91,18 +91,6 @@ The rpi5-1 host firewall has been enforcing since 2026-11-04 (see [`../docs/rpi5
 Decide whether to narrow NUT (`:3493`) from the whole Server VLAN to the worker nodes, which is all that uses it. Jump-box OS
 upgrade (Debian 12 to 13) is tracked in `FUTURE.md`.
 
-### Pin container images by digest
-
-`docker:pinDigests` is in `renovate.json` (2026-11-09; see `argocd/README.md`, "Image digest pinning"), alongside the existing
-GitHub Actions pinning. A local Renovate dry run found 50 images to pin. What's left:
-
-- Review and merge the grouped "container image digest pins" PR when Renovate opens it, then watch ArgoCD sync every app (the
-  image is the same, but each pod is replaced). Then move this section to [`DONE.md`](DONE.md).
-- Pin the `tag:` values in the Authelia and democratic-csi Helm values, which are deliberately excluded for now. Check with
-  `helm template` that each chart renders `tag: vX@sha256:...` into a valid image reference, then widen those regex managers to
-  capture `currentDigest` and drop the exclusion rule in `renovate.json`.
-- Decide whether digest-only updates for any images should auto-merge (today they don't; a same-tag rebuild is a manual PR).
-
 ### Gate the jump-box Terraform jobs with an Environment
 
 Deferred 2026-10-04. The Terraform plan and apply jobs run on rpi5-1, which holds Terraform's SOPS age key, for any PR

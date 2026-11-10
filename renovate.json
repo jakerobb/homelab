@@ -30,16 +30,6 @@
       "groupName": "container image digest pins"
     },
     {
-      "description": "Not pinned yet: image tags in the Authelia and democratic-csi Helm values. Their regex managers (below) don't capture a digest, and it's unverified that each chart renders `tag: v1@sha256:...` into a valid image reference. Revisit by checking `helm template` output for each chart.",
-      "matchManagers": ["custom.regex"],
-      "matchFileNames": [
-        "argocd/apps/authelia/application.yaml",
-        "argocd/apps/democratic-csi/application.yaml",
-        "argocd/apps/democratic-csi-nfs/application.yaml"
-      ],
-      "pinDigests": false
-    },
-    {
       "description": "Renovate itself releases several times a day. It's baked into the ARC runner image (images/arc-runner/Dockerfile) just to validate renovate.json, and every bump rebuilds that image, so take it weekly.",
       "matchDatasources": ["npm"],
       "matchPackageNames": ["renovate"],
@@ -144,7 +134,7 @@
         "/^argocd/apps/democratic-csi-nfs/application\\.yaml$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+tag: '(?<currentValue>.*?)'"
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+tag: '(?<currentValue>[^'@]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?'"
       ]
     },
     {

@@ -217,3 +217,11 @@ should list `linux/arm64` (and `linux/amd64`) as platforms. Then re-run the fail
 republished the same v0.95.1 tag, the PR needs nothing else. If it shipped v0.95.2, Renovate updates the same branch once
 a kube-prometheus-stack chart release bumps the operator (`rebaseWhen` is `conflicted`, so it won't rebase otherwise).
 Once #577 is green and merged, delete this item. No target date; this depends on upstream.
+
+## Decide on auto-merging digest-only updates
+
+**Waiting on:** data. Image digest pinning went live 2026-11-10 (see [`DONE.md`](DONE.md)), and there isn't enough history yet to
+tell how often a digest-only PR appears (a registry republishing the same tag) or what those rebuilds look like. **Revisit on or
+after 2026-11-24.** By then, look at the digest-only PRs Renovate has opened and decide whether any images (our own, say, or
+well-behaved upstreams) should auto-merge them. Today none do, so each is a manual PR. That's the case where you most want to look
+first, so the default is to leave it manual unless the PRs prove noisy.

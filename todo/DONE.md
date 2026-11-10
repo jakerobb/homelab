@@ -3,6 +3,16 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## Container images pinned by digest (2026-11-09 to 2026-11-10)
+
+**Done.** `docker:pinDigests` is in `renovate.json`, and every container image reference (Kubernetes manifests, the Compose file,
+Dockerfiles, the arc-runners pod template, and the Authelia and democratic-csi Helm values) is written as `repo:tag@sha256:...`. A
+tag bump and its new digest arrive in one PR; a registry repointing a tag is its own PR. The grouped pin PR (#609) merged and ArgoCD
+synced all 50 apps cleanly. The first run failed because the arc-runners regex used a custom capture group in its
+`autoReplaceStringTemplate`, which Renovate doesn't expose (the debug log said "Could not extract ... after autoreplace"); the fix
+spells the indentation out. The Authelia and democratic-csi values were pinned by hand afterwards, after `helm template` showed only
+the `image:` lines change. Details are in [`../argocd/README.md`](../argocd/README.md) ("Image digest pinning").
+
 ## Alert when the NAS's Cloud Sync fails (2026-11-09)
 
 **Done.** The `NAS app backups to B2` task's post-script pings a Healthchecks.io check (period 1 day, grace 4 hours). TrueNAS runs a
