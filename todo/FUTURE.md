@@ -51,30 +51,6 @@ app makes is Flux (all in `MonitoringInfluxClient.cs`), and InfluxDB 3 dropped F
 moves to SQL or InfluxQL, remove that rule and plan the 2.x → 3.x data migration; 3.x doesn't read 2.x's storage
 directly.
 
-## Confirm SigNoz's ClickHouse volume has plateaued
-
-**Check on or after 2026-11-11.** Moved here from `READY.md` on 2026-11-04 after an investigation found nothing to fix yet.
-The volume (`data-volumeclaim-template-chi-signoz-clickhouse-cluster-0-0-0`, 30Gi) was at 21 GiB on 2026-10-28 and 22 of 30 GiB
-(74%) on 2026-11-04. The earlier "not plateauing" reading was wrong: `signoz_metrics.samples_v4` has a 30-day TTL
-(`ttl_only_drop_parts = 1`) and has dropped every partition before 2026-10-05. Volume has been steady at about 210 MiB a day
-since 10-05, so the 30-day window only finished filling on 2026-11-04. The system log tables have 30-day TTLs and start on
-10-05 or 10-06, so they've reached steady state too. Growth already slowed from about 0.58 GiB/day to about 0.14.
-
-On the 11th, check the volume's used space (`df -h /var/lib/clickhouse` in `chi-signoz-clickhouse-cluster-0-0-0`, or the PVC's
-kubelet metrics). If it's flat near 22 to 23 GiB, delete this item. If it's still climbing, grow the volume
-(`clickhouse.persistence` in [`../argocd/apps/signoz/application.yaml`](../argocd/apps/signoz/application.yaml)) or shorten retention.
-
-Notes from the investigation:
-- Two stray `samples_v4` partitions (2026-09-23 and 2026-09-27, about 4 MiB together) were past their TTL but lingered, and were
-  dropped by hand on 2026-11-04. Each held an empty part with no TTL info, which is the suspected reason ClickHouse skipped them.
-  Eleven more partitions in other tables (`signoz_logs`, `time_series_v4*`, `samples_v4_agg_*`, `metadata`) from 2026-09-17 to
-  09-27 showed the same pattern and were dropped the same way. If new ones appear, look for `delete_ttl_info_max` more than a day
-  in the past in `system.parts`.
-- About 6.3 GiB is the system log tables (`query_log`, `part_log`, `metric_log`, `asynchronous_metric_log`,
-  `aggregated_zookeeper_log`). Deliberately left alone: shortening their TTLs isn't worth the effort.
-- Heavy ad-hoc queries over `system.query_log` and `system.part_log` can trip ClickHouse's own server-wide memory cap (90% of the
-  12Gi pod limit, 10.8 GiB since 2026-11-08; it was 7.2 GiB before). That stops only the query, not the pod; keep them narrow (filter on `event_date`).
-
 ## Memory requests for SigNoz's ClickHouse operator
 
 **Waiting on:** the upstream `signoz` Helm chart exposing resources for its bundled clickhouse-operator. As of chart
@@ -201,19 +177,3 @@ npm 11).
 `npx -p node@24 -p npm@<fixed version> -- npm install --package-lock-only`. If it succeeds, remove the `constraints`
 block and the `renovate-config` package rule from `restock-radar`'s `renovate.json`, and delete this item. No target
 date; this depends on upstream.
-
-## Re-run lint on the kube-prometheus-stack v93 PR (prometheus-operator arm64 image)
-
-**Waiting on:** the latest release of `quay.io/prometheus-operator/prometheus-operator` having an image index with both
-`linux/amd64` and `linux/arm64` correctly labeled. The v0.95.1 index (2026-11-06) lists five manifests, all labeled
-`linux/amd64` or `unknown/unknown`; v0.94.2 had amd64, arm/v7, arm64, ppc64le and s390x. Tracked upstream in
-[prometheus-operator/prometheus-operator#8953](https://github.com/prometheus-operator/prometheus-operator/issues/8953)
-(open as of 2026-11-08, no maintainer reply yet). A commenter says the images themselves are fine and only the index's
-platform labels are wrong. This is what fails the `lint` check on Renovate's kube-prometheus-stack v93 PR
-([#577](https://github.com/jakerobb/homelab/pull/577)).
-
-**To check:** `docker buildx imagetools inspect quay.io/prometheus-operator/prometheus-operator:<latest release tag>`
-should list `linux/arm64` (and `linux/amd64`) as platforms. Then re-run the failed `lint` check on #577. If upstream
-republished the same v0.95.1 tag, the PR needs nothing else. If it shipped v0.95.2, Renovate updates the same branch once
-a kube-prometheus-stack chart release bumps the operator (`rebaseWhen` is `conflicted`, so it won't rebase otherwise).
-Once #577 is green and merged, delete this item. No target date; this depends on upstream.
