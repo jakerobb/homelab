@@ -299,10 +299,49 @@ The MS-A2 has two SODIMM slots, so this is a swap, not an addition. Keep the old
 HexOS goes down, and with it every PVC and `/mnt/data/shared`. Control planes, DNS and non-PVC pods stay up. Plan for
 roughly one to two hours, plus the memory test.
 
-Expect silence from the cluster for the whole window: Prometheus, Alertmanager and ntfy all have PVCs or sit behind
-them, so nothing will alert or notify until 3.8. `network-optimizer-lb` (the 10G-only Service) has no announcer while
-`talos-worker-1` is down, which is accepted: nearly everything else is off then too. The Studio and the Pi worker keep
-running the non-PVC pods.
+**Two things stay running through the outage: restock-radar and ntfy**, so stock alerts keep arriving on phones. They
+run as temporary stand-ins on throwaway `emptyDir` storage, pinned to the Studio; see
+[The restock-radar and ntfy carve-out](#the-restock-radar-and-ntfy-carve-out) below. Everything else stops, and the
+rest of the cluster is silent for the whole window: Prometheus and Alertmanager have PVCs, so nothing will alert about
+the cluster itself until 3.8 (ntfy is up, but nothing is publishing to it except restock-radar). The restock-radar web UI
+is unreachable too, because Authelia keeps its 2FA registrations on a PVC and stays off. `network-optimizer-lb` (the
+10G-only Service) has no announcer while `talos-worker-1` is down, which is accepted: nearly everything else is off
+then too. The Studio and the Pi worker keep running the non-PVC pods.
+
+### The restock-radar and ntfy carve-out
+
+[`../scripts/nas-outage/nas-outage.sh`](../scripts/nas-outage/nas-outage.sh) does the whole thing, in three commands:
+`plan` (read-only checks and a server-side dry run), `start` (3.2) and `finish --nas-up` (3.8). It runs on the jump box.
+
+- **What it creates.** `restock-radar-standby` and `ntfy-standby`, generated from the live Deployments when the script
+  runs (so they always carry the current image digest, config and probes) with every PVC swapped for an `emptyDir`,
+  pinned to `talos-worker-studio` (never `talos-worker-1`: the drain in 3.3 would evict them and their data). The real
+  Deployments are only scaled to 0 and back; git is never touched. That is also why ArgoCD must be stopped first: its
+  self-heal would otherwise scale the real ones straight back up, so `start` and `finish` refuse to run while the
+  controller is up.
+- **What's lost.** ntfy's message cache (12 hours of recent messages, for clients that were offline) is recreated
+  empty. restock-radar keeps its database, which is a few MB: 0.6 MB, plus a write-ahead log that was 4 MB on
+  2026-11-12, so the script always copies the `-wal` file along with the `.db`. Anything the stand-in learns during the
+  outage is copied back by `finish`.
+- **What it deliberately leaves out.** Authelia: it holds the 2FA registrations, which aren't worth putting on a
+  throwaway volume (they were lost once, in the 2026-09-15 migration), and the stock alerts don't go through it. The
+  Home Assistant stack and everything else stay off.
+- **No skipped poll interval.** restock-radar sleeps for its poll interval plus or minus jitter *after* each cycle
+  finishes: 5 minutes plus or minus 1, so the gap between one cycle ending and the next starting is at least 4 minutes.
+  Both hand-overs (in `start`, and back in `finish`) wait for `restock_radar_last_cycle_timestamp_seconds` to change,
+  then stop one copy and start the other inside that gap. The stand-in pod is created ahead of time with an init
+  container that blocks until the database arrives, and its image is already pulled, so the hand-over itself is only:
+  scale the old one to 0 and wait for it to exit cleanly (SIGTERM checkpoints the WAL), stream the database through
+  `kubectl exec`, compare checksums, release the init container. It prints how long that took and warns past 150 seconds.
+  Tested on 2026-11-12 against the live cluster without a hand-over (pod admission, pinning, image pull on the Studio,
+  `exec` into the init container, the copy and the checksum comparison all work; the copy took under a second).
+- **If a stand-in's pod is lost** (the Studio VM restarts, say) it comes back blocked in its init container, not with an
+  empty database, so it can't silently re-baseline. `nas-outage.sh reseed` pushes the copy that `start` saved in
+  `~/nas-outage/seed.tar` into it, which restores the state as of the hand-over.
+
+Backups need no thought: the stand-in's `/backups` is a throwaway `emptyDir`, the nightly NFS copies on the NAS simply
+stop for the window, and `finish` puts the newest database back on the real volume. The pre-outage database is kept
+next to it in `/data/.pre-outage` on the `restock-radar-data` volume, in case the copy back needs undoing.
 
 ### 3.0 Beforehand
 
@@ -319,7 +358,24 @@ running the non-PVC pods.
 - **Pause the Healthchecks.io check** (the dead-man's-switch; see "Dead-man's-switch" in
   [`../argocd/README.md`](../argocd/README.md)) when you scale things down in 3.2. Alertmanager is a StatefulSet, so
   it goes to zero with the rest and the pings stop; the check emails 10 to 20 minutes later. Resume it in 3.8.
-- Pick a quiet window. An Alertmanager silence is pointless here, since Alertmanager is off.
+- **Put the carve-out script on the jump box and rehearse it.** The repo isn't checked out there, so copy the script
+  over (the same way as `~/bin/etcd-snapshot-backup.sh`):
+
+  ```bash
+  scp scripts/nas-outage/nas-outage.sh jakerobb@rpi5-1.lan:bin/
+  ```
+
+  Run `~/bin/nas-outage.sh plan` on the jump box: it checks that `talos-worker-studio` is Ready and schedulable, builds
+  both stand-ins and server-side dry-runs them, and prints where the real pods are. Then do one full rehearsal while the
+  NAS is up (about 15 minutes, with ArgoCD stopped for that time): scale the Argo controller to 0 as in 3.2,
+  `~/bin/nas-outage.sh start`, check `status` and that a restock-radar alert would arrive, then
+  `~/bin/nas-outage.sh finish --nas-up` and scale Argo back to 1. A rehearsal is the only way to see a real hand-over
+  time, and it leaves `~/nas-outage/{seed,final}.tar` as proof that both copies work.
+- The Studio must be healthy for the whole window, since it holds the only copy of restock-radar's live data: check
+  `talos-worker-studio` is Ready, the Telegraf disk alert is quiet, and nothing else is about to reboot it
+  ([Rebooting the Studio](#rebooting-the-studio)).
+- Pick a quiet window. An Alertmanager silence is pointless here, since Alertmanager is off. Avoid the Studio's own
+  maintenance and the scheduled backups, which the stand-ins don't cover.
 - Hold the staged `hexos.tf` PR (3.9) until after the RAM is in and HexOS is up.
 - Facts checked 2026-11-07: HexOS is VM **102** (`hexos`, 10240 MiB), the worker is VM **101** (16384 MiB), the ZFS
   pool is `data`, and there are 21 PVCs in 14 namespaces. The host reports 29,769 MB total with about 1.5 GB
@@ -365,21 +421,32 @@ Pause the Healthchecks.io check now (see 3.0). Then stop the controller first (c
 kubectl -n argocd scale statefulset argocd-application-controller --replicas=0
 ```
 
-Scale deployments to zero first, which includes the operators, and wait a minute so they can't recreate anything:
+Scale deployments to zero first, which includes the operators, and wait a minute so they can't recreate anything.
+**Skip `restock-radar` and `ntfy`**: those two are handed over by the carve-out script below, and a blanket scale-down
+would also kill their stand-ins.
 
 ```bash
-for ns in $(kubectl get pvc -A --no-headers | awk '{print $1}' | sort -u); do kubectl -n "$ns" scale deploy --all --replicas=0; done
+for ns in $(kubectl get pvc -A --no-headers | awk '{print $1}' | sort -u | grep -vxE 'restock-radar|ntfy'); do kubectl -n "$ns" scale deploy --all --replicas=0; done
 ```
 
 Then the StatefulSets (Prometheus, ClickHouse, zookeeper, signoz and the rest), and suspend the CronJobs in those
-namespaces:
+namespaces (the same two are skipped; neither has a StatefulSet, and restock-radar's nightly backup is in the app):
 
 ```bash
-for ns in $(kubectl get pvc -A --no-headers | awk '{print $1}' | sort -u); do kubectl -n "$ns" scale sts --all --replicas=0; kubectl -n "$ns" get cronjob -o name | xargs -r -I{} kubectl -n "$ns" patch {} -p '{"spec":{"suspend":true}}'; done
+for ns in $(kubectl get pvc -A --no-headers | awk '{print $1}' | sort -u | grep -vxE 'restock-radar|ntfy'); do kubectl -n "$ns" scale sts --all --replicas=0; kubectl -n "$ns" get cronjob -o name | xargs -r -I{} kubectl -n "$ns" patch {} -p '{"spec":{"suspend":true}}'; done
 ```
 
-Verify that no pod still mounts a PVC, and that the PVC list matches what was scaled (21 PVCs across 14
-namespaces on 2026-11-07):
+Last, hand restock-radar and ntfy over to their stand-ins (Argo is already stopped, which the script requires). It
+restarts ntfy on the Studio first, then waits for restock-radar's next poll cycle to finish, which takes up to six
+minutes, and stops the real pod right then. It prints the before and after state; expect no warnings. If it fails it
+rolls both apps back onto their real volumes, which is safe because the NAS is still up.
+
+```bash
+~/bin/nas-outage.sh start
+```
+
+Verify that no pod still mounts a PVC (the script also checks this for its two namespaces), and that the PVC list
+matches what was scaled (21 PVCs across 14 namespaces on 2026-11-07; the PVCs of restock-radar and ntfy are now unused):
 
 ```bash
 kubectl get pods -A -o json | jq -r '.items[] | select(.spec.volumes[]?.persistentVolumeClaim) | "\(.metadata.namespace)/\(.metadata.name) \(.status.phase)"'
@@ -390,6 +457,10 @@ kubectl get pods -A -o json | jq -r '.items[] | select(.spec.volumes[]?.persiste
 ```bash
 kubectl drain talos-worker-1 --ignore-daemonsets --delete-emptydir-data --timeout=300s
 ```
+
+The stand-ins are pinned to `talos-worker-studio` and aren't on this node. Confirm with
+`kubectl get pods -A -o wide | grep standby`: if either is on `talos-worker-1`, stop and don't drain, because
+`--delete-emptydir-data` would discard restock-radar's live database.
 
 ### 3.4 Power down, cleanly and in order
 
@@ -465,7 +536,24 @@ kubectl uncordon talos-worker-1
 
 ### 3.8 Restore the workloads
 
-Start the Argo controller. Its self-heal restores replicas, StatefulSets and CronJob `suspend` from git, so there's
+**First, hand restock-radar and ntfy back, while ArgoCD is still stopped.** The order matters: once Argo is up its
+self-heal scales the real Deployments to 1 by itself, and a real restock-radar starting on the stale NAS database
+would alert again on every change the stand-in already reported. This needs HexOS verified (3.7) and
+`talos-worker-1` uncordoned, since the real pods need their iSCSI volumes. The script restarts the real ntfy and only
+then removes its stand-in; mounts the NAS volume in a helper pod; waits for the stand-in's next poll cycle to finish;
+copies the database back (the old one is kept in `/data/.pre-outage`, and the copy is undone if the checksums
+differ); stops the stand-in; and starts the real restock-radar, all inside the four-minute gap. It compares the item
+and variant counts before and after, and warns past 150 seconds:
+
+```bash
+~/bin/nas-outage.sh finish --nas-up
+```
+
+If it can't mount the NAS volume or the real ntfy won't start, it stops before touching restock-radar, and the
+stand-ins keep serving. Fix the cause (usually a volume that came back read-only, see
+[the procedure](proxmox-os-updates.md#after-a-reboot-read-only-iscsi-volumes)) and run it again.
+
+Then start the Argo controller. Its self-heal restores replicas, StatefulSets and CronJob `suspend` from git, so there's
 nothing to scale back by hand. Because the controller was off, refresh the root app first and confirm its revision is
 current before trusting the child apps (an out-of-date root once gave a false all-Synced).
 
@@ -509,4 +597,10 @@ for n in 31 34 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E 
 - HexOS won't start at 24 GiB: `qm set 102 --memory 10240` and start; the workers can stay as they are.
 - A volume turned read-only after the restore: delete the affected pod, one at a time
   ([procedure](proxmox-os-updates.md#after-a-reboot-read-only-iscsi-volumes)).
+- The carve-out went wrong. `~/bin/nas-outage.sh status` shows what's running and how long ago restock-radar last
+  finished a cycle. A stand-in pod that was lost is `reseed`'s job (above). If `start` fails, it rolls both apps back
+  onto their real volumes by itself. If `finish` can't be used at all, the stand-in's database is in
+  `~/nas-outage/final.tar` (taken at the last hand-over) and the pre-outage one is in `~/nas-outage/seed.tar`;
+  restock-radar's own README has the restore procedure for a database file. Losing the carve-out isn't fatal: with an
+  empty database the next start re-baselines silently, and UI-added products are the only thing not in git.
 - The ZFS snapshot from 3.1 is the last resort. Remember `claude-ops` can't destroy snapshots.
