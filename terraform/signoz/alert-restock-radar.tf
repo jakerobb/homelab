@@ -1,6 +1,6 @@
 # restock-radar's poller has stopped making progress: no successful product
-# fetch for an hour. The app polls every 20 minutes (plus or minus a minute), so
-# an hour is three missed passes. restock_radar_last_success_timestamp_seconds
+# fetch for an hour. The app polls every 5 minutes (plus or minus a minute), so
+# an hour is about twelve missed passes. restock_radar_last_success_timestamp_seconds
 # moves only when a fetch succeeds, and starts at process start, so this covers
 # a blocked or rate-limited store, a store outage, and a hung poller alike. The
 # app's own failure alerts (in ntfy) cover a single item going bad; this is

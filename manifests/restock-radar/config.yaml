@@ -5,7 +5,7 @@
 # Every variant of a product is watched. Items are store slugs, the last
 # segment of a product URL; old slugs the store redirects also work.
 # Seeded 2026-10-05 from the 26 store products in ChangeDetection.
-poll_interval: 20m
+poll_interval: 5m
 poll_jitter: 1m
 request_delay: 2s
 http_port: 8080
