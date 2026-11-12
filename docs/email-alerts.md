@@ -34,7 +34,10 @@ YAML/JSON. Contains the Brevo SMTP key as the password, and Brevo's assigned
 SMTP login (not a real mailbox — a generated identifier tied to the API
 key) as the user.
 
-Decrypt and deploy to rpi5-1:
+`scripts/msmtpq/install.sh` decrypts it to `~/.msmtprc` (mode 600) on rpi5-1, and records the sha256 of the encrypted file in
+`~/.msmtprc.sops.sha256` (world-readable). The compose-deploy cron compares that hash with the repo's file, so after you
+change the secret and merge, you get an ntfy alert to re-run the installer
+([`compose-deploy.md`](compose-deploy.md#host-scripts-outside-docker)). To decrypt by hand instead:
 
 ```bash
 sops -d --output-type binary scripts/secrets/msmtprc.sops.yaml > ~/.msmtprc
@@ -62,7 +65,7 @@ cron's own mail-on-output behavior works unmodified):
 sudo apt install msmtp-mta
 ```
 
-Crontab needs `MAILTO` set, and the job's own stdout redirected away so only
+Each cron.d file needs `MAILTO` set, and the job's own stdout redirected away so only
 a real failure (which lands on stderr, given `set -euo pipefail`) triggers a
 mail — otherwise every successful run's normal output would also mail:
 
@@ -99,8 +102,8 @@ What it does:
 - `dpkg-divert`s `msmtp-mta`'s `/usr/sbin/sendmail` and `/usr/lib/sendmail`
   symlinks (to `*.msmtp-mta`) and points them at the wrapper, so an
   `msmtp-mta` upgrade can't silently put non-queueing `msmtp` back
-- adds the flush job to the crontab:
-  `*/15 * * * * /usr/local/bin/msmtpq-sendmail --q-mgmt -r > /dev/null 2>&1`.
+- (the flush job is `scripts/rpi5-cron/homelab-msmtpq-flush`, installed by that directory's `install.sh`):
+  `*/15 * * * * jakerobb /usr/local/bin/msmtpq-sendmail --q-mgmt -r > /dev/null 2>&1`.
   All output is discarded on purpose: with `MAILTO` set, any output would
   be mailed through the same queue it is failing to flush.
 

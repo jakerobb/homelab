@@ -77,13 +77,21 @@ open alerts.
 
 Standalone scripts that run from cron on rpi5-1 but aren't in `docker-compose/` ride the same step 3, via the script's
 `HOST_FILES` table (repo path, destination, mode). Today that's `scripts/etcd-snapshot-backup.sh` and
-`scripts/unifi-gc-report.py`, both to `~/bin/` at mode 700. To put another script under management, add a line to the table.
+`scripts/unifi-gc-report.py` (to `~/bin/`, mode 700), plus the two SOPS-encrypted secrets they use, `b2-etcd-backup.sops.yaml` and
+`studio-unlock.sops.yaml` (to `~/bin/secrets/`, mode 600, ciphertext only). To put another file under management, add a line to the table.
 
 - Same drift protection as above: a copy edited on the host is flagged, not overwritten.
 - The first run after a script is added takes over whatever copy is already there (they were deployed by hand before), so
   a stale copy is replaced rather than flagged.
 - Written via temp file and rename, so a run in progress keeps its old copy. No services are restarted.
-- Secrets (like `~/bin/secrets/b2-etcd-backup.sops.yaml`) are not managed; they still go in by hand.
+- Only files the `jakerobb` user owns are written. Root-owned installs (`/usr/local/bin/msmtpq-sendmail`, the firewall, the
+  studio-unlock-watchdog, the unattended-upgrades config) still go in through their `install.sh` scripts; the cron job
+  deliberately has no root. Instead, each run compares the installed copies with the repo (the script's `NEEDS_INSTALL`
+  table), and if one is stale, missing or unreadable you get an ntfy alert naming the installer to run on rpi5-1. The alert
+  clears itself once the copy matches. (A file missing from the repo is ignored.) The decrypted SMTP credentials in
+  `~/.msmtprc` can't be compared directly, so `msmtpq/install.sh` records the sha256 of the encrypted repo file in
+  `~/.msmtprc.sops.sha256` and the cron compares that (the `SOPS_HASHES` table). `~/bin/secrets/` must already exist at
+  mode 700.
 
 ### Image updates
 
@@ -93,7 +101,7 @@ new version ships; merging it is what updates the container, via the normal
 `up -d` above. Watchtower used to do this in place and was removed on
 2026-09-28.
 
-Superseded images are cleaned up by a crontab entry on rpi5-1 (not this
+Superseded images are cleaned up by a cron job on rpi5-1 (`homelab-docker-image-prune`, not this
 script): `docker image prune --all --force --filter until=168h` daily at 5am.
 That removes every image no container uses, except ones created in the last
 week.
@@ -129,10 +137,11 @@ That first real run also does a normal deploy. Expect it to recreate
 since removed, had left them with a stale `com.docker.compose.image` label),
 and nothing else.
 
-Then add the cron entry (`crontab -e`; `MAILTO` is already set there):
+Then install the cron job, which lives with the others in [`scripts/rpi5-cron/`](../scripts/rpi5-cron/)
+([`cron-jobs.md`](cron-jobs.md)):
 
-```
-*/5 * * * * /usr/bin/python3 /home/jakerobb/dev/homelab/scripts/compose-deploy/compose-deploy.py
+```bash
+cd ~/dev/homelab && ./scripts/rpi5-cron/install.sh
 ```
 
 Subscribe to `https://ntfy.jakerobb.org/homelab-alerts` if you haven't
@@ -140,7 +149,8 @@ already.
 
 ## Operating it
 
-- **Pause auto-deploy:** comment out the cron line. Any uncommitted edit in
+- **Pause auto-deploy:** comment out the line in `/etc/cron.d/homelab-compose-deploy` (the drift alert will nag
+  until you restore it). Any uncommitted edit in
   `~/dev/homelab` also pauses it, with an alert.
 - **Run now / watch a run:** `compose-deploy.py -v`. A lock prevents
   overlapping runs.

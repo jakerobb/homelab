@@ -86,11 +86,11 @@ It prints nothing when everything is fine. Added 2026-09-27, after the
 2026-09-27 health check found the install step above had never been run:
 the config was merged but `unattended-upgrades` still wasn't installed.
 
-Install the cron entry on rpi5-1 (`MAILTO` is already set in the crontab).
+The cron job is `scripts/rpi5-cron/homelab-unattended-upgrades-check-rpi5-1` ([`cron-jobs.md`](cron-jobs.md)); install it on rpi5-1.
 09:00 is after the `apt-daily-upgrade` timer's 06:00–07:00 window:
 
 ```bash
-crontab -l | { cat; echo "0 9 * * * \$HOME/dev/homelab/scripts/unattended-upgrades/check.sh > /dev/null"; } | crontab -
+cd ~/dev/homelab && ./scripts/rpi5-cron/install.sh
 ```
 
 To check by hand:

@@ -1,0 +1,5 @@
+# Daily check that unattended-upgrades is healthy on this host (docs/rpi5-1-os-updates.md).
+# Managed from scripts/rpi5-cron/ (install.sh); edit it there, not in /etc/cron.d.
+MAILTO=jakerobb@gmail.com
+PATH=/usr/local/bin:/usr/bin:/bin
+0 9 * * * jakerobb /home/jakerobb/dev/homelab/scripts/unattended-upgrades/check.sh > /dev/null

@@ -156,7 +156,7 @@ and fix it, or postpone.
 
 ### Timing
 
-- [ ] The window avoids the cron times that matter. Check `crontab -l` on
+- [ ] The window avoids the cron times that matter. Check `/etc/cron.d/homelab-*` on
       rpi5-1 for the etcd snapshot, and remember the Proxmox config backup
       pushes to rpi5-1 at 03:00 and the upgrade check runs at 09:00. A
       missed run is harmless, but then you'll wonder about it later.
@@ -587,7 +587,7 @@ Note the end time.
 | Compose is back | `docker ps` | `unbound`, `telegraf`, `vector`, `nut-upsd` all `Up` |
 | Unbound answers | from your Mac: `dig @192.168.102.2 <a *.lan name>` | same answer as `@192.168.102.130` |
 | UPS visible | `upsc <ups-name>@localhost` and from another host: `upsc <ups-name>@rpi5-1.lan` | live values; nut-exporter alert clears |
-| `compose-deploy` | `crontab -l`, then wait for the next run or run it by hand | no drift alert, no errors |
+| `compose-deploy` | `ls /etc/cron.d/homelab-*` (re-run `scripts/rpi5-cron/install.sh` on the new Pi), then wait for the next run or run it by hand | no drift alert, no errors |
 | GHA runner | `systemctl status 'actions.runner.*'`, and GitHub → Settings → Actions → Runners | service active, runner **Idle** |
 | Terraform | push a trivial change on a branch, or re-run the latest plan job | plan job runs on the runner and succeeds |
 | Talos access | `talosctl -n 192.168.102.11 version`, `kubectl get nodes` | all 7 nodes `Ready` (cordoned worker shows `SchedulingDisabled`) |

@@ -21,6 +21,28 @@ B2_BUCKET="jakerobb-homelab-etcd-backups"
 B2_SECRETS="${HOME}/bin/secrets/b2-etcd-backup.sops.yaml"
 B2_BIN="${HOME}/.local/bin/b2"
 
+# Healthchecks.io heartbeat (2026-11-12): the success ping goes out at the very
+# end, and any failure pings /fail, so a night that doesn't finish (cron broken,
+# host down, the script dying early) alerts from outside instead of depending
+# on the cron mail arriving. The ping URL is a secret: a SOPS file synced here
+# by compose-deploy. No file, no heartbeat.
+HC_SECRETS="${HOME}/bin/secrets/healthchecks-etcd-backup.sops.yaml"
+hc_ping() {
+  [ -f "$HC_SECRETS" ] || return 0
+  local url
+  url="$(sops --decrypt --extract '["url"]' "$HC_SECRETS" 2>/dev/null)" || return 0
+  curl -fsS -m 10 --retry 3 -o /dev/null "${url}${1:-}" || true
+}
+
+VERIFY_FILE=""
+on_exit() {
+  local rc=$?
+  if [ -n "$VERIFY_FILE" ]; then rm -f "$VERIFY_FILE"; fi
+  if [ "$rc" -ne 0 ]; then hc_ping /fail; fi
+  return "$rc"
+}
+trap on_exit EXIT
+
 mkdir -p "$BACKUP_DIR"
 
 TS=$(date +%Y%m%d-%H%M%S)
@@ -52,7 +74,6 @@ sops exec-env "$B2_SECRETS" "${B2_BIN} sync --no-progress --skip-newer --allow-e
 # find out. Only verifies tonight's fresh snapshot, not the full 30-day
 # history, to keep this fast and bounded.
 VERIFY_FILE="$(mktemp)"
-trap 'rm -f "$VERIFY_FILE"' EXIT
 
 sops exec-env "$B2_SECRETS" "${B2_BIN} file download b2://${B2_BUCKET}/$(basename "$SNAPSHOT") ${VERIFY_FILE} --no-progress"
 
@@ -60,3 +81,5 @@ if ! cmp -s "$SNAPSHOT" "$VERIFY_FILE"; then
   echo "ERROR: snapshot downloaded back from B2 does not match the local original ($SNAPSHOT)" >&2
   exit 1
 fi
+
+hc_ping

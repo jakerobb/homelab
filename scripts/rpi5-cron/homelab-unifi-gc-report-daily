@@ -1,0 +1,5 @@
+# Daily UniFi GC digest (docs/unifi-gc-report.md).
+# Managed from scripts/rpi5-cron/ (install.sh); edit it there, not in /etc/cron.d.
+MAILTO=jakerobb@gmail.com
+PATH=/usr/local/bin:/usr/bin:/bin
+0 7 * * * jakerobb /usr/bin/python3 /home/jakerobb/bin/unifi-gc-report.py --window-hours 24 >> /home/jakerobb/.unifi-gc-report.log 2>&1

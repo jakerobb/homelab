@@ -52,13 +52,14 @@ ssh-copy-id -i ~/.ssh/id_ed25519_proxmox.pub root@proxmox.lan
 rpi5-1 already has tested outbound mail ([`email-alerts.md`](email-alerts.md)),
 and the Proxmox host's mail setup has never been checked, so the daily
 [`check.sh`](../scripts/unattended-upgrades/check.sh) runs from rpi5-1's
-crontab, piped over SSH, and cron on rpi5-1 mails anything it prints to
+cron (`homelab-unattended-upgrades-check-proxmox`), piped over SSH, and cron on rpi5-1 mails anything it prints to
 stderr. That includes SSH itself failing, so an unreachable host also
-produces a mail. Installed 2026-09-27 on rpi5-1 (`MAILTO` is already set in
-the crontab):
+produces a mail. Installed 2026-09-27 on rpi5-1; since then the job is
+[`scripts/rpi5-cron/homelab-unattended-upgrades-check-proxmox`](../scripts/rpi5-cron/homelab-unattended-upgrades-check-proxmox)
+([`cron-jobs.md`](cron-jobs.md)):
 
 ```bash
-crontab -l | { cat; echo "5 9 * * * ssh -o BatchMode=yes proxmox \"bash -s\" < \$HOME/dev/homelab/scripts/unattended-upgrades/check.sh > /dev/null"; } | crontab -
+cd ~/dev/homelab && ./scripts/rpi5-cron/install.sh
 ```
 
 To check by hand, on the Proxmox host:

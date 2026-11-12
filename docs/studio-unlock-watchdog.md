@@ -66,6 +66,9 @@ age key that `jakerobb` already holds on the Pi. To keep the exposure small:
    sops --encrypt --in-place scripts/secrets/studio-unlock.sops.yaml
    ```
 
+   Once merged, the compose-deploy cron copies it to `~/bin/secrets/` on rpi5-1 within ~5 minutes
+   ([`compose-deploy.md`](compose-deploy.md#host-scripts-outside-docker)). To use it before the merge, copy it by hand:
+
    ```bash
    scp scripts/secrets/studio-unlock.sops.yaml jakerobb@rpi5-1.lan:bin/secrets/
    ```
