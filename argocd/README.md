@@ -2024,7 +2024,7 @@ ChangeDetection's and Browserless's store watches (ChangeDetection itself moved 
 
 - **No browser.** It reads the JSON the store's Next.js frontend serves at
   `/_next/data/{buildId}/us/en/products/{slug}.json` (status, price and
-  restock ETA per variant), one small request per product every 20 minutes
+  restock ETA per variant), one request per product category (a page lists every product in its family) every 5 minutes
   with jitter. It backs off if the store returns 403/429/503. See the app's
   DESIGN.md.
 - **Watch list** is `config.yaml`, seeded from the 26 store products in
