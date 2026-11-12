@@ -3,6 +3,18 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## SigNoz ClickHouse volume plateaued (2026-11-11)
+
+**Done (no change needed).** `data-volumeclaim-template-chi-signoz-clickhouse-cluster-0-0-0` is at 21G of 30G (71%) on 2026-11-11,
+down from 22G (74%) on 2026-11-04, so the 30-day TTL window has finished filling and the volume is flat. No resize or retention
+change needed.
+
+## kube-prometheus-stack v93 lint unblocked (2026-11-11)
+
+**Done.** [prometheus-operator#8953](https://github.com/prometheus-operator/prometheus-operator/issues/8953) was closed on 2026-11-10 with
+v0.95.2, and Renovate's kube-prometheus-stack v93 PR ([#577](https://github.com/jakerobb/homelab/pull/577)) merged at 2026-11-10 21:24Z.
+The cluster runs `prometheus-operator:v0.95.2` and `prometheus-config-reloader:v0.95.2`.
+
 ## Alert when the NAS's Cloud Sync fails (2026-11-09)
 
 **Done.** The `NAS app backups to B2` task's post-script pings a Healthchecks.io check (period 1 day, grace 4 hours). TrueNAS runs a
