@@ -73,6 +73,18 @@ including the output of failed commands, goes to
 holds `state.json`: last-deployed commit, file hashes, pending restarts, and
 open alerts.
 
+### Host scripts outside `~/docker`
+
+Standalone scripts that run from cron on rpi5-1 but aren't in `docker-compose/` ride the same step 3, via the script's
+`HOST_FILES` table (repo path, destination, mode). Today that's `scripts/etcd-snapshot-backup.sh` and
+`scripts/unifi-gc-report.py`, both to `~/bin/` at mode 700. To put another script under management, add a line to the table.
+
+- Same drift protection as above: a copy edited on the host is flagged, not overwritten.
+- The first run after a script is added takes over whatever copy is already there (they were deployed by hand before), so
+  a stale copy is replaced rather than flagged.
+- Written via temp file and rename, so a run in progress keeps its old copy. No services are restarted.
+- Secrets (like `~/bin/secrets/b2-etcd-backup.sops.yaml`) are not managed; they still go in by hand.
+
 ### Image updates
 
 Every image in `docker-compose.yml` is pinned to a specific version (or, for
