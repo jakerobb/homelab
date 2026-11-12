@@ -45,6 +45,20 @@ Next, look at the versions of everything -- apps, dependencies, and infrastructu
 
 4. updates that require significant work (e.g. tearing down and rebuilding a K8s node)
 
+**Talos OS upgrades are gated on the Pi fork.** The Pi 5 nodes (the three control planes and `talos-worker-3`) can only run a Talos
+version that the `yama6a/talos-raspberry-pi5` fork has built. Before suggesting a Talos upgrade, get the newest upstream release
+(`gh release list -R siderolabs/talos --exclude-pre-releases`) and check that the fork has a tag for that version
+(`gh api repos/yama6a/talos-raspberry-pi5/tags --jq '.[].name'`, tags look like `v1.14.5-5`; match the `vX.Y.Z` prefix).
+- **Fork tag exists:** report the upgrade (section 3), as a full cluster upgrade per
+  [`../rolling-node-change/instructions.md`](../rolling-node-change/instructions.md).
+- **No fork tag yet:** don't suggest the upgrade, and don't mention it unless the next bullet applies. (The Image Factory workers
+  would have to wait too: the cluster stays on one Talos version.)
+- **No fork tag and the upstream release is a month old or more** (check its `published_at`): tell me, near the top of the report. That
+  probably warrants action, such as asking the fork's maintainer or building the image ourselves. Give both dates.
+Check the Talos version we run against the same fork tag too: if nodes are on different Talos versions (`talosctl version` on each; as on 2026-11-12, when the
+workers moved to v1.14.6 and the Pis stayed on v1.14.5), report it as drift to close, naming the version the Pis are waiting for and
+since when, and flag any difference beyond the patch number as a problem.
+
 Finally, review todo/FUTURE.md. Every item gets a real look; do not triage by heading or by date alone.
 
 - **Read the whole file.** It is long enough that a single `cat` gets truncated in the middle. Read it with the Read tool in

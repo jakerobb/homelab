@@ -40,9 +40,18 @@ cd "$(mktemp -d)" && B=https://github.com/siderolabs/talos/releases/download/$V 
   && sudo install -m 0755 talosctl-linux-arm64 /usr/local/bin/talosctl && talosctl version --client --short
 ```
 
+**Talos OS upgrade, first check the fork.** Keep every node on the same Talos version. The Pi nodes (control planes and
+`talos-worker-3`) need a build from the `yama6a/talos-raspberry-pi5` fork for the target version:
+`gh api repos/yama6a/talos-raspberry-pi5/tags --jq '.[0:3][].name'`. If there is no tag for the target yet, don't upgrade any node;
+wait for it. Only deliberately split versions if there is a specific reason (a fix needed on the workers now), say so, and never
+across a minor version (`1.14.x` to `1.15.x`): that needs the whole cluster moved in one pass, and a separate plan.
+The first request for a new version of a schematic makes Image Factory build the installer, taking ~45s, so a manifest `curl` looks
+hung once. Pre-warm both schematics with one `curl` each before draining anything.
+
 **Talos OS upgrade, workers.** Drain, then `talosctl -n <ip> upgrade --image factory.talos.dev/installer/<schematic>:<version>`.
-Use the node's own schematic (the standard one on worker-1/3 and worker-studio, the `tsc=reliable` one on worker-mbp). Afterwards patch
-`.machine.install.image` to the same value (no reboot). Uncordon once it is back.
+Use the node's own schematic (the standard one on worker-1/3 and worker-studio, the `tsc=reliable` one on worker-mbp). Use `--wait --timeout 15m`; it also uncordons the node when it is Ready. Afterwards patch
+`.machine.install.image` to the same value (no reboot). Retry the patch if it gets "connection refused": `talosd` can still be restarting just after the wait returns, and the failure is easy to miss, so re-read `get machineconfig` to confirm. A
+"server version is older than client version" warning on not-yet-upgraded nodes is expected after the `talosctl` update.
 
 **Talos OS upgrade, Pi control planes.** Never use the fork's plain tag: the combined-image recipe and U-Boot patch in
 [`../../talos/README.md`](../../talos/README.md#full-sequence-per-node) is required until upstream carries the fix. Do not
@@ -61,7 +70,7 @@ password, and the node only rejoins after that (see
 - `talosctl -n <ip> get extensions` still lists `iscsi-tools` and `util-linux-tools`.
 - `kubectl get nodes`: the node is `Ready` at the expected kubelet version. Control planes: `talosctl etcd status`
   shows all members healthy.
-- A pod with an iSCSI volume on the node mounts and can write. Prometheus and SigNoz's ClickHouse can take several
+- A pod with an iSCSI volume on the node mounts and can write (ClickHouse's image has `sh`; Prometheus's doesn't). Prometheus and SigNoz's ClickHouse can take several
   minutes to reattach after a reboot.
 - An external `curl` of an ingress or LoadBalancer IP works. Cilium has failed silently before while reporting
   Healthy.
