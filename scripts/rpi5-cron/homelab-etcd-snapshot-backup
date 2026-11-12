@@ -1,0 +1,5 @@
+# Nightly etcd snapshot + B2 upload (docs/etcd-backup.md). Stdout discarded so only errors are mailed.
+# Managed from scripts/rpi5-cron/ (install.sh); edit it there, not in /etc/cron.d.
+MAILTO=jakerobb@gmail.com
+PATH=/usr/local/bin:/usr/bin:/bin
+15 3 * * * jakerobb /home/jakerobb/bin/etcd-snapshot-backup.sh > /dev/null

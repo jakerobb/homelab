@@ -1,0 +1,5 @@
+# Pull-based Compose auto-deploy and host-file sync (docs/compose-deploy.md).
+# Managed from scripts/rpi5-cron/ (install.sh); edit it there, not in /etc/cron.d.
+MAILTO=jakerobb@gmail.com
+PATH=/usr/local/bin:/usr/bin:/bin
+*/5 * * * * jakerobb /usr/bin/python3 /home/jakerobb/dev/homelab/scripts/compose-deploy/compose-deploy.py

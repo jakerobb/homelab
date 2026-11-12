@@ -58,7 +58,16 @@ not because it was the culprit here.
 The script itself is versioned here and run via cron on rpi5-1. Since 2026-11-12 it's kept in
 sync automatically: the Compose auto-deploy cron ([`compose-deploy.md`](compose-deploy.md#host-scripts-outside-docker)) copies
 it to `~/bin/` within ~5 minutes of a merge. (Before that it was deployed by hand, and a stale copy missing the
-`--skip-newer` fix failed the 2026-11-11 B2 upload.) The SOPS-encrypted B2 key still goes in by hand.
+`--skip-newer` fix failed the 2026-11-11 B2 upload.) The SOPS-encrypted B2 key is synced the same way.
+
+## Heartbeat
+
+The script pings a [Healthchecks.io](https://healthchecks.io) check at the very end of a successful run (after the B2
+download-and-verify), and pings its `/fail` URL if anything fails. A night that never runs or never finishes (cron broken,
+host down) then alerts from outside, instead of relying on the cron mail arriving. Check settings: period 1 day, grace 3
+hours. The ping URL is a secret, kept in `scripts/secrets/healthchecks-etcd-backup.sops.yaml` (template:
+`healthchecks-etcd-backup.example.yaml`, one `url:` key) and copied to `~/bin/secrets/` by compose-deploy. Without that file
+there's no heartbeat and nothing else changes.
 
 ## Restore
 
@@ -177,19 +186,15 @@ work." Next one due **~2026-12-21**.
 # (docs/compose-deploy.md); on a fresh host, wait for its next run, or run it by hand.
 mkdir -p ~/bin
 
-# Copy the SOPS-encrypted B2 key alongside it (safe to scp as-is, it's ciphertext):
+# The SOPS-encrypted B2 key is copied into ~/bin/secrets/ by the same cron; the directory has to exist first:
 mkdir -p ~/bin/secrets && chmod 700 ~/bin/secrets
-# scp scripts/secrets/b2-etcd-backup.sops.yaml jakerobb@rpi5-1.lan:~/bin/secrets/
-chmod 600 ~/bin/secrets/b2-etcd-backup.sops.yaml
 
 # Test it once by hand before trusting it to cron
 ~/bin/etcd-snapshot-backup.sh
 ls -la ~/backups/etcd/
 
-# Install the daily cron job (03:15 — offset from the Proxmox config backup
-# at 03:00 on a different host, so there's no real reason they'd collide,
-# just kept them visually distinct). MAILTO must already be set in this
-# crontab (see email-alerts.md) and stdout must be redirected away, so cron
-# only mails on a real failure (stderr) rather than on every successful run.
-crontab -l 2>/dev/null | { cat; echo "15 3 * * * \$HOME/bin/etcd-snapshot-backup.sh > /dev/null"; } | crontab -
+# Install the daily cron job (03:15; defined in scripts/rpi5-cron/homelab-etcd-snapshot-backup,
+# see cron-jobs.md). stdout is redirected away there, so cron only mails on a real failure
+# (stderr) rather than on every successful run.
+cd ~/dev/homelab && ./scripts/rpi5-cron/install.sh
 ```

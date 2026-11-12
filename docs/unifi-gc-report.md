@@ -133,7 +133,7 @@ problem. `unifi-core` and CPU were otherwise healthy at the time (89% idle),
 pointing at GC pause frequency itself as the likely contributor. 150 sits
 just above that observed "degraded but not critical" band, still comfortably
 below the actual thrashing range. Adjust the `--min-full-gc-per-hour` value
-in the crontab line again if 150 turns out to be too sensitive (noisy false
+in the cron file (`scripts/rpi5-cron/homelab-unifi-gc-report-hourly`) again if 150 turns out to be too sensitive (noisy false
 positives during normal operation) or not sensitive enough (another
 slow-dashboard episode that doesn't trip it).
 
@@ -160,8 +160,8 @@ expected (daily send, forced alert send, real-threshold skip).
 ## Reverting
 
 ```bash
-# rpi5-1: remove the cron line and script
-ssh jakerobb@rpi5-1.lan "crontab -l | grep -v unifi-gc-report.py | crontab -"
+# rpi5-1: delete the two homelab-unifi-gc-report-* files from scripts/rpi5-cron/ (merge, then run install.sh,
+# which removes them from /etc/cron.d), then the script:
 ssh jakerobb@rpi5-1.lan "rm ~/bin/unifi-gc-report.py ~/.ssh/unifi_gc_report_ed25519*"
 
 # gateway: remove the forced-command line from authorized_keys, e.g.

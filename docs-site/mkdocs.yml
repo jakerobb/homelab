@@ -122,6 +122,7 @@ nav:
       - rpi5-1:
           - Docker Compose stack: docker-compose/README.md
           - Compose auto-deploy: docs/compose-deploy.md
+          - Cron jobs: docs/cron-jobs.md
           - OS updates: docs/rpi5-1-os-updates.md
           - Jump box swap runbook: docs/jump-box-swap.md
           - Host firewall: docs/rpi5-1-firewall.md

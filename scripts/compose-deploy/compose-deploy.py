@@ -70,6 +70,38 @@ VALIDATORS = {}
 HOST_FILES = {
     "scripts/etcd-snapshot-backup.sh": ("~/bin/etcd-snapshot-backup.sh", 0o700),
     "scripts/unifi-gc-report.py": ("~/bin/unifi-gc-report.py", 0o700),
+    # SOPS ciphertext (safe to copy). ~/bin/secrets must already be mode 700.
+    "scripts/secrets/b2-etcd-backup.sops.yaml": ("~/bin/secrets/b2-etcd-backup.sops.yaml", 0o600),
+    "scripts/secrets/studio-unlock.sops.yaml": ("~/bin/secrets/studio-unlock.sops.yaml", 0o600),
+    "scripts/secrets/healthchecks-etcd-backup.sops.yaml": ("~/bin/secrets/healthchecks-etcd-backup.sops.yaml", 0o600),
+}
+
+# Repo-relative source -> (installed path, installer): root-owned installs this
+# script can't (and shouldn't: it runs without root) update itself. If the
+# installed copy is missing, unreadable, or no longer matches the repo, alert
+# that a manual install is due. (A file missing from the repo is skipped.)
+SOPS_HASHES = {
+    "scripts/secrets/msmtprc.sops.yaml": ("~/.msmtprc.sops.sha256", "scripts/msmtpq/install.sh"),
+}
+
+NEEDS_INSTALL = {
+    "scripts/rpi5-cron/homelab-compose-deploy": ("/etc/cron.d/homelab-compose-deploy", "scripts/rpi5-cron/install.sh"),
+    "scripts/rpi5-cron/homelab-docker-image-prune": ("/etc/cron.d/homelab-docker-image-prune", "scripts/rpi5-cron/install.sh"),
+    "scripts/rpi5-cron/homelab-etcd-snapshot-backup": ("/etc/cron.d/homelab-etcd-snapshot-backup", "scripts/rpi5-cron/install.sh"),
+    "scripts/rpi5-cron/homelab-msmtpq-flush": ("/etc/cron.d/homelab-msmtpq-flush", "scripts/rpi5-cron/install.sh"),
+    "scripts/rpi5-cron/homelab-unattended-upgrades-check-proxmox": ("/etc/cron.d/homelab-unattended-upgrades-check-proxmox", "scripts/rpi5-cron/install.sh"),
+    "scripts/rpi5-cron/homelab-unattended-upgrades-check-rpi5-1": ("/etc/cron.d/homelab-unattended-upgrades-check-rpi5-1", "scripts/rpi5-cron/install.sh"),
+    "scripts/rpi5-cron/homelab-unifi-gc-report-daily": ("/etc/cron.d/homelab-unifi-gc-report-daily", "scripts/rpi5-cron/install.sh"),
+    "scripts/rpi5-cron/homelab-unifi-gc-report-hourly": ("/etc/cron.d/homelab-unifi-gc-report-hourly", "scripts/rpi5-cron/install.sh"),
+    "scripts/msmtpq/msmtpq-sendmail": ("/usr/local/bin/msmtpq-sendmail", "scripts/msmtpq/install.sh"),
+    "scripts/rpi5-1-firewall/homelab-fw.nft": ("/etc/homelab-fw/homelab-fw.nft", "scripts/rpi5-1-firewall/install.sh"),
+    "scripts/rpi5-1-firewall/homelab-fw.service": ("/etc/systemd/system/homelab-fw.service", "scripts/rpi5-1-firewall/install.sh"),
+    "scripts/unattended-upgrades/20auto-upgrades": ("/etc/apt/apt.conf.d/20auto-upgrades", "scripts/unattended-upgrades/install.sh"),
+    "scripts/unattended-upgrades/52unattended-upgrades-local": ("/etc/apt/apt.conf.d/52unattended-upgrades-local", "scripts/unattended-upgrades/install.sh"),
+    "scripts/studio-unlock-watchdog/studio-unlock-watchdog.sh": ("/usr/local/lib/studio-unlock-watchdog/studio-unlock-watchdog.sh", "scripts/studio-unlock-watchdog/install.sh"),
+    "scripts/studio-unlock-watchdog/askpass.sh": ("/usr/local/lib/studio-unlock-watchdog/askpass.sh", "scripts/studio-unlock-watchdog/install.sh"),
+    "scripts/studio-unlock-watchdog/studio-unlock-watchdog.service": ("/etc/systemd/system/studio-unlock-watchdog.service", "scripts/studio-unlock-watchdog/install.sh"),
+    "scripts/studio-unlock-watchdog/studio-unlock-watchdog.timer": ("/etc/systemd/system/studio-unlock-watchdog.timer", "scripts/studio-unlock-watchdog/install.sh"),
 }
 
 args = None
@@ -140,6 +172,26 @@ def services_for(paths, mounts):
     """Services with a bind mount at, or containing, any of the given paths."""
     return {svc for svc, sources in mounts.items()
             for s in sources for p in paths if p == s or s in p.parents}
+
+
+# SOPS file holding {url: <Healthchecks.io ping URL>} for this job (the URL is
+# a secret: anyone with it can send pings). Absent = no heartbeat.
+HEARTBEAT = REPO / "scripts" / "secrets" / "healthchecks-compose-deploy.sops.yaml"
+
+
+def heartbeat(suffix=""):
+    """Pings Healthchecks.io so a run that never happens (cron broken, host down,
+    script crashing before it starts) alerts from outside. suffix '/fail' reports a crash."""
+    if not HEARTBEAT.exists():
+        return
+    p = run([SOPS, "--decrypt", "--extract", '["url"]', str(HEARTBEAT)], timeout=60)
+    url = p.stdout.decode().strip()
+    if p.returncode != 0 or not url:
+        return
+    try:
+        urllib.request.urlopen(url + suffix, timeout=15).close()
+    except OSError as e:
+        log(f"heartbeat ping failed: {e}")  # local log only; the URL is secret
 
 
 def notify(title, message, priority, tags):
@@ -225,7 +277,8 @@ class Deploy:
         for dest, (src, sops_args) in DECRYPTED.items():
             entries[dest] = (SRC / src, lambda src=SRC / src, a=sops_args: self.decrypt(src, a))
         for rel, (dest, _) in HOST_FILES.items():
-            entries[dest] = (REPO / rel, lambda src=REPO / rel: src.read_bytes())
+            if (REPO / rel).exists():  # optional ones (like the heartbeat secret) may not exist yet
+                entries[dest] = (REPO / rel, lambda src=REPO / rel: src.read_bytes())
         return entries
 
     def decrypt(self, src, sops_args):
@@ -273,6 +326,41 @@ class Deploy:
                              f"it into {src.relative_to(REPO)} or revert it, or "
                              f"accept it with: compose-deploy.py --adopt {dest}")
         return writes
+
+    def check_installs(self):
+        """Raises one problem per installed file that needs a manual (root) install."""
+        def install_problem(dest, installer, why):
+            self.problem(f"install:{dest}", f"{dest} {why}, and auto-deploy can't write root-owned "
+                                            f"files. On rpi5-1: cd ~/dev/homelab && ./{installer}")
+
+        for rel, (dest, installer) in NEEDS_INSTALL.items():
+            wanted = read(REPO / rel)
+            if wanted is None:
+                continue
+            try:
+                installed = Path(dest).read_bytes()
+            except FileNotFoundError:
+                install_problem(dest, installer, "is missing")
+            except OSError as e:
+                install_problem(dest, installer, f"can't be read ({e.strerror})")
+            else:
+                if installed != wanted:
+                    install_problem(dest, installer, "is out of date with the repo")
+        for rel, (hash_file, installer) in SOPS_HASHES.items():
+            wanted = read(REPO / rel)
+            if wanted is None:
+                continue
+            dest = str(Path(hash_file).expanduser())
+            try:
+                recorded = Path(dest).read_text().split()[:1]
+            except FileNotFoundError:
+                install_problem(dest, installer, "is missing (the installer records it)")
+                continue
+            except OSError as e:
+                install_problem(dest, installer, f"can't be read ({e.strerror})")
+                continue
+            if recorded != [sha(wanted)]:
+                install_problem(dest, installer, f"doesn't match the repo's {rel} (secret changed since the last install)")
 
     def write(self, dest, content, src_sha):
         path = dest_path(dest)
@@ -332,6 +420,7 @@ class Deploy:
                   for svc, spec in json.loads(p.stdout)["services"].items()}
 
         writes = self.plan_files()
+        self.check_installs()
         # Files that changed through the symlinks just by pulling (plus
         # deletions); copies are covered by `writes` instead.
         pulled = [DEPLOY / rel for rel in changed if is_linked(rel) or not (DEPLOY / rel).exists()]
@@ -423,7 +512,12 @@ def main():
 
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
     d = Deploy(state)
-    d.run()
+    try:
+        d.run()
+    except BaseException:
+        if not args.dry_run:
+            heartbeat("/fail")
+        raise
     if args.dry_run:
         return
     # Problems not re-evaluated this run (e.g. checkout paused before the
@@ -435,6 +529,7 @@ def main():
     tmp = STATE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
     tmp.replace(STATE_FILE)
+    heartbeat()
 
 
 if __name__ == "__main__":

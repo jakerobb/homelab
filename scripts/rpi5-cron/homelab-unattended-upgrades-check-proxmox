@@ -1,0 +1,5 @@
+# Same check on the Proxmox host, piped over SSH (docs/proxmox-os-updates.md).
+# Managed from scripts/rpi5-cron/ (install.sh); edit it there, not in /etc/cron.d.
+MAILTO=jakerobb@gmail.com
+PATH=/usr/local/bin:/usr/bin:/bin
+5 9 * * * jakerobb ssh -o BatchMode=yes proxmox "bash -s" < /home/jakerobb/dev/homelab/scripts/unattended-upgrades/check.sh > /dev/null

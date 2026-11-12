@@ -1,0 +1,5 @@
+# Weekly-old image cleanup; replaces Watchtower cleanup and Ofelia's never-working prune job. Keeps anything created in the last week.
+# Managed from scripts/rpi5-cron/ (install.sh); edit it there, not in /etc/cron.d.
+MAILTO=jakerobb@gmail.com
+PATH=/usr/local/bin:/usr/bin:/bin
+0 5 * * * jakerobb /usr/bin/docker image prune --all --force --filter until=168h > /dev/null

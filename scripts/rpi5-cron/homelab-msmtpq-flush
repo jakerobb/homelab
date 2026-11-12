@@ -1,0 +1,5 @@
+# Retry queued outbound mail (docs/email-alerts.md). Output fully discarded: with MAILTO set it would itself be mailed via the queue it is failing to flush; results go to ~/.msmtp.queue.log.
+# Managed from scripts/rpi5-cron/ (install.sh); edit it there, not in /etc/cron.d.
+MAILTO=jakerobb@gmail.com
+PATH=/usr/local/bin:/usr/bin:/bin
+*/15 * * * * jakerobb /usr/local/bin/msmtpq-sendmail --q-mgmt -r > /dev/null 2>&1
