@@ -55,8 +55,10 @@ key's secret (regenerating the master key in the B2 console fixed it
 immediately). The apt package was still worth replacing regardless, just
 not because it was the culprit here.
 
-The script itself is versioned here, but it's **deployed manually** to
-rpi5-1 (not something Terraform manages) and run via cron there.
+The script itself is versioned here and run via cron on rpi5-1. Since 2026-11-12 it's kept in
+sync automatically: the Compose auto-deploy cron ([`compose-deploy.md`](compose-deploy.md#host-scripts-outside-docker)) copies
+it to `~/bin/` within ~5 minutes of a merge. (Before that it was deployed by hand, and a stale copy missing the
+`--skip-newer` fix failed the 2026-11-11 B2 upload.) The SOPS-encrypted B2 key still goes in by hand.
 
 ## Restore
 
@@ -171,10 +173,9 @@ work." Next one due **~2026-12-21**.
 ## Deploying the script + cron job (on rpi5-1)
 
 ```bash
-# Copy scripts/etcd-snapshot-backup.sh from this repo to ~/bin/ on rpi5-1:
+# scripts/etcd-snapshot-backup.sh is copied to ~/bin/ by the compose-deploy cron
+# (docs/compose-deploy.md); on a fresh host, wait for its next run, or run it by hand.
 mkdir -p ~/bin
-# (scp or paste the file content in)
-chmod 700 ~/bin/etcd-snapshot-backup.sh
 
 # Copy the SOPS-encrypted B2 key alongside it (safe to scp as-is, it's ciphertext):
 mkdir -p ~/bin/secrets && chmod 700 ~/bin/secrets

@@ -56,8 +56,8 @@ boundary) and only counts lines after it.
 ## Files
 
 - [`scripts/unifi-gc-report.py`](../scripts/unifi-gc-report.py) -- the
-  script itself (source of truth; deployed manually, same as
-  `etcd-snapshot-backup.sh`)
+  script itself (source of truth; copied to `~/bin/` automatically by the
+  compose-deploy cron, same as `etcd-snapshot-backup.sh`)
 - Deployed to `rpi5-1:~/bin/unifi-gc-report.py`
 - Log of each run: `rpi5-1:~/.unifi-gc-report.log`
 
@@ -140,8 +140,9 @@ slow-dashboard episode that doesn't trip it).
 ## Testing / redeploying
 
 ```bash
+# The script reaches ~/bin by itself within ~5 minutes of a merge (docs/compose-deploy.md).
+# To test an unmerged change, copy it by hand, but compose-deploy will flag it as drift:
 scp scripts/unifi-gc-report.py jakerobb@rpi5-1.lan:~/bin/unifi-gc-report.py
-ssh jakerobb@rpi5-1.lan "chmod 700 ~/bin/unifi-gc-report.py"
 
 # Daily mode (always sends)
 ssh jakerobb@rpi5-1.lan "python3 ~/bin/unifi-gc-report.py --window-hours 24"

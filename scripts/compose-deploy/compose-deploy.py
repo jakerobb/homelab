@@ -6,9 +6,10 @@ merged change to this script deploys itself on the next run). Each run:
 
   1. Fast-forwards the checkout to origin/main (refuses if it has local edits).
   2. Validates the compose file.
-  3. Brings the non-symlinked copies and SOPS-decrypted files in ~/docker up
-     to date with the repo — but never overwrites a file that was changed
-     outside the repo since this script last wrote it (drift: alert instead).
+  3. Brings the non-symlinked copies and SOPS-decrypted files in ~/docker, plus
+     the standalone host scripts in HOST_FILES (e.g. ~/bin), up to date with
+     the repo — but never overwrites a file that was changed outside the
+     repo since this script last wrote it (drift: alert instead).
   4. `docker compose up -d --remove-orphans` (also self-heals anything that
      was stopped or edited by hand).
   5. Restarts services whose bind-mounted config changed but that `up -d`
@@ -62,6 +63,15 @@ STOP_BEFORE_WRITE = set()
 # broken one.
 VALIDATORS = {}
 
+# Repo-relative source -> (destination, mode): standalone scripts that run from
+# cron on this host but live outside ~/docker (and aren't read straight from the
+# checkout). Written atomically (temp file + rename), so a script that's running
+# right now keeps its old inode. No service restarts: they aren't bind-mounted.
+HOST_FILES = {
+    "scripts/etcd-snapshot-backup.sh": ("~/bin/etcd-snapshot-backup.sh", 0o700),
+    "scripts/unifi-gc-report.py": ("~/bin/unifi-gc-report.py", 0o700),
+}
+
 args = None
 
 
@@ -109,6 +119,15 @@ def read(path):
         return path.read_bytes()
     except FileNotFoundError:
         return None
+
+
+def dest_path(dest):
+    """Managed-file key -> real path: '~/...' keys are host files, the rest sit in ~/docker."""
+    return Path(dest).expanduser() if dest.startswith("~") else DEPLOY / dest
+
+
+def show(dest):
+    return dest if dest.startswith("~") else f"~/docker/{dest}"
 
 
 def is_linked(rel):
@@ -205,6 +224,8 @@ class Deploy:
                 entries[rel] = (SRC / rel, lambda src=SRC / rel: src.read_bytes())
         for dest, (src, sops_args) in DECRYPTED.items():
             entries[dest] = (SRC / src, lambda src=SRC / src, a=sops_args: self.decrypt(src, a))
+        for rel, (dest, _) in HOST_FILES.items():
+            entries[dest] = (REPO / rel, lambda src=REPO / rel: src.read_bytes())
         return entries
 
     def decrypt(self, src, sops_args):
@@ -221,9 +242,9 @@ class Deploy:
             del self.files[gone]
         for dest, (src, render) in sorted(entries.items()):
             try:
-                src_sha, dest_sha = sha(src.read_bytes()), sha(read(DEPLOY / dest))
+                src_sha, dest_sha = sha(src.read_bytes()), sha(read(dest_path(dest)))
             except OSError as e:
-                self.problem(f"file:{dest}", f"can't read ~/docker/{dest}: {e.strerror}")
+                self.problem(f"file:{dest}", f"can't read {show(dest)}: {e.strerror}")
                 continue
             rec = self.files.get(dest)
             if rec == {"src": src_sha, "dest": dest_sha}:
@@ -235,25 +256,36 @@ class Deploy:
                 continue
             if dest_sha == sha(content):
                 self.files[dest] = {"src": src_sha, "dest": dest_sha}
-            elif dest_sha is None or (rec and rec["dest"] == dest_sha):
+            elif dest_sha is None or (rec and rec["dest"] == dest_sha) or (
+                    rec is None and any(dest == d for d, _ in HOST_FILES.values())):
+                # (Host scripts were deployed by hand before this script managed
+                # them, so an unrecorded copy is just a stale one: take over.)
                 writes.append((dest, content, src_sha))
             elif args.adopt is not None and (not args.adopt or dest in args.adopt):
                 # Recording the current source means the next repo change to
                 # this file overwrites the adopted copy as usual.
                 self.files[dest] = {"src": src_sha, "dest": dest_sha}
-                self.action(f"adopted ~/docker/{dest} as-is")
+                self.action(f"adopted {show(dest)} as-is")
             else:
                 self.problem(f"drift:{dest}",
-                             f"~/docker/{dest} differs from the repo and wasn't written by "
+                             f"{show(dest)} differs from the repo and wasn't written by "
                              "auto-deploy (edited on the host, or by the app itself). Backfill "
-                             f"it into docker-compose/{src.relative_to(SRC)} or revert it, or "
+                             f"it into {src.relative_to(REPO)} or revert it, or "
                              f"accept it with: compose-deploy.py --adopt {dest}")
         return writes
 
     def write(self, dest, content, src_sha):
-        path = DEPLOY / dest
+        path = dest_path(dest)
+        mode = next((m for d, m in HOST_FILES.values() if d == dest), None)
         try:
-            if path.exists():
+            if mode is not None:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = path.with_name(f".{path.name}.compose-deploy")
+                with open(tmp, "wb", opener=lambda p, fl: os.open(p, fl, mode)) as f:
+                    f.write(content)
+                os.chmod(tmp, mode)
+                tmp.replace(path)
+            elif path.exists():
                 # In place, keeping the inode (single-file bind mounts keep
                 # tracking it) and existing owner/permissions.
                 with open(path, "r+b") as f:
@@ -264,11 +296,11 @@ class Deploy:
                 with open(path, "wb", opener=lambda p, fl: os.open(p, fl, 0o600)) as f:
                     f.write(content)
         except OSError as e:
-            self.problem(f"file:{dest}", f"can't write ~/docker/{dest}: {e.strerror} — copy it "
-                                         "by hand (see docker-compose/README.md)")
+            self.problem(f"file:{dest}", f"can't write {show(dest)}: {e.strerror} — copy it "
+                                         "by hand (see docs/compose-deploy.md)")
             return False
         self.files[dest] = {"src": src_sha, "dest": sha(content)}
-        self.action(f"updated ~/docker/{dest}")
+        self.action(f"updated {show(dest)}")
         return True
 
     # --- main flow ----------------------------------------------------------
@@ -306,8 +338,8 @@ class Deploy:
 
         if args.dry_run:
             for dest, _, _ in writes:
-                log(f"would update ~/docker/{dest}")
-            touched = pulled + [DEPLOY / d for d, _, _ in writes]
+                log(f"would update {show(dest)}")
+            touched = pulled + [dest_path(d) for d, _, _ in writes]
             log(f"would restart (if not recreated): {sorted(services_for(touched, mounts)) or 'none'}")
             for line in compose("up", "-d", "--remove-orphans", "--dry-run").stderr.decode().splitlines():
                 if any(w in line for w in ("Recreate ", "Create ", "Remov")):
@@ -315,10 +347,10 @@ class Deploy:
             self.state["head"] = old  # dry run never advances
             return
 
-        stopped = services_for([DEPLOY / d for d, _, _ in writes], mounts) & STOP_BEFORE_WRITE
+        stopped = services_for([dest_path(d) for d, _, _ in writes], mounts) & STOP_BEFORE_WRITE
         if stopped:
             compose("stop", *sorted(stopped))
-        written = [DEPLOY / d for d, c, s in writes if self.write(d, c, s)]
+        written = [dest_path(d) for d, c, s in writes if self.write(d, c, s)]
 
         before = self.container_ids()
         if compose("up", "-d", "--remove-orphans").returncode != 0:
