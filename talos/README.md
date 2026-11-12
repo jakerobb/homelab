@@ -2,9 +2,10 @@
 
 ## Current state
 
-_(as of 2026-10-29)_
+_(as of 2026-11-12)_
 
-- **Talos v1.14.5** on all 6 nodes (3 control planes, 3 workers: `talos-worker-1`, `talos-worker-3` and `talos-worker-mbp`), **Kubernetes v1.37.2**.
+- **Talos v1.14.6** on the three Image Factory workers (`talos-worker-1`, `talos-worker-mbp`, `talos-worker-studio`); **v1.14.5** on the four
+  Pi 5 nodes (3 control planes and `talos-worker-3`), which wait for the fork to publish a v1.14.6 build. **Kubernetes v1.37.2**.
   Upgrade procedure: [`../skills/rolling-node-change/instructions.md`](../skills/rolling-node-change/instructions.md).
 - 3-node control plane on Raspberry Pi 5 (4GB), already installed and working.
   Control planes use a **custom installer image**, `ghcr.io/yama6a/talos-raspberry-pi5:v1.14.5-1`,
@@ -23,8 +24,8 @@ _(as of 2026-10-29)_
   **Any amd64 worker (e.g. the MS-A2 Talos VM) must use a Factory schematic image
   (`factory.talos.dev/installer/<schematic-id>:<version>`) — `ghcr.io/siderolabs/installer` doesn't
   exist for recent releases, and the rpi5 installer image must never be reused for amd64 hardware.**
-  Currently `factory.talos.dev/installer/85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615:v1.14.5`
-  (the `iscsi-tools` + `util-linux-tools` schematic, plus the kernel-log arg — see "iscsi-tools extension" and
+  Currently `factory.talos.dev/installer/85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615:v1.14.6`
+  (on v1.14.6 now; the `iscsi-tools` + `util-linux-tools` schematic, plus the kernel-log arg — see "iscsi-tools extension" and
   "Talos kernel logs" below), confirmed against both workers' live `get extensions` output and persisted in machine
   config as of 2026-10-05. (Before that: `613e1592…`, the same extensions without the kernel arg.)
 - CNI: Cilium — version tracked in

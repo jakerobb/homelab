@@ -68,11 +68,12 @@ lock can be dropped from the docs for good. Otherwise it stays as long as that g
 
 ## UPS Tower stuck "Adopting" in UniFi
 
-**Why:** the UniFi UPS Tower (shown as "Office UPS" in unpoller, `192.168.0.9`, MAC `1c:0b:8b:3a:6b:ff`) periodically got stuck
-in the controller's "Adopting" state, a known UniFi UPS firmware bug. It keeps powering the outlets the whole time; only
-management is lost, so nothing visibly breaks. It was fixed on 2026-09-20 by a factory reset, re-adopt and an upgrade to
-firmware 1.6.4.432 (an early-access release), and was stable through at least 2026-10-01. Earlier fixes held for weeks
-before it recurred, so this one isn't proven. See
+**Why:** the UniFi UPS Tower (shown as "Office UPS" in unpoller, `192.168.0.9`, MAC `1c:0b:8b:3a:6b:ff`) periodically 
+got stuck in the controller's "Adopting" state, a known UniFi UPS firmware bug. It keeps powering the outlets the whole 
+time; only management is lost, so nothing visibly breaks. It was fixed on 2026-09-20 by a factory reset, re-adopt and an
+upgrade to firmware 1.6.4.432 (an early-access release), and was stable through at least 2026-10-01. By 2026-11-12 it 
+had moved on to firmware 1.6.9.468 (newer) and was still healthy. Earlier fixes held for weeks before it recurred, so 
+this one isn't proven. See
 [`../docs/troubleshooting.md`](../docs/troubleshooting.md#the-ups-tower-is-stuck-adopting-in-unifi).
 
 **Check:** ask Prometheus about the unpoller series for the device. The service proxy on the API server needs no
@@ -83,13 +84,13 @@ ssh jakerobb@rpi5-1.lan 'for q in "unpoller_device_info%7Bname%3D%22Office%20UPS
 These are, in order: the device's info series (its `version` label is the firmware), its uptime growth over the last hour, and
 the number of uptime resets (reboots) in the last 24 hours.
 
-**Healthy:** the info series exists with `version` `1.6.4.432` (or newer), the uptime grew by about 3,600 seconds in an
+**Healthy:** the info series exists with `version` `1.6.9.468` (the 2026-11-12 baseline, or newer), the uptime grew by about 3,600 seconds in an
 hour, and there were 0 resets.
 
 **Trouble:** the info series is missing, the uptime didn't grow (it stops advancing when the controller loses the device),
-any reset in 24 hours, or a changed firmware version. Also look for a `UPS Tower is offline` notice on the
+any reset in 24 hours, or a firmware version older than 1.6.9.468. Also look for a `UPS Tower is offline` notice on the
 `network-optimizer-alerts` ntfy topic. If it recurs: check the device's state in the UniFi API before assuming a new problem
 (`state` 7 with `adopted` true is this bug), and post a follow-up in the 1.6.4 community thread, since Ubiquiti's UI team
 is engaging there.
 
-**Retire when:** about three months with no recurrence on 1.6.4 or a newer release.
+**Retire when:** about three months with no recurrence on 1.6.4 or a newer release (counted from the 2026-09-20 fix).
