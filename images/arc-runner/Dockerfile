@@ -21,7 +21,7 @@ LABEL org.opencontainers.image.source="https://github.com/jakerobb/homelab" \
 ARG TARGETARCH
 
 # renovate: datasource=github-releases depName=helm/helm
-ARG HELM_VERSION=v4.3.1
+ARG HELM_VERSION=v4.3.2
 # renovate: datasource=github-releases depName=yannh/kubeconform
 ARG KUBECONFORM_VERSION=v0.8.0
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
