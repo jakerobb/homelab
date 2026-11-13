@@ -313,19 +313,28 @@ spec:
                   # over 12 hours: the kernel reuses device names, and on
                   # 2026-11-06 sdd went from renovate's hourly-writing volume
                   # to restock-radar's quiet one and tripped the alert falsely.
+                  # 2026-11-12: it tripped falsely again, flapping every few
+                  # minutes on worker-1's sdb (InfluxDB's LUN before a reboot,
+                  # mosquitto's quiet one after). Restarting node-exporter's
+                  # pod gives every series a new `pod` label, and the old
+                  # series' history (a steady writer, attached 17 hours)
+                  # kept matching the new one on (instance, device) alone.
+                  # So the series are now summed across pods, and the
+                  # 12-hour test counts samples per serial and must match
+                  # the serial attached right now.
                   - alert: ISCSIVolumeWritesStopped
                     expr: >-
-                      avg_over_time((rate(node_disk_written_bytes_total{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[5m]) > bool 0)[1d:5m]) > 0.5
-                      and
-                      rate(node_disk_written_bytes_total{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[15m]) == 0
+                      avg_over_time((sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[5m])) > bool 0)[1d:5m]) > 0.5
                       and on (instance, device)
-                      node_disk_written_bytes_total{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}
+                      sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[15m])) == 0
                       and on (instance, device)
-                      count_over_time(node_disk_info{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[1d:5m]) > 144
+                      (sum by (instance, device, serial) (count_over_time(node_disk_info{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[1d:5m])) > 144
+                      and on (instance, device, serial)
+                      node_disk_info{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"})
                     for: 5m
                     labels:
                       severity: warning

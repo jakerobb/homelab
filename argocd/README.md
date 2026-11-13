@@ -368,6 +368,28 @@ Renovate PRs like everything else) — see the
 - **Image tag is pinned, not `:latest`** — deliberately, so the `kubernetes`
   manager picks it up and Renovate ends up opening a PR against its own
   CronJob when a new version ships.
+- **On-demand run after restock-radar publishes (added 2026-11-12).** restock-radar's `docker-publish.yml` ends with a
+  `notify-homelab` job that dispatches
+  [`.github/workflows/renovate-on-publish.yml`](../.github/workflows/renovate-on-publish.yml) here. That workflow runs
+  Renovate once against this repo, on an ARC runner using the Renovate CLI baked into the runner image (the pod can't
+  reach the cluster or the LAN, only GitHub and the registries), and then enables GitHub's native auto-merge on the
+  resulting restock-radar image PR, so a merge to restock-radar becomes a deploy within minutes. **That auto-merge
+  ignores `automergeSchedule`:** it merges as soon as `lint` passes, at any hour or weekend, unlike the CronJob's midday
+  runs above. Delete the workflow's last step to keep the 11am-2pm window. Because the pod has no containerbase volume,
+  Renovate runs with `RENOVATE_BINARY_SOURCE=global` and can't update a Terraform lock file in this run; the CronJob still
+  does that. The secrets are in a GitHub Environment so a PR's workflow can't read them: this job is the only secret
+  holder on the ARC runners, and lint's pods still have none. One-time setup:
+  - In **homelab**, create an Environment named `renovate` (Settings → Environments), set **Deployment branches and
+    tags** to **Selected branches and tags** with only `main`, and no required reviewers. Add these **environment**
+    secrets (not repository secrets): `RENOVATE_TOKEN` (a new fine-grained PAT named `renovate-on-publish`, for `jakerobb/homelab` only, with the CronJob
+    token's repository permissions (Contents, Issues, Pull requests and Workflows read/write; Dependabot alerts
+    read) and an expiry. Separate from the CronJob's token (`renovate-cronjob`), which covers the app repos too, so
+    that a leak from either place can be revoked without breaking the other) and `RENOVATE_GIT_PRIVATE_KEY` (the same key as the `renovate-signing-key` item, in its one-line
+    `\n`-escaped form; the ruleset requires signed commits). Keep the job at `LOG_LEVEL: info`: the logs are public.
+  - In **restock-radar**, add the Actions secret `HOMELAB_DISPATCH_TOKEN`: a fine-grained PAT for `jakerobb/homelab` only,
+    with **Actions: Read and write** and nothing else.
+  - Rotate all three with the other GitHub tokens (see `todo/READY.md`, "Secrets rotation").
+  The other three Go apps don't have this yet.
 - **GitHub token (one-time, manual):** Renovate needs a token that can push
   branches and open PRs against this repo. Create a **fine-grained personal
   access token** at GitHub → Settings → Developer settings → Fine-grained

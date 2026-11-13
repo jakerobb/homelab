@@ -1,7 +1,9 @@
 # Repo-wide static checks. Runs on the in-cluster ARC scale set `arc-runner`
-# (argocd/apps/arc-runners/) rather than a GitHub-hosted runner: the pods have
+# (argocd/apps/arc-runners/) rather than a GitHub-hosted runner: lint's pods have
 # no secrets, no cluster credentials, and no route to the LAN (NetworkPolicy),
 # and the cluster's workers render the manifests ~3x faster than ubuntu-latest.
+# (The one job here that does get secrets, renovate-on-publish.yml, reads them
+# from an Environment limited to `main`, so a PR's workflow can't.)
 # Outside contributors' runs still need approval, per the repo setting.
 #
 # The runner image (images/arc-runner/) has every tool the checks use, so a
