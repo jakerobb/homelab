@@ -153,6 +153,17 @@ they drift. A reusable workflow in one repo (called with the image name and whet
 next change into one PR. The catch is that every repo then depends on one repo, and modbus's Swagger step is a special
 case. Worth it if a fifth Go app turns up, or the next shared change is as big as this one was.
 
+### Smoke-test restock-radar in a temporary namespace
+
+Nothing checks that a restock-radar image starts before it ships: CI builds it, `docker-publish.yml` pushes it, and
+Renovate's auto-merge deploys it, with only the readiness probe and `progressDeadlineSeconds` to catch a bad one (and
+restock-radar uses `Recreate`, so there's no old pod to fall back on). Add a CI check that deploys the freshly built image
+into a temporary namespace on the cluster, waits for it to be Ready, runs a few smoke tests against it (`/health`, a page
+load, one API call), and deletes the namespace. Questions to settle first: where it runs (the ARC runners have no
+Kubernetes API access and no LAN route by design, so it needs its own runner or a different approach, such as `kind` on a
+GitHub-hosted runner), how to give it a throwaway config and volume rather than the iSCSI one, and whether it gates the
+publish (so a failing image is never pushed) or the deploy. Then consider the same for the other three apps.
+
 ## VolumeSnapshots for the iSCSI volumes
 
 Nothing here can take a VolumeSnapshot today. The external-snapshotter CRDs are installed

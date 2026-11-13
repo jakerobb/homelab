@@ -1,0 +1,95 @@
+# Runs Renovate on demand when restock-radar publishes a new image, so the
+# image-bump PR here opens within minutes instead of waiting for the CronJob's
+# next run (manifests/renovate/). restock-radar's docker-publish.yml triggers
+# this with `workflow_dispatch`, using a token that can only dispatch workflows.
+#
+# Runs on the in-cluster ARC scale set (argocd/apps/arc-runners/), using the
+# Renovate CLI baked into the runner image. The pods have no Kubernetes API
+# token and no route to the LAN, so this job can't touch the cluster; it only
+# talks to GitHub and the registries. It uses this repo's renovate.json, so the
+# PR is the same one the CronJob would open (same image-tag rule, digest pin and
+# `automerge` label). RENOVATE_BINARY_SOURCE=global: the pod has no containerbase
+# volume, so Renovate uses the image's tools (git, helm, node) and can't update a
+# Terraform lock file, which a restock-radar bump never needs.
+#
+# Secrets: the job runs in the `renovate` Environment, whose deployment branches
+# are limited to `main`, so only a run of this workflow from `main` can read
+# them. A branch that adds its own workflow gets nothing. Environment secrets
+# (one-time setup: argocd/README.md's Renovate section):
+#   RENOVATE_TOKEN           fine-grained PAT named `renovate-on-publish`, this
+#                            repo only: Contents, Issues (the Dependency
+#                            Dashboard), Pull requests and Workflows read/write,
+#                            Dependabot alerts read. Not the CronJob's token.
+#   RENOVATE_GIT_PRIVATE_KEY the CronJob's commit-signing key (the ruleset
+#                            requires signed commits), in its one-line form
+# A PAT rather than GITHUB_TOKEN so the PR's lint check runs. Keep LOG_LEVEL at
+# info: the logs of this public repo are public.
+#
+# Merging: Renovate's own automerge window (renovate.json's automergeSchedule)
+# only applies when the CronJob does the merge. The last step enables GitHub's
+# native auto-merge, which merges as soon as the required `lint` check passes,
+# at any hour. Delete that step to keep merges inside the 11am-2pm weekday
+# window; the CronJob's midday runs then merge the PR as before.
+name: renovate-on-publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-on-publish
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: arc-runner
+    environment: renovate
+    timeout-minutes: 15
+    steps:
+      # No checkout: Renovate clones the repo itself.
+      - name: Renovate
+        env:
+          RENOVATE_PLATFORM: github
+          RENOVATE_REPOSITORIES: jakerobb/homelab
+          RENOVATE_BINARY_SOURCE: global
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+          RENOVATE_GIT_PRIVATE_KEY: ${{ secrets.RENOVATE_GIT_PRIVATE_KEY }}
+          LOG_LEVEL: info
+        run: renovate
+
+      # curl and the GraphQL API rather than `gh`: the runner image doesn't
+      # ship the GitHub CLI, and native auto-merge has no REST endpoint.
+      - name: Enable auto-merge on the restock-radar PR
+        env:
+          GH_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
+
+          # The image-bump branch is renovate/docker.io-jakerobb-restock-radar-<tag>.x
+          prs=$(api "https://api.github.com/repos/$REPO/pulls?state=open&per_page=100" | jq -r '
+            .[] | select(.head.ref | startswith("renovate/docker.io-jakerobb-restock-radar-"))
+                | select(any(.labels[]; .name == "automerge")) | "\(.number) \(.node_id)"')
+          if [ -z "$prs" ]; then
+            echo "No open restock-radar image PR (already merged, or Renovate saw no new tag)."
+            exit 0
+          fi
+
+          while read -r number node_id; do
+            body=$(jq -n --arg id "$node_id" '{
+              query: "mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH}) { pullRequest { number } } }",
+              variables: {id: $id}}')
+            resp=$(api -X POST https://api.github.com/graphql -d "$body")
+            if echo "$resp" | jq -e '.errors | not' >/dev/null; then
+              echo "Auto-merge enabled on #$number"
+            elif echo "$resp" | jq -e '[.errors[].message] | any(test("clean status"))' >/dev/null; then
+              # Nothing to wait for (no checks pending): merge now.
+              api -X PUT "https://api.github.com/repos/$REPO/pulls/$number/merge" -d '{"merge_method":"squash"}' >/dev/null
+              echo "Merged #$number (already mergeable)"
+            else
+              echo "Could not enable auto-merge on #$number: $(echo "$resp" | jq -c .errors)" >&2
+              exit 1
+            fi
+          done <<< "$prs"
