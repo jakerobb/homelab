@@ -82,24 +82,16 @@ jobs:
       # catalog's schema lags the chart (it rejects `listenerConfig`, which
       # chart 0.15.0 sets by default).
       #
-      # The external-secrets.io schemas are pinned to a catalog commit from
-      # 2026-10-08, listed before `main` so it wins for that group (other
-      # groups 404 there and fall through). The catalog's
-      # clustersecretstore_v1.json changed that day and kubeconform can no
-      # longer load it ("could not find schema for ClusterSecretStore"). Drop
-      # the pin once `main` validates again (try the command below without it).
-      #
-      # cilium.io is pinned the same way, to the commit before the catalog's
+      # cilium.io is pinned to the commit before the catalog's
       # 2026-11-01 "Update cilium to 1.20.2" rewrote ciliumnetworkpolicy_v2.json
       # into a form kubeconform can't load ("could not find schema for
-      # CiliumNetworkPolicy"). Same remedy: drop the pin once `main` loads again.
+      # CiliumNetworkPolicy"). Drop the pin once `main` loads again (try the command below without it).
       - name: Validate Kubernetes manifests
         if: ${{ !cancelled() && steps.render.outcome == 'success' }}
         run: |
           kubeconform -strict -summary -output text \
             -skip CustomResourceDefinition,AutoscalingRunnerSet \
             -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/f3e4382095909ac60000da025f323ba44d4c738a/external-secrets.io/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/6ec4c804fcb9b0a90fec9dd468aa57b984be150a/cilium.io/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             "$RUNNER_TEMP/rendered"

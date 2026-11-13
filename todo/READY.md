@@ -236,13 +236,3 @@ Found while checking what the alerts and the cluster's history show. The alerts 
   ntfy. A small CronJob could publish a message, poll to confirm ntfy stored it, and ping a second Healthchecks check.
 - **Optional: a B2-side freshness check.** The Cloud Sync failure alert is live (see [`DONE.md`](DONE.md)); it can't notice a sync
   that succeeds but copies nothing new. A check that the newest object in the bucket is under 36 hours old would.
-
-## Drop the kubeconform external-secrets.io schema pin
-
-**Unblocked 2026-11-12.** kubeconform validates `manifests/external-secrets-config/clustersecretstore.yaml` against the catalog's
-`main` location alone (Valid: 1, Skipped: 0), so the "could not find schema for ClusterSecretStore" failure that led to the pin is
-gone, even though [datreeio/CRDs-catalog#991](https://github.com/datreeio/CRDs-catalog/issues/991) and the converter fix
-[#964](https://github.com/datreeio/CRDs-catalog/pull/964) are still open (the catalog was evidently regenerated). Remove the
-pinned `external-secrets.io` `-schema-location` line (`f3e4382`) and its comment from
-[`../.github/workflows/lint.yml`](../.github/workflows/lint.yml), then confirm the lint job still passes on a rendered full run, not
-just that one file. The Cilium pin (`6ec4c80`) beside it is a separate matter.

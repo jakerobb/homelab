@@ -3,6 +3,13 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## kubeconform external-secrets.io schema pin dropped (2026-11-12)
+
+**Done.** The pin to catalog commit `f3e4382` is gone from [`../.github/workflows/lint.yml`](../.github/workflows/lint.yml). The
+catalog's `main` loads the `ClusterSecretStore` schema again, even though datreeio/CRDs-catalog#991 and #964 were still open. A full
+local render (218 files, 706 resources) validates with 0 errors, 17 files of which use `external-secrets.io`. The Cilium pin beside it
+stays.
+
 ## SigNoz ClickHouse volume plateaued (2026-11-11)
 
 **Done (no change needed).** `data-volumeclaim-template-chi-signoz-clickhouse-cluster-0-0-0` is at 21G of 30G (71%) on 2026-11-11,
