@@ -313,28 +313,35 @@ spec:
                   # over 12 hours: the kernel reuses device names, and on
                   # 2026-11-06 sdd went from renovate's hourly-writing volume
                   # to restock-radar's quiet one and tripped the alert falsely.
-                  # 2026-11-12: it tripped falsely again, flapping every few
-                  # minutes on worker-1's sdb (InfluxDB's LUN before a reboot,
-                  # mosquitto's quiet one after). Restarting node-exporter's
-                  # pod gives every series a new `pod` label, and the old
-                  # series' history (a steady writer, attached 17 hours)
-                  # kept matching the new one on (instance, device) alone.
-                  # So the series are now summed across pods, and the
-                  # 12-hour test counts samples per serial and must match
-                  # the serial attached right now.
+                  # 2026-11-12/13: it tripped falsely twice more on worker-1's
+                  # sdb (InfluxDB's LUN before a reboot, mosquitto's quiet
+                  # one after). First, restarting node-exporter's pod gave
+                  # every series a new `pod` label, so the old series kept
+                  # matching the new one on (instance, device). Then, once
+                  # the new LUN had been attached 12 hours, the steady-writer
+                  # score still averaged in the old LUN's writes, because
+                  # it was computed per device name. Every clause is now
+                  # per (instance, device, serial): writes are summed
+                  # across pods and joined to node_disk_info for the
+                  # serial, so each LUN is scored only over the time it was
+                  # attached, and the join also requires it to be attached
+                  # right now.
                   - alert: ISCSIVolumeWritesStopped
                     expr: >-
-                      avg_over_time((sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[5m])) > bool 0)[1d:5m]) > 0.5
-                      and on (instance, device)
-                      sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[15m])) == 0
-                      and on (instance, device)
-                      (sum by (instance, device, serial) (count_over_time(node_disk_info{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[1d:5m])) > 144
+                      avg_over_time(((sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[5m]))
+                      * on (instance, device) group_left (serial)
+                      max by (instance, device, serial) (node_disk_info{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"})) > bool 0)[1d:5m]) > 0.5
                       and on (instance, device, serial)
-                      node_disk_info{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"})
+                      ((sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[15m]))
+                      * on (instance, device) group_left (serial)
+                      max by (instance, device, serial) (node_disk_info{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"})) == 0)
+                      and on (instance, device, serial)
+                      (count_over_time((max by (instance, device, serial) (node_disk_info{job="node-exporter",
+                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}))[1d:5m]) > 144)
                     for: 5m
                     labels:
                       severity: warning
