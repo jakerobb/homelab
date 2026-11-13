@@ -10,11 +10,11 @@ One runbook for three connected changes, in three phases so that only the last o
 
 ## Why these numbers
 
-- **The workers don't need the RAM.** In early November 2026 the MS-A2 workers used 2.1 and 2.4 GiB of 8, mbp
-  6.6 of 24 and worker-3 5.1 of 16. The only documented memory problem is HexOS: SCST (the iSCSI target) sizes its
-  buffer limits at 25% of the NAS's RAM (40% of that per device), and its allocation failures stalled volumes on
-  2026-09-29, 10-05, 10-07 and 10-11 (see [`../todo/READY.md`](../todo/READY.md)). 24 GiB gives roughly 6 GiB and 2.4 GiB
-  there, against about 2.5 GiB and 1 GiB at 10 GiB.
+- **The workers don't need the RAM.** In early November 2026 the MS-A2 workers used 2.1 and 2.4 GiB of 8, mbp 6.6 of 24
+  and worker-3 5.1 of 16. The only documented memory problem is HexOS: SCST (the iSCSI target) sizes its buffer limits
+  at 25% of the NAS's RAM (40% of that per device), and its allocation failures stalled volumes on 2026-09-29, 10-05,
+  10-07 and 10-11 (see [`../todo/READY.md`](../todo/READY.md)). 24 GiB gives roughly 6 GiB and 2.4 GiB there, against
+  about 2.5 GiB and 1 GiB at 10 GiB.
 - **One worker per machine.** Two VMs on one host share its fate, and each Talos node costs about 1.5 GiB of fixed
   overhead (cilium-agent, envoy, otel, kubelet). The "two workers on purpose" comment in
   [`../terraform/proxmox/talos-worker.tf`](../terraform/proxmox/talos-worker.tf) was about keeping capacity while one
@@ -131,17 +131,19 @@ The merge applies [`talos-worker.tf`](../terraform/proxmox/talos-worker.tf) via
 Nothing here needs the Mac.
 
 - Add a DHCP reservation in the UCG for MAC `02:00:00:00:00:36` to `192.168.102.36`.
-- Add `.36` to `nut_v4` in the firewall file (and re-run `sudo ./install.sh enforce`), so `nut-exporter` works if it lands there.
-- Write `talos/patches/workers/worker-studio.yaml`, modelled on [`worker-mbp.yaml`](../talos/patches/workers/worker-mbp.yaml)
-  (the file as built is the reference): hostname `talos-worker-studio`, static ULA `fd3d:b17d:9f8e:102::36/64` with
-  the `::/0` route via `fe80::1e0b:8bff:fe14:a5d5` (metric 2048), `accept_ra_rt_info_max_plen`, the `/etc/iscsi` and
-  `/var/lib/iscsi` extraMounts, and `kernel.modules: [iscsi_tcp]`. Take the interface name and `install.disk` from the
-  maintenance API, not by analogy (they came out as `enp0s2` and `/dev/vda`). `install.image` is the same schematic
-  as worker-1 (`85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615`) at the **current** Talos version
-  (the shared template's image is stale), **without** `tsc=reliable`, which is an x86 clocksource workaround. The
-  `nic-speed-mbps` label is the measured VM speed, not the host NIC's; see 2.3.
+- Add `.36` to `nut_v4` in the firewall file (and re-run `sudo ./install.sh enforce`), so `nut-exporter` works if it
+  lands there.
+- Write `talos/patches/workers/worker-studio.yaml`, modelled on
+  [`worker-mbp.yaml`](../talos/patches/workers/worker-mbp.yaml) (the file as built is the reference): hostname
+  `talos-worker-studio`, static ULA `fd3d:b17d:9f8e:102::36/64` with the `::/0` route via `fe80::1e0b:8bff:fe14:a5d5`
+  (metric 2048), `accept_ra_rt_info_max_plen`, the `/etc/iscsi` and `/var/lib/iscsi` extraMounts, and
+  `kernel.modules: [iscsi_tcp]`. Take the interface name and `install.disk` from the maintenance API, not by analogy
+  (they came out as `enp0s2` and `/dev/vda`). `install.image` is the same schematic as worker-1
+  (`85824046c9070c5b1dbcd4c6673157d7cd6d78785c10c3dc03a1b0f2a50c1615`) at the **current** Talos version (the shared
+  template's image is stale), **without** `tsc=reliable`, which is an x86 clocksource workaround. The `nic-speed-mbps`
+  label is the measured VM speed, not the host NIC's; see 2.3.
 - Prepare, but **do not merge**, the phase 3 change: `hexos.tf` `dedicated = 24576` with the comment rewritten (see
-  3.9). It would fail to start on 29 GiB, which is why it waits for the RAM.
+  3.10). It would fail to start on 29 GiB, which is why it waits for the RAM.
 
 ---
 
@@ -158,15 +160,16 @@ start but a GUI app like UTM does not. The files are in [`../scripts/studio-work
 Anything that allows traffic by node IP has to learn `192.168.102.36`, and forget `.32`. In the repo that's already
 done (rpi5-1's `nut_v4`; Vector's map is a phase 2 edit, see 1.5). The rest lives outside the repo:
 
-- **UniFi firewall rules.** The IoT VLAN rule that lets cluster nodes reach `kvm`, `rack-led` and `modbus-relay`
-  allows node IPs, not just rpi5-1 (see [IoT VLAN firewall](../argocd/README.md)). It's documented as
-  `.11`-`.13`, `.31`, `.32`, `.34`, without `.35`, so check whether it's an IP group and what's actually in it. Add `.36`,
-  remove `.32`. Check any other rule that names node IPs: Home Assistant, Matter and Scrypted run with `hostNetwork` and
-  float to any worker, so they reach cameras and IoT devices from the node's own address.
+- **UniFi firewall rules.** The IoT VLAN rule that lets cluster nodes reach `kvm`, `rack-led` and `modbus-relay` allows
+  node IPs, not just rpi5-1 (see [IoT VLAN firewall](../argocd/README.md)). It's documented as `.11`-`.13`, `.31`,
+  `.32`, `.34`, without `.35`, so check whether it's an IP group and what's actually in it. Add `.36`, remove `.32`.
+  Check any other rule that names node IPs: Home Assistant, Matter and Scrypted run with `hostNetwork` and float to any
+  worker, so they reach cameras and IoT devices from the node's own address.
 - **Device-side allowlists** that name the old nodes' IPs, if any (a camera, the KVM, the Z-Wave or Zigbee gateways).
 - **DHCP reservation** for `02:00:00:00:00:36` to `192.168.102.36` (1.5). Remove `.32`'s (1.4).
 - **After the node is up**, repeat the reachability test that found the IoT rule problem: a test pod pinned to
-  `talos-worker-studio` that reaches an IoT-VLAN host, and a `hostNetwork` pod (blackbox-exporter, Home Assistant) landing on it.
+  `talos-worker-studio` that reaches an IoT-VLAN host, and a `hostNetwork` pod (blackbox-exporter, Home Assistant)
+  landing on it.
 
 Nothing to change on HexOS: NFS exports are limited to the Server VLAN (`192.168.102.0/24`), and iSCSI uses
 democratic-csi's credentials rather than per-initiator addresses, so a new node on that VLAN is already allowed. The
@@ -297,21 +300,21 @@ fails with an I/O error unless you wait (`install.sh` waits up to 150 s).
 The MS-A2 has two SODIMM slots, so this is a swap, not an addition. Keep the old sticks as a fallback.
 
 HexOS goes down, and with it every PVC and `/mnt/data/shared`. Control planes, DNS and non-PVC pods stay up. Plan for
-roughly one to two hours, plus the memory test.
+roughly one to two hours, plus the memory test and about 10 to 15 minutes for the TrueNAS update in 3.4.
 
 **Two things stay running through the outage: restock-radar and ntfy**, so stock alerts keep arriving on phones. They
-run as temporary stand-ins on throwaway `emptyDir` storage, pinned to the Studio; see
-[The restock-radar and ntfy carve-out](#the-restock-radar-and-ntfy-carve-out) below. Everything else stops, and the
-rest of the cluster is silent for the whole window: Prometheus and Alertmanager have PVCs, so nothing will alert about
-the cluster itself until 3.8 (ntfy is up, but nothing is publishing to it except restock-radar). The restock-radar web UI
-is unreachable too, because Authelia keeps its 2FA registrations on a PVC and stays off. `network-optimizer-lb` (the
-10G-only Service) has no announcer while `talos-worker-1` is down, which is accepted: nearly everything else is off
-then too. The Studio and the Pi worker keep running the non-PVC pods.
+run as temporary stand-ins on throwaway `emptyDir` storage, pinned to the Studio; see [The restock-radar and ntfy
+carve-out](#the-restock-radar-and-ntfy-carve-out) below. Everything else stops, and the rest of the cluster is silent
+for the whole window: Prometheus and Alertmanager have PVCs, so nothing will alert about the cluster itself until 3.9
+(ntfy is up, but nothing is publishing to it except restock-radar). The restock-radar web UI is unreachable too, because
+Authelia keeps its 2FA registrations on a PVC and stays off. `network-optimizer-lb` (the 10G-only Service) has no
+announcer while `talos-worker-1` is down, which is accepted: nearly everything else is off then too. The Studio and the
+Pi worker keep running the non-PVC pods.
 
 ### The restock-radar and ntfy carve-out
 
 [`../scripts/nas-outage/nas-outage.sh`](../scripts/nas-outage/nas-outage.sh) does the whole thing, in three commands:
-`plan` (read-only checks and a server-side dry run), `start` (3.2) and `finish --nas-up` (3.8). It runs on the jump box.
+`plan` (read-only checks and a server-side dry run), `start` (3.2) and `finish --nas-up` (3.9). It runs on the jump box.
 
 - **What it creates.** `restock-radar-standby` and `ntfy-standby`, generated from the live Deployments when the script
   runs (so they always carry the current image digest, config and probes) with every PVC swapped for an `emptyDir`,
@@ -332,9 +335,9 @@ then too. The Studio and the Pi worker keep running the non-PVC pods.
   then stop one copy and start the other inside that gap. The stand-in pod is created ahead of time with an init
   container that blocks until the database arrives, and its image is already pulled, so the hand-over itself is only:
   scale the old one to 0 and wait for it to exit cleanly (SIGTERM checkpoints the WAL), stream the database through
-  `kubectl exec`, compare checksums, release the init container. It prints how long that took and warns past 150 seconds.
-  Tested on 2026-11-12 against the live cluster without a hand-over (pod admission, pinning, image pull on the Studio,
-  `exec` into the init container, the copy and the checksum comparison all work; the copy took under a second).
+  `kubectl exec`, compare checksums, release the init container. It prints how long that took and warns past 150
+  seconds. Tested on 2026-11-12 against the live cluster without a hand-over (pod admission, pinning, image pull on the
+  Studio, `exec` into the init container, the copy and the checksum comparison all work; the copy took under a second).
 - **If a stand-in's pod is lost** (the Studio VM restarts, say) it comes back blocked in its init container, not with an
   empty database, so it can't silently re-baseline. `nas-outage.sh reseed` pushes the copy that `start` saved in
   `~/nas-outage/seed.tar` into it, which restores the state as of the hand-over.
@@ -346,7 +349,7 @@ next to it in `/data/.pre-outage` on the `restock-radar-data` volume, in case th
 ### 3.0 Beforehand
 
 - **Test the used SODIMMs** before they go anywhere near the NAS: memtest86+ from a USB stick, at least two full
-  passes. Ideally do this in another machine. Otherwise it's the first thing to do in step 3.5, which extends the
+  passes. Ideally do this in another machine. Otherwise it's the first thing to do in step 3.6, which extends the
   outage.
 - Check they match the MS-A2's supported type (DDR5 SODIMM, same speed class as the old ones).
 - Have ready: a USB stick with memtest86+, the KVM connected, a small screwdriver.
@@ -357,7 +360,7 @@ next to it in `/data/.pre-outage` on the `restock-radar-data` volume, in case th
   VM 100, and the `proxmox` plan on a PR is empty.
 - **Pause the Healthchecks.io check** (the dead-man's-switch; see "Dead-man's-switch" in
   [`../argocd/README.md`](../argocd/README.md)) when you scale things down in 3.2. Alertmanager is a StatefulSet, so
-  it goes to zero with the rest and the pings stop; the check emails 10 to 20 minutes later. Resume it in 3.8.
+  it goes to zero with the rest and the pings stop; the check emails 10 to 20 minutes later. Resume it in 3.9.
 - **Put the carve-out script on the jump box and rehearse it.** The repo isn't checked out there, so copy the script
   over (the same way as `~/bin/etcd-snapshot-backup.sh`):
 
@@ -376,7 +379,7 @@ next to it in `/data/.pre-outage` on the `restock-radar-data` volume, in case th
   ([Rebooting the Studio](#rebooting-the-studio)).
 - Pick a quiet window. An Alertmanager silence is pointless here, since Alertmanager is off. Avoid the Studio's own
   maintenance and the scheduled backups, which the stand-ins don't cover.
-- Hold the staged `hexos.tf` PR (3.9) until after the RAM is in and HexOS is up.
+- Hold the staged `hexos.tf` PR (3.10) until after the RAM is in and HexOS is up.
 - Facts checked 2026-11-07: HexOS is VM **102** (`hexos`, 10240 MiB), the worker is VM **101** (16384 MiB), the ZFS
   pool is `data`, and there are 21 PVCs in 14 namespaces. The host reports 29,769 MB total with about 1.5 GB
   available, so it is genuinely full today.
@@ -462,10 +465,44 @@ The stand-ins are pinned to `talos-worker-studio` and aren't on this node. Confi
 `kubectl get pods -A -o wide | grep standby`: if either is on `talos-worker-1`, stop and don't drain, because
 `--delete-emptydir-data` would discard restock-radar's live database.
 
-### 3.4 Power down, cleanly and in order
+### 3.4 Update TrueNAS (HexOS VM) while nothing is using it
 
-HexOS first, so ZFS exports. Its VM ID is 102 (confirm with `qm list`); shut it down with ACPI and wait until it has stopped before touching
-the others:
+This is the cheapest moment for a TrueNAS update that reboots the NAS: every PVC is already unmounted (3.2), so the
+reboot can't turn any volume read-only, and the NAS is about to be powered off anyway. The update (25.10.8 at the time
+of writing; it replaces the kernel, so it needs a reboot) goes here, after the drain and before the shutdown, rather
+than earlier (it would cut storage under running workloads) or after the RAM swap (a failed boot would then be tangled
+up with the memory change).
+
+Confirm nothing mounts a PVC first (the check at the end of 3.2) and that the carve-out's stand-ins are on the Studio
+(3.3). Then take a fresh snapshot. This one is consistent, because nothing is writing; the one from 3.1 was taken with
+workloads still running:
+
+```bash
+ssh truenas-ops 'sudo zfs snapshot -r data@pre-truenas-update'
+```
+
+Check the release notes for pre-update actions (none were needed from 25.10.7 to 25.10.8), then install from the
+TrueNAS UI (System, Update, Install Update) and let it reboot into the new boot environment. This is a patch release
+within 25.x, so it doesn't touch the `democratic-csi` REST-API hold (see
+[`../todo/FUTURE.md`](../todo/FUTURE.md#democratic-csi-on-truenass-json-rpc-api-hold-hexostruenas-below-26x)). If
+HexOS manages TrueNAS updates itself, use whatever path it gives you rather than fighting it.
+
+When it's back, confirm it booted the new version and is healthy before going on. This is the same check as 3.8, just
+earlier, and it matters: a problem found now is a problem with the update alone.
+
+```bash
+ssh truenas-ops 'cat /etc/version; uptime; sudo zfs list | head -5'
+```
+
+The pool is online, the datasets are there, and the iSCSI and NFS services are running (HexOS UI, or `showmount -e
+truenas.lan` from rpi5-1). If it won't boot, TrueNAS should still have the previous boot environment (not tested on this
+VM): pick it from the GRUB menu on the VM console (Proxmox UI) and carry on with the RAM swap on the old version. Then
+carry on to 3.5.
+
+### 3.5 Power down, cleanly and in order
+
+HexOS first, so ZFS exports. Its VM ID is 102 (confirm with `qm list`); shut it down with ACPI and wait until it has
+stopped before touching the others:
 
 ```bash
 ssh proxmox "qm list"
@@ -483,7 +520,7 @@ ssh proxmox "qm shutdown 101 --timeout 180"
 ssh proxmox "shutdown -h now"
 ```
 
-### 3.5 Swap the RAM and set the BIOS (at the machine)
+### 3.6 Swap the RAM and set the BIOS (at the machine)
 
 - Unplug the power, swap the two SODIMMs, reassemble.
 - Boot to the BIOS. Confirm 64 GB is detected, then apply the UMA change from
@@ -499,7 +536,7 @@ Check the host sees the memory (expect roughly 62 to 63 GiB):
 ssh proxmox "free -m"
 ```
 
-### 3.6 Give HexOS the memory and start it
+### 3.7 Give HexOS the memory and start it
 
 Staged Terraform changes don't apply to a stopped VM until the next start, and `hexos.tf` also has
 `reboot_after_update = false`. Set it live so the merge is a no-op for it:
@@ -508,9 +545,9 @@ Staged Terraform changes don't apply to a stopped VM until the next start, and `
 ssh proxmox "qm set 102 --memory 24576 && qm start 102"
 ```
 
-Then merge the staged `hexos.tf` PR (3.9).
+Then merge the staged `hexos.tf` PR (3.10).
 
-### 3.7 Verify HexOS is healthy before anything depends on it
+### 3.8 Verify HexOS is healthy before anything depends on it
 
 - Cold start: `ssh truenas-ops uptime` shows minutes, not days.
 - The pool is online and the datasets are there: `ssh truenas-ops 'sudo zfs list'`.
@@ -534,11 +571,11 @@ talosctl -n 192.168.102.31 read /proc/uptime
 kubectl uncordon talos-worker-1
 ```
 
-### 3.8 Restore the workloads
+### 3.9 Restore the workloads
 
 **First, hand restock-radar and ntfy back, while ArgoCD is still stopped.** The order matters: once Argo is up its
 self-heal scales the real Deployments to 1 by itself, and a real restock-radar starting on the stale NAS database
-would alert again on every change the stand-in already reported. This needs HexOS verified (3.7) and
+would alert again on every change the stand-in already reported. This needs HexOS verified (3.8) and
 `talos-worker-1` uncordoned, since the real pods need their iSCSI volumes. The script restarts the real ntfy and only
 then removes its stand-in; mounts the NAS volume in a helper pod; waits for the stand-in's next poll cycle to finish;
 copies the database back (the old one is kept in `/data/.pre-outage`, and the copy is undone if the checksums
@@ -576,7 +613,7 @@ for n in 31 34 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E 
 - **Resume the Healthchecks.io check** and confirm it turns green within about 10 minutes (Alertmanager's `Watchdog`
   pings it every 5).
 
-### 3.9 Finish
+### 3.10 Finish
 
 - `hexos.tf`: `dedicated = 24576` with a rewritten comment. The current one (lines 90 to 99) says the host has 32 GB and
   fits no more than 10 GiB. Replace it with something like: "24 GiB, up from 10 GiB (the host went from 32 GB to
@@ -584,7 +621,7 @@ for n in 31 34 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E 
   6144 MB total and 2458 MB per device, against about 2.5 GB and 1 GB at 10 GiB. The earlier bump from 8 GiB
   (2026-10-08) was for the 8 MiB-buffer allocation failures behind the Prometheus volume stalls; this adds margin.
   The host has 64 GB: this VM, the 16 GiB worker, and about 22 GiB left for Proxmox and future VMs." Keep the "no
-  `floating`" note about ballooning. It's a no-op apply, since 3.6 already set the value live.
+  `floating`" note about ballooning. It's a no-op apply, since 3.7 already set the value live.
 - `todo/HARDWARE.md`: delete the done UMA, RAM and Studio items. Add a completion note to `todo/DONE.md`.
 - `todo/DONE.md`: the retired "HexOS iSCSI target out of command memory" entry mentions "another RAM increase" only as
   a fallback; note that SCST's limits are now the 24 GiB ones.
@@ -593,6 +630,7 @@ for n in 31 34 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E 
 
 ### Rollback
 
+- A TrueNAS update that won't boot or misbehaves: boot the previous boot environment from the GRUB menu (3.4).
 - A bad stick: put the old pair back and boot; nothing else changed except the BIOS UMA setting, which is harmless.
 - HexOS won't start at 24 GiB: `qm set 102 --memory 10240` and start; the workers can stay as they are.
 - A volume turned read-only after the restore: delete the affected pod, one at a time
@@ -603,4 +641,4 @@ for n in 31 34 35 36; do echo "$n:"; talosctl -n 192.168.102.$n dmesg | grep -E 
   `~/nas-outage/final.tar` (taken at the last hand-over) and the pre-outage one is in `~/nas-outage/seed.tar`;
   restock-radar's own README has the restore procedure for a database file. Losing the carve-out isn't fatal: with an
   empty database the next start re-baselines silently, and UI-added products are the only thing not in git.
-- The ZFS snapshot from 3.1 is the last resort. Remember `claude-ops` can't destroy snapshots.
+- The ZFS snapshots from 3.1 and 3.4 are the last resort. Remember `claude-ops` can't destroy snapshots.
