@@ -176,7 +176,7 @@ spec:
               name: logs
         - name: speedtest
           # Released in lockstep with the app; keep the tags matched.
-          image: ghcr.io/ozark-connect/speedtest:2.11.0@sha256:d31776d8a376ded6e6317d96a807ba9ac614a36227e594ccc73b30c05dc4a8e0
+          image: ghcr.io/ozark-connect/speedtest:2.11.2@sha256:1a260d637b5368e27f9f5e816407972b8a62d3ded913c5ae451399aaeb219074
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
