@@ -3006,6 +3006,35 @@ downloads included).
   Renovate opens separate PRs for them, so merge both together, and read the
   release notes first: ARC's minor releases have carried breaking changes.
 
+### A second scale set for restock-radar (added 2026-11-16)
+
+Scale sets are bound to one repo (a personal account has no org-level pool),
+so [`apps/arc-runners-restock-radar/`](apps/arc-runners-restock-radar/application.yaml)
+is a second one, registered to `jakerobb/restock-radar`. Its workflows say
+`runs-on: arc-runner-restock-radar`.
+
+- **Shared with the first set:** the controller, the runner image (two image
+  pins, so Renovate opens two PRs; merge them together), the `arc-github-app`
+  Secret, and the NetworkPolicy (it selects every pod in `arc-runners`). The
+  GitHub App must be installed on restock-radar as well; the installation ID is
+  the same.
+- **Different:** `maxRunners: 2`, and a shared build cache. The PVC
+  [`restock-radar-ci-cache`](../manifests/arc-runners-restock-radar/pvc.yaml)
+  (`hexos-nfs`, ReadWriteMany, 10Gi) is mounted at `/cache`. `AGENT_TOOLSDIRECTORY`
+  points the Actions tool cache there, so `setup-go` and `setup-node` download a
+  toolchain only when its version changes; `GOMODCACHE`, `GOCACHE` and
+  `npm_config_cache` do the same for dependencies. restock-radar's workflows set
+  `cache: false` on both `setup-*` actions, since their own caching goes through
+  GitHub's cache service.
+- **Trade-off:** the cache is writable by every job, including PR jobs, so a
+  malicious PR could plant a binary that later runs use. Fork PRs need approval
+  and the pods are cut off from the LAN, and restock-radar's publish jobs
+  (registry credentials) stay on GitHub-hosted runners. If that stops being
+  acceptable, drop `GOCACHE` and the tool cache first. To reset it, delete the
+  PVC; a miss only costs a download.
+- **Docker jobs aren't here.** The pods have no Docker and are amd64-only, and
+  restock-radar's image build is multi-arch.
+
 ### Custom runner image
 
 On the stock runner image a warm lint job took ~92s, mostly setup: Node and the
