@@ -24,7 +24,7 @@ resource "signoz_rule" "restock_radar_stalled" {
 
   annotations = {
     summary     = "Restock Radar has stopped checking the store"
-    description = "No successful fetch for {{$value}} seconds (polls run every 20 minutes). Check restock_radar_fetches_total by result, and the restock-radar pod's log."
+    description = "No successful fetch for {{$value}} seconds (polls run every 5 minutes). Check restock_radar_fetches_total by result, and the restock-radar pod's log."
   }
 
   labels = {

@@ -196,12 +196,12 @@ transforms:
         }]
       }
 
-  # Talos kernel log -> OTLP. `host` is the sending node's IP (the socket
-  # source sets it), mapped to the Kubernetes node name so SigNoz's
+  # Talos kernel log, with `node` added. `host` is the sending node's IP (the
+  # socket source sets it), mapped to the Kubernetes node name so SigNoz's
   # k8s.node.name matches what the kubelet-side logs use. A node missing from
   # the map falls back to its IP; add new nodes here (and see the "Talos
   # kernel logs" section of talos/README.md).
-  talos_kernel_otlp:
+  talos_kernel_node:
     type: remap
     inputs:
       - talos_kernel
@@ -214,6 +214,15 @@ transforms:
       ip = to_string(.host) ?? ""
       node, err = string(get!(nodes, [ip]))
       if err != null { node = ip }
+      .node = node
+
+  # Talos kernel log -> OTLP.
+  talos_kernel_otlp:
+    type: remap
+    inputs:
+      - talos_kernel_node
+    source: |
+      node = to_string(.node) ?? ""
       body = strip_whitespace(to_string(.msg) ?? "")
       ts = parse_timestamp(to_string(get!(., ["talos-time"])) ?? "", format: "%+") ?? now()
       ts_ns = to_string(to_unix_timestamp!(ts, unit: "nanoseconds"))
@@ -241,8 +250,50 @@ transforms:
         }]
       }
 
+  # Kernel storage errors -> ntfy, without SigNoz or Prometheus in the path.
+  #
+  # Why: on 2026-10-11 the volume under SigNoz's ClickHouse went read-only for
+  # eight hours, so SigNoz stored nothing and its own "Kernel storage error"
+  # alert (terraform/signoz/alert-kernel-storage.tf) never got the lines; on
+  # 2026-09-29 and 10-05 the victim was Prometheus's volume. Vector runs on
+  # rpi5-1's local disk and already receives every worker's kernel log, so it
+  # counts the failures itself. Nothing here infers failure from quiet.
+  #
+  # The pattern is the same narrow one as the SigNoz alert. The "EXT4-fs (sdX):
+  # error count since last fsck" and "mounting fs with errors" notices (an old
+  # error flag, logged when a volume mounts) are deliberately not matched:
+  # Talos replays the whole boot's kernel log after every reboot.
+  talos_kernel_storage_errors:
+    type: filter
+    inputs:
+      - talos_kernel_node
+    condition:
+      type: vrl
+      source: |
+        match(string(.msg) ?? "", r'timing out command|I/O error|potential data loss|Remounting filesystem read-only|EXT4-fs error|XFS .*(Corruption|Metadata I/O)|blocked for more than [0-9]+ seconds')
+
+  # A stall logs thousands of lines (every failed command), so send one per
+  # node per 30 minutes. A second node still gets its own notification.
+  talos_kernel_storage_throttled:
+    type: throttle
+    inputs:
+      - talos_kernel_storage_errors
+    threshold: 1
+    window_secs: 1800
+    key_field: "{{ node }}"
+
+  talos_kernel_storage_alert:
+    type: remap
+    inputs:
+      - talos_kernel_storage_throttled
+    source: |
+      line = strip_whitespace(string(.msg) ?? "")
+      node = string(.node) ?? "unknown node"
+      .message = node + " logged a storage error: " + line + "\nFind the pod that mounts the device and restart it if it logged write errors, then check HexOS for what stalled. Further errors from this node are held back for 30 minutes."
+
 sinks:
-  # SigNoz is the only destination. Logs also went to VictoriaLogs until
+  # SigNoz is the destination for all logs (the one other sink, ntfy_kernel_storage
+  # at the bottom, carries only disk-error alerts). Logs also went to VictoriaLogs until
   # 2026-10-01 (dual-shipped since 2026-09-22 while SigNoz was on trial); its
   # three elasticsearch sinks are gone from here. One combined OTLP sink covers
   # all four sources: the *_otlp transforms above reshape each event into
@@ -263,3 +314,26 @@ sinks:
       method: post
       encoding:
         codec: otlp
+
+  # Straight to ntfy's homelab-alerts topic, the way scripts/compose-deploy
+  # does, not through Alertmanager: Alertmanager sits behind Authelia. The
+  # cost is that these notifications don't show in Alertmanager or the Glance
+  # Alerts widget, and don't resolve. Vector retries a failed POST; if ntfy
+  # itself is down (its volume is iSCSI too), the SigNoz alert is the backup.
+  ntfy_kernel_storage:
+    type: http
+    inputs:
+      - talos_kernel_storage_alert
+    uri: https://ntfy.jakerobb.org/homelab-alerts
+    method: post
+    encoding:
+      codec: text
+    framing:
+      method: bytes
+    batch:
+      max_events: 1
+    request:
+      headers:
+        Title: Kernel storage error
+        Priority: "3"
+        Tags: warning
