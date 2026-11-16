@@ -33,7 +33,17 @@ Evaluate the stack and look for issues. Pick the single most-concerning issue (a
     IDX=$(( $(date +%j) % SHARDS ))
     sed -n "$(( IDX*SHARD + 1 )),$(( IDX*SHARD + SHARD ))p" /tmp/pods.txt
     ```
-- **Compose stack on rpi5-1** (what's left: `nut-upsd`, `unbound`, `telegraf`, `vector`). `restart: unless-stopped` hides flapping behind an "Up" status, so check `docker inspect -f '{{.Name}} {{.RestartCount}} {{.State.StartedAt}}'` for restarts or recent start times, then skim the logs of anything suspicious. `nut-upsd` is the UPS feed the cluster's `nut-exporter` reads, so if it dies the UPS data vanishes silently. `vector` carries syslog and Talos kernel logs to SigNoz, so confirm recent logs are actually arriving there.
+- **Compose stack on rpi5-1** (what's left: `nut-upsd`, `unbound`, `telegraf`, `vector`). `restart: unless-stopped` hides flapping behind an "Up" status, so check `docker inspect -f '{{.Name}} {{.RestartCount}} {{.State.StartedAt}}'` for restarts or recent start times, then skim the logs of anything suspicious. `nut-upsd` is the UPS feed the cluster's `nut-exporter` reads, so if it dies the UPS data vanishes silently. `vector` carries syslog and Talos kernel logs to SigNoz, so confirm recent logs are actually arriving there. Don't judge it by `docker logs vector`: it logs only its startup banner and errors, so an empty or tiny log is normal. Ask SigNoz's ClickHouse instead (Vector tags its rows with a `source_type` resource attribute):
+  ```bash
+  ssh jakerobb@rpi5-1.lan 'kubectl -n signoz exec -i chi-signoz-clickhouse-cluster-0-0-0 -c clickhouse -- clickhouse-client --multiquery' <<'SQL'
+  select resources_string['source_type'] as source, count() as rows_30m, toDateTime(max(timestamp)/1000000000) as newest
+  from signoz_logs.distributed_logs_v2
+  where timestamp > (toUnixTimestamp(now() - interval 30 minute)) * 1000000000
+    and mapContains(resources_string, 'source_type')
+  group by source order by rows_30m desc
+  SQL
+  ```
+  Healthy: `unifi` and `pi-journal` both have thousands of rows with a `newest` within a few minutes of now. `talos-kernel` and `docker` are sparse (Talos only logs when something happens, and most containers are quiet), so tens of rows, or a few, is fine. Trouble: `unifi` or `pi-journal` missing or stale (more than about 10 minutes old), or all four sources gone, which means Vector or the SigNoz OTLP path is down.
 
 Next, look at the versions of everything -- apps, dependencies, and infrastructure. Determine whether new versions exist, and prepare a report for me. Group into four sections:
 
