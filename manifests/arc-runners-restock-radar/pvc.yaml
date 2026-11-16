@@ -1,0 +1,21 @@
+# Shared build cache for restock-radar's CI runners (argocd/apps/arc-runners-restock-radar/):
+# the Actions tool cache (Go and Node toolchains), the Go module and build
+# caches, and npm's cache. Runner pods are ephemeral, so without this every job
+# re-downloads all of it. hexos-nfs because up to maxRunners pods mount it at
+# once (ReadWriteMany); any UID can write to it (docs/nfs-storage.md), so the
+# runner's uid 1001 needs no fsGroup or init container.
+#
+# Nothing prunes it except Go, which trims its own build cache. If it fills,
+# delete the PVC and let the next job repopulate it; a miss only costs the
+# download. 10Gi is far more than the toolchains, modules and npm cache need.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: restock-radar-ci-cache
+  namespace: arc-runners
+spec:
+  storageClassName: hexos-nfs
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 10Gi
