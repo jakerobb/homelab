@@ -45,7 +45,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: modbus-controller
-          image: docker.io/jakerobb/modbus-eth-controller:20261112144915@sha256:e2681baaa1d86fac0c53577e3dbdb427ce403dded28c07898ea04d3f3238affc
+          image: docker.io/jakerobb/modbus-eth-controller:20261116181506@sha256:298b76dbbdfa09d97023b6db4609d66210309f23f256248a4e7d0892b7721e22
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
