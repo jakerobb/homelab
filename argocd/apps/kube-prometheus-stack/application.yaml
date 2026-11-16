@@ -283,83 +283,18 @@ spec:
                         command" or "I/O error, dev", find the pod that
                         mounts the device, and restart it if it logged write
                         errors. Then check HexOS for what stalled.
-                  # 2026-10-12: the volume under SigNoz's ClickHouse stalled
-                  # for 180s at 23:26 EDT on 10-11 (about 10,400 SCST
-                  # allocation failures in three minutes). ext4 aborted its
-                  # journal and remounted the volume read-only, and SigNoz
-                  # stored nothing for eight hours. Nothing alerted:
-                  # ISCSIVolumeIOStall never fired (a read-only volume has
-                  # no requests waiting), node-exporter can't see pod
-                  # volumes' filesystems on Talos (so no
-                  # node_filesystem_readonly), and the "Kernel storage
-                  # error" alert lives in SigNoz, the thing that was down.
-                  # What did change was the device itself: ClickHouse's
-                  # disk went from ~1.25 MB/s to exactly 0 for eight
-                  # hours. A steady writer (a write in more than half of the
-                  # last day's 5-minute windows; nightly backups and other
-                  # bursty volumes score far lower) that then has no writes
-                  # for 15 minutes is the signal. Because the score decays
-                  # as the silence grows, the alert stays up for up to ~12h
-                  # of silence. A device that disappears (pod moved, volume
-                  # detached) must not match, but rate() over 15m keeps
-                  # returning 0 from the old samples for up to 15 minutes
-                  # after the series ends (a false alarm on 2026-10-27 when
-                  # matter-server's pod was deleted). The final clause
-                  # requires the device to exist right now: the instant
-                  # selector goes empty as soon as the scrape stops
-                  # reporting it. The last clause requires the same LUN
-                  # (node_disk_info carries the LUN serial, so a different
-                  # volume gets a fresh series) to have been attached for
-                  # over 12 hours: the kernel reuses device names, and on
-                  # 2026-11-06 sdd went from renovate's hourly-writing volume
-                  # to restock-radar's quiet one and tripped the alert falsely.
-                  # 2026-11-12/13: it tripped falsely twice more on worker-1's
-                  # sdb (InfluxDB's LUN before a reboot, mosquitto's quiet
-                  # one after). First, restarting node-exporter's pod gave
-                  # every series a new `pod` label, so the old series kept
-                  # matching the new one on (instance, device). Then, once
-                  # the new LUN had been attached 12 hours, the steady-writer
-                  # score still averaged in the old LUN's writes, because
-                  # it was computed per device name. Every clause is now
-                  # per (instance, device, serial): writes are summed
-                  # across pods and joined to node_disk_info for the
-                  # serial, so each LUN is scored only over the time it was
-                  # attached, and the join also requires it to be attached
-                  # right now.
-                  - alert: ISCSIVolumeWritesStopped
-                    expr: >-
-                      avg_over_time(((sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[5m]))
-                      * on (instance, device) group_left (serial)
-                      max by (instance, device, serial) (node_disk_info{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"})) > bool 0)[1d:5m]) > 0.5
-                      and on (instance, device, serial)
-                      ((sum by (instance, device) (rate(node_disk_written_bytes_total{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}[15m]))
-                      * on (instance, device) group_left (serial)
-                      max by (instance, device, serial) (node_disk_info{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"})) == 0)
-                      and on (instance, device, serial)
-                      (count_over_time((max by (instance, device, serial) (node_disk_info{job="node-exporter",
-                      instance=~"192\\.168\\.102\\.3[0-9]:9100", device=~"sd[b-z]"}))[1d:5m]) > 144)
-                    for: 5m
-                    labels:
-                      severity: warning
-                    annotations:
-                      summary: Writes to an iSCSI volume on {{ $labels.instance }} stopped.
-                      description: >-
-                        Disk {{ $labels.device }} on {{ $labels.instance }} had
-                        steady writes for the previous two hours and has had none
-                        for 15 minutes. If the pod that mounts it is still
-                        running, the volume has most likely gone read-only after
-                        an I/O stall (ext4 aborts its journal and remounts ro,
-                        and the pod keeps running while every write fails).
-                        Find the pod, run `touch` in its data directory, and
-                        delete the pod if it fails (the same volume remounts
-                        read-write). Check the node's dmesg for "Remounting
-                        filesystem read-only", and HexOS's scst.log for
-                        "Allocation of sgv_pool_obj failed".
-                  # The same incident's other symptom: SigNoz's collector
+                  # There used to be a second rule here, ISCSIVolumeWritesStopped,
+                  # that inferred a stalled volume from a steady writer going
+                  # quiet. It fired on every healthy volume that happened to be
+                  # quiet (removed 2026-11-13). Failures are now counted
+                  # directly: Vector on rpi5-1 filters the workers' kernel logs
+                  # for disk errors and posts to ntfy, independent of
+                  # Prometheus and SigNoz (see the talos_kernel_storage_alert
+                  # transform in docker-compose/vector/vector.yaml).
+                  # 2026-10-11: the volume under SigNoz's ClickHouse went
+                  # read-only for eight hours and nothing alerted; ISCSIVolumeIOStall
+                  # can't see a read-only volume (no requests wait on it).
+                  # That incident's other symptom: SigNoz's collector
                   # was OOMKilled 16 times in 33 hours (every ~30 minutes,
                   # so never in CrashLoopBackOff and never KubePodCrashLooping)
                   # while it queued data it couldn't write.
