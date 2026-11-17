@@ -38,7 +38,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: truenas-exporter
-          image: docker.io/jakerobb/truenas-exporter:20261116205942@sha256:23f5161b32005ea8c63a030363cc3af38ab8d793c3c07e870f6a931f4077bcc1
+          image: docker.io/jakerobb/truenas-exporter:20261117183835@sha256:cba600f24e3d8f385edf355622d66d5edebec26b241d5dfbab94c6316f36b1a4
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
