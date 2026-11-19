@@ -42,7 +42,7 @@ spec:
           # Pinned by digest as well as tag: the app's date tags are UTC days,
           # and a second publish on the same day moves the tag, which would
           # change nothing here and leave nodes running their cached image.
-          image: docker.io/jakerobb/restock-radar:20261119151753@sha256:d897a6cc3f64eecba5deb02763ed7c9509ff66c2884d5e98190ef21eeb4c8c51
+          image: docker.io/jakerobb/restock-radar:20261119160014@sha256:928795a8a7723e493f87281a9dc6a64f3f3d6766448fcaec38d539db79dc89da
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
