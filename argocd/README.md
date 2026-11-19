@@ -1295,6 +1295,19 @@ POSTs to the in-cluster ntfy. Config is under `notifications:` in
   separate **`argocd-deploys`** topic, so merges don't bury the alerts. To
   turn it on, add `on-sync-succeeded` to `notifications.subscriptions` and
   subscribe to `https://ntfy.jakerobb.org/argocd-deploys`.
+- **New-version message (restock-radar).** `New version deployed: restock-radar`
+  with the image tag, priority 3, on the **`argocd-deploys`** topic (subscribe
+  to `https://ntfy.jakerobb.org/argocd-deploys`). Unlike the global
+  subscriptions it's opt-in per Application, via the annotation
+  `notifications.argoproj.io/subscribe.on-image-deployed.ntfy: ""` on
+  [`apps/restock-radar/application.yaml`](apps/restock-radar/application.yaml);
+  add it to another app to get the same message. `on-image-deployed` fires when
+  the app is Synced and Healthy and `status.summary.images[0]` differs from the
+  last image it announced (`oncePer`), so config-only syncs and pod restarts
+  are silent, and a rollout that never turns Healthy sends nothing (the
+  degraded alert covers it). Expect one message the first time after enabling,
+  since nothing has been announced yet. It looks at the first image only, so it
+  suits single-image apps.
 - **NetworkPolicy.** The chart's `argocd-notifications-controller` policy
   restricts ingress only, so egress is open; the one change needed was
   letting that pod into ntfy's :8080

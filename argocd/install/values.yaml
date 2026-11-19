@@ -150,6 +150,24 @@ notifications:
               "tags": ["white_check_mark"],
               "click": {{ if and .app.spec.source (contains "github.com/jakerobb/homelab" .app.spec.source.repoURL) }}{{ printf "%s/commit/%s" (call .repo.RepoURLToHTTPS .app.spec.source.repoURL) .app.status.sync.revision | toJson }}{{ else }}{{ printf "%s/applications/%s" .context.argocdUrl .app.metadata.name | toJson }}{{ end }}
             }
+    # Sent only to Applications annotated for it (restock-radar's), when the
+    # app is Synced and Healthy on a different image than the last one
+    # announced, so a rollout that never becomes Healthy says nothing.
+    # `summary.images` is the image(s) in the app; the digest is cut off the
+    # displayed name.
+    template.image-deployed: |
+      webhook:
+        ntfy:
+          method: POST
+          body: |
+            {
+              "topic": "argocd-deploys",
+              "title": {{ printf "New version deployed: %s" .app.metadata.name | toJson }},
+              "message": {{ index .app.status.summary.images 0 | splitList "@" | first | toJson }},
+              "priority": 3,
+              "tags": ["rocket"],
+              "click": {{ printf "%s/applications/%s" .context.argocdUrl .app.metadata.name | toJson }}
+            }
   triggers:
     # oncePer: an app retries a failed sync up to 10 times (see the Application
     # manifests' retry blocks), and each failure would otherwise notify.
@@ -164,6 +182,15 @@ notifications:
       - when: app.status.operationState != nil and app.status.operationState.phase in ['Succeeded']
         oncePer: app.status.sync.revision
         send: [deploy-succeeded]
+    # Fires when an app is Synced and Healthy on an image it hasn't announced
+    # yet: oncePer is the image, so config-only syncs and restarts stay quiet.
+    # Not in the global `subscriptions`; an Application opts in with the
+    # annotation `notifications.argoproj.io/subscribe.on-image-deployed.ntfy`.
+    # Assumes one image per app (oncePer looks at the first).
+    trigger.on-image-deployed: |
+      - when: app.status.sync.status == 'Synced' and app.status.health.status == 'Healthy' and app.status.summary != nil and app.status.summary.images != nil
+        oncePer: app.status.summary.images[0]
+        send: [image-deployed]
   # Every Application, no per-app annotations to forget. ArgoCD's controller
   # only fires on a transition into the trigger's condition.
   # The recipient is the notifier's name, `ntfy`, not `webhook:ntfy`: a
