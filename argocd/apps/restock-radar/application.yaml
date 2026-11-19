@@ -5,6 +5,10 @@ kind: Application
 metadata:
   name: restock-radar
   namespace: argocd
+  annotations:
+    # New-version notification (argocd/README.md's "Deploy notifications").
+    # An empty value is correct: the recipient is in the key.
+    notifications.argoproj.io/subscribe.on-image-deployed.ntfy: ""
 spec:
   project: default
   source:
