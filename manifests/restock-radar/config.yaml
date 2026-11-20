@@ -11,6 +11,21 @@ request_delay: 2s
 http_port: 8080
 db_path: /data/restock-radar.db
 
+# Every region is asked about every category any region has, so each store's own
+# range is tracked without listing it. The US is read every cycle; the others
+# roll, reading a twelfth of their category pages each 5-minute cycle (hourly in
+# full). Built-in ids: us, ca, eu, uk, jp, br, tw, sg. The first is the default
+# for items that name no region.
+regions:
+  - id: us
+  - {id: ca, poll_every: 1h}
+  - {id: eu, poll_every: 1h}
+  - {id: uk, poll_every: 1h}
+  - {id: jp, poll_every: 1h}
+  - {id: br, poll_every: 1h}
+  - {id: tw, poll_every: 1h}
+  - {id: sg, poll_every: 1h}
+
 # Nightly copies of the database to the restock-radar-backups volume
 # (manifests/restock-radar/pvc.yaml), newest 14 kept. To restore, see the
 # restock-radar section of argocd/README.md.
