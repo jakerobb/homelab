@@ -78,7 +78,7 @@ spec:
                   # downloads it (once, into the cache volume). Bumped in
                   # lockstep by Renovate: keep the two pins on the same tag.
                   # renovate: datasource=docker depName=ghcr.io/jakerobb/homelab-arc-runner
-                  image: ghcr.io/jakerobb/homelab-arc-runner:1.74@sha256:cd036aa68eb598e2882909507849fb28826045405379aba9d5a79c82675fd744
+                  image: ghcr.io/jakerobb/homelab-arc-runner:1.76@sha256:9c7f837faf2351ca21abf241d109c79c9302ef22d75af20f41dedcbdbf045344
                   command: ["/home/runner/run.sh"]
                   env:
                     # The runner derives RUNNER_TOOL_CACHE from this; setup-go
