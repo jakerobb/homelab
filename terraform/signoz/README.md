@@ -20,6 +20,9 @@ Manages SigNoz dashboards and alerts. SigNoz itself is deployed by ArgoCD (`argo
 - `alert-kernel-storage.tf` — "Kernel storage error": a worker's kernel logged a disk I/O
   timeout or error, from the Talos kernel logs Vector forwards (see "Talos kernel logs" in
   `talos/README.md`). Same ntfy channel.
+- `alert-stale-logs.tf` — "SigNoz logs stale": no in-cluster logs have reached SigNoz for ten
+  minutes (or none at all), which means the collector or ClickHouse ingest path has stalled.
+  The header says how to recover. Same ntfy channel.
 - `alert-descheduler.tf` — "Descheduler evicted pods": an informational push whenever the
   descheduler evicts a pod, counted from its pod log. Same ntfy channel.
 - `dashboard-etcd.tf` — etcd health on the three control-plane members: leader and

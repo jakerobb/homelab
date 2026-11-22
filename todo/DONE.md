@@ -3,6 +3,18 @@
 Completed cluster-readiness work, kept for reference — what was decided, why, and where the resulting configuration
 lives. Roughly grouped by topic rather than strict chronological order.
 
+## SigNoz log ingestion stalled twice, now alerted (2026-11-22)
+
+**Done.** Log ingestion stopped for about 8 hours on 2026-11-21 and again on 2026-11-22, unnoticed both times. First,
+`signoz_logs.tag_attributes_v2` came up read-only after a ClickHouse restart (error 231: its local parts didn't match
+ZooKeeper's), so every collector insert into it timed out at 14 s and the batches were dropped. Fixed by touching
+`/var/lib/clickhouse/flags/force_restore_data` and deleting the ClickHouse pod, which moved the unexpected parts to `detached`.
+Then ClickHouse restarted again and the collector, up 41 hours, never recovered (`couldn't PrepareBatch ... context deadline
+exceeded`) until `kubectl -n signoz rollout restart deploy signoz-otel-collector`. The logs from those gaps are gone. Why the
+table and ZooKeeper diverged is unknown. The "SigNoz logs stale" rule in
+[`../terraform/signoz/alert-stale-logs.tf`](../terraform/signoz/alert-stale-logs.tf) now fires after 10 minutes with no
+in-cluster logs; its header says what to check.
+
 ## kubeconform external-secrets.io schema pin dropped (2026-11-12)
 
 **Done.** The pin to catalog commit `f3e4382` is gone from [`../.github/workflows/lint.yml`](../.github/workflows/lint.yml). The
