@@ -33,6 +33,9 @@ STATE_DIR = HOME / ".local" / "state" / "host-deploy"
 STATE_FILE = STATE_DIR / "state.json"
 LOG_FILE = STATE_DIR / "deploy.log"
 LOG_MAX_BYTES = 1_000_000
+# One line: a Healthchecks.io ping URL for this host (a secret: anyone with it can send pings, so it lives on the
+# host, mode 0600, not in the repo). Absent = no heartbeat.
+HEARTBEAT_FILE = Path(os.environ.get("HOST_DEPLOY_HEARTBEAT_FILE", HOME / ".config" / "host-deploy" / "heartbeat-url"))
 NTFY_URL = os.environ.get("HOST_DEPLOY_NTFY_URL", "https://ntfy.jakerobb.org/homelab-alerts")  # override: tests
 
 args = None
@@ -95,6 +98,21 @@ def notify(title, message, priority, tags):
     except OSError as e:
         # stderr -> launchd's log, so a problem still gets out when ntfy (which lives on the cluster) is down.
         print(f"host-deploy: ntfy unreachable ({e}); undelivered notification:\n{title}\n{message}", file=sys.stderr)
+
+
+def heartbeat(suffix=""):
+    """Pings Healthchecks.io so a run that never happens (launchd job gone, host down, script crashing on startup)
+    alerts from outside, since this job is also what raises the other alerts. suffix '/fail' reports a crash."""
+    try:
+        url = HEARTBEAT_FILE.read_text().strip()
+    except OSError:
+        return
+    if not url:
+        return
+    try:
+        urllib.request.urlopen(url + suffix, timeout=15).close()
+    except (OSError, ValueError) as e:
+        log(f"heartbeat ping failed: {type(e).__name__}")  # not the message: it can contain the secret URL
 
 
 class Deploy:
@@ -282,7 +300,13 @@ def main():
     tmp = STATE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
     tmp.replace(STATE_FILE)
+    heartbeat()  # last, so a run that dies before finishing doesn't count. A paused deploy still pings: it's alerted.
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        if args is None or not args.dry_run:
+            heartbeat("/fail")
+        raise
