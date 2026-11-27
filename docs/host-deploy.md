@@ -62,12 +62,31 @@ anything in the manifest that isn't installed yet. The plist hard-codes `/Users/
 `src` is repo-relative. A source missing from the repo is ignored. To add a host, add `manifests/<name>.json` and run
 `install.sh` there. To put another file under management, add a line and merge: the next run picks it up.
 
+## Heartbeat
+
+If this job stopped (launchd job gone, host down, the script crashing on startup), nothing would alert, since it is also
+what raises the other alerts. So each completed run pings a [Healthchecks.io](https://healthchecks.io) check, and a crash
+pings its `/fail` URL. A paused deploy (dirty clone, missing manifest) still pings: that's alerted on ntfy, and the
+heartbeat only means the job ran. `--dry-run` never pings.
+
+The ping URL is a secret, so it lives on the host, not in the repo (the Mac has no SOPS key). Per host:
+
+1. In Healthchecks.io create a check named `host-deploy <LocalHostName>` (e.g. `host-deploy m5ultramacstudio`), period 5
+   minutes, grace 15 minutes, with the usual email integration.
+2. On that Mac, as your normal user:
+
+   ```bash
+   mkdir -p ~/.config/host-deploy && chmod 700 ~/.config/host-deploy
+   printf '%s\n' '<ping URL>' > ~/.config/host-deploy/heartbeat-url && chmod 600 ~/.config/host-deploy/heartbeat-url
+   ```
+
+Without the file there is no heartbeat and nothing else changes. The next run (within 5 minutes) sends the first ping.
+
 ## Operating it
 
 - **Run now:** `/usr/bin/python3 ~/.local/share/host-deploy/homelab/scripts/host-deploy/host-deploy.py -v` (`--dry-run`
   changes nothing).
 - **Pause:** `sudo launchctl bootout system/com.jakerobb.host-deploy`; resume with `install.sh`.
-- **No heartbeat yet.** Unlike compose-deploy there's no Healthchecks.io ping, so if this job stops, nothing alerts.
-  Worth adding when the second host is on it.
+- **Heartbeat:** see [Heartbeat](#heartbeat).
 - **Alert after a restart-the-VM install:** drain the node first (the alert says so), then run the installer it names.
   `studio-worker/install.sh` leaves the VM alone when nothing it installs has changed.

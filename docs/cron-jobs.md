@@ -27,8 +27,8 @@ redirected to `/dev/null` for jobs that are quiet on success.
 
 ## Heartbeats
 
-Two jobs ping Healthchecks.io, so that a job that silently stops alerts from outside: compose-deploy (below) and the
-[etcd backup](etcd-backup.md#heartbeat).
+Three jobs ping Healthchecks.io, so that a job that silently stops alerts from outside: compose-deploy (below), the
+[etcd backup](etcd-backup.md#heartbeat) and [host-deploy](host-deploy.md#heartbeat) on the Mac hosts.
 
 ## Is compose-deploy itself running?
 
