@@ -1,0 +1,3 @@
+# Installed to /etc/sudoers.d/talos-vm-kick by scripts/talos-vm-host/install.sh (@USER@ becomes the installing user).
+# The trailing "" means no arguments are allowed.
+@USER@ ALL=(root) NOPASSWD: /usr/local/sbin/talos-vm-kick ""

@@ -285,6 +285,14 @@ Power the VM off but **keep it** for a week as a rollback. Then:
   counts and tables in `talos/README.md` (including the NIC-speed table), `overview.md`, the rolling-node-change
   skill's "All 7 nodes" and the `HARDWARE.md` entry.
 
+### Restarting a wedged VM
+
+`sudo -n /usr/local/sbin/talos-vm-kick` (from [`scripts/talos-vm-host/`](../scripts/talos-vm-host/)) restarts the VM daemon,
+and sends SIGKILL to QEMU if it hasn't exited after 150 seconds. It takes no arguments, finds the daemon and QEMU by name,
+and touches nothing else. Run it only on a drained node, since it powers the VM off. The passwordless-sudo rule is
+for exactly that path with no arguments. Install it with `scripts/talos-vm-host/install.sh`; it's generic, so the MacBook
+Pro will use the same file. The deploy loop that tells you when it's stale is [`host-deploy.md`](host-deploy.md).
+
 ### Rebooting the Studio
 
 A shutdown or power loss needs the FileVault unlock above before anything starts. To restart it deliberately, cordon
