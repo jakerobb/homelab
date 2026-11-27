@@ -15,12 +15,13 @@ GRACE=150   # seconds QEMU gets to exit gracefully (the daemon's ExitTimeOut is 
 [ $# -eq 0 ] || { echo "talos-vm-kick takes no arguments" >&2; exit 64; }
 [ "$(id -u)" -eq 0 ] || { echo "talos-vm-kick must run as root (via sudo)" >&2; exit 77; }
 
-LABELS=$(ls /Library/LaunchDaemons/com.jakerobb.talos-worker-*.plist 2>/dev/null | sed 's|.*/||; s|\.plist$||')
+LABELS=$(find /Library/LaunchDaemons -maxdepth 1 -name 'com.jakerobb.talos-worker-*.plist' 2>/dev/null | sed 's|.*/||; s|\.plist$||')
 [ "$(printf '%s\n' "$LABELS" | grep -c .)" -eq 1 ] || { echo "expected exactly one com.jakerobb.talos-worker-* daemon, found: ${LABELS:-none}" >&2; exit 1; }
 TARGET="system/$LABELS"
 
 vm_pids() { pgrep -u root -f 'qemu-system-.*/talos-vm/disk\.qcow2'; }
-alive() { for p in "$@"; do kill -0 "$p" 2>/dev/null && echo "$p"; done; }
+# Prints those of the space-separated pids in $1 that are still running.
+alive() { for p in $1; do kill -0 "$p" 2>/dev/null && echo "$p"; done; }
 
 BEFORE=$(vm_pids | tr '\n' ' ')
 echo "restarting $TARGET (QEMU: ${BEFORE:-not running})"
@@ -28,11 +29,11 @@ launchctl kickstart -k "$TARGET" &
 KICK=$!
 
 i=0
-while [ -n "$BEFORE" ] && [ -n "$(alive $BEFORE)" ] && [ "$i" -lt "$GRACE" ]; do sleep 1; i=$((i + 1)); done
-STUCK=$([ -n "$BEFORE" ] && alive $BEFORE | tr '\n' ' ')
+while [ -n "$BEFORE" ] && [ -n "$(alive "$BEFORE")" ] && [ "$i" -lt "$GRACE" ]; do sleep 1; i=$((i + 1)); done
+STUCK=$([ -n "$BEFORE" ] && alive "$BEFORE" | tr '\n' ' ')
 if [ -n "$STUCK" ]; then
   echo "QEMU ($STUCK) still running after ${GRACE}s; sending SIGKILL"
-  kill -9 $STUCK
+  for p in $STUCK; do kill -9 "$p"; done
 fi
 i=0; while kill -0 "$KICK" 2>/dev/null && [ "$i" -lt 30 ]; do sleep 1; i=$((i + 1)); done
 kill -0 "$KICK" 2>/dev/null && kill "$KICK"
