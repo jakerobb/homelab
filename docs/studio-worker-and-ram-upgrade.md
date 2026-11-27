@@ -288,7 +288,7 @@ Power the VM off but **keep it** for a week as a rollback. Then:
 ### Restarting a wedged VM
 
 `sudo -n /usr/local/sbin/talos-vm-kick` (from [`scripts/talos-vm-host/`](../scripts/talos-vm-host/)) restarts the VM daemon,
-and sends SIGKILL to QEMU if it hasn't exited after 150 seconds. It takes no arguments, finds the daemon and QEMU by name,
+and sends SIGKILL to QEMU if it hasn't exited after 110 seconds. It takes no arguments, finds the daemon and QEMU by name,
 and touches nothing else. Run it only on a drained node, since it powers the VM off. The passwordless-sudo rule is
 for exactly that path with no arguments. Install it with `scripts/talos-vm-host/install.sh`; it's generic, so the MacBook
 Pro will use the same file. The deploy loop that tells you when it's stale is [`host-deploy.md`](host-deploy.md).
@@ -302,12 +302,24 @@ by SSH afterwards. A graceful stop can take a minute or two, so `launchctl booto
 fails with an I/O error unless you wait (`install.sh` waits up to 150 s).
 
 **A guest reboot (including a Talos upgrade's) restarts QEMU.** `run-vm.sh` passes `-no-reboot`, so when the guest resets,
-QEMU exits and launchd's `KeepAlive` starts a fresh one: a cold boot of the VM. Without it, QEMU reset the vCPUs in place,
-and under HVF that wedged on the 2026-11-25 Talos v1.14.7 upgrade: QEMU never exited, spun at ~200% CPU writing `unhandled
-exception ec=0x20` about 44 million times (3 GB in `/var/log/talos-worker-studio.log`), and only `sudo kill -9 <pid>` then
-`sudo launchctl kickstart -k system/com.jakerobb.talos-worker-studio` got it going. `run-vm.sh` also collapses repeated
-lines in QEMU's output now. Upgrade with `talosctl upgrade --reboot-mode powercycle` (skips kexec). Re-run `install.sh` after
-any change to `run-vm.sh`; launchd runs the installed copy in `/usr/local/sbin`, not the repo's.
+QEMU exits and launchd's `KeepAlive` starts a fresh one: a cold boot of the VM. `run-vm.sh` also collapses repeated
+lines in QEMU's output. Re-run `install.sh` after any change to `run-vm.sh`; launchd runs the installed copy in
+`/usr/local/sbin`, not the repo's.
+
+**Talos's default reboot uses kexec, and kexec hangs under HVF.** On the 2026-11-25 Talos v1.14.7 upgrade QEMU never
+exited: it spun at ~200% CPU writing `unhandled exception ec=0x20` about 44 million times (3 GB in
+`/var/log/talos-worker-studio.log`), and only `sudo kill -9 <pid>` then `launchctl kickstart -k` got it going. `-no-reboot`
+doesn't help with that, because kexec never resets the guest: a plain `talosctl reboot` on 2026-11-27 hung the same way
+(console: `kexec_core: Starting new kernel`, `Bye!`, then nothing; QEMU at ~500% CPU, ignoring SIGTERM). Two things
+avoid it, both tested on 2026-11-27 (each ended in a ~40 s cold restart and a Ready node):
+
+- **`kernel.kexec_load_disabled: "1"`** in the node's `machine.sysctls`
+  ([`worker-studio.yaml`](../talos/patches/workers/worker-studio.yaml)) makes Talos skip kexec for every reboot, whoever
+  triggers it. This is the durable fix.
+- `--reboot-mode powercycle` (upgrade) or `--mode powercycle` (reboot) on the command, which skips kexec for that one
+  command. Keep passing it as belt and braces.
+
+If it wedges anyway, see [Restarting a wedged VM](#restarting-a-wedged-vm).
 
 ---
 

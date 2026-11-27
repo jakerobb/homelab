@@ -11,7 +11,7 @@
 set -u
 PATH=/usr/bin:/bin:/usr/sbin:/sbin
 export PATH
-GRACE=150   # seconds QEMU gets to exit gracefully (the daemon's ExitTimeOut is 120, plus Talos's shutdown)
+GRACE=110   # seconds QEMU gets to exit gracefully; keep under the daemon's ExitTimeOut (120) so we SIGKILL before launchd relaunches
 [ $# -eq 0 ] || { echo "talos-vm-kick takes no arguments" >&2; exit 64; }
 [ "$(id -u)" -eq 0 ] || { echo "talos-vm-kick must run as root (via sudo)" >&2; exit 77; }
 

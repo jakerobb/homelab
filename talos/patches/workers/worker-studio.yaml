@@ -27,8 +27,13 @@ machine:
   nodeLabels:
     homelab.jakerobb.org/nic-speed-mbps: "6000"
   # Accept Route Information Options in Router Advertisements, per interface (see worker-mbp.yaml).
+  # kernel.kexec_load_disabled makes Talos skip kexec and do a real reboot. Under QEMU/HVF the kexec jump hangs
+  # (the new kernel never starts and QEMU spins at ~500% CPU, ignoring SIGTERM), so any reboot, including a plain
+  # `talosctl reboot` or a config change that reboots, would wedge the VM. With kexec off the guest resets, QEMU
+  # exits (-no-reboot) and launchd starts a fresh one. Applied live with --mode=no-reboot 2026-11-27 and verified.
   sysctls:
     net.ipv6.conf.enp0s2.accept_ra_rt_info_max_plen: "64"
+    kernel.kexec_load_disabled: "1"
   # QEMU (HVF) under macOS on the Mac Studio, run as a root LaunchDaemon (scripts/studio-worker/). The
   # disk is virtio-blk, so /dev/vda. The shared worker.yaml template's install.image is stale and amd64-only,
   # so it's overridden: same Factory schematic as the Proxmox workers (iscsi-tools, util-linux-tools, kernel
