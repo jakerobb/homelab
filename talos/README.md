@@ -449,8 +449,11 @@ fix the firmware remotely. The runnable scripts, including a read-only dry-run v
 Control planes one at a time, with an `etcd-snapshot-backup.sh` run first. Checks after each node are in
 [`../skills/rolling-node-change/instructions.md`](../skills/rolling-node-change/instructions.md).
 
+0. **Check the ESP is big enough:** `talos/tools/upgrade/check-esp.sh <node-ip>` (see "ESP size" below). Never upgrade a
+   node that fails it.
 1. If the node's firmware isn't fixed yet, patch it and power-cycle it as above. Otherwise skip this step.
-2. Build the combined image on rpi5-1 (arm64, so no cross-compilation) and push it to `ttl.sh`. These nodes have no
+2. Build the combined image on rpi5-1 (arm64, so no cross-compilation) and push it to `ttl.sh`, tagged `:24h` (the
+   longest it keeps; `:4h` expired while worker-3 was being debugged). These nodes have no
    registry pull credential, so the image must be public wherever it's hosted:
    ```dockerfile
    FROM ghcr.io/yama6a/talos-raspberry-pi5:<target-tag>
@@ -466,6 +469,27 @@ Recoverable but physical; it isn't a re-run-the-command fix. See the fork's
 
 Workers use the Image Factory instead: `talosctl upgrade --image factory.talos.dev/installer/<schematic-id>:<version>`.
 `ghcr.io/siderolabs/installer:<version>` doesn't exist for recent releases.
+
+## ESP size
+
+The ESP (the FAT32 `EFI` partition holding the UKI, systemd-boot, `u-boot.bin` and the overlays) has to hold the whole
+new Pi 5 boot image, about 103 MiB for v1.14.7, before the old one is removed. Measured 2026-11-26:
+
+| Node | ESP |
+|---|---|
+| control planes, `talos-worker-1` | 2.2 GB |
+| `talos-worker-3` | 99 MiB |
+
+`talos-worker-3` was written with `dd` from the fork's raw image (see its section), which carries a small fixed ESP. The
+control planes' much larger ESPs most likely come from being provisioned through the installer. The v1.14.7 upgrade
+removed worker-3's old UKI, ran out of room writing the new one and left a node with no kernel, which then looped on
+boot. Recovering it means a reflash and rejoin (see "If a node doesn't come back" above).
+
+- **Preflight:** [`tools/upgrade/check-esp.sh`](tools/upgrade/check-esp.sh) `<node-ip>` reads the partition size over
+  the Talos API and fails under 400 MiB. [`tools/upgrade/upgrade-node.sh`](tools/upgrade/upgrade-node.sh) runs it first.
+- **Provisioning a Pi node:** don't `dd` the raw image. Boot Talos in maintenance mode and `apply-config` with the
+  combined image as `install.image`, so the installer lays out the disk. Expect the same 2.2 GB ESP as the control planes
+  (untested on worker-3 so far; check with the preflight afterwards).
 
 ## Machine-config install.image
 
@@ -1175,6 +1199,7 @@ decoupled name (the Mac Studio's worker is `talos-worker-studio`, named for its 
 
 - **Address:** `192.168.102.35`, MAC `88:a2:9e:2b:0c:2d` (UniFi DHCP reservation). `.33` is TrueNAS, so the next
   free `.3x` slot was used rather than the `.21`-`.29` "physical host" range, matching `talos-worker-mbp` (`.34`).
+- **ESP is only 99 MiB** because of how it was written. See "ESP size"; this blocked its v1.14.7 upgrade.
 - **Image:** the control planes' Pi 5 image, `ghcr.io/yama6a/talos-raspberry-pi5` `v1.14.2-1`, written as a raw disk
   image (`metal-arm64-rpi5.raw.xz`, `dd` from the new Pi booted from SD) with `/u-boot.bin` on the EFI
   partition swapped for the `hive.2` build (see "Pi 5 U-Boot fix"). So it

@@ -7,7 +7,7 @@
 set -eu
 
 VM_DIR="${VM_DIR:-/Users/jakerobb/talos-vm}"
-QEMU=/opt/homebrew/bin/qemu-system-aarch64
+QEMU="${QEMU:-/opt/homebrew/bin/qemu-system-aarch64}"
 FW=/opt/homebrew/share/qemu/edk2-aarch64-code.fd
 BRIDGE_IF="${BRIDGE_IF:-en0}"
 MAC="02:00:00:00:00:36"
@@ -21,6 +21,7 @@ NET="${NET:-vmnet-bridged,id=net0,ifname=${BRIDGE_IF}}"
 
 set -- \
   -machine virt,highmem=on -accel hvf -cpu host \
+  -no-reboot \
   -smp 16 -m 40960 \
   -drive if=pflash,format=raw,file="$FW",readonly=on \
   -drive if=pflash,format=raw,file="$VM_DIR/vars.fd" \
@@ -38,10 +39,26 @@ if [ -f "$CDROM" ]; then
   set -- "$@" -drive if=none,id=cd0,file="$CDROM",media=cdrom,readonly=on -device usb-ehci -device usb-storage,drive=cd0,bootindex=2
 fi
 
+# -no-reboot: a guest reboot makes QEMU exit, and launchd (KeepAlive) starts a fresh process, which is a cold boot of the
+# VM. Without it QEMU resets the vCPUs in place, and under HVF that wedged during the 2026-11-25 Talos upgrade: QEMU
+# never exited, spun at ~200% CPU printing "unhandled exception ec=0x20" (3 GB of log) and needed kill -9.
+#
+# Even so, QEMU's stderr goes through `uniq_log` below, which collapses runs of identical lines, so a storm like that
+# can't fill the disk.
+#
 # Not `exec`: launchd stops the daemon with SIGTERM (host shutdown, restart, bootout), which would kill the VM
 # like a power cut. Instead ask the guest to power down over the QEMU monitor (Talos treats the ACPI power
 # button as a graceful shutdown) and wait for it, up to the plist's ExitTimeOut.
-"$QEMU" "$@" &
+uniq_log() {
+  /usr/bin/awk '
+    $0 == prev { n++; next }
+    { if (n > 1) print "(previous line repeated " n " times)"; print; prev = $0; n = 1; fflush() }
+    END { if (n > 1) print "(previous line repeated " n " times)" }'
+}
+LOGFIFO="$VM_DIR/qemu-log.fifo"
+rm -f "$LOGFIFO"; mkfifo "$LOGFIFO"
+uniq_log < "$LOGFIFO" &
+"$QEMU" "$@" > "$LOGFIFO" 2>&1 &
 QPID=$!
 trap 'echo system_powerdown | /usr/bin/nc -U "$VM_DIR/monitor.sock" >/dev/null 2>&1 || kill "$QPID"' TERM INT
 # `wait` returns early when a trapped signal arrives; keep waiting until QEMU itself has exited.
