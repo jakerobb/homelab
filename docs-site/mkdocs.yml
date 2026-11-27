@@ -139,6 +139,7 @@ nav:
           - TrueNAS ops access: docs/truenas-ops-access.md
       - MacBook Pro worker:
           - UTM Talos worker: docs/utm-talos-worker.md
+          - QEMU Talos worker (replacing UTM): docs/mbp-worker-qemu.md
           - Host metrics: docs/mac-host-metrics.md
       - Studio worker and RAM upgrade: docs/studio-worker-and-ram-upgrade.md
       - Studio unlock watchdog: docs/studio-unlock-watchdog.md

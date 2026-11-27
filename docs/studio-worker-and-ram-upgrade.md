@@ -151,9 +151,11 @@ Nothing here needs the Mac.
 
 Done 2026-11-06. The VM runs under **QEMU with Hypervisor.framework (HVF) as a root LaunchDaemon**, not under UTM.
 The reason is FileVault: after a remote unlock the Mac sits at the login window with no GUI session, so LaunchDaemons
-start but a GUI app like UTM does not. The files are in [`../scripts/studio-worker/`](../scripts/studio-worker/):
-`run-vm.sh` (the QEMU command line), `com.jakerobb.talos-worker-studio.plist` and `install.sh`. The generic UTM recipe
-([`utm-talos-worker.md`](utm-talos-worker.md)) still applies to the 2018 MBP.
+start but a GUI app like UTM does not. The host's files are in [`../scripts/studio-worker/`](../scripts/studio-worker/):
+`com.jakerobb.talos-worker-studio.plist` (which carries the VM's settings) and `install.sh`. The QEMU command line is
+the shared launcher [`../scripts/talos-vm-host/run-vm.sh`](../scripts/talos-vm-host/run-vm.sh), which the MacBook Pro
+uses too ([`mbp-worker-qemu.md`](mbp-worker-qemu.md)); the generic UTM recipe ([`utm-talos-worker.md`](utm-talos-worker.md))
+is the history for the MBP.
 
 ### 2.0 Address allowlists (before the node takes pods)
 
@@ -205,8 +207,8 @@ Do this before the VM, on the Studio:
    never opens the maintenance API, as the UTM runbook explains. A blank disk falls through to the ISO on first boot,
    and after the install the disk boots first. The ISO stays attached as a recovery boot.)
 2. Add a DHCP reservation for MAC `02:00:00:00:00:36` to `192.168.102.36` in the UCG.
-3. Copy `scripts/studio-worker/` to `~/talos-vm/` (or use the repo checkout) and run `./install.sh`. It installs
-   `run-vm.sh` as `/usr/local/sbin/talos-worker-studio-run` and loads the daemon. The VM is 16 vCPUs, 40960 MiB,
+3. From the repo checkout, run `scripts/studio-worker/install.sh`. It installs the shared `run-vm.sh` as
+   `/usr/local/sbin/talos-worker-studio-run` and loads the daemon. The VM is 16 vCPUs, 40960 MiB,
    `vmnet-bridged` on `en0`, virtio-net with `rx_queue_size=1024`, virtio-blk disk. A SIGTERM (host shutdown, a
    `launchctl bootout`) sends an ACPI power-down, so Talos shuts down cleanly; the plist's `ExitTimeOut` is 120 s.
    **Re-running `install.sh` restarts the VM**: cordon and drain the node first.

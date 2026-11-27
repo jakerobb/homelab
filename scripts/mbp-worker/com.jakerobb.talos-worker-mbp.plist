@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jakerobb.talos-worker-mbp</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/sbin/talos-worker-mbp-run</string>
+  </array>
+  <!-- Per-host settings for the shared launcher (scripts/talos-vm-host/run-vm.sh). The values match what UTM ran:
+       6 vCPUs, 24 GiB, the VM's MAC, bridged on en11 (the interface that carries 192.168.102.9). -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VM_ARCH</key>
+    <string>x86_64</string>
+    <key>VM_MAC</key>
+    <string>02:00:00:00:00:34</string>
+    <key>VM_CPUS</key>
+    <string>6</string>
+    <key>VM_MEM_MB</key>
+    <string>24576</string>
+    <key>BRIDGE_IF</key>
+    <string>en11</string>
+  </dict>
+  <!-- A root system daemon, so it starts at boot with no GUI session (after a FileVault unlock the Mac
+       sits at the login window), and vmnet-bridged gets the privilege it needs. -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <!-- Seconds launchd waits after SIGTERM before SIGKILL: time for Talos to shut down cleanly. -->
+  <key>ExitTimeOut</key>
+  <integer>120</integer>
+  <key>StandardOutPath</key>
+  <string>/var/log/talos-worker-mbp.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/talos-worker-mbp.log</string>
+</dict>
+</plist>

@@ -10,6 +10,22 @@
   </array>
   <!-- A root system daemon, so it starts at boot with no GUI session (after a FileVault unlock the Mac
        sits at the login window), and vmnet-bridged gets the privilege it needs. -->
+  <!-- Per-host settings for the shared launcher (scripts/talos-vm-host/run-vm.sh). -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VM_ARCH</key>
+    <string>aarch64</string>
+    <key>VM_MAC</key>
+    <string>02:00:00:00:00:36</string>
+    <key>VM_CPUS</key>
+    <string>16</string>
+    <key>VM_MEM_MB</key>
+    <string>40960</string>
+    <key>BRIDGE_IF</key>
+    <string>en0</string>
+    <key>VM_NIC_OPTS</key>
+    <string>rx_queue_size=1024</string>
+  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>

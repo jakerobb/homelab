@@ -1,5 +1,9 @@
 # Talos worker in a UTM VM on a Mac
 
+> **Superseded for running the VM.** Both Macs now run their worker under QEMU as a LaunchDaemon
+> ([Studio](studio-worker-and-ram-upgrade.md#phase-2-studio-is-ready-no-outage), and the MBP after its
+> [cutover](mbp-worker-qemu.md)). This page stays as the record of the UTM setup and for the Talos install quirks.
+
 Manual runbook for joining a physical Mac to the Talos cluster as a worker,
 running Talos in a [UTM](https://mac.getutm.app/) VM — used first for
 `talos-worker-mbp` (2018 MacBook Pro, see
