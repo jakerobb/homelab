@@ -65,7 +65,8 @@ Use the node's own schematic (the standard one on worker-1/3 and worker-studio, 
 patch `.machine.install.image` on these nodes (explained in that README).
 
 **Talos OS upgrade, `talos-worker-studio`.** Pass `-- --reboot-mode powercycle` to `upgrade-node.sh` so the guest skips
-kexec. The VM runs with QEMU `-no-reboot`, so the guest's reset makes QEMU exit and launchd starts it fresh. Before the
+kexec (the node also sets `kernel.kexec_load_disabled`, so any reboot skips it; kexec hangs under HVF). The VM runs with
+QEMU `-no-reboot`, so the guest's reset makes QEMU exit and launchd starts it fresh, a ~40 s cold boot. Before the
 first upgrade after changing `run-vm.sh`, re-run `scripts/studio-worker/install.sh` on the Studio and test with a plain
 `talosctl reboot` (drain first). If QEMU hangs anyway, run `sudo -n /usr/local/sbin/talos-vm-kick` on the Studio (see
 [`../../docs/studio-worker-and-ram-upgrade.md`](../../docs/studio-worker-and-ram-upgrade.md#restarting-a-wedged-vm)).
