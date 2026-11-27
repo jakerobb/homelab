@@ -87,7 +87,7 @@ spec:
               name: data
       containers:
         - name: scrypted
-          image: koush/scrypted:v0.148.6-noble-full@sha256:e0d30a771aed73c3c530758046ef7669c26aaf03665f485f9ccb639a57669e1d
+          image: koush/scrypted:v0.148.6-noble-full@sha256:b9326e7321cc7f68eb59c4627712a2ee855c3aa9b9f0889d64a18f9af5192c65
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
