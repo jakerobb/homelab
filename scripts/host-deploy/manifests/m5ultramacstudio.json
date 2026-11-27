@@ -1,0 +1,32 @@
+{
+  "files": [],
+  "installs": [
+    {
+      "src": "scripts/studio-worker/run-vm.sh",
+      "dest": "/usr/local/sbin/talos-worker-studio-run",
+      "installer": "scripts/studio-worker/install.sh",
+      "note": "this restarts the VM: cordon and drain talos-worker-studio first"
+    },
+    {
+      "src": "scripts/studio-worker/com.jakerobb.talos-worker-studio.plist",
+      "dest": "/Library/LaunchDaemons/com.jakerobb.talos-worker-studio.plist",
+      "installer": "scripts/studio-worker/install.sh",
+      "note": "this restarts the VM: cordon and drain talos-worker-studio first"
+    },
+    {
+      "src": "scripts/talos-vm-host/talos-vm-kick.sh",
+      "dest": "/usr/local/sbin/talos-vm-kick",
+      "installer": "scripts/talos-vm-host/install.sh"
+    },
+    {
+      "src": "scripts/talos-vm-host/talos-vm-kick.sudoers",
+      "hash_file": "/usr/local/share/homelab/talos-vm-kick.sudoers.sha256",
+      "installer": "scripts/talos-vm-host/install.sh"
+    },
+    {
+      "src": "scripts/host-deploy/com.jakerobb.host-deploy.plist",
+      "dest": "/Library/LaunchDaemons/com.jakerobb.host-deploy.plist",
+      "installer": "scripts/host-deploy/install.sh"
+    }
+  ]
+}
