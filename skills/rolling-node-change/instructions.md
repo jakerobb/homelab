@@ -16,7 +16,14 @@ any unexpected result instead of pressing on.
    down at once; quorum is 2 of 3.
 3. MacBook Pro worker involved: check host disk first (`ssh jakerobb@192.168.102.9 df -h /`). A full host disk has
    frozen the VM before (see [`../../docs/utm-talos-worker.md`](../../docs/utm-talos-worker.md)).
-4. Pick the order: workers before control planes is fine; control planes strictly one at a time.
+4. Pick the order: **control planes first**, strictly one at a time, then workers. The API server must be at least as
+   new as the kubelets and a lost control plane costs only redundancy, where a lost worker costs capacity. While a
+   control plane is down there is no etcd fault tolerance left (2 of 3 is quorum), so don't touch anything else that
+   could take a second one down.
+5. Talos OS upgrade: run `talos/tools/upgrade/check-esp.sh <ip>` against every node you'll upgrade (all must pass) and
+   stop if any fails. Upgrade nodes with `talos/tools/upgrade/upgrade-node.sh`, one at a time, and stop at the first
+   non-zero exit: it only prints `ALLDONE` once the node reports the target version, a fresh boot, `Ready` and its
+   extensions.
 
 ## Change types
 
@@ -49,13 +56,19 @@ The first request for a new version of a schematic makes Image Factory build the
 hung once. Pre-warm both schematics with one `curl` each before draining anything.
 
 **Talos OS upgrade, workers.** Drain, then `talosctl -n <ip> upgrade --image factory.talos.dev/installer/<schematic>:<version>`.
-Use the node's own schematic (the standard one on worker-1/3 and worker-studio, the `tsc=reliable` one on worker-mbp). Use `--wait --timeout 15m`; it also uncordons the node when it is Ready. Afterwards patch
+Use the node's own schematic (the standard one on worker-1/3 and worker-studio, the `tsc=reliable` one on worker-mbp). `upgrade-node.sh` applies `--wait --timeout 15m`; the upgrade also uncordons the node when it is Ready. Afterwards patch
 `.machine.install.image` to the same value (no reboot). Retry the patch if it gets "connection refused": `talosd` can still be restarting just after the wait returns, and the failure is easy to miss, so re-read `get machineconfig` to confirm. A
 "server version is older than client version" warning on not-yet-upgraded nodes is expected after the `talosctl` update.
 
 **Talos OS upgrade, Pi control planes.** Never use the fork's plain tag: the combined-image recipe and U-Boot patch in
 [`../../talos/README.md`](../../talos/README.md#full-sequence-per-node) is required until upstream carries the fix. Do not
 patch `.machine.install.image` on these nodes (explained in that README).
+
+**Talos OS upgrade, `talos-worker-studio`.** Pass `-- --reboot-mode powercycle` to `upgrade-node.sh` so the guest skips
+kexec. The VM runs with QEMU `-no-reboot`, so the guest's reset makes QEMU exit and launchd starts it fresh. Before the
+first upgrade after changing `run-vm.sh`, re-run `scripts/studio-worker/install.sh` on the Studio and test with a plain
+`talosctl reboot` (drain first). If QEMU hangs anyway, see
+[`../../docs/studio-worker-and-ram-upgrade.md`](../../docs/studio-worker-and-ram-upgrade.md#rebooting-the-studio).
 
 **Host reboot (Proxmox, MBP, Mac Studio).** Drain the nodes it carries first; afterwards check for silently read-only iSCSI volumes
 (see [`../../docs/troubleshooting.md`](../../docs/troubleshooting.md)). The Studio runs FileVault: an Apple-menu Restart
