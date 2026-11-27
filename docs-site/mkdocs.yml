@@ -117,6 +117,7 @@ nav:
       - eso-restarter: manifests/eso-restarter/README.md
       - Upgrade checker routine: skills/upgrade-checker/instructions.md
       - Rolling node change: skills/rolling-node-change/instructions.md
+      - PoE switch firmware upgrade: docs/poe-switch-firmware-upgrade.md
       - Pi 5 U-Boot fix: talos/tools/uboot-fix/README.md
   - Hosts:
       - rpi5-1:
