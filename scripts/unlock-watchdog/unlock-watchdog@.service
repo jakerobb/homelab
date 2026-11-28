@@ -1,5 +1,5 @@
 [Unit]
-Description=Unlock the Mac Studio's FileVault over SSH when its Talos worker is down
+Description=Unlock %i's FileVault over SSH when its Talos worker is down
 After=network-online.target
 Wants=network-online.target
 
@@ -9,8 +9,8 @@ Type=oneshot
 User=jakerobb
 Environment=HOME=/home/jakerobb
 Environment=SOPS_AGE_KEY_FILE=/home/jakerobb/.config/sops/age/keys.txt
-ExecStart=/usr/local/lib/studio-unlock-watchdog/studio-unlock-watchdog.sh
-StateDirectory=studio-unlock-watchdog
+ExecStart=/usr/local/lib/unlock-watchdog/unlock-watchdog.sh %i
+StateDirectory=unlock-watchdog/%i
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only

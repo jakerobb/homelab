@@ -77,15 +77,15 @@ open alerts.
 
 Standalone scripts that run from cron on rpi5-1 but aren't in `docker-compose/` ride the same step 3, via the script's
 `HOST_FILES` table (repo path, destination, mode). Today that's `scripts/etcd-snapshot-backup.sh` and
-`scripts/unifi-gc-report.py` (to `~/bin/`, mode 700), plus the two SOPS-encrypted secrets they use, `b2-etcd-backup.sops.yaml` and
-`studio-unlock.sops.yaml` (to `~/bin/secrets/`, mode 600, ciphertext only). To put another file under management, add a line to the table.
+`scripts/unifi-gc-report.py` (to `~/bin/`, mode 700), plus the SOPS-encrypted secrets they use, `b2-etcd-backup.sops.yaml`,
+`studio-unlock.sops.yaml` and `mbp-unlock.sops.yaml` (to `~/bin/secrets/`, mode 600, ciphertext only). To put another file under management, add a line to the table.
 
 - Same drift protection as above: a copy edited on the host is flagged, not overwritten.
 - The first run after a script is added takes over whatever copy is already there (they were deployed by hand before), so
   a stale copy is replaced rather than flagged.
 - Written via temp file and rename, so a run in progress keeps its old copy. No services are restarted.
 - Only files the `jakerobb` user owns are written. Root-owned installs (`/usr/local/bin/msmtpq-sendmail`, the firewall, the
-  studio-unlock-watchdog, the unattended-upgrades config) still go in through their `install.sh` scripts; the cron job
+  unlock-watchdog, the unattended-upgrades config) still go in through their `install.sh` scripts; the cron job
   deliberately has no root. Instead, each run compares the installed copies with the repo (the script's `NEEDS_INSTALL`
   table), and if one is stale, missing or unreadable you get an ntfy alert naming the installer to run on rpi5-1. The alert
   clears itself once the copy matches. (A file missing from the repo is ignored.) The decrypted SMTP credentials in

@@ -17,10 +17,10 @@ a launcher shared with the Studio, the daemon plist and the host-deploy manifest
   VM settings, so host-deploy will raise NEEDS_INSTALL for both on the Studio. The generated QEMU arguments are
   byte-identical, but installing restarts the VM: drain `talos-worker-studio` first, then run
   `scripts/studio-worker/install.sh`.
-- **FileVault unlock for the MBP.** The rpi5-1 watchdog
-  ([`../docs/studio-unlock-watchdog.md`](../docs/studio-unlock-watchdog.md)) is Studio-specific today (host, port probes,
-  secret) and needs generalizing to take a list of hosts. The MBP also needs a dedicated unlock user and its own SOPS
-  secret, created by hand. The MBP's FileVault is on.
+- **FileVault unlock for the MBP.** The watchdog on rpi5-1 now takes a host name
+  ([`../docs/unlock-watchdog.md`](../docs/unlock-watchdog.md)), so install it there, create the MBP's dedicated unlock
+  user and `mbp-unlock.sops.yaml` by hand, test it (shut the MBP down, power on, run the script three times), then
+  enable `unlock-watchdog@mbp.timer`. The MBP's FileVault is on.
 - **Retire UTM** once the VM has run on QEMU for a while: delete the `disk.qcow2.utm-backup` clone and the UTM VM.
 
 ## Dual-stack cluster (IPv4 + IPv6)

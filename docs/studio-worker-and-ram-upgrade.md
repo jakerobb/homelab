@@ -194,7 +194,7 @@ Do this before the VM, on the Studio:
   reaches the login window, LaunchDaemons start (Telegraf and the VM daemon both do), and the node rejoins. The
   Apple-menu Restart does an *authenticated restart* that skips the unlock, so only a shutdown or power loss needs it.
   An automatic unlock watchdog on the jump box is built but not yet enabled; see
-  [`studio-unlock-watchdog.md`](studio-unlock-watchdog.md) for the tradeoff and the test it still needs.
+  [`unlock-watchdog.md`](unlock-watchdog.md) for the tradeoff and the test it still needs.
 - Disk headroom. The 2018 MBP's host disk filling froze its VM and corrupted its image store. Install Telegraf per
   [`mac-host-metrics.md`](mac-host-metrics.md) (with its disk alert, and the Cilium egress rule for `:9273`), and keep
   the qcow2 on the internal SSD with room.

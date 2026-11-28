@@ -1,20 +1,22 @@
-# Studio FileVault unlock watchdog
+# FileVault unlock watchdog (Mac Studio and MacBook Pro)
 
-The Mac Studio runs FileVault (the decision stays "on"), so after a shutdown or a power cut it waits at the unlock
-screen and `talos-worker-studio` stays down until someone unlocks it. This watchdog runs on rpi5-1, notices that
-state, and unlocks the Mac over SSH. The files are in
-[`../scripts/studio-unlock-watchdog/`](../scripts/studio-unlock-watchdog/); background on FileVault and the VM
-daemon is in [`studio-worker-and-ram-upgrade.md`](studio-worker-and-ram-upgrade.md) (Phase 2).
+The Mac Studio and the MacBook Pro both run FileVault (the decision stays "on"), so after a shutdown or a power cut a
+Mac waits at the unlock screen and its Talos worker (`talos-worker-studio`, `talos-worker-mbp`) stays down until someone
+unlocks it. This watchdog runs on rpi5-1, notices that state, and unlocks the Mac over SSH. There is one timer per Mac
+(`unlock-watchdog@studio.timer`, `unlock-watchdog@mbp.timer`), each running the same script with that Mac's settings from
+`hosts/<name>.env`. The files are in [`../scripts/unlock-watchdog/`](../scripts/unlock-watchdog/); background on
+FileVault and the VM daemon is in [`studio-worker-and-ram-upgrade.md`](studio-worker-and-ram-upgrade.md) (Phase 2) and
+[`mbp-worker-qemu.md`](mbp-worker-qemu.md).
 
-**Status:** built, and the real unlock path was tested 2026-11-06 and passed (see "Test result" below). The files are
-installed on rpi5-1; whether the timer is enabled is a separate step (see "Operating it").
+**Status:** the Studio's unlock path was tested 2026-11-06 and passed (see "Test result" below). The MBP's has not been
+tested yet; see "Adding the MacBook Pro". Whether each timer is enabled is a separate step (see "Operating it").
 
 ## What it does
 
-A systemd timer runs `studio-unlock-watchdog.sh` every minute. It only uses TCP probes, so there is no key to maintain
+A systemd timer per Mac runs `unlock-watchdog.sh <name>` every minute. It only uses TCP probes, so there is no key to maintain
 on the Studio:
 
-| Worker `:50000` | Studio `:22` | Studio `:9273` (Telegraf) | Meaning | Action |
+| Worker `:50000` | Mac `:22` | Mac `:9273` (Telegraf) | Meaning | Action |
 |---|---|---|---|---|
 | open | | | healthy | reset state (notify if it had been trying) |
 | closed | closed | | off, or mid-boot | nothing |
@@ -29,7 +31,7 @@ Limits, so a wrong password can't become an authentication storm: at most 3 atte
 and sends a priority-5 alert until the worker answers again (which resets everything). It never touches a Mac that
 answers on `:9273`.
 
-Notifications go to the `homelab-alerts` topic on ntfy and to the journal (`journalctl -u studio-unlock-watchdog`).
+Notifications go to the `homelab-alerts` topic on ntfy and to the journal (`journalctl -u unlock-watchdog@studio`, `-u unlock-watchdog@mbp`).
 ntfy runs in the cluster, so if the cluster is down the journal is the only record.
 
 ## The security tradeoff
@@ -52,12 +54,14 @@ age key that `jakerobb` already holds on the Pi. To keep the exposure small:
 
 ## Setup
 
-1. On the Studio: create the unlock user as above, note its short name, and check it is listed by
+The commands use the Studio (`studio`); for another Mac use its name from `hosts/` (`mbp`).
+
+1. On the Mac: create the unlock user as above, note its short name, and check it is listed by
    `sudo fdesetup list`.
 2. In the repo, create the secret **yourself** (the password shouldn't pass through chat or a tool):
 
    ```bash
-   cp scripts/secrets/studio-unlock.example.yaml scripts/secrets/studio-unlock.sops.yaml
+   cp scripts/secrets/unlock.yaml.example scripts/secrets/studio-unlock.sops.yaml
    ```
 
    Edit the two values in the copy, then:
@@ -77,16 +81,33 @@ age key that `jakerobb` already holds on the Pi. To keep the exposure small:
 3. On rpi5-1, from a checkout of this repo, install the files and units. The timer stays off:
 
    ```bash
-   ~/dev/homelab/scripts/studio-unlock-watchdog/install.sh
+   ~/dev/homelab/scripts/unlock-watchdog/install.sh
    ```
 
-   It pins the Studio's host key and prints the fingerprint. Compare it with the Studio's before going on
-   (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run on the Studio).
+   It pins each Mac's host key and prints the fingerprint. Compare it with the Mac's before going on
+   (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run on the Mac). The first run on a Mac that had the old
+   Studio-only version replaces it, keeps the Studio's pinned key, and re-enables the Studio's timer if it was on.
 4. Dry-run it against the live (unlocked, healthy) Studio. It should say `healthy`:
 
    ```bash
-   DRY_RUN=1 /usr/local/lib/studio-unlock-watchdog/studio-unlock-watchdog.sh
+   DRY_RUN=1 /usr/local/lib/unlock-watchdog/unlock-watchdog.sh studio
    ```
+
+## Adding the MacBook Pro
+
+The MBP (`jakerobb-mbp`, `192.168.102.9`, worker `talos-worker-mbp` at `.34`) needs its own unlock user and secret.
+
+1. **On the MBP**, create a standard (non-admin) user for this with a long random password, as for the Studio. Confirm
+   with `sudo fdesetup list` that it is a FileVault user, and keep it out of Remote Login's allowed list.
+2. **Create `scripts/secrets/mbp-unlock.sops.yaml`** the same way as the Studio's (copy `unlock.yaml.example`, edit,
+   `sops --encrypt --in-place`). Don't paste the password anywhere else. The compose-deploy cron copies it to
+   `~/bin/secrets/` on rpi5-1; until then `scp` it there.
+3. **On rpi5-1**, run `scripts/unlock-watchdog/install.sh` (it pins the MBP's host key; compare the fingerprint with
+   `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the MBP) and dry-run it against the healthy MBP:
+   `DRY_RUN=1 /usr/local/lib/unlock-watchdog/unlock-watchdog.sh mbp` should say `healthy`.
+4. **Test it** as for the Studio below: cordon and drain `talos-worker-mbp`, shut the MBP down, power it on so it stops
+   at the FileVault screen, then run the script by hand three times a minute apart and watch it unlock the Mac and
+   the node return. Only then enable `unlock-watchdog@mbp.timer`.
 
 ## The test (before enabling)
 
@@ -97,12 +118,12 @@ Do this with the KVM or the keyboard attached, in case the unlock fails.
 2. With the timer still off, run the script by hand on rpi5-1 three times a minute apart (the first two only count):
 
    ```bash
-   /usr/local/lib/studio-unlock-watchdog/studio-unlock-watchdog.sh
+   /usr/local/lib/unlock-watchdog/unlock-watchdog.sh studio
    ```
 
    On the third it should log `Unlocking the Studio`, SSH in, and within a few minutes report that Telegraf is
    answering. Confirm the node returns to `Ready`, then uncordon it.
-3. Only then `sudo systemctl enable --now studio-unlock-watchdog.timer`.
+3. Only then `sudo systemctl enable --now unlock-watchdog@studio.timer`.
 
 ### Test result (2026-11-06)
 
@@ -117,9 +138,9 @@ Do this with the KVM or the keyboard attached, in case the unlock fails.
 ## Operating it
 
 - **Turn it off** for planned Studio downtime you don't want undone (a RAM swap, a long power-off):
-  `sudo systemctl stop studio-unlock-watchdog.timer`. Turn it back on afterwards.
+  `sudo systemctl stop unlock-watchdog@studio.timer`. Turn it back on afterwards.
 - **After a password change on the Studio**, update the SOPS file on the Pi, or the next unlock will fail and, after
   three tries, give up with the priority-5 alert.
-- **State** lives in `/var/lib/studio-unlock-watchdog/` (counters and the pinned host key). Deleting a file there is
+- **State** lives in `/var/lib/unlock-watchdog/<name>/` (counters and the pinned host key). Deleting a file there is
   safe; the script rebuilds it.
 - The macOS Apple-menu **Restart** needs none of this (it unlocks itself), and neither does a Mac that is already up.

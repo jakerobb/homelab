@@ -73,6 +73,7 @@ HOST_FILES = {
     # SOPS ciphertext (safe to copy). ~/bin/secrets must already be mode 700.
     "scripts/secrets/b2-etcd-backup.sops.yaml": ("~/bin/secrets/b2-etcd-backup.sops.yaml", 0o600),
     "scripts/secrets/studio-unlock.sops.yaml": ("~/bin/secrets/studio-unlock.sops.yaml", 0o600),
+    "scripts/secrets/mbp-unlock.sops.yaml": ("~/bin/secrets/mbp-unlock.sops.yaml", 0o600),
     "scripts/secrets/healthchecks-etcd-backup.sops.yaml": ("~/bin/secrets/healthchecks-etcd-backup.sops.yaml", 0o600),
 }
 
@@ -98,10 +99,12 @@ NEEDS_INSTALL = {
     "scripts/rpi5-1-firewall/homelab-fw.service": ("/etc/systemd/system/homelab-fw.service", "scripts/rpi5-1-firewall/install.sh"),
     "scripts/unattended-upgrades/20auto-upgrades": ("/etc/apt/apt.conf.d/20auto-upgrades", "scripts/unattended-upgrades/install.sh"),
     "scripts/unattended-upgrades/52unattended-upgrades-local": ("/etc/apt/apt.conf.d/52unattended-upgrades-local", "scripts/unattended-upgrades/install.sh"),
-    "scripts/studio-unlock-watchdog/studio-unlock-watchdog.sh": ("/usr/local/lib/studio-unlock-watchdog/studio-unlock-watchdog.sh", "scripts/studio-unlock-watchdog/install.sh"),
-    "scripts/studio-unlock-watchdog/askpass.sh": ("/usr/local/lib/studio-unlock-watchdog/askpass.sh", "scripts/studio-unlock-watchdog/install.sh"),
-    "scripts/studio-unlock-watchdog/studio-unlock-watchdog.service": ("/etc/systemd/system/studio-unlock-watchdog.service", "scripts/studio-unlock-watchdog/install.sh"),
-    "scripts/studio-unlock-watchdog/studio-unlock-watchdog.timer": ("/etc/systemd/system/studio-unlock-watchdog.timer", "scripts/studio-unlock-watchdog/install.sh"),
+    "scripts/unlock-watchdog/unlock-watchdog.sh": ("/usr/local/lib/unlock-watchdog/unlock-watchdog.sh", "scripts/unlock-watchdog/install.sh"),
+    "scripts/unlock-watchdog/askpass.sh": ("/usr/local/lib/unlock-watchdog/askpass.sh", "scripts/unlock-watchdog/install.sh"),
+    "scripts/unlock-watchdog/hosts/studio.env": ("/usr/local/lib/unlock-watchdog/hosts/studio.env", "scripts/unlock-watchdog/install.sh"),
+    "scripts/unlock-watchdog/hosts/mbp.env": ("/usr/local/lib/unlock-watchdog/hosts/mbp.env", "scripts/unlock-watchdog/install.sh"),
+    "scripts/unlock-watchdog/unlock-watchdog@.service": ("/etc/systemd/system/unlock-watchdog@.service", "scripts/unlock-watchdog/install.sh"),
+    "scripts/unlock-watchdog/unlock-watchdog@.timer": ("/etc/systemd/system/unlock-watchdog@.timer", "scripts/unlock-watchdog/install.sh"),
 }
 
 args = None

@@ -1,5 +1,5 @@
 [Unit]
-Description=Check every minute whether the Mac Studio needs a FileVault unlock
+Description=Check every minute whether %i needs a FileVault unlock
 
 [Timer]
 OnBootSec=2min

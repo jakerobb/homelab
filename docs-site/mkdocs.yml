@@ -142,7 +142,7 @@ nav:
           - QEMU Talos worker (replacing UTM): docs/mbp-worker-qemu.md
           - Host metrics: docs/mac-host-metrics.md
       - Studio worker and RAM upgrade: docs/studio-worker-and-ram-upgrade.md
-      - Studio unlock watchdog: docs/studio-unlock-watchdog.md
+      - FileVault unlock watchdog: docs/unlock-watchdog.md
       - Host deploy (Mac VM hosts): docs/host-deploy.md
   - Terraform:
       - GitHub Actions: docs/gha-terraform.md
