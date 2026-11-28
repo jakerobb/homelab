@@ -2,7 +2,7 @@
   "files": [],
   "installs": [
     {
-      "src": "scripts/studio-worker/run-vm.sh",
+      "src": "scripts/talos-vm-host/run-vm.sh",
       "dest": "/usr/local/sbin/talos-worker-studio-run",
       "installer": "scripts/studio-worker/install.sh",
       "note": "this restarts the VM: cordon and drain talos-worker-studio first"

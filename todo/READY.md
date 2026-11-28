@@ -3,31 +3,25 @@
 Cluster-readiness backlog — each of these is its own effort, meant to be tackled separately rather than all at once.
 This list is in roughly priority order.
 
-## MacBook Pro host: deploy loop, QEMU instead of UTM, FileVault unlock
+## MacBook Pro host: finish the move to QEMU
 
-The Mac Studio now has [host-deploy](../docs/host-deploy.md) (a launchd pull-and-alert loop), the `talos-vm-kick` restart
-helper and a QEMU-run VM that restarts itself after a guest reboot. The 2018 MacBook Pro (`jakerobb-mbp`, `.9`) still runs
-`talos-worker-mbp` under UTM, by hand. Bringing it up to the same standard is one effort:
+The Mac Studio and the 2018 MacBook Pro (`jakerobb-mbp`, `.9`) are meant to run `talos-worker-*` the same way: a QEMU
+LaunchDaemon, [host-deploy](../docs/host-deploy.md), the `talos-vm-kick` helper, and an unattended FileVault unlock. The
+code for the MBP is written (see [`../docs/mbp-worker-qemu.md`](../docs/mbp-worker-qemu.md): a QEMU build with no Homebrew,
+a launcher shared with the Studio, the daemon plist and the host-deploy manifest). What is left is doing it:
 
-- **Deploy loop.** Add `scripts/host-deploy/manifests/jakerobb-mbp.json` and run `scripts/host-deploy/install.sh` on it.
-  Checked 2026-11-26: it has `/usr/bin/python3` (3.9.6), git and `~/dev/homelab`, so nothing to install for that part.
-  Both `host-deploy.py` and `talos-vm-kick` are written to be host-agnostic. Add a Healthchecks.io heartbeat to
-  host-deploy at this point, since two hosts depend on it.
-- **Replace UTM with QEMU.** The MBP is x86_64 on macOS 15.7.9, with no Homebrew (its macOS is too old for current
-  Homebrew; see [`../docs/mac-host-metrics.md`](../docs/mac-host-metrics.md)), so `brew install qemu` isn't available. A QEMU
-  build or a static binary has to come from somewhere else, and that's the first thing to settle. The VM launcher
-  `scripts/studio-worker/run-vm.sh` is arm64-specific (`qemu-system-aarch64`, `-machine virt`, the aarch64 edk2
-  firmware, and the host user's paths). Generalize it by architecture rather than copying it: x86_64 needs
-  `qemu-system-x86_64`, `q35`, OVMF, and `-accel hvf`. Keep the `-no-reboot` and log-collapsing behaviour, the
-  `tsc=reliable` schematic (worker-mbp has its own), the MAC address and the bridge interface. Reuse UTM's qcow2 if it's
-  compatible. Then move the daemon name and manifest over, and retire
-  [`../docs/utm-talos-worker.md`](../docs/utm-talos-worker.md) except as the history.
-- **FileVault unlock.** Decide whether the MBP runs FileVault (not checked). If it does, the rpi5-1 watchdog in
-  [`../docs/studio-unlock-watchdog.md`](../docs/studio-unlock-watchdog.md) is Studio-specific today (host, port probes,
-  secret) and needs generalizing to take a list of hosts. If it doesn't, the LaunchDaemon already starts at boot and none
-  of this applies.
-- **Host disk.** UTM's image store filling the host disk has frozen the VM before. Keep the Telegraf disk alert, and
-  check headroom before the qcow2 moves.
+- **Cutover.** Follow the runbook in `mbp-worker-qemu.md`: install host-deploy and `talos-vm-kick` on the MBP, move
+  the UTM disk to `~/talos-vm/disk.qcow2`, run `scripts/mbp-worker/install.sh`, test a plain reboot (kexec may hang under
+  HVF on x86 as it did on the Studio), and uncordon.
+- **Studio re-install.** The launcher moved to `scripts/talos-vm-host/run-vm.sh` and the Studio's plist now carries the
+  VM settings, so host-deploy will raise NEEDS_INSTALL for both on the Studio. The generated QEMU arguments are
+  byte-identical, but installing restarts the VM: drain `talos-worker-studio` first, then run
+  `scripts/studio-worker/install.sh`.
+- **FileVault unlock for the MBP.** The rpi5-1 watchdog
+  ([`../docs/studio-unlock-watchdog.md`](../docs/studio-unlock-watchdog.md)) is Studio-specific today (host, port probes,
+  secret) and needs generalizing to take a list of hosts. The MBP also needs a dedicated unlock user and its own SOPS
+  secret, created by hand. The MBP's FileVault is on.
+- **Retire UTM** once the VM has run on QEMU for a while: delete the `disk.qcow2.utm-backup` clone and the UTM VM.
 
 ## Dual-stack cluster (IPv4 + IPv6)
 
