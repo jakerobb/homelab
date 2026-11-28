@@ -92,6 +92,7 @@ requests fit with room to spare, nothing is pinned to it).
 - **Re-install on host-deploy alerts.** A change to `run-vm.sh` or the plist raises a NEEDS_INSTALL alert on both Macs
   and re-running the installer restarts that Mac's VM, so drain the node first.
 - **FileVault.** After a power cut the MBP waits at the unlock screen. The rpi5-1
-  [unlock watchdog](studio-unlock-watchdog.md) is being extended to cover it.
+  [unlock watchdog](unlock-watchdog.md) covers it once the MBP's unlock user and secret are set up (see "Adding the
+  MacBook Pro" there).
 - **Disk.** UTM's image store filling the host disk has frozen the VM before. The qcow2 is about 65 GB and the host has
   about 95 GB free; keep the Telegraf disk alert ([host metrics](mac-host-metrics.md)).
