@@ -43,6 +43,7 @@ for env in "$DIR"/hosts/*.env; do
   name="$(basename "$env" .env)"
   host="$(sed -n 's/^HOST=//p' "$env")"
   secrets="$(sed -n 's/^SECRETS_FILE=//p' "$env")"
+  mode="$(sed -n 's/^UNLOCK_MODE=//p' "$env")"
   install -d -m 755 "$STATE/$name"
   if [ ! -s "$STATE/$name/known_hosts" ]; then
     ssh-keyscan -t ed25519 "$host" > "$STATE/$name/known_hosts" 2>/dev/null || true
@@ -54,7 +55,7 @@ for env in "$DIR"/hosts/*.env; do
       echo "Could not read $name's host key from $host (is it up?). Re-run install.sh later to pin it." >&2
     fi
   fi
-  [ -f "$secrets" ] || echo "No $secrets yet for $name. See docs/unlock-watchdog.md (Setup)." >&2
+  [ "$mode" = alert ] || [ -f "$secrets" ] || echo "No $secrets yet for $name. See docs/unlock-watchdog.md (Setup)." >&2
 done
 
 for name in "${ENABLE[@]:-}"; do
