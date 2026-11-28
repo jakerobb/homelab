@@ -91,8 +91,10 @@ requests fit with room to spare, nothing is pinned to it).
 
 - **Re-install on host-deploy alerts.** A change to `run-vm.sh` or the plist raises a NEEDS_INSTALL alert on both Macs
   and re-running the installer restarts that Mac's VM, so drain the node first.
-- **FileVault.** After a power cut the MBP waits at the unlock screen. The rpi5-1
-  [unlock watchdog](unlock-watchdog.md) covers it once the MBP's unlock user and secret are set up (see "Adding the
-  MacBook Pro" there).
+- **FileVault.** After a power cut or restart the MBP waits at the FileVault screen with no network (tested
+  2026-11-27), so it has to be unlocked at its keyboard; the VM and node come back by themselves within a few minutes
+  of that. The rpi5-1 [unlock watchdog](unlock-watchdog.md) runs in alert-only mode for it: if `talos-worker-mbp`
+  stays down for 10 minutes and the Mac isn't running its services, it sends an ntfy alert, "MacBook Pro may need
+  unlocking".
 - **Disk.** UTM's image store filling the host disk has frozen the VM before. The qcow2 is about 65 GB and the host has
   about 95 GB free; keep the Telegraf disk alert ([host metrics](mac-host-metrics.md)).

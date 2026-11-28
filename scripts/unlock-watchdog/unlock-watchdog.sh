@@ -10,6 +10,9 @@
 #   Mac :22 closed                    -> off or mid-boot; nothing to unlock; reset the locked counter
 #   Mac :22 open, :9273 open          -> unlocked, but the worker is down (the VM daemon, not FileVault); alert only
 #   Mac :22 open, :9273 closed        -> looks locked; after LOCKED_THRESHOLD runs in a row, try the unlock
+# UNLOCK_MODE=alert (hosts/<name>.env) never tries the unlock: when the worker is down and the Mac's Telegraf isn't up,
+# it alerts once that the Mac needs unlocking by hand (and says whether it answers ping and :22), then repeats the alert
+# every REALERT seconds until the worker is back. Used for the MacBook Pro, which has no network at the FileVault screen.
 # The unlock is a password SSH login, which the pre-boot server accepts for FileVault users; the connection is then
 # closed as the Mac continues booting. Retries are rate-limited (COOLDOWN) and capped (MAX_ATTEMPTS): a wrong or
 # changed password must not turn into a stream of failed logins.
@@ -19,7 +22,7 @@ NAME="${1:?usage: unlock-watchdog.sh <host>  (a file in hosts/, e.g. studio or m
 case "$NAME" in *[!a-z0-9-]*) echo "bad host name: $NAME" >&2; exit 64 ;; esac
 LIB="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$LIB/hosts/$NAME.env" ] || { echo "no $LIB/hosts/$NAME.env" >&2; exit 64; }
-# Per-host settings: LABEL, HOST, WORKER_NAME, WORKER_HOST, SECRETS_FILE.
+# Per-host settings: LABEL, HOST, WORKER_NAME, WORKER_HOST, SECRETS_FILE, and optionally UNLOCK_MODE.
 # shellcheck source=/dev/null
 . "$LIB/hosts/$NAME.env"
 : "${LABEL:?}" "${HOST:?}" "${WORKER_NAME:?}" "${WORKER_HOST:?}" "${SECRETS_FILE:?}"
@@ -33,6 +36,9 @@ LOCKED_THRESHOLD="${LOCKED_THRESHOLD:-3}"          # consecutive runs that look 
 COOLDOWN="${COOLDOWN:-900}"                        # seconds between unlock attempts
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"                  # attempts before giving up and alerting
 BOOT_WAIT="${BOOT_WAIT:-240}"                      # seconds to wait for Telegraf to appear after an attempt
+UNLOCK_MODE="${UNLOCK_MODE:-auto}"                 # auto: unlock it; alert: only tell me it needs unlocking by hand
+DOWN_ALERT="${DOWN_ALERT:-600}"                    # alert mode: seconds the worker may be down, Mac silent, before alerting
+REALERT="${REALERT:-3600}"                         # alert mode: seconds between repeats of that alert
 UNLOCKED_DOWN_ALERT="${UNLOCKED_DOWN_ALERT:-900}"  # seconds the worker may be down on an unlocked Mac before alerting
 NTFY_URL="${NTFY_URL:-https://ntfy.jakerobb.org/homelab-alerts}"
 DRY_RUN="${DRY_RUN:-0}"
@@ -46,17 +52,19 @@ notify() {  # notify <priority 1-5> <title> <message>
     || log "(ntfy unreachable; the message is only in the journal)"
 }
 
+ping_ok() { ping -c 2 -W 2 "$1" >/dev/null 2>&1; }
+
 port_open() { timeout 3 bash -c "exec 3<>/dev/tcp/$1/$2" 2>/dev/null; }
 
 mkdir -p "${STATE_DIR:?}"
 get() { cat "${STATE_DIR:?}/$1" 2>/dev/null || echo "${2:-0}"; }
 put() { printf '%s\n' "$2" > "${STATE_DIR:?}/$1"; }
 drop() { local f; for f in "$@"; do rm -f "${STATE_DIR:?}/$f"; done; }
-clear_state() { drop locked_count attempts last_attempt gave_up worker_down_since unlocked_alerted; }
+clear_state() { drop locked_count attempts last_attempt gave_up worker_down_since unlocked_alerted host_down_alerted; }
 now="$(date +%s)"
 
 if port_open "$WORKER_HOST" "$WORKER_PORT"; then
-  if [ -e "$STATE_DIR/attempts" ] || [ -e "$STATE_DIR/gave_up" ]; then
+  if [ -e "$STATE_DIR/attempts" ] || [ -e "$STATE_DIR/gave_up" ] || [ -e "$STATE_DIR/host_down_alerted" ]; then
     notify 3 "$LABEL worker is back" "$WORKER_NAME answers on $WORKER_HOST:$WORKER_PORT again."
   fi
   clear_state
@@ -65,6 +73,19 @@ if port_open "$WORKER_HOST" "$WORKER_PORT"; then
 fi
 
 [ -e "$STATE_DIR/worker_down_since" ] || put worker_down_since "$now"
+
+if [ "$UNLOCK_MODE" = alert ] && ! port_open "$HOST" "$TELEGRAF_PORT"; then
+  down_for=$(( now - $(get worker_down_since "$now") ))
+  if ping_ok "$HOST"; then pings=yes; else pings=no; fi
+  if port_open "$HOST" "$SSH_PORT"; then ssh_state=open; else ssh_state=closed; fi
+  log "$LABEL isn't running its services (ping: $pings, :$SSH_PORT $ssh_state); worker down for ${down_for}s"
+  last_alert="$(get host_down_alerted 0)"
+  if [ "$down_for" -ge "$DOWN_ALERT" ] && [ $(( now - last_alert )) -ge "$REALERT" ]; then
+    put host_down_alerted "$now"
+    notify 4 "$LABEL may need unlocking" "$WORKER_NAME has been down for $((down_for / 60)) minutes and the $LABEL isn't running its services (answers ping: $pings, SSH :$SSH_PORT $ssh_state). If it was restarted or lost power, it is probably at the FileVault screen: unlock it at the keyboard."
+  fi
+  exit 0
+fi
 
 if ! port_open "$HOST" "$SSH_PORT"; then
   put locked_count 0

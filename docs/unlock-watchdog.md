@@ -2,14 +2,14 @@
 
 The Mac Studio and the MacBook Pro both run FileVault (the decision stays "on"), so after a shutdown or a power cut a
 Mac waits at the unlock screen and its Talos worker (`talos-worker-studio`, `talos-worker-mbp`) stays down until someone
-unlocks it. This watchdog runs on rpi5-1, notices that state, and unlocks the Mac over SSH. There is one timer per Mac
+unlocks it. This watchdog runs on rpi5-1, notices that state, and unlocks the Mac over SSH (the Studio) or tells you to unlock it by hand (the MacBook Pro, which has no network at the FileVault screen). There is one timer per Mac
 (`unlock-watchdog@studio.timer`, `unlock-watchdog@mbp.timer`), each running the same script with that Mac's settings from
 `hosts/<name>.env`. The files are in [`../scripts/unlock-watchdog/`](../scripts/unlock-watchdog/); background on
 FileVault and the VM daemon is in [`studio-worker-and-ram-upgrade.md`](studio-worker-and-ram-upgrade.md) (Phase 2) and
 [`mbp-worker-qemu.md`](mbp-worker-qemu.md).
 
-**Status:** the Studio's unlock path was tested 2026-11-06 and passed (see "Test result" below). The MBP's has not been
-tested yet; see "Adding the MacBook Pro". Whether each timer is enabled is a separate step (see "Operating it").
+**Status:** the Studio's unlock path was tested 2026-11-06 and passed (see "Test result" below). The MBP can't be
+unlocked remotely, so it only alerts; see "The MacBook Pro: alert only". Whether each timer is enabled is a separate step (see "Operating it").
 
 ## What it does
 
@@ -93,21 +93,24 @@ The commands use the Studio (`studio`); for another Mac use its name from `hosts
    DRY_RUN=1 /usr/local/lib/unlock-watchdog/unlock-watchdog.sh studio
    ```
 
-## Adding the MacBook Pro
+## The MacBook Pro: alert only
 
-The MBP (`jakerobb-mbp`, `192.168.102.9`, worker `talos-worker-mbp` at `.34`) needs its own unlock user and secret.
+The MBP (`jakerobb-mbp`, `192.168.102.9`, worker `talos-worker-mbp` at `.34`) is set to `UNLOCK_MODE=alert` in
+`hosts/mbp.env`, so the watchdog never tries to unlock it. Tested 2026-11-27: after a full shutdown and power-on, the
+Mac sat at the FileVault screen with **no network at all** (no ping, no ARP entry on rpi5-1, nothing on `:22`). Its
+network is an add-on adapter (`en11`), the pre-boot environment doesn't bring it up, and an Intel MacBook may not offer
+pre-boot SSH anyway. So the unlock has to be done at its keyboard. (Enter the account password; no login is needed
+afterwards, because the VM daemon starts at boot. The node was Ready again within minutes of the unlock.)
 
-1. **On the MBP**, create a standard (non-admin) user for this with a long random password, as for the Studio. Confirm
-   with `sudo fdesetup list` that it is a FileVault user, and keep it out of Remote Login's allowed list.
-2. **Create `scripts/secrets/mbp-unlock.sops.yaml`** the same way as the Studio's (copy `unlock.yaml.example`, edit,
-   `sops --encrypt --in-place`). Don't paste the password anywhere else. The compose-deploy cron copies it to
-   `~/bin/secrets/` on rpi5-1; until then `scp` it there.
-3. **On rpi5-1**, run `scripts/unlock-watchdog/install.sh` (it pins the MBP's host key; compare the fingerprint with
-   `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the MBP) and dry-run it against the healthy MBP:
-   `DRY_RUN=1 /usr/local/lib/unlock-watchdog/unlock-watchdog.sh mbp` should say `healthy`.
-4. **Test it** as for the Studio below: cordon and drain `talos-worker-mbp`, shut the MBP down, power it on so it stops
-   at the FileVault screen, then run the script by hand three times a minute apart and watch it unlock the Mac and
-   the node return. Only then enable `unlock-watchdog@mbp.timer`.
+What the watchdog does instead: when `:50000` (the worker) is closed and Telegraf (`:9273`) isn't answering, it logs
+what it sees (ping, `:22`) and, once the worker has been down for 10 minutes (`DOWN_ALERT`), sends one ntfy alert,
+"MacBook Pro may need unlocking", saying whether the Mac answers ping and SSH. It repeats that alert every hour
+(`REALERT`) until the worker is back, then sends "worker is back". A Mac that is up but whose worker is down still gets the
+existing "Mac is up, worker down" alert, and that alert's text points at the VM daemon.
+
+The rest (the pinned host key, the per-host secret, the unlock logic) stays in place in case pre-boot SSH on Intel is
+pursued later. To try it, remove `UNLOCK_MODE=alert` from `mbp.env`, create `mbp-unlock.sops.yaml` as for the Studio, and
+run the test below against the MBP. The MBP's `mbp-unlock.sops.yaml` isn't needed in alert mode.
 
 ## The test (before enabling)
 
