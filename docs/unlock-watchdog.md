@@ -61,7 +61,7 @@ The commands use the Studio (`studio`); for another Mac use its name from `hosts
 2. In the repo, create the secret **yourself** (the password shouldn't pass through chat or a tool):
 
    ```bash
-   cp scripts/secrets/unlock.example.yaml scripts/secrets/studio-unlock.sops.yaml
+   cp scripts/secrets/unlock.yaml.example scripts/secrets/studio-unlock.sops.yaml
    ```
 
    Edit the two values in the copy, then:
@@ -99,7 +99,7 @@ The MBP (`jakerobb-mbp`, `192.168.102.9`, worker `talos-worker-mbp` at `.34`) ne
 
 1. **On the MBP**, create a standard (non-admin) user for this with a long random password, as for the Studio. Confirm
    with `sudo fdesetup list` that it is a FileVault user, and keep it out of Remote Login's allowed list.
-2. **Create `scripts/secrets/mbp-unlock.sops.yaml`** the same way as the Studio's (copy `unlock.example.yaml`, edit,
+2. **Create `scripts/secrets/mbp-unlock.sops.yaml`** the same way as the Studio's (copy `unlock.yaml.example`, edit,
    `sops --encrypt --in-place`). Don't paste the password anywhere else. The compose-deploy cron copies it to
    `~/bin/secrets/` on rpi5-1; until then `scp` it there.
 3. **On rpi5-1**, run `scripts/unlock-watchdog/install.sh` (it pins the MBP's host key; compare the fingerprint with
